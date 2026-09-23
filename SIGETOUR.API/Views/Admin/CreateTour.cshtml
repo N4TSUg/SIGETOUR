@@ -264,7 +264,7 @@
 </section>
 
 <script>
-    function previewImages(event) {
+        function previewImages(event) {
         const container = document.getElementById('image-preview-container');
         const emptyMsg = document.getElementById('empty-images-msg');
         const files = event.target.files;
@@ -273,22 +273,22 @@
             emptyMsg.style.display = 'none';
         }
         
-        container.innerHTML = '';
+        const existingDynamic = container.querySelectorAll('.dynamic-preview');
+        existingDynamic.forEach(el => el.remove());
         
         Array.from(files).forEach((file, index) => {
             const reader = new FileReader();
             reader.onload = function(e) {
                 const div = document.createElement('div');
-                div.className = 'relative rounded-lg border border-outline-variant overflow-hidden bg-surface-container-low group shadow-sm flex flex-col';
+                div.className = 'dynamic-preview relative rounded-lg border border-outline-variant overflow-hidden bg-surface-container-low group shadow-sm flex flex-col';
                 div.innerHTML = `
                     <div class="relative h-32 w-full overflow-hidden bg-surface-container">
                         <img src="${e.target.result}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
-                        ${index === 0 ? `<span class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-primary text-on-primary text-xs font-label-sm font-bold shadow-sm flex items-center gap-1"><span class="material-symbols-outlined text-xs">star</span><span>Principal</span></span>` : ''}
                     </div>
                     <div class="p-2.5 bg-surface-container-lowest flex-1 flex flex-col justify-between">
                         <span class="text-xs font-semibold text-on-surface truncate block mb-1.5">${file.name}</span>
                         <div class="flex items-center justify-between gap-1">
-                            <span class="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary font-bold">Nueva</span>
+                            <span class="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary font-bold">Por Subir</span>
                             <span class="text-xs text-on-surface-variant font-medium">${(file.size / 1024 / 1024).toFixed(1)} MB</span>
                         </div>
                     </div>
@@ -353,6 +353,18 @@
             </text>
         }
     });
+    function deleteExistingImage(id, btnElement) {
+        if (confirm("¿Estás seguro de eliminar esta imagen del tour?")) {
+            fetch('/Admin/DeleteTourImage?id=' + id, { method: 'POST' })
+            .then(res => {
+                if (res.ok) {
+                    btnElement.closest('.relative.rounded-lg').remove();
+                } else {
+                    alert('Error al eliminar la imagen.');
+                }
+            });
+        }
+    }
 </script>
 
 <!-- SECTION 5: Galería Multimedia y Subida de Imágenes -->
@@ -387,11 +399,40 @@
     <!-- Photo Preview & Management Grid -->
     <div>
         <label class="block text-label-md font-label-md text-on-surface mb-3 font-semibold">Fotografías Seleccionadas para Subir</label>
-        <div id="image-preview-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <!-- Dynamic Previews will be injected here via JS -->
-            <div class="col-span-full text-center py-8 text-on-surface-variant text-sm border-2 border-dashed border-outline-variant rounded-lg" id="empty-images-msg">
-                Aún no has seleccionado imágenes.
-            </div>
+                <div id="image-preview-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            @if (Model.Images != null && Model.Images.Any())
+            {
+                foreach(var img in Model.Images)
+                {
+                    <div class="relative rounded-lg border border-outline-variant overflow-hidden bg-surface-container-low group shadow-sm flex flex-col">
+                        <div class="relative h-32 w-full overflow-hidden bg-surface-container">
+                            <img src="@img.ImageUrl" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                                                        @if (img.IsMain)
+                            {
+                                <span class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-primary text-on-primary text-xs font-label-sm font-bold shadow-sm flex items-center gap-1"><span class="material-symbols-outlined text-xs">star</span><span>Principal</span></span>
+                            }
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <button type="button" onclick="deleteExistingImage('@img.Id', this)" class="p-1.5 rounded-full bg-surface-container-lowest text-red-600 hover:bg-red-100" title="Eliminar foto guardada">
+                                    <span class="material-symbols-outlined text-base">delete</span>
+                                </button>
+                            </div>
+                            <!-- Delete existing image feature could go here in the future -->
+                        </div>
+                        <div class="p-2.5 bg-surface-container-lowest flex-1 flex flex-col justify-between">
+                            <span class="text-xs font-semibold text-on-surface truncate block mb-1.5">@System.IO.Path.GetFileName(img.ImageUrl)</span>
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="px-2 py-0.5 rounded text-xs bg-surface-variant text-on-surface-variant font-bold">Guardada</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="col-span-full text-center py-8 text-on-surface-variant text-sm border-2 border-dashed border-outline-variant rounded-lg" id="empty-images-msg">
+                    Aún no has seleccionado imágenes.
+                </div>
+            }
         </div>
     </div>
 </section>
@@ -408,6 +449,9 @@
 </div>
 </div> <!-- End of left column space-y-6 -->
 </form></main>
+
+
+
 
 
 

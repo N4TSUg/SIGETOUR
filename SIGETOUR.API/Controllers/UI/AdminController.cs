@@ -200,6 +200,24 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction(nameof(Tours));
         }
 
+                [HttpPost]
+        public async Task<IActionResult> DeleteTourImage(Guid id)
+        {
+            var image = await _context.Set<TourImage>().FindAsync(id);
+            if (image != null)
+            {
+                _context.Set<TourImage>().Remove(image);
+                await _context.SaveChangesAsync();
+                
+                try {
+                    var filePath = Path.Combine(_env.WebRootPath, image.ImageUrl.TrimStart('/').Replace('/', '\\'));
+                    if (System.IO.File.Exists(filePath))
+                        System.IO.File.Delete(filePath);
+                } catch { } // ignore file delete errors
+            }
+            return Ok();
+        }
+
         private async Task ProcessImages(TourPackage tour, IFormFileCollection files)
         {
             if (files != null && files.Count > 0)
@@ -233,3 +251,4 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+

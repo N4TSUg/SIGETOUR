@@ -33,14 +33,14 @@
     </div>
   </section>
 
-  <section class="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-3 h-auto md:h-[480px] rounded-xl overflow-hidden shadow-sm">
+  <section class="grid grid-cols-1 md:grid-cols-4 gap-3 h-auto rounded-xl overflow-hidden shadow-sm">
     @if (Model.Images != null && Model.Images.Any())
     {
         var mainImage = Model.Images.FirstOrDefault(i => i.IsMain) ?? Model.Images.First();
         <div class="md:col-span-2 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[280px]">
           <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage.ImageUrl" alt="@Model.Title"/>
         </div>
-        @foreach (var img in Model.Images.Where(i => i.Id != mainImage.Id).Take(3))
+        @foreach (var img in Model.Images.Where(i => i.Id != mainImage.Id))
         {
           <div class="relative group overflow-hidden bg-surface-variant min-h-[160px]">
             <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@img.ImageUrl" alt="Foto adicional"/>
@@ -165,5 +165,7 @@
     </aside>
   </div>
 </main>
+
+
 
 
