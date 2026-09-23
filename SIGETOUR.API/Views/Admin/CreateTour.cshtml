@@ -51,12 +51,7 @@
 <!-- Categoría Temática -->
 <div>
 <label class="block text-label-md font-label-md text-on-surface mb-1.5">Categoría Temática *</label>
-<select asp-for="Category" class="w-full px-3.5 py-2 text-body-md font-body-md bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary focus:border-transparent"><option value="0">Arqueología y Petroglifos</option><option value="1">City Tour</option><option value="2">Naturaleza</option></select>
-<option selected="">Arqueología &amp; Petroglifos</option>
-<option>Termalismo &amp; Spa Baños del Inca</option>
-<option>Naturaleza, Bosques &amp; Aventura</option>
-<option>Tradición, Agroturismo &amp; Quesos</option>
-<option>City Tour Colonial &amp; Iglesias</option>
+<select asp-for="Category" asp-items="Html.GetEnumSelectList<SIGETOUR.API.Core.Enums.TourCategory>()" class="w-full px-3.5 py-2 text-body-md font-body-md bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary focus:border-transparent">
 </select>
 </div>
 <!-- Tipo de Salida -->
@@ -412,6 +407,7 @@
 </div>
 </div> <!-- End of left column space-y-6 -->
 </form></main>
+
 
 
 
