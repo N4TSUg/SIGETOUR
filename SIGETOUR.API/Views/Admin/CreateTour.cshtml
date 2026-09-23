@@ -385,7 +385,7 @@
         currentDeleteImageBtn = null;
     }
 
-    document.getElementById('confirmImageDeleteBtn').addEventListener('click', () => {
+        function confirmImageDelete() {
         if (!currentDeleteImageId) return;
         
         fetch('/Admin/DeleteTourImage?id=' + currentDeleteImageId, { method: 'POST' })
@@ -398,7 +398,7 @@
                 closeImageModal();
             }
         });
-    });
+    }
 </script>
 
 <!-- SECTION 6: Galería Multimedia y Subida de Imágenes -->
@@ -506,7 +506,7 @@
     </div>
     <div class="p-5 pt-4 flex justify-end gap-3">
         <button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md font-bold hover:bg-surface-container transition-all" onclick="closeImageModal()" type="button">Cancelar</button>
-        <button type="button" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700" id="confirmImageDeleteBtn">
+        <button type="button" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700" id="confirmImageDeleteBtn" onclick="confirmImageDelete()">
             <span class="material-symbols-outlined text-[18px]">delete_forever</span>
             <span>Sí, Eliminar</span>
         </button>
@@ -514,6 +514,7 @@
   </div>
 </div>
 </main>
+
 
 
 
