@@ -1,4 +1,4 @@
-﻿@model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
+@model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
 @{ Layout = "_Layout"; }
 <main class="flex-1">
 <!-- HERO SECTION: Destinos y Circuitos Turísticos -->
@@ -277,7 +277,7 @@
                         <a href="/Tour/Details/@tour.Slug" class="p-2 border border-outline-variant hover:border-primary text-secondary hover:text-primary rounded-lg text-xs font-bold transition-all" title="Ver Itinerario Completo">
                             <span class="material-symbols-outlined text-[20px]">description</span>
                         </a>
-                        <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20reservar%20el%20Tour%20@Uri.EscapeDíataString(tour.Title)" target="_blank" class="px-4 py-2.5 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all">
+                        <a href="/Booking/Checkout/@tour.Slug" class="px-4 py-2.5 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all">
                             <span>Reservar</span>
                             <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
                         </a>
