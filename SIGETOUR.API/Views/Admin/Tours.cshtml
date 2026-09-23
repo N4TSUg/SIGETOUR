@@ -10,10 +10,9 @@
         <h1 class="text-display-sm font-bold text-on-surface">Tours y Circuitos</h1>
         <p class="text-body-lg text-on-surface-variant">Administración de paquetes turísticos.</p>
     </div>
-    <button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors">
+    <a asp-action="CreateTour" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors">
         <span class="material-symbols-outlined">add</span>
-        Nuevo Tour
-    </button>
+        Nuevo Tour</a>
 </div>
 
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
@@ -62,24 +61,20 @@
                             <td class="p-4 text-center">
                                 @if (tour.IsActive)
                                 {
-                                    <span class="inline-flex items-center gap-1 text-primary bg-primary-container px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-green-800 bg-green-100 px-2 py-1 rounded-full font-label-sm">
                                         <span class="material-symbols-outlined text-[14px]">check_circle</span> Activo
                                     </span>
                                 }
                                 else
                                 {
-                                    <span class="inline-flex items-center gap-1 text-error bg-error-container px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-red-800 bg-red-100 px-2 py-1 rounded-full font-label-sm">
                                         <span class="material-symbols-outlined text-[14px]">cancel</span> Inactivo
                                     </span>
                                 }
                             </td>
                             <td class="p-4 text-right space-x-1">
-                                <button class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Editar">
-                                    <span class="material-symbols-outlined text-[20px]">edit</span>
-                                </button>
-                                <button class="p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-surface-container transition-colors" title="Eliminar">
-                                    <span class="material-symbols-outlined text-[20px]">delete</span>
-                                </button>
+                                <a asp-action="EditTour" asp-route-id="@tour.Id" class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors inline-block" title="Editar"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+                                <form asp-action="DeleteTour" asp-route-id="@tour.Id" method="post" style="display:inline;" onsubmit="return confirm('¿Estás seguro de eliminar este tour?');"><button type="submit" class="p-2 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-surface-container transition-colors" title="Eliminar"><span class="material-symbols-outlined text-[20px]">delete</span></button></form>
                             </td>
                         </tr>
                     }
@@ -96,4 +91,5 @@
         </table>
     </div>
 </div>
+
 

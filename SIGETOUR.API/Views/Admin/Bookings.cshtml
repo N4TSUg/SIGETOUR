@@ -47,19 +47,19 @@
                             <td class="p-4 text-center">
                                 @if (booking.Status == BookingStatus.Confirmed)
                                 {
-                                    <span class="inline-flex items-center gap-1 text-primary bg-primary-container px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-green-800 bg-green-100 px-2 py-1 rounded-full font-label-sm">
                                         <span class="material-symbols-outlined text-[14px]">check_circle</span> Confirmado
                                     </span>
                                 }
                                 else if (booking.Status == BookingStatus.Pending)
                                 {
-                                    <span class="inline-flex items-center gap-1 text-tertiary bg-tertiary-container px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-yellow-800 bg-yellow-100 px-2 py-1 rounded-full font-label-sm">
                                         <span class="material-symbols-outlined text-[14px]">pending</span> Pendiente
                                     </span>
                                 }
                                 else
                                 {
-                                    <span class="inline-flex items-center gap-1 text-error bg-error-container px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-red-800 bg-red-100 px-2 py-1 rounded-full font-label-sm">
                                         <span class="material-symbols-outlined text-[14px]">cancel</span> Cancelado
                                     </span>
                                 }
@@ -84,3 +84,4 @@
         </table>
     </div>
 </div>
+
