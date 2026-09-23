@@ -50,7 +50,7 @@ namespace SIGETOUR.API.Controllers.UI
                 CustomerName = model.CustomerName,
                 CustomerEmail = model.CustomerEmail,
                 CustomerPhone = model.CustomerPhone,
-                TravelDate = model.TravelDate,
+                TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc),
                 TotalPassengers = model.Passengers,
                 TotalAmount = (tour.BasePrice * model.Passengers) + pickupCost,
                 PickupLocation = pickupLocation,
@@ -85,4 +85,5 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
