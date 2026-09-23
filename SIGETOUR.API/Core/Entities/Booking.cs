@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace SIGETOUR.API.Core.Entities
@@ -20,6 +20,9 @@ namespace SIGETOUR.API.Core.Entities
         
         public BookingStatus Status { get; set; } = BookingStatus.Pending;
 
+        public string PickupLocation { get; set; } = string.Empty;
+        public decimal PickupCost { get; set; }
+
         public ICollection<BookingItem> Items { get; set; } = new List<BookingItem>();
     }
 
@@ -30,3 +33,4 @@ namespace SIGETOUR.API.Core.Entities
         Cancelled
     }
 }
+
