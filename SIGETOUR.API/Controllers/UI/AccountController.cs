@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.ViewModels;
@@ -18,9 +18,10 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Login()
         {
-            if (User.Identity != null && User.Identity.IsAuthenticated)
+            if (_signInManager.IsSignedIn(User))
             {
                 return RedirectToAction("Dashboard", "Admin");
             }
@@ -61,3 +62,4 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+

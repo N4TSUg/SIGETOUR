@@ -136,10 +136,10 @@
 <!-- TOP APP BAR -->
 <header class="bg-surface-container-lowest dark:bg-inverse-surface border-b border-outline-variant dark:border-outline shadow-sm flex justify-between items-center w-full px-space-lg py-space-sm shrink-0 z-30">
 <div class="flex items-center gap-space-md">
-<div class="flex items-center gap-space-sm bg-white p-1 rounded-lg border border-outline-variant/30">
+<a asp-controller="Home" asp-action="Index" class="flex items-center gap-space-sm bg-white p-1 rounded-lg border border-outline-variant/30 hover:bg-surface-container-lowest cursor-pointer transition-colors" title="Volver a la página principal">
 <img alt="Foto de perfil del Administrador de Turismo Chilón" class="h-10 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA418HlYgLM2V8ufbicRSZe3WiwFD80IhK7kjiUezcwFF9F_CeRFGUIPTJulkVhUOhEN5cmAaj3ta3_l3-UkTwCEYXMYTeor7kI8L2fQHDEo5sOt_FV8VWsQDU612MgYBMHH9AsPAWdl4YuPE8m8w_ZE42u43C21Iom_xU0OiAnStcNdpefRgQCdz1gi1QqB5ZI08SrQT6KVzYGfxDLj-5UPh5CbtpJ-wE1Fwr_bXVdjKYEqmFEgkTRksJJuWe00M9grak">
 <span class="text-title-md font-title-md font-bold text-primary dark:text-inverse-primary tracking-wide hidden sm:inline">Turismo Chilón</span>
-</div>
+</a>
 <!-- Quick Passenger/Booking Search -->
 <div class="relative hidden lg:block w-80">
 <span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">search</span>
@@ -198,33 +198,44 @@
 <div class="text-body-sm font-body-sm text-on-surface-variant text-[11px]">Cajamarca Operaciones</div>
 </div>
 </div>
-<!-- Navigation Tabs -->
+@{
+    var action = ViewContext.RouteData.Values["Action"]?.ToString();
+    var activeClass = "flex items-center gap-space-sm px-space-md py-space-sm rounded-lg bg-primary-container text-on-primary-container font-label-lg transition-all duration-150 active:scale-98";
+    var inactiveClass = "flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all duration-150 active:scale-98";
+    
+    var dashClass = action == "Dashboard" ? activeClass : inactiveClass;
+    var toursClass = action == "Tours" ? activeClass : inactiveClass;
+    var fleetClass = action == "Fleet" ? activeClass : inactiveClass;
+    var bookingsClass = action == "Bookings" ? activeClass : inactiveClass;
+    var usersClass = action == "Users" ? activeClass : inactiveClass;
+}
+  <!-- Navigation Tabs -->
 <nav class="space-y-1 flex-1">
-<!-- Item 1: Díashboard (ACTIVE) -->
-<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg bg-primary-container text-on-primary-container font-label-lg transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
-<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
-<span class="">Díashboard</span>
-</a>
+<!-- Item 1: Dashboard -->
+  <a class="@dashClass" asp-controller="Admin" asp-action="Dashboard">
+  <span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+  <span class="">Dashboard</span>
+  </a>
 <!-- Item 2: Catálogo Tours -->
-<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
-<span class="material-symbols-outlined text-[20px]">tour</span>
-<span class="">Catálogo Tours</span>
-</a>
+  <a class="@toursClass" asp-controller="Admin" asp-action="Tours">
+  <span class="material-symbols-outlined text-[20px]">tour</span>
+  <span class="">Catálogo Tours</span>
+  </a>
 <!-- Item 3: Salidas y Flota -->
-<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
-<span class="material-symbols-outlined text-[20px]">directions_bus</span>
-<span class="">Salidas y Flota</span>
-</a>
+  <a class="@fleetClass" asp-controller="Admin" asp-action="Fleet">
+  <span class="material-symbols-outlined text-[20px]">directions_bus</span>
+  <span class="">Salidas y Flota</span>
+  </a>
 <!-- Item 4: Despacho -->
-<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
-<span class="material-symbols-outlined text-[20px]">departure_board</span>
-<span class="">Despacho</span>
-</a>
+  <a class="@bookingsClass" asp-controller="Admin" asp-action="Bookings">
+  <span class="material-symbols-outlined text-[20px]">departure_board</span>
+  <span class="">Despacho</span>
+  </a>
 <!-- Item 5: Caja y Finanzas -->
-<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
-<span class="material-symbols-outlined text-[20px]">point_of_sale</span>
-<span class="">Caja y Finanzas</span>
-</a>
+  <a class="@usersClass" asp-controller="Admin" asp-action="Users">
+  <span class="material-symbols-outlined text-[20px]">group</span>
+  <span class="">Usuarios y Roles</span>
+  </a>
 <!-- Side Action CTA -->
 <div class="pt-space-md px-1">
 <button class="w-full bg-primary hover:bg-[#0e5a52] text-on-primary py-2.5 px-space-md rounded-lg font-label-lg flex items-center justify-center gap-2 shadow-sm transition-all duration-150 active:scale-95">
@@ -259,3 +270,6 @@
 
 
 </body></html>
+
+
+

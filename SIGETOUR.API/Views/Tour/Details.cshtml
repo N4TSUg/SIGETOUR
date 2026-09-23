@@ -125,7 +125,7 @@
         <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
           <div class="flex items-center gap-2 text-primary border-b border-outline-variant pb-3">
             <span class="material-symbols-outlined text-[24px]">check_circle</span>
-            <h2 class="text-title-md font-title-md font-bold">Qu Incluye</h2>
+            <h2 class="text-title-md font-title-md font-bold">Qué Incluye</h2>
           </div>
           <ul class="space-y-3 text-body-sm text-on-surface">
             @if (Model.Inclusions != null)
@@ -156,7 +156,7 @@
             </div>
             <p class="text-xs text-outline font-medium mt-1">Por persona (No incluye IGV si requiere factura)</p>
           </div>
-          <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20reservar%20el%20Tour%20@Uri.EscapeDíataString(Model.Title)" target="_blank" class="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg uppercase tracking-wider shadow-md active:scale-95 transition-all">
+          <a asp-controller="Booking" asp-action="Checkout" asp-route-tourId="@Model.Id" class="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg uppercase tracking-wider shadow-md active:scale-95 transition-all">
             <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
             <span>Reservar Ahora</span>
           </a>
@@ -165,4 +165,5 @@
     </aside>
   </div>
 </main>
+
 
