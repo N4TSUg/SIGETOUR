@@ -1,0 +1,6 @@
+@SIGETOUR.API_HostAddress = http://localhost:5047
+
+GET {{SIGETOUR.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

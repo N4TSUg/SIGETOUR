@@ -1,0 +1,302 @@
+@model SIGETOUR.API.ViewModels.LoginViewModel
+@{ Layout = null; }
+<!DOCTYPE html><html class="h-full" lang="es"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Acceso Administrativo | Turismo Chil√≥n</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Google Fonts: Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-bright": "#e4fffb",
+            "surface-dim": "#ade5df",
+            "on-error": "#ffffff",
+            "on-primary": "#ffffff",
+            "primary-fixed-dim": "#71d8c3",
+            "on-secondary": "#ffffff",
+            "primary-container": "#008472",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-container": "#416b6c",
+            "on-primary-fixed": "#00201b",
+            "on-surface": "#00201e",
+            "secondary-fixed": "#beebeb",
+            "background": "#e4fffb",
+            "primary-fixed": "#8ef5df",
+            "outline": "#6d7a76",
+            "on-tertiary": "#ffffff",
+            "on-tertiary-fixed": "#410000",
+            "secondary-container": "#beebeb",
+            "on-error-container": "#93000a",
+            "tertiary": "#b0251b",
+            "on-secondary-fixed-variant": "#224d4e",
+            "surface": "#e4fffb",
+            "on-primary-fixed-variant": "#005045",
+            "primary": "#00685a",
+            "on-secondary-fixed": "#002020",
+            "surface-container-low": "#c6fef8",
+            "inverse-on-surface": "#c3fcf5",
+            "surface-variant": "#b5ede7",
+            "tertiary-container": "#d33f30",
+            "on-primary-container": "#f4fffa",
+            "on-background": "#00201e",
+            "on-surface-variant": "#3d4946",
+            "tertiary-fixed-dim": "#ffb4a9",
+            "inverse-primary": "#71d8c3",
+            "secondary": "#3b6566",
+            "surface-tint": "#006b5c",
+            "inverse-surface": "#003734",
+            "surface-container": "#c1f9f3",
+            "on-tertiary-container": "#fffbff",
+            "surface-container-highest": "#b5ede7",
+            "secondary-fixed-dim": "#a2cfcf",
+            "tertiary-fixed": "#ffdad5",
+            "surface-container-high": "#bbf3ed",
+            "on-tertiary-fixed-variant": "#910a07",
+            "error-container": "#ffdad6",
+            "outline-variant": "#bdc9c5",
+            "error": "#ba1a1a"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "gutter": "1.25rem",
+            "space-lg": "1.5rem",
+            "space-md": "1rem",
+            "space-xl": "2.5rem",
+            "margin-lg": "3.5rem",
+            "margin": "1rem",
+            "gutter-lg": "2rem",
+            "margin-md": "2rem",
+            "space-sm": "0.5rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "title-md": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "title-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"],
+            "headline-lg-mobile": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+            "title-md": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+            "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+            "title-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+            "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.04em", "fontWeight": "700" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+            "headline-lg-mobile": ["26px", { "lineHeight": "34px", "fontWeight": "700" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-auth-shadow {
+      box-shadow: 0 20px 32px -8px rgba(11, 59, 60, 0.16), 0 4px 12px -2px rgba(0, 135, 117, 0.08);
+    }
+    .backdrop-patron {
+      background-image: radial-gradient(rgba(0, 104, 90, 0.07) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body-md min-h-full flex flex-col justify-between backdrop-patron antialiased relative selection:bg-primary selection:text-on-primary">
+<!-- Top Security Status Bar -->
+<header class="w-full bg-surface-container-lowest/80 backdrop-blur-md px-space-md py-space-sm flex justify-between items-center z-10">
+<div class="flex items-center gap-space-sm">
+<span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-surface-container text-primary font-bold">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-primary font-bold tracking-wide">TURISMO CHIL√ìN</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Transporte &amp; Turismo | Cajamarca, Per√∫</span>
+</div>
+</div>
+<!-- Security Badges -->
+<div class="hidden sm:flex items-center gap-space-sm">
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-bright border border-outline-variant/50 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: &quot;FILL&quot; 1;">lock</span>
+<span class="">Conexi√≥n Segura SSL 256-bit</span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container text-primary font-label-sm text-label-sm">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="">Terminal Operativo Activo</span>
+</div>
+</div>
+</header>
+<!-- Main Login Canvas -->
+<main class="flex-grow flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8 z-10">
+<div class="w-full max-w-[500px]">
+<!-- Primary Card Container -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/60 custom-auth-shadow overflow-hidden relative">
+<!-- Top Emerald Accent Bar -->
+<div class="h-1.5 w-full bg-gradient-to-r from-primary via-primary-container to-secondary"></div>
+<div class="p-6 sm:p-8">
+<!-- Logo & Header Section -->
+<div class="flex flex-col items-center text-center mb-6">
+<div class="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl p-2 bg-surface-container-lowest flex items-center justify-center shadow-sm border border-outline-variant/40 mb-4 transition-transform hover:scale-105 duration-200">
+<img alt="Logotipo Oficial Turismo Chil√≥n Cajamarca" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUXvgeImb3N-pe8T2oxVP1tqWA2SaBvi-TQq0GO16m6UceRfxr8AGOuFJlrwW92Vkdi_OcR5ks3aBWBK-Ze8X8_8q3YbGxFYMn1eMIoFV9b2AZlqXJ4qCdH-v-YXOii-CtMAlTYbZ1wXOkBfK75P6AEsBg3tEHg-yS8_SSjTEGwG6JlXG863L-AQuldVoiABQP_eRPI7df1VaXCUW5LYXY3Vz7-H13xfabnWJX3VA7HEMaokQo6WtNEn61Rxe-eLKkCsk">
+</div>
+<span class="px-3 py-0.5 rounded-full bg-surface-container-low text-primary font-label-sm text-label-sm font-semibold tracking-wider mb-2">
+              SISTEMA INTEGRADO DE GESTI√ìN
+            </span>
+<h1 class="font-headline-sm text-headline-sm text-on-surface font-bold">
+              Acceso Administrativo al Sistema
+            </h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 max-w-sm">
+              Plataforma de Despacho, Control de Flota y Gesti√≥n de Tours
+            </p>
+</div>
+<!-- Restricted Access Notice -->
+<div class="mb-5 flex items-start gap-2.5 p-3 rounded-lg bg-surface-bright border border-primary/20 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5" style="font-variation-settings: &quot;FILL&quot; 1;">shield</span>
+<p class="font-label-sm text-label-sm leading-snug">
+<strong class="text-primary font-bold">Acceso Restringido:</strong> Exclusivo para despachadores autorizados, supervisores de flota y administraci√≥n DIRCETUR / Gerencia.
+            </p>
+</div>
+<!-- Login Form -->
+<form asp-controller="Account" asp-action="Login" method="post" class="space-y-4" id="adminLoginForm">
+    <div asp-validation-summary="ModelOnly" class="text-error font-body-sm bg-error-container p-2 rounded-md"></div>
+    <div>
+        <label asp-for="EmailOrUsername" class="block font-label-md text-label-md text-on-surface font-semibold mb-1.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[16px] text-primary">badge</span>
+            Usuario o Correo Corporativo
+        </label>
+        <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-outline">
+                <span class="material-symbols-outlined text-[20px]">person</span>
+            </div>
+            <input asp-for="EmailOrUsername" class="w-full pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="admin@sigetour.com o admin" required />
+            <span asp-validation-for="EmailOrUsername" class="text-error text-[11px] block mt-1"></span>
+        </div>
+    </div>
+    
+    <div>
+        <div class="flex justify-between items-center mb-1.5">
+            <label asp-for="Password" class="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px] text-primary">key</span>
+                ContraseÒa de acceso
+            </label>
+        </div>
+        <div class="relative">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-outline">
+                <span class="material-symbols-outlined text-[20px]">lock</span>
+            </div>
+            <input asp-for="Password" class="w-full pl-10 pr-10 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="ïïïïïïïïïïïï" required />
+            <button aria-label="Mostrar u ocultar contraseÒa" class="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface focus:outline-none transition-colors" id="togglePasswordBtn" onclick="togglePasswordVisibility()" type="button">
+                <span class="material-symbols-outlined text-[20px]" id="passwordIcon">visibility</span>
+            </button>
+            <span asp-validation-for="Password" class="text-error text-[11px] block mt-1"></span>
+        </div>
+    </div>
+
+    <div class="flex items-center pt-1">
+        <input asp-for="RememberMe" class="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary focus:ring-offset-0 transition-colors" />
+        <label asp-for="RememberMe" class="ml-2.5 block font-body-sm text-body-sm text-on-surface-variant cursor-pointer select-none">
+            Recordar sesiÛn en este equipo de caja/despacho
+        </label>
+    </div>
+
+    <div class="pt-2">
+        <button class="w-full min-h-[46px] flex justify-center items-center gap-2 px-6 py-3 rounded-lg bg-primary-container hover:bg-primary text-on-primary-container font-label-lg text-label-lg tracking-wide uppercase shadow-sm active:scale-[0.99] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="submitButton" type="submit">
+            <span class="material-symbols-outlined text-[20px]">login</span>
+            <span>Iniciar SesiÛn en el Panel</span>
+        </button>
+    </div>
+</form>
+</div></div><!-- Terminal System Support Footer -->
+<div class="px-6 py-4 bg-surface-container-low/70 border-t border-outline-variant/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px] text-secondary">contact_support</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold text-on-surface">Mesa de Ayuda y Soporte TI:</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Sistemas &amp; Despacho 24/7</span>
+</div>
+</div>
+<div class="flex items-center gap-2 font-label-sm text-label-sm font-semibold text-primary">
+<a class="hover:underline flex items-center gap-1" href="tel:+51901195392">
+<span class="material-symbols-outlined text-[14px]">call</span> +51 901 195 392
+            </a>
+<span class="text-outline-variant">|</span>
+<a class="hover:underline" href="tel:+51944746364">
+              +51 944 746 364
+            </a>
+</div>
+</div>
+</div>
+<!-- Footer Disclaimer -->
+<div class="mt-6 text-center space-y-1">
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+          Turismo Chil√≥n S.A.C. ‚Ä¢ RUC 20601248901 ‚Ä¢ Cajamarca - Per√∫
+        </p>
+<p class="font-label-sm text-label-sm text-outline">
+          Autorizado por MTC &amp; DIRCETUR Cajamarca para Transporte Tur√≠stico y Regular
+        </p>
+</div>
+</div>
+</main>
+<!-- Bottom System Micro Bar -->
+<footer class="w-full py-2.5 px-4 bg-surface-container-lowest/70 backdrop-blur-sm border-t border-outline-variant/30 flex flex-col sm:flex-row justify-between items-center text-on-surface-variant font-label-sm text-label-sm z-10 gap-2">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+<span class="">Base de Datos Operaciones: Online (Latencia: 24ms)</span>
+</div>
+<div>
+<span class="">Versi√≥n del Sistema v4.8.2-PROD ‚Ä¢ Servidor Central Cajamarca</span>
+</div>
+</footer>
+<!-- Vanilla JS Interactions -->
+<script>
+    function togglePasswordVisibility() {
+      const passwordInput = document.getElementById('password');
+      const passwordIcon = document.getElementById('passwordIcon');
+      
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        passwordIcon.textContent = 'visibility_off';
+      } else {
+        passwordInput.type = 'password';
+        passwordIcon.textContent = 'visibility';
+      }
+    }
+
+
+
+</script>
+</body></html>
+

@@ -1,0 +1,688 @@
+@{ Layout = "_AdminLayout"; }
+<!-- 1. Header Section: Title, Subtitle, Badges, and Primary Actions -->
+<section class="bg-surface-container-lowest rounded-xl p-6 border border-outline-variant/60 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+<div>
+<div class="flex flex-wrap items-center gap-2.5 mb-2">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-tertiary text-label-sm font-label-sm uppercase tracking-wider font-bold">
+<span class="material-symbols-outlined text-[14px]" data-icon="shield_lock">shield_lock</span>
+              Solo SuperAdmin
+            </span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-on-secondary-container text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px] text-primary" data-icon="badge">badge</span>
+              ASP.NET Core Identity Core v8
+            </span>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface-variant text-label-sm font-label-sm">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+              Políticas Granulares de Claims
+            </span>
+</div>
+<h1 class="text-headline-sm md:text-headline-md font-headline-md text-on-surface font-extrabold tracking-tight">
+            Control de Acceso y Gestión de Usuarios Identity
+          </h1>
+<p class="text-body-md font-body-md text-on-surface-variant mt-1 max-w-3xl">
+            Administración de cuentas corporativas, asignación de roles, permisos granulares y auditoría de seguridad para la flota administrativa de Turismo Chilón.
+          </p>
+</div>
+<!-- Action CTAs -->
+<div class="flex flex-wrap items-center gap-3 shrink-0">
+<button class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-outline text-on-surface hover:bg-surface-container text-label-lg font-label-lg transition-all duration-150 active:scale-95 shadow-xs" id="btnAuditoria">
+<span class="material-symbols-outlined text-primary text-[19px]" data-icon="history">history</span>
+            Auditoría de Inicios de Sesión
+          </button>
+<button class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary text-label-lg font-label-lg shadow-sm transition-all duration-150 active:scale-95" id="btnNuevoUsuario">
+<span class="material-symbols-outlined text-[20px]" data-icon="person_add">person_add</span>
+            + Crear Nuevo Administrador
+          </button>
+</div>
+</section>
+<!-- 2. Identity Accounts Metrics Grid -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Card 1: Total Admins -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface-variant">Usuarios Administradores</p>
+<h3 class="text-headline-lg font-headline-lg text-on-surface mt-1 font-extrabold">6 <span class="text-title-sm font-normal text-on-surface-variant">cuentas</span></h3>
+<span class="text-label-sm font-label-sm text-primary flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="check_circle">check_circle</span> 100% Personal Central
+            </span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[26px]" data-icon="group">group</span>
+</div>
+</div>
+<!-- Card 2: Active Accounts -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface-variant">Cuentas Activas</p>
+<h3 class="text-headline-lg font-headline-lg text-primary mt-1 font-extrabold">5</h3>
+<span class="text-label-sm font-label-sm text-on-surface-variant flex items-center gap-1 mt-1">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span> Autenticados vía Identity
+            </span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-primary-container">
+<span class="material-symbols-outlined text-[26px]" data-icon="how_to_reg">how_to_reg</span>
+</div>
+</div>
+<!-- Card 3: Locked / Suspended -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface-variant">Cuentas Bloqueadas / Suspendidas</p>
+<h3 class="text-headline-lg font-headline-lg text-tertiary mt-1 font-extrabold">1</h3>
+<span class="text-label-sm font-label-sm text-tertiary flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="lock_clock">lock_clock</span> Bloqueo manual por auditoría
+            </span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-error-container/60 flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined text-[26px]" data-icon="no_accounts">no_accounts</span>
+</div>
+</div>
+<!-- Card 4: Failed Logins -->
+<div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
+<div>
+<p class="text-label-md font-label-md text-on-surface-variant">Intentos Fallidos Recientes</p>
+<h3 class="text-headline-lg font-headline-lg text-on-surface mt-1 font-extrabold">0</h3>
+<span class="text-label-sm font-label-sm text-primary font-bold flex items-center gap-1 mt-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="gpp_good">gpp_good</span> Seguridad OK (0 lockout)
+            </span>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-lowest border border-outline-variant flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[26px]" data-icon="security">security</span>
+</div>
+</div>
+</section>
+<!-- 3. Main Data Table: Administradores de Turismo Chilón (ASP.NET Core Identity Table) -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-sm overflow-hidden">
+<!-- Table Toolbar -->
+<div class="p-5 border-b border-outline-variant/50 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface-bright/40">
+<div class="flex items-center gap-3">
+<div class="p-2 rounded-lg bg-primary-container text-on-primary-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="manage_accounts">manage_accounts</span>
+</div>
+<div>
+<h2 class="text-title-md font-title-md font-bold text-on-surface">Usuarios y Roles de Administración</h2>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Cuentas con credenciales en la base de datos de seguridad corporativa</p>
+</div>
+</div>
+<!-- Filter Badges -->
+<div class="flex items-center gap-2">
+<span class="text-label-sm font-label-sm text-on-surface-variant">Filtrar por rol:</span>
+<button class="px-2.5 py-1 rounded-md text-label-sm font-label-sm bg-primary text-on-primary">Todos (6)</button>
+<button class="px-2.5 py-1 rounded-md text-label-sm font-label-sm bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors">SuperAdmin (2)</button>
+<button class="px-2.5 py-1 rounded-md text-label-sm font-label-sm bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors">Admin General (2)</button>
+<button class="px-2.5 py-1 rounded-md text-label-sm font-label-sm bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors">Operadores (2)</button>
+</div>
+</div>
+<!-- Table Viewport -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/70 border-b border-outline-variant/60 text-label-md font-label-md text-on-surface-variant">
+<th class="py-3.5 px-4 font-bold">Usuario Corporativo</th>
+<th class="py-3.5 px-4 font-bold">Rol Identity</th>
+<th class="py-3.5 px-4 font-bold">Estado de Cuenta</th>
+<th class="py-3.5 px-4 font-bold">Autenticación 2FA</th>
+<th class="py-3.5 px-4 font-bold">Último Acceso / Dispositivo</th>
+<th class="py-3.5 px-4 font-bold text-right">Acciones de SuperAdmin</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/40 text-body-sm font-body-sm">
+<!-- Row 1: SuperAdmin (Active) -->
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-4 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-inverse-surface text-inverse-primary font-bold flex items-center justify-center text-label-md shadow-xs ring-2 ring-primary">
+                      MC
+                    </div>
+<div>
+<p class="font-bold text-on-surface text-body-md">Carlos Alberto Chilón</p>
+<p class="text-primary font-mono text-[12px]">carlos.chilon@chilon.pe</p>
+<span class="text-[11px] text-on-surface-variant">DNI: 26718293 • Director General de Operaciones</span>
+</div>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-inverse-surface text-inverse-primary text-label-sm font-label-sm font-bold shadow-xs">
+<span class="material-symbols-outlined text-[14px]" data-icon="key">key</span>
+                    SuperAdmin
+                  </span>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm font-bold">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                    Activo
+                  </span>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-1.5 text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="verified_user">verified_user</span>
+<span>Activo (Authenticator)</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<p class="text-on-surface font-semibold text-body-sm">Hoy, 09:42 AM</p>
+<p class="text-on-surface-variant text-[11px] font-mono">IP: 192.168.10.12 (Sede Central Jr. 2 de Mayo)</p>
+</td>
+<td class="py-4 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Editar Roles &amp; Permisos">
+<span class="material-symbols-outlined text-[18px]" data-icon="manage_accounts">manage_accounts</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Restablecer Contraseña">
+<span class="material-symbols-outlined text-[18px]" data-icon="lock_reset">lock_reset</span>
+</button>
+<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-surface-container text-on-surface-variant" title="Protección de cuenta raíz">Inmutable</span>
+</div>
+</td>
+</tr>
+<!-- Row 2: Supervisor de Reservas (Active) -->
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-4 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary font-bold flex items-center justify-center text-label-md shadow-xs">
+                      MV
+                    </div>
+<div>
+<p class="font-bold text-on-surface text-body-md">María Elena Vásquez</p>
+<p class="text-primary font-mono text-[12px]">mvasquez@chilon.pe</p>
+<span class="text-[11px] text-on-surface-variant">DNI: 43891022 • Supervisora de Reservas y Pasajes</span>
+</div>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-high text-primary text-label-sm font-label-sm font-bold">
+<span class="material-symbols-outlined text-[14px]" data-icon="supervisor_account">supervisor_account</span>
+                    Administrador General
+                  </span>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm font-bold">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                    Activo
+                  </span>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-1.5 text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="verified_user">verified_user</span>
+<span>Activo (SMS 2FA)</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<p class="text-on-surface font-semibold text-body-sm">Ayer, 06:15 PM</p>
+<p class="text-on-surface-variant text-[11px] font-mono">IP: 192.168.10.35 (Terminal Cajamarca)</p>
+</td>
+<td class="py-4 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Editar Roles &amp; Permisos">
+<span class="material-symbols-outlined text-[18px]" data-icon="tune">tune</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Restablecer Contraseña">
+<span class="material-symbols-outlined text-[18px]" data-icon="password">password</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-error-container text-on-surface-variant hover:text-tertiary transition-colors" title="Bloquear Acceso">
+<span class="material-symbols-outlined text-[18px]" data-icon="block">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: Encargado de Despacho (Active) -->
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-4 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary text-on-secondary font-bold flex items-center justify-center text-label-md shadow-xs">
+                      JR
+                    </div>
+<div>
+<p class="font-bold text-on-surface text-body-md">Jorge Luis Rojas</p>
+<p class="text-primary font-mono text-[12px]">jrojas@chilon.pe</p>
+<span class="text-[11px] text-on-surface-variant">DNI: 40129845 • Encargado de Despacho y Flota</span>
+</div>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-label-sm font-label-sm font-bold">
+<span class="material-symbols-outlined text-[14px]" data-icon="departure_board">departure_board</span>
+                    Operador de Despacho
+                  </span>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm font-bold">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                    Activo
+                  </span>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-1.5 text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="shield">shield</span>
+<span>Activo (Authenticator)</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<p class="text-on-surface font-semibold text-body-sm">Hoy, 08:05 AM</p>
+<p class="text-on-surface-variant text-[11px] font-mono">IP: 192.168.10.88 (Despacho Andino)</p>
+</td>
+<td class="py-4 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Editar Roles &amp; Permisos">
+<span class="material-symbols-outlined text-[18px]" data-icon="tune">tune</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Restablecer Contraseña">
+<span class="material-symbols-outlined text-[18px]" data-icon="lock_reset">lock_reset</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-error-container text-on-surface-variant hover:text-tertiary transition-colors" title="Bloquear Acceso">
+<span class="material-symbols-outlined text-[18px]" data-icon="block">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: Cajero / Ventanilla (Active) -->
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-4 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container text-primary font-bold flex items-center justify-center text-label-md border border-outline-variant">
+                      LT
+                    </div>
+<div>
+<p class="font-bold text-on-surface text-body-md">Lucía Torres Mendoza</p>
+<p class="text-primary font-mono text-[12px]">ltorres@chilon.pe</p>
+<span class="text-[11px] text-on-surface-variant">DNI: 71203948 • Administradora de Counter y Caja</span>
+</div>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-label-sm font-label-sm font-bold">
+<span class="material-symbols-outlined text-[14px]" data-icon="point_of_sale">point_of_sale</span>
+                    Cajero / Ventanilla
+                  </span>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm font-bold">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                    Activo
+                  </span>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-1.5 text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="verified_user">verified_user</span>
+<span>Activo (SMS 2FA)</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<p class="text-on-surface font-semibold text-body-sm">Hoy, 07:30 AM</p>
+<p class="text-on-surface-variant text-[11px] font-mono">IP: 192.168.10.42 (Ventanilla 1)</p>
+</td>
+<td class="py-4 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Editar Roles &amp; Permisos">
+<span class="material-symbols-outlined text-[18px]" data-icon="tune">tune</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Restablecer Contraseña">
+<span class="material-symbols-outlined text-[18px]" data-icon="lock_reset">lock_reset</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-error-container text-on-surface-variant hover:text-tertiary transition-colors" title="Bloquear Acceso">
+<span class="material-symbols-outlined text-[18px]" data-icon="block">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5: Admin Counter (LOCKED TEMPORARILY - Cuenta Bloqueada) -->
+<tr class="bg-error-container/20 hover:bg-error-container/30 transition-colors">
+<td class="py-4 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-tertiary text-on-tertiary font-bold flex items-center justify-center text-label-md shadow-xs">
+                      RP
+                    </div>
+<div>
+<p class="font-bold text-on-surface text-body-md">Ricardo Paredes Guevara</p>
+<p class="text-tertiary font-mono text-[12px]">rparedes@chilon.pe</p>
+<span class="text-[11px] text-tertiary font-semibold">DNI: 45910283 • Bloqueado por auditoría de seguridad</span>
+</div>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant text-label-sm font-label-sm font-semibold">
+<span class="material-symbols-outlined text-[14px]" data-icon="badge">badge</span>
+                    Cajero / Ventanilla
+                  </span>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-error-container text-tertiary font-label-sm text-label-sm font-bold border border-tertiary/20">
+<span class="material-symbols-outlined text-[14px]" data-icon="lock">lock</span>
+                    Bloqueado
+                  </span>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px] text-outline" data-icon="gpp_maybe">gpp_maybe</span>
+<span>Suspendido</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<p class="text-tertiary font-semibold text-body-sm">Hace 3 días, 11:20 AM</p>
+<p class="text-on-surface-variant text-[11px] font-mono">LockoutEnd: Indefinido</p>
+</td>
+<td class="py-4 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2.5 py-1 rounded-md bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm transition-colors shadow-xs" title="Desbloquear inmediatamente">
+                      Desbloquear
+                    </button>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Restablecer Credenciales">
+<span class="material-symbols-outlined text-[18px]" data-icon="password">password</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-error-container text-on-surface-variant hover:text-tertiary transition-colors" title="Eliminar definitivamente">
+<span class="material-symbols-outlined text-[18px]" data-icon="delete_forever">delete_forever</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 6: SuperAdmin Secundario (Active) -->
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-4 px-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-inverse-surface text-inverse-primary font-bold flex items-center justify-center text-label-md ring-2 ring-primary">
+                      GC
+                    </div>
+<div>
+<p class="font-bold text-on-surface text-body-md">Guillermo Chilón Ortiz</p>
+<p class="text-primary font-mono text-[12px]">gchilon@chilon.pe</p>
+<span class="text-[11px] text-on-surface-variant">DNI: 19827364 • Director de Finanzas y Control</span>
+</div>
+</div>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-inverse-surface text-inverse-primary text-label-sm font-label-sm font-bold shadow-xs">
+<span class="material-symbols-outlined text-[14px]" data-icon="key">key</span>
+                    SuperAdmin
+                  </span>
+</td>
+<td class="py-4 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container-highest text-primary font-label-sm text-label-sm font-bold">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+                    Activo
+                  </span>
+</td>
+<td class="py-4 px-4">
+<div class="flex items-center gap-1.5 text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="verified_user">verified_user</span>
+<span>Activo (Authenticator)</span>
+</div>
+</td>
+<td class="py-4 px-4">
+<p class="text-on-surface font-semibold text-body-sm">Ayer, 04:50 PM</p>
+<p class="text-on-surface-variant text-[11px] font-mono">IP: 192.168.10.15 (Gerencia)</p>
+</td>
+<td class="py-4 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Editar Roles &amp; Permisos">
+<span class="material-symbols-outlined text-[18px]" data-icon="tune">tune</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors" title="Restablecer Contraseña">
+<span class="material-symbols-outlined text-[18px]" data-icon="lock_reset">lock_reset</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-error-container text-on-surface-variant hover:text-tertiary transition-colors" title="Bloquear Acceso">
+<span class="material-symbols-outlined text-[18px]" data-icon="block">block</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Pagination & Identity Status -->
+<div class="p-4 border-t border-outline-variant/50 flex flex-col sm:flex-row items-center justify-between gap-3 bg-surface-bright/30 text-label-md font-label-md text-on-surface-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="database">database</span>
+<span>Mostrando 6 de 6 Cuentas Identity Registradas • Conexión de Datos Directa</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 rounded border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50" disabled="">Anterior</button>
+<span class="px-2 font-bold text-primary">Pág 1 de 1</span>
+<button class="px-3 py-1 rounded border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50" disabled="">Siguiente</button>
+</div>
+</div>
+</section>
+<!-- 4. Registered Identity Users Creation Modal/Drawer (Interactive preview) -->
+<section class="bg-surface-container-lowest rounded-xl border-2 border-primary/30 p-6 shadow-md transition-all" id="panelNuevoUsuario">
+<div class="flex items-start justify-between border-b border-outline-variant/60 pb-4 mb-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-[24px]" data-icon="person_add">person_add</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h3 class="text-title-md font-title-md font-bold text-on-surface">Registrar Nuevo Administrador Identity</h3>
+<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-surface-container-highest text-primary">ASP.NET UserStore</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Alta de credenciales en el proveedor de seguridad con Claims específicos</p>
+</div>
+</div>
+<span class="text-label-sm font-label-sm bg-inverse-surface text-inverse-primary px-2.5 py-1 rounded font-bold uppercase tracking-wider">
+            Exclusivo SuperAdmin
+          </span>
+</div>
+<form class="space-y-6" onsubmit="event.preventDefault(); alert('Usuario Identity creado satisfactoriamente en el entorno corporativo.');">
+<!-- Personal and Organizational Info -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div>
+<label class="block text-label-md font-label-md text-on-surface mb-1.5">Nombre Completo <span class="text-tertiary">*</span></label>
+<input class="w-full px-3.5 py-2 rounded-lg bg-surface-bright border border-outline-variant text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none transition-all" placeholder="ej. Juan Carlos Mendoza" required="" type="text"/>
+</div>
+<div>
+<label class="block text-label-md font-label-md text-on-surface mb-1.5">Cargo Operativo <span class="text-tertiary">*</span></label>
+<select class="w-full px-3.5 py-2 rounded-lg bg-surface-bright border border-outline-variant text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none transition-all" required="">
+<option value="">Seleccione el cargo...</option>
+<option value="counter">Administrador de Counter</option>
+<option value="reservas">Supervisor de Reservas</option>
+<option value="despacho">Encargado de Despacho</option>
+<option value="finanzas">Supervisor de Caja Chica y Finanzas</option>
+<option value="superadmin">Subdirector SuperAdmin</option>
+</select>
+</div>
+<div>
+<label class="block text-label-md font-label-md text-on-surface mb-1.5">DNI / Documento de Identidad <span class="text-tertiary">*</span></label>
+<input class="w-full px-3.5 py-2 rounded-lg bg-surface-bright border border-outline-variant text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none transition-all font-mono" maxlength="8" placeholder="8 dígitos" required="" type="text"/>
+</div>
+</div>
+<!-- Identity Credentials & Contact -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div>
+<label class="block text-label-md font-label-md text-on-surface mb-1.5">Correo Corporativo / UserName <span class="text-tertiary">*</span></label>
+<div class="relative">
+<input class="w-full px-3.5 py-2 rounded-lg bg-surface-bright border border-outline-variant text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none transition-all" placeholder="jcarlos@chilon.pe" required="" type="email"/>
+<span class="absolute right-3 top-2.5 text-primary text-[12px] font-bold">@@chilon.pe</span>
+</div>
+</div>
+<div>
+<label class="block text-label-md font-label-md text-on-surface mb-1.5">Número de Teléfono / WhatsApp <span class="text-tertiary">*</span></label>
+<input class="w-full px-3.5 py-2 rounded-lg bg-surface-bright border border-outline-variant text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none transition-all font-mono" placeholder="+51 976 000 000" required="" type="tel"/>
+</div>
+<div>
+<label class="block text-label-md font-label-md text-on-surface mb-1.5">Contraseña Inicial Segura <span class="text-tertiary">*</span></label>
+<div class="flex gap-2">
+<input class="w-full px-3.5 py-2 rounded-lg bg-surface-bright border border-outline-variant text-body-md font-body-md font-mono text-on-surface focus:ring-2 focus:ring-primary focus:outline-none transition-all" id="inputPass" required="" type="text" value="Chilon2025#Sec!"/>
+<button class="px-3 py-2 rounded-lg bg-surface-container text-primary hover:bg-surface-container-high font-label-sm text-label-sm shrink-0 transition-colors" onclick="document.getElementById('inputPass').value = 'TC' + Math.random().toString(36).substring(2, 7) + '#25';" title="Generar contraseña temporal" type="button">
+                  Generar
+                </button>
+</div>
+</div>
+</div>
+<!-- Additional Security Options & Role Selection -->
+<div class="p-4 rounded-xl bg-surface-container-low/50 border border-outline-variant/60 space-y-4">
+<!-- Roles Dropdown / Radios -->
+<div>
+<label class="block text-label-lg font-label-lg text-on-surface mb-2 font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="assignment_ind">assignment_ind</span>
+                Asignación de Rol Principal de Identity:
+              </label>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+<label class="flex items-start gap-2.5 p-3 rounded-lg border border-outline-variant bg-surface-container-lowest cursor-pointer hover:border-primary transition-all">
+<input class="mt-1 text-primary focus:ring-primary" name="rolIdentity" type="radio" value="SuperAdmin"/>
+<div>
+<span class="block font-bold text-label-md text-on-surface">SuperAdmin</span>
+<span class="block text-[11px] text-on-surface-variant">Acceso ilimitado a usuarios, cajas y flotas</span>
+</div>
+</label>
+<label class="flex items-start gap-2.5 p-3 rounded-lg border border-primary bg-primary/5 cursor-pointer">
+<input checked="" class="mt-1 text-primary focus:ring-primary" name="rolIdentity" type="radio" value="Administrador General"/>
+<div>
+<span class="block font-bold text-label-md text-primary">Administrador General</span>
+<span class="block text-[11px] text-on-surface-variant">Gestión de tours, tarifas y reservas globales</span>
+</div>
+</label>
+<label class="flex items-start gap-2.5 p-3 rounded-lg border border-outline-variant bg-surface-container-lowest cursor-pointer hover:border-primary transition-all">
+<input class="mt-1 text-primary focus:ring-primary" name="rolIdentity" type="radio" value="Operador de Despacho"/>
+<div>
+<span class="block font-bold text-label-md text-on-surface">Operador Despacho</span>
+<span class="block text-[11px] text-on-surface-variant">Manifiestos, control de flota y salidas</span>
+</div>
+</label>
+<label class="flex items-start gap-2.5 p-3 rounded-lg border border-outline-variant bg-surface-container-lowest cursor-pointer hover:border-primary transition-all">
+<input class="mt-1 text-primary focus:ring-primary" name="rolIdentity" type="radio" value="Cajero / Ventanilla"/>
+<div>
+<span class="block font-bold text-label-md text-on-surface">Cajero / Ventanilla</span>
+<span class="block text-[11px] text-on-surface-variant">Emisión de boletos, cobros y cuadre de turno</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Granular Claims & Policies -->
+<div>
+<label class="block text-label-lg font-label-lg text-on-surface mb-2 font-bold flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="policy">policy</span>
+                Permisos de Claims Granulares (User Claims):
+              </label>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+<label class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface cursor-pointer">
+<input checked="" class="rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+<span>Crear / Editar Tours y Circuitos</span>
+</label>
+<label class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface cursor-pointer">
+<input checked="" class="rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+<span>Modificar Tarifas y Asientos VIP</span>
+</label>
+<label class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface cursor-pointer">
+<input class="rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+<span>Anular Reservas y Emitir Reembolsos</span>
+</label>
+<label class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface cursor-pointer">
+<input checked="" class="rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+<span>Gestionar Salidas de Flota</span>
+</label>
+<label class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface cursor-pointer">
+<input class="rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+<span>Ver Reportes Financieros y Cajas</span>
+</label>
+<label class="flex items-center gap-2 text-body-sm font-body-sm text-on-surface cursor-pointer">
+<input class="rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+<span>Autorizar Sobreventa y Cortesías</span>
+</label>
+</div>
+</div>
+<!-- Security Requirements (2FA & Force Password Change) -->
+<div class="pt-3 border-t border-outline-variant/60 flex flex-wrap items-center gap-6">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+<span class="text-label-md font-label-md text-on-surface font-semibold">Requerir cambio de contraseña en primer inicio</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded border-outline text-primary focus:ring-primary" type="checkbox"/>
+<span class="text-label-md font-label-md text-primary font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="shield">shield</span>
+                  Autenticación de Dos Factores (2FA) Obligatoria
+                </span>
+</label>
+</div>
+</div>
+<!-- Modal Actions Footer -->
+<div class="flex items-center justify-end gap-3 pt-2">
+<button class="px-4 py-2 rounded-lg border border-outline-variant text-on-surface hover:bg-surface-container font-label-md text-label-md transition-colors" type="reset">
+              Limpiar Formulario
+            </button>
+<button class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm transition-all duration-150 active:scale-95" type="submit">
+<span class="material-symbols-outlined text-[20px]" data-icon="how_to_reg">how_to_reg</span>
+              Crear Cuenta en Identity
+            </button>
+</div>
+</form>
+</section>
+<!-- 5. Identity Security & Audit Log (Compact Section) -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant/60 shadow-sm overflow-hidden">
+<div class="p-4 border-b border-outline-variant/50 flex items-center justify-between bg-surface-bright/40">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-primary text-[20px]" data-icon="policy">policy</span>
+<h3 class="text-title-sm font-title-sm font-bold text-on-surface">Registro de Seguridad y Auditoría (Audit Log Identity)</h3>
+</div>
+<span class="text-label-sm font-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+            Eventos auditados en tiempo real (Cifrado SHA-256)
+          </span>
+</div>
+<div class="divide-y divide-outline-variant/40 text-body-sm font-body-sm">
+<!-- Audit Item 1 -->
+<div class="p-3.5 px-4 flex flex-col md:flex-row md:items-center justify-between gap-2 hover:bg-surface-container-low/40 transition-colors">
+<div class="flex items-center gap-3">
+<span class="p-1 rounded bg-error-container text-tertiary">
+<span class="material-symbols-outlined text-[18px]" data-icon="lock_clock">lock_clock</span>
+</span>
+<div>
+<span class="font-bold text-on-surface">Usuario bloqueado por SuperAdmin:</span>
+<span class="font-mono text-tertiary ml-1">rparedes@chilon.pe</span>
+<span class="text-on-surface-variant ml-2">(Motivo: Revisión de discrepancia en arqueo de caja)</span>
+</div>
+</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant font-mono text-right shrink-0">
+              Hoy • 08:32 AM • IP: 192.168.10.12 (Admin Central)
+            </div>
+</div>
+<!-- Audit Item 2 -->
+<div class="p-3.5 px-4 flex flex-col md:flex-row md:items-center justify-between gap-2 hover:bg-surface-container-low/40 transition-colors">
+<div class="flex items-center gap-3">
+<span class="p-1 rounded bg-surface-container-high text-primary">
+<span class="material-symbols-outlined text-[18px]" data-icon="tune">tune</span>
+</span>
+<div>
+<span class="font-bold text-on-surface">Claim actualizado para</span>
+<span class="font-mono text-primary ml-1">mvasquez@chilon.pe</span>
+<span class="text-on-surface-variant ml-2">: Se concedió claim 'CanModifyTariffs'</span>
+</div>
+</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant font-mono text-right shrink-0">
+              Ayer • 05:14 PM • SuperAdmin Master
+            </div>
+</div>
+<!-- Audit Item 3 -->
+<div class="p-3.5 px-4 flex flex-col md:flex-row md:items-center justify-between gap-2 hover:bg-surface-container-low/40 transition-colors">
+<div class="flex items-center gap-3">
+<span class="p-1 rounded bg-surface-container-highest text-primary">
+<span class="material-symbols-outlined text-[18px]" data-icon="login">login</span>
+</span>
+<div>
+<span class="font-bold text-on-surface">Inicio de sesión exitoso 2FA:</span>
+<span class="font-mono text-on-surface ml-1">carlos.chilon@chilon.pe</span>
+<span class="text-on-surface-variant ml-2">desde Terminal Jr. 2 de Mayo (Cajamarca)</span>
+</div>
+</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant font-mono text-right shrink-0">
+              Hoy • 09:42 AM • macOS / Edge Browser
+            </div>
+</div>
+</div>
+</section>
+</main>
+</div>
+<script>
+    // Lightweight micro-interaction to scroll to user creation panel
+    document.getElementById('btnNuevoUsuario').addEventListener('click', () => {
+      const panel = document.getElementById('panelNuevoUsuario');
+      panel.scrollIntoView({ behavior: 'smooth' });
+      panel.classList.add('ring-4', 'ring-primary/40');
+      setTimeout(() => {
+        panel.classList.remove('ring-4', 'ring-primary/40');
+      }, 1500);
+    });
+
+    document.getElementById('btnAuditoria').addEventListener('click', () => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: 'smooth'
+      });
+    });

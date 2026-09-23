@@ -1,0 +1,407 @@
+@model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
+@{ Layout = "_Layout"; }
+<main class="flex-1">
+<!-- HERO SECTION: Destinos y Circuitos Turísticos -->
+<section class="relative bg-gradient-to-b from-surface-container-low via-surface to-surface-bright py-12 md:py-16 border-b border-outline-variant/60">
+<div class="max-w-7xl mx-auto px-4 md:px-8 relative z-10">
+<!-- Breadcrumb & Badge -->
+<div class="flex flex-wrap items-center gap-2 mb-4">
+<span class="px-3 py-1 bg-surface-container text-primary text-label-sm font-label-sm rounded-full border border-primary/20 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">explore</span> Catálogo Oficial 2025
+          </span>
+<span class="text-outline text-xs">/</span>
+<span class="text-secondary text-body-sm font-body-sm">Cajamarca, Perú</span>
+<span class="text-outline text-xs">/</span>
+<span class="text-on-surface font-semibold text-body-sm font-body-sm">Salidas Diarias Garantizadas</span>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
+<div class="lg:col-span-8">
+<h1 class="text-headline-lg md:text-display-lg font-display-lg text-inverse-surface tracking-tight leading-tight mb-4">
+              Explora los Mejores Destinos y Circuitos Turísticos de Cajamarca
+            </h1>
+<p class="text-body-lg font-body-lg text-on-surface-variant max-w-3xl leading-relaxed">Viaja seguro con nuestra moderna flota de Mercedes-Benz Sprinter y Toyota HiAce, asistencia permanente y cobertura SOAT turística integral con asistencia permanente.</p>
+</div>
+<!-- Mini trust counters -->
+<div class="lg:col-span-4 flex lg:justify-end">
+<div class="bg-surface-container-lowest/90 backdrop-blur p-4 rounded-xl border border-outline-variant/70 shadow-sm flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[28px]">verified_user</span>
+</div>
+<div>
+<div class="flex items-center gap-1 text-tertiary font-bold text-headline-sm">
+<span class="">100%</span>
+<span class="text-xs bg-tertiary-fixed text-on-tertiary-fixed px-1.5 py-0.5 rounded">Garantizado</span>
+</div>
+<p class="text-body-sm text-secondary font-medium">Cumplimiento de itinerario y protocolos</p>
+</div>
+</div>
+</div>
+</div>
+<!-- FAST ROUTE SEARCH BAR -->
+<div class="mt-8 bg-surface-container-lowest rounded-2xl p-4 md:p-5 shadow-lg border border-outline-variant/80">
+<form class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 md:gap-4 items-center" onsubmit="event.preventDefault();">
+<!-- Search Destination -->
+<div class="lg:col-span-4">
+<label class="block text-label-sm font-label-sm text-secondary mb-1">Destino o Circuito</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-secondary text-[20px]">tour</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface placeholder:text-outline outline-none" placeholder="Ej. Cumbemayo, Otuzco, Porcón..." type="text">
+</div>
+</div>
+<!-- Date Selector -->
+<div class="lg:col-span-3">
+<label class="block text-label-sm font-label-sm text-secondary mb-1">Fecha del Tour</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-secondary text-[20px]">calendar_month</span>
+<input class="w-full pl-10 pr-3 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface outline-none" type="date" value="2025-05-15">
+</div>
+</div>
+<!-- Turno / Horario -->
+<div class="lg:col-span-3">
+<label class="block text-label-sm font-label-sm text-secondary mb-1">Turno de Salida</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-secondary text-[20px]">schedule</span>
+<select class="w-full pl-10 pr-8 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface outline-none appearance-none">
+<option>Cualquier Turno</option>
+<option>Mañana (09:00 AM - 09:30 AM)</option>
+<option>Tarde (02:30 PM - 03:30 PM)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 pointer-events-none text-secondary text-[18px]">expand_more</span>
+</div>
+</div>
+<!-- Submit Button -->
+<div class="lg:col-span-2 pt-1 sm:pt-5 lg:pt-0">
+<button class="w-full h-[42px] bg-primary hover:bg-primary-container text-on-primary font-label-lg font-bold rounded-lg shadow transition-all flex items-center justify-center gap-2 active:scale-95" type="submit">
+<span class="material-symbols-outlined text-[20px]">search</span>
+<span class="">Buscar</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+</section>
+<!-- CATALOG MAIN LAYOUT: Sticky Sidebar Filters + Tour Cards Grid -->
+<div class="max-w-7xl mx-auto px-4 md:px-8 py-10" id="catalogo">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- LEFT COLUMN: Advanced Filters Sidebar -->
+<aside class="lg:col-span-4 xl:col-span-3 sticky top-24 bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant shadow-sm">
+<div class="flex items-center justify-between pb-4 border-b border-outline-variant/60">
+<div class="flex items-center gap-2 text-inverse-surface font-title-sm">
+<span class="material-symbols-outlined text-primary text-[22px]">tune</span>
+<span class="font-bold">Filtrar Circuitos</span>
+</div>
+<button class="text-label-sm text-tertiary hover:underline font-semibold cursor-pointer" type="reset">
+              Limpiar Filtros
+            </button>
+</div>
+<div class="space-y-6 pt-5">
+<!-- Category Filter -->
+<div>
+<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-3 flex items-center justify-between">
+<span class="">Categoría</span>
+<span class="text-[11px] text-outline font-normal">8 tours</span>
+</h2>
+<div class="space-y-2 text-body-sm">
+<label class="flex items-center justify-between cursor-pointer group">
+<div class="flex items-center gap-2">
+<input checked="" class="text-primary focus:ring-primary h-4 w-4 border-outline-variant" name="cat" type="radio">
+<span class="group-hover:text-primary transition-colors font-medium">Todos los Circuitos</span>
+</div>
+<span class="text-xs bg-surface-container text-secondary px-2 py-0.5 rounded-full font-bold">8</span>
+</label>
+<label class="flex items-center justify-between cursor-pointer group">
+<div class="flex items-center gap-2">
+<input class="text-primary focus:ring-primary h-4 w-4 border-outline-variant" name="cat" type="radio">
+<span class="group-hover:text-primary transition-colors">Arqueología e Historia</span>
+</div>
+<span class="text-xs bg-surface-container-low text-secondary px-2 py-0.5 rounded-full">3</span>
+</label>
+<label class="flex items-center justify-between cursor-pointer group">
+<div class="flex items-center gap-2">
+<input class="text-primary focus:ring-primary h-4 w-4 border-outline-variant" name="cat" type="radio">
+<span class="group-hover:text-primary transition-colors">Naturaleza y Bosques</span>
+</div>
+<span class="text-xs bg-surface-container-low text-secondary px-2 py-0.5 rounded-full">2</span>
+</label>
+<label class="flex items-center justify-between cursor-pointer group">
+<div class="flex items-center gap-2">
+<input class="text-primary focus:ring-primary h-4 w-4 border-outline-variant" name="cat" type="radio">
+<span class="group-hover:text-primary transition-colors">Aguas Termales &amp; Salud</span>
+</div>
+<span class="text-xs bg-surface-container-low text-secondary px-2 py-0.5 rounded-full">1</span>
+</label>
+<label class="flex items-center justify-between cursor-pointer group">
+<div class="flex items-center gap-2">
+<input class="text-primary focus:ring-primary h-4 w-4 border-outline-variant" name="cat" type="radio">
+<span class="group-hover:text-primary transition-colors">Tradición y Gastronomía</span>
+</div>
+<span class="text-xs bg-surface-container-low text-secondary px-2 py-0.5 rounded-full">2</span>
+</label>
+</div>
+</div>
+<!-- Duración -->
+<div class="pt-4 border-t border-outline-variant/60">
+<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-3">Duración del Recorrido</h2>
+<div class="grid grid-cols-2 gap-2 text-body-sm">
+<button class="px-3 py-2 border border-primary bg-surface-container-low text-primary font-semibold rounded-lg text-center text-xs transition-all" type="button">
+                  Medio Día <span class="block text-[10px] font-normal text-secondary">3 - 4.5 hrs</span>
+</button>
+<button class="px-3 py-2 border border-outline-variant hover:border-primary text-secondary rounded-lg text-center text-xs transition-all" type="button">
+                  Día Completo <span class="block text-[10px] font-normal text-outline">6 - 8 hrs</span>
+</button>
+</div>
+</div>
+<!-- Turno de Salida -->
+<div class="pt-4 border-t border-outline-variant/60">
+<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-2.5">Turno de Salida</h2>
+<div class="space-y-2">
+<label class="flex items-center gap-2 text-body-sm cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary border-outline-variant" type="checkbox">
+<span class="">Mañana (9:00 AM / 9:30 AM)</span>
+</label>
+<label class="flex items-center gap-2 text-body-sm cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary border-outline-variant" type="checkbox">
+<span class="">Tarde (2:30 PM / 3:30 PM)</span>
+</label>
+</div>
+</div>
+<!-- Rango de Precios -->
+<div class="pt-4 border-t border-outline-variant/60">
+<div class="flex justify-between items-center mb-2">
+<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary">Presupuesto por Persona</h2>
+<span class="text-xs font-bold text-primary">S/ 25 - S/ 50</span>
+</div>
+<input class="w-full accent-primary h-2 bg-secondary-container rounded-lg cursor-pointer" max="80" min="25" type="range" value="50">
+<div class="flex justify-between text-[11px] text-outline mt-1 font-medium">
+<span class="">S/ 25 min</span>
+<span class="">S/ 80+ max</span>
+</div>
+</div>
+<!-- Exigencia Física -->
+<div class="pt-4 border-t border-outline-variant/60">
+<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-2.5">Nivel de Exigencia</h2>
+<div class="flex flex-wrap gap-1.5">
+<span class="px-2.5 py-1 text-xs bg-surface-container text-primary font-semibold rounded-md border border-primary/20 cursor-pointer">Fácil / Familiar</span>
+<span class="px-2.5 py-1 text-xs bg-surface-bright text-secondary rounded-md border border-outline-variant hover:border-primary cursor-pointer">Moderado</span>
+<span class="px-2.5 py-1 text-xs bg-surface-bright text-secondary rounded-md border border-outline-variant hover:border-primary cursor-pointer">Caminata Ligera</span>
+</div>
+</div>
+<!-- Garantías Chilón -->
+<div class="pt-4 border-t border-outline-variant/60 bg-surface-bright/60 -mx-5 -mb-5 p-5 rounded-b-2xl">
+<h2 class="text-label-sm font-label-sm font-bold text-on-surface mb-2 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary">shield</span>
+                Garantías de Viaje Chilón
+              </h2>
+<div class="space-y-1.5 text-body-sm">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary border-outline-variant" disabled="" type="checkbox">
+<span class="text-xs">Salida Diaria Garantizada</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary border-outline-variant" disabled="" type="checkbox">
+<span class="text-xs">Recojo en Hotel Céntrico</span>
+</label>
+
+</div>
+</div>
+</div>
+</aside>
+<!-- RIGHT COLUMN: Tours Grid & Results Header -->
+<section class="lg:col-span-8 xl:col-span-9 space-y-6">
+<!-- Results Top Bar -->
+<div class="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
+<p class="text-body-md font-body-md text-on-surface">
+                Mostrando <strong class="font-bold text-primary">6 circuitos disponibles</strong> en Cajamarca con salida diaria
+              </p>
+</div>
+<div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+<label class="text-label-sm font-label-sm text-secondary whitespace-nowrap">Ordenar por:</label>
+<select class="py-1.5 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option>Más populares y recomendados</option>
+<option>Precio: menor a mayor</option>
+<option>Precio: mayor a menor</option>
+<option>Duración del circuito</option>
+</select>
+</div>
+</div>
+<!-- GRID OF 6 TOUR CARDS -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-6">
+    @foreach (var tour in Model)
+    {
+        <article class="bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant hover:border-primary/50 shadow-sm hover:shadow-lg transition-all duration-300 flex flex-col group">
+            <div class="relative h-52 w-full overflow-hidden bg-surface-dim">
+                @if (tour.Images != null && tour.Images.Any())
+                {
+                    var mainImage = tour.Images.FirstOrDefault(i => i.IsMain) ?? tour.Images.First();
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage.ImageUrl" alt="@tour.Title">
+                }
+                else
+                {
+                    <div class="w-full h-full flex items-center justify-center bg-surface-variant text-on-surface-variant">
+                        <span class="font-semibold">Sin im�genes referenciales</span>
+                    </div>
+                }
+                <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-black/20"></div>
+                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                    <span class="bg-surface-container-lowest/90 backdrop-blur text-primary text-[11px] font-bold px-2 py-1 rounded-md shadow-sm">Acreditado DIRCETUR</span>
+                </div>
+            </div>
+            <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between text-xs text-secondary mb-2">
+                        <span class="flex items-center gap-1 font-semibold text-primary">
+                            <span class="material-symbols-outlined text-[16px]">explore</span> @tour.Category
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[16px]">schedule</span> @tour.Duration
+                        </span>
+                    </div>
+                    <h3 class="text-headline-sm font-headline-sm text-inverse-surface group-hover:text-primary transition-colors font-bold mb-2">
+                        @tour.Title
+                    </h3>
+                    <p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2 mb-4">
+                        @tour.Subtitle
+                    </p>
+                </div>
+                <div class="pt-4 border-t border-outline-variant/60 flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] uppercase tracking-wider text-secondary block">Precio por pasajero</span>
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-headline-md font-headline-md font-extrabold text-tertiary">S/ @tour.BasePrice.ToString("0.00")</span>
+                            <span class="text-xs text-outline">PEN</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="/Tour/Details/@tour.Id" class="p-2 border border-outline-variant hover:border-primary text-secondary hover:text-primary rounded-lg text-xs font-bold transition-all" title="Ver Itinerario Completo">
+                            <span class="material-symbols-outlined text-[20px]">description</span>
+                        </a>
+                        <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chil�n,%20deseo%20reservar%20el%20Tour%20@Uri.EscapeDataString(tour.Title)" target="_blank" class="px-4 py-2.5 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all">
+                            <span>Reservar</span>
+                            <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </article>
+    }
+</div>
+<!-- Bottom Notice for Travelers -->
+<div class="p-4 rounded-xl bg-surface-container-high/40 border border-primary/20 flex items-center gap-3 text-secondary text-body-sm">
+<span class="material-symbols-outlined text-primary text-[24px]">info</span>
+<div>
+<p class="font-medium text-on-surface">Todos los tours incluyen recojo gratuito en hoteles ubicados en el perímetro del Centro Histórico de Cajamarca.</p>
+<p class="text-xs text-secondary">Para salidas desde zonas rurales o traslados al Aeropuerto de Cajamarca (CJA), consulta nuestras tarifas preferenciales.</p>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- SECTION: ARMA TU TOUR PRIVADO O EXCLUSIVO -->
+<section class="max-w-7xl mx-auto px-4 md:px-8 py-10">
+<div class="relative rounded-3xl overflow-hidden bg-gradient-to-r from-inverse-surface via-primary to-primary-container p-8 md:p-12 text-on-primary shadow-xl">
+<!-- Geometric Accent Shapes -->
+<div class="absolute -right-16 -top-16 w-80 h-80 bg-surface-container-high/10 rounded-full blur-2xl pointer-events-none"></div>
+<div class="absolute right-1/4 -bottom-20 w-64 h-64 bg-tertiary/20 rounded-full blur-xl pointer-events-none"></div>
+<div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+<div class="lg:col-span-8 space-y-4">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest/20 backdrop-blur rounded-full text-xs font-bold tracking-wider uppercase text-inverse-on-surface">
+<span class="material-symbols-outlined text-[16px] text-tertiary-fixed-dim">groups</span> Servicio Corporativo y Delegaciones
+            </span>
+<h2 class="text-headline-lg font-headline-lg font-bold text-white tracking-tight">
+              ¿Viajas en Familia o Grupo? Arma tu Tour 100% Privado
+            </h2>
+<p class="text-body-lg font-body-lg text-surface-container-lowest/90 max-w-2xl leading-relaxed">Disfruta de vans exclusivas puerta a puerta, horarios personalizados a tu ritmo, traslados directos y traslados cómodos hacia el Aeropuerto Mayor General FAP Armando Revoredo Iglesias.</p>
+<div class="flex flex-wrap gap-4 pt-2">
+<div class="flex items-center gap-2 text-sm text-surface-bright">
+<span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Vans de 11 a 19 pasajeros
+              </div>
+<div class="flex items-center gap-2 text-sm text-surface-bright">
+<span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Factura Comercial &amp; Convenios
+              </div>
+<div class="flex items-center gap-2 text-sm text-surface-bright">
+<span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Asignación Inmediata
+              </div>
+</div>
+</div>
+<div class="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-3 justify-center">
+<a class="px-6 py-4 bg-tertiary-container hover:bg-tertiary text-on-tertiary rounded-xl font-label-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95 text-center" href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20solicito%20cotización%20para%20un%20servicio%20privado" target="_blank">
+<span class="material-symbols-outlined text-[22px]">chat</span>
+<span class="">Cotizar Tour Privado</span>
+</a>
+<a class="px-6 py-3.5 bg-surface-container-lowest/15 hover:bg-surface-container-lowest/25 backdrop-blur text-on-primary border border-surface-container-lowest/30 rounded-xl font-label-md font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all text-center" href="tel:+51944746364">
+<span class="material-symbols-outlined text-[20px]">call</span>
+<span class="">Llamar Directo a Central</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+<!-- SECTION: MAP & SALIDAS CENTRALES -->
+<section class="max-w-7xl mx-auto px-4 md:px-8 py-10" id="oficinas">
+<div class="bg-surface-container-lowest rounded-3xl p-6 md:p-10 border border-outline-variant shadow-sm grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+<div class="lg:col-span-5 space-y-4">
+<div class="inline-flex items-center gap-2 text-primary font-label-sm uppercase tracking-wider font-bold">
+<span class="material-symbols-outlined text-[18px]">location_on</span> Punto de Embarque Oficial
+          </div>
+<h2 class="text-headline-md font-headline-md text-inverse-surface font-bold">
+            Oficina Central de Pasajes &amp; Terminal de Salida
+          </h2>
+<p class="text-body-md font-body-md text-on-surface-variant">
+            Ubicados estratégicamente a solo 3 cuadras de la Plaza de Armas de Cajamarca. Nuestras unidades cuentan con sala de espera climatizada, custodia de equipaje y WiFi de cortesía.
+          </p>
+<div class="space-y-3 pt-2">
+<div class="flex items-start gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary mt-0.5 shrink-0">
+<span class="material-symbols-outlined text-[18px]">store</span>
+</div>
+<div>
+<strong class="text-sm text-inverse-surface block">Dirección Central:</strong>
+<span class="text-body-sm text-secondary">Jr. 2 de Mayo 569, Cajamarca 06001, Perú</span>
+</div>
+</div>
+<div class="flex items-start gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary mt-0.5 shrink-0">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+</div>
+<div>
+<strong class="text-sm text-inverse-surface block">Horario de Atención Presencial:</strong>
+<span class="text-body-sm text-secondary">Lunes a Domingo de 06:30 AM a 09:30 PM (Horario corrido)</span>
+</div>
+</div>
+<div class="flex items-start gap-3">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary mt-0.5 shrink-0">
+<span class="material-symbols-outlined text-[18px]">phone_in_talk</span>
+</div>
+<div>
+<strong class="text-sm text-inverse-surface block">Contacto Telefónico:</strong>
+<span class="text-body-sm text-secondary">+51 901 195 392 / +51 944 746 364</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Simulated Map / Geographic Location Representation -->
+<div class="lg:col-span-7 h-80 rounded-2xl overflow-hidden relative border border-outline-variant/70 shadow-inner bg-surface-container-low flex flex-col justify-end p-6" data-location="Cajamarca">
+<img class="absolute inset-0 w-full h-full object-cover" data-alt="Stylized architectural graphic map of downtown Cajamarca Peru with Jr 2 de Mayo marked clearly in teal pins, Plaza de Armas, colonial grid street pattern rendered in clean light tones, petrol teal roads and soft mint green accents conveying precision travel navigation." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeq-L60p8o17y1aWsoJUS3_zCO82fgUMb_4JW4ws4-rOZ1jFsyLPcow0-GiVirPfHbjX3bvYBs-XYtkRha6dcKkeJqTN_wCPmNZ6_yRxW9ME1MWBoY4PKJ6aRdUd1a9sYQnjUV42uqe_oBKsM50uXoYX37xp-jtdqIFGVatKpH-kDvPa75OxEhkj3LKlP2fj40AKjYVel-ozENIEN6YH_PZml3jSTWQ7KAiZCxv5b4fiNmNXDyqNzfEQ">
+<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/90 via-inverse-surface/30 to-transparent"></div>
+<div class="relative z-10 bg-surface-container-lowest/95 backdrop-blur-md p-4 rounded-xl border border-outline-variant/80 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-tertiary text-on-tertiary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[20px]">navigation</span>
+</div>
+<div>
+<span class="font-bold text-sm text-inverse-surface block">Turismo Chilón Cajamarca SAC</span>
+<span class="text-xs text-secondary">Jr. 2 de Mayo 569 (Embarque Directo)</span>
+</div>
+</div>
+<a class="px-4 py-2 bg-primary hover:bg-primary-container text-on-primary rounded-lg text-xs font-label-md font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 transition-colors" href="https://maps.google.com/?q=Jr.+2+de+Mayo+569+Cajamarca+Peru" target="_blank">
+<span class="">Abrir en Google Maps</span>
+<span class="material-symbols-outlined text-[16px]">open_in_new</span>
+</a>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- FOOTER (Institutional - Strictly adheres to brand & no unauthorized domain) -->

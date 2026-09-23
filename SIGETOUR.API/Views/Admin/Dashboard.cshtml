@@ -1,0 +1,443 @@
+@{ Layout = "_AdminLayout"; }
+<!-- 1. Header Banner & Quick Actions -->
+<section class="bg-surface-container-lowest rounded-xl p-space-lg border border-outline-variant/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-0.5 rounded text-[11px] font-bold tracking-wider bg-primary/10 text-primary uppercase">Cajamarca Operativa</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant">| Sábado de Temporada Alta</span>
+</div>
+<h1 class="text-headline-md font-headline-md text-on-surface">Panel de Control Operativo - Cajamarca</h1>
+<p class="text-body-md font-body-md text-on-surface-variant">Monitoreo en tiempo real de salidas, asignación de unidades Sprinter/HiAce y balance de ventas de ventanilla.</p>
+</div>
+<!-- Top Action Buttons -->
+<div class="flex flex-wrap items-center gap-space-sm">
+<button class="bg-primary hover:bg-[#0e5a52] text-on-primary px-space-md py-2.5 rounded-lg text-label-md font-label-md flex items-center gap-2 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+<span class="">Venta Directa en Ventanilla</span>
+</button>
+<button class="bg-surface-container hover:bg-surface-container-high text-primary border border-primary/30 px-space-md py-2.5 rounded-lg text-label-md font-label-md flex items-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[18px]">local_shipping</span>
+<span class="">Despachar Unidad</span>
+</button>
+<button class="bg-white hover:bg-surface border border-outline-variant text-on-surface-variant px-space-md py-2.5 rounded-lg text-label-md font-label-md flex items-center gap-2 transition-all" title="Generar lista para control MTC / SUTRAN">
+<span class="material-symbols-outlined text-[18px]">file_download</span>
+<span class="">Exportar Manifiesto MTC</span>
+</button>
+</div>
+</section>
+<!-- 2. Operational KPI Cards -->
+<section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md">
+<!-- KPI 1: Pasajeros Hoy -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md border border-outline-variant/30 shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="text-label-md font-label-md text-on-surface-variant font-semibold">Pasajeros Hoy</span>
+<span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">group</span>
+</span>
+</div>
+<div class="my-2">
+<div class="text-headline-lg font-headline-lg text-on-surface font-extrabold">142 <span class="text-label-md text-outline font-normal">turistas</span></div>
+<div class="text-label-sm font-label-sm text-primary flex items-center gap-1 font-semibold mt-1">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+              +18% vs sábado pasado
+            </div>
+</div>
+<div>
+<div class="flex justify-between text-body-sm font-body-sm text-outline mb-1">
+<span class="">Ocupación de asientos</span>
+<span class="font-bold text-on-surface">88%</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2 overflow-hidden">
+<div class="bg-primary h-2 rounded-full" style="width: 88%"></div>
+</div>
+</div>
+</div>
+<!-- KPI 2: Salidas y Circuitos -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md border border-outline-variant/30 shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="text-label-md font-label-md text-on-surface-variant font-semibold">Salidas y Circuitos</span>
+<span class="w-8 h-8 rounded-lg bg-secondary-container text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">tour</span>
+</span>
+</div>
+<div class="my-2">
+<div class="text-headline-lg font-headline-lg text-on-surface font-extrabold">8 <span class="text-label-md text-outline font-normal">programadas</span></div>
+<div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">4 en ruta</span>
+<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">3 abordando</span>
+<span class="text-[11px] font-semibold text-outline">1 tarde</span>
+</div>
+</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant border-t border-outline-variant/30 pt-2 flex justify-between">
+<span class="">Siguiente: Cumbemayo</span>
+<span class="font-bold text-primary">09:00 AM</span>
+</div>
+</div>
+<!-- KPI 3: Recaudación del Día -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md border border-outline-variant/30 shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="text-label-md font-label-md text-on-surface-variant font-semibold">Recaudación Diaria</span>
+<span class="w-8 h-8 rounded-lg bg-primary-fixed text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+</span>
+</div>
+<div class="my-2">
+<div class="text-headline-lg font-headline-lg text-primary font-extrabold">S/ 5,840 <span class="text-label-md text-on-surface-variant font-normal">PEN</span></div>
+<div class="flex justify-between items-center text-body-sm font-body-sm mt-1">
+<span class="text-on-surface font-medium">Cobrado: <strong class="text-primary">S/ 4,220</strong></span>
+<span class="text-tertiary font-medium">Pendiente: <strong>S/ 1,620</strong></span>
+</div>
+</div>
+<div class="text-body-sm font-body-sm text-outline border-t border-outline-variant/30 pt-2 flex items-center justify-between">
+<span class="">Yape / Plin / Efectivo</span>
+<span class="text-primary font-bold">100% conciliado</span>
+</div>
+</div>
+<!-- KPI 4: Flota en Operación -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md border border-outline-variant/30 shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="text-label-md font-label-md text-on-surface-variant font-semibold">Flota en Operación</span>
+<span class="w-8 h-8 rounded-lg bg-surface-container text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">rv_hookup</span>
+</span>
+</div>
+<div class="my-2">
+<div class="text-headline-lg font-headline-lg text-on-surface font-extrabold">6 / 7 <span class="text-label-md text-outline font-normal">unidades</span></div>
+<p class="text-body-sm font-body-sm text-on-surface-variant mt-1">Mercedes Sprinter (4) &amp; Toyota HiAce (2)</p>
+</div>
+<div class="border-t border-outline-variant/30 pt-2 flex items-center justify-between text-body-sm">
+<span class="text-emerald-700 font-semibold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-emerald-600"></span> 1 van en retén (taller)
+            </span>
+<span class="text-label-sm font-label-sm text-primary font-bold">Ver Estado</span>
+</div>
+</div>
+</section>
+<!-- 3. Tablero de Salidas y Despacho en Vivo de Hoy (Interactive Table) -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant/40 shadow-sm overflow-hidden flex flex-col">
+<div class="p-space-md border-b border-outline-variant/30 flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm bg-white">
+<div class="flex items-center gap-space-sm">
+<span class="w-3 h-3 rounded-full bg-primary animate-ping"></span>
+<h2 class="text-title-md font-title-md font-bold text-on-surface">Tablero de Salidas y Despacho en Vivo</h2>
+<span class="text-label-sm font-label-sm bg-surface-container px-2 py-0.5 rounded text-primary font-bold">Turno Mañana / Tarde</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="flex rounded-lg border border-outline-variant/40 overflow-hidden text-body-sm font-body-sm">
+<button class="px-3 py-1 bg-primary text-white font-semibold">Todas (8)</button>
+<button class="px-3 py-1 bg-white hover:bg-surface text-on-surface-variant">En Ruta (4)</button>
+<button class="px-3 py-1 bg-white hover:bg-surface text-on-surface-variant">En Terminal (3)</button>
+</div>
+<button class="p-1.5 border border-outline-variant/40 rounded-lg hover:bg-surface text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/30 bg-surface/30 text-label-sm font-label-sm text-on-surface-variant uppercase tracking-wider">
+<th class="py-3 px-4">Hora</th>
+<th class="py-3 px-4">Circuito / Destino Turístico</th>
+<th class="py-3 px-4">Unidad &amp; Placa</th>
+<th class="py-3 px-4">Personal Asignado</th>
+<th class="py-3 px-4">Ocupación</th>
+<th class="py-3 px-4">Estado de Salida</th>
+<th class="py-3 px-4 text-right">Acciones Rápidas</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/20 text-body-sm font-body-sm">
+<!-- Fila 1: Cumbemayo -->
+<tr class="hover:bg-surface/40 transition-colors">
+<td class="py-3.5 px-4 font-bold text-primary font-title-sm">
+                  09:00 AM
+                </td>
+<td class="py-3.5 px-4">
+<div class="font-bold text-on-surface">Circuito Cumbemayo &amp; Acueducto Pre-incaico</div>
+<div class="text-[11px] text-outline">Ruta Geológica - Duración 3.5 hrs</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-1.5 font-semibold text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">directions_bus</span>
+                    Sprinter VIP
+                  </div>
+<div class="text-[11px] font-mono text-outline">Placa: T7B-952</div>
+</td>
+<td class="py-3.5 px-4"><div class="font-medium text-on-surface">Carlos M.</div><div class="text-[11px] text-primary font-semibold flex items-center gap-0.5"><span class="material-symbols-outlined text-[14px]">badge</span> Rosa P. (Coordinación)</div></td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<span class="font-bold text-emerald-700">19 / 19</span>
+<span class="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded text-[10px] font-bold">LLENO</span>
+</div>
+<div class="w-24 bg-surface-container rounded-full h-1.5 mt-1">
+<div class="bg-emerald-600 h-1.5 rounded-full" style="width: 100%"></div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                    En Ruta (Los Frailones)
+                  </span>
+</td>
+<td class="py-3.5 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1.5 rounded hover:bg-surface-container text-primary hover:text-[#0e5a52]" title="Ver Manifiesto de Pasajeros">
+<span class="material-symbols-outlined text-[18px]">assignment</span>
+</button>
+<button class="p-1.5 rounded hover:bg-surface-container text-secondary" title="Enviar WhatsApp">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Fila 2: Granja Porcón -->
+<tr class="hover:bg-surface/40 transition-colors">
+<td class="py-3.5 px-4 font-bold text-primary font-title-sm">
+                  09:30 AM
+                </td>
+<td class="py-3.5 px-4">
+<div class="font-bold text-on-surface">Granja Porcón &amp; Bosques de Pino</div>
+<div class="text-[11px] text-outline">Cooperativa Agraria y Zoológico Altoandino</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-1.5 font-semibold text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">airport_shuttle</span>
+                    Toyota HiAce Combi
+                  </div>
+<div class="text-[11px] font-mono text-outline">Placa: M3F-810</div>
+</td>
+<td class="py-3.5 px-4"><div class="font-medium text-on-surface">Jorge L.</div><div class="text-[11px] text-outline">Operaciones de Campo</div></td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<span class="font-bold text-on-surface">14 / 15</span>
+<span class="text-[10px] text-outline font-semibold">1 disp.</span>
+</div>
+<div class="w-24 bg-surface-container rounded-full h-1.5 mt-1">
+<div class="bg-primary h-1.5 rounded-full" style="width: 93%"></div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    Abordando en Jr. 2 de Mayo 569
+                  </span>
+</td>
+<td class="py-3.5 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2.5 py-1 rounded bg-primary text-white text-[11px] font-bold hover:bg-[#0e5a52]">Check-in</button>
+<button class="p-1.5 rounded hover:bg-surface-container text-secondary" title="Enviar WhatsApp">
+<span class="material-symbols-outlined text-[18px]">chat</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Fila 3: Baños del Inca -->
+<tr class="hover:bg-surface/40 transition-colors">
+<td class="py-3.5 px-4 font-bold text-primary font-title-sm">
+                  09:30 AM
+                </td>
+<td class="py-3.5 px-4">
+<div class="font-bold text-on-surface">Baños del Inca &amp; Complejo Termal</div>
+<div class="text-[11px] text-outline">Pozas del Inca Atahualpa &amp; Hidromasaje</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-1.5 font-semibold text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">directions_bus</span>
+                    Sprinter Interurbana
+                  </div>
+<div class="text-[11px] font-mono text-outline">Placa: B8K-114</div>
+</td>
+<td class="py-3.5 px-4"><div class="font-medium text-on-surface">Manuel T.</div><div class="text-[11px] text-outline">Equipo Operativo</div></td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<span class="font-bold text-on-surface">18 / 19</span>
+<span class="text-[10px] text-outline font-semibold">1 disp.</span>
+</div>
+<div class="w-24 bg-surface-container rounded-full h-1.5 mt-1">
+<div class="bg-primary h-1.5 rounded-full" style="width: 95%"></div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">
+<span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                    Recojo: Hotel Costa del Sol
+                  </span>
+</td>
+<td class="py-3.5 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1.5 rounded hover:bg-surface-container text-primary" title="Ver Hoja de Ruta">
+<span class="material-symbols-outlined text-[18px]">assignment</span>
+</button>
+<button class="p-1.5 rounded hover:bg-surface-container text-secondary" title="Llamar a unidad">
+<span class="material-symbols-outlined text-[18px]">call</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Fila 4: Ventanillas de Otuzco -->
+<tr class="hover:bg-surface/40 transition-colors">
+<td class="py-3.5 px-4 font-bold text-on-surface-variant font-title-sm">
+                  03:00 PM
+                </td>
+<td class="py-3.5 px-4">
+<div class="font-bold text-on-surface">Ventanillas de Otuzco &amp; Hacienda La Collpa</div>
+<div class="text-[11px] text-outline">Necrópolis y Tradicional Llamado de Vacas</div>
+</td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-1.5 font-semibold text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">directions_bus</span>
+                    Sprinter VIP
+                  </div>
+<div class="text-[11px] font-mono text-outline">Placa: T1X-408</div>
+</td>
+<td class="py-3.5 px-4"><div class="font-medium text-on-surface">Hernán V.</div><div class="text-[11px] text-outline">Soporte: David Soto</div></td>
+<td class="py-3.5 px-4">
+<div class="flex items-center gap-2">
+<span class="font-bold text-tertiary">12 / 19</span>
+<span class="text-[10px] bg-tertiary-fixed text-on-tertiary-fixed px-1.5 rounded font-bold">7 LIBRES</span>
+</div>
+<div class="w-24 bg-surface-container rounded-full h-1.5 mt-1">
+<div class="bg-primary/70 h-1.5 rounded-full" style="width: 63%"></div>
+</div>
+</td>
+<td class="py-3.5 px-4">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                    Programado / Venta Abierta
+                  </span>
+</td>
+<td class="py-3.5 px-4 text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="px-2.5 py-1 rounded bg-tertiary-container hover:bg-tertiary text-on-tertiary-container text-[11px] font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">sell</span>
+                      Vender
+                    </button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- 4. Complementary Two-Column Bento Layout -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+<!-- Left Column (7 Cols): Demanda por Circuito & Desempeño -->
+<div class="lg:col-span-7 bg-surface-container-lowest rounded-xl p-space-lg border border-outline-variant/40 shadow-sm flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-3 border-b border-outline-variant/30">
+<div>
+<h3 class="text-title-md font-title-md font-bold text-on-surface">Demanda Turística por Circuito</h3>
+<p class="text-body-sm font-body-sm text-outline">Porcentaje de reservas acumuladas en la semana actual</p>
+</div>
+<span class="text-label-sm font-label-sm bg-surface-container px-2.5 py-1 rounded text-primary font-bold">Cajamarca Histórico</span>
+</div>
+<!-- Custom Visual Bars for Tour Demands -->
+<div class="mt-space-md space-y-4">
+<!-- Item 1 -->
+<div>
+<div class="flex justify-between items-center text-body-sm font-body-sm mb-1">
+<span class="font-bold text-on-surface">1. Cumbemayo y Frailones (Arqueológico)</span>
+<span class="font-bold text-primary">38% <span class="text-outline font-normal">(54 pax)</span></span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-3 overflow-hidden">
+<div class="bg-primary h-3 rounded-full" style="width: 38%"></div>
+</div>
+</div>
+<!-- Item 2 -->
+<div>
+<div class="flex justify-between items-center text-body-sm font-body-sm mb-1">
+<span class="font-bold text-on-surface">2. Granja Porcón (Ecoturismo &amp; Granja)</span>
+<span class="font-bold text-secondary">25% <span class="text-outline font-normal">(36 pax)</span></span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-3 overflow-hidden">
+<div class="bg-secondary h-3 rounded-full" style="width: 25%"></div>
+</div>
+</div>
+<!-- Item 3 -->
+<div>
+<div class="flex justify-between items-center text-body-sm font-body-sm mb-1">
+<span class="font-bold text-on-surface">3. Baños del Inca &amp; Aguas Termales</span>
+<span class="font-bold text-primary-container">20% <span class="text-outline font-normal">(28 pax)</span></span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-3 overflow-hidden">
+<div class="bg-primary-container h-3 rounded-full" style="width: 20%"></div>
+</div>
+</div>
+<!-- Item 4 -->
+<div>
+<div class="flex justify-between items-center text-body-sm font-body-sm mb-1">
+<span class="font-bold text-on-surface">4. Ventanillas de Otuzco &amp; Hacienda La Collpa</span>
+<span class="font-bold text-tertiary-container">17% <span class="text-outline font-normal">(24 pax)</span></span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-3 overflow-hidden">
+<div class="bg-tertiary-container h-3 rounded-full" style="width: 17%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Summary Badge -->
+<div class="mt-space-lg p-3 bg-surface-container/50 rounded-lg border border-outline-variant/30 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">verified</span>
+<span class="text-body-sm font-body-sm text-on-surface">Capacidad total diaria: <strong>160 plazas</strong> en 7 vans</span>
+</div>
+<span class="text-label-sm font-label-sm text-primary font-bold">18 Asientos Restantes Hoy</span>
+</div>
+</div>
+<!-- Right Column (5 Cols): Alertas Operativas y Últimas Transacciones -->
+<div class="lg:col-span-5 flex flex-col gap-space-md">
+<!-- Box 1: Alerta Regulatoria y MTC -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md border border-outline-variant/40 shadow-sm">
+<div class="flex items-center justify-between mb-2">
+<span class="flex items-center gap-1.5 text-title-sm font-title-sm font-bold text-on-surface">
+<span class="material-symbols-outlined text-emerald-600 text-[20px]">verified_user</span>
+                Cumplimiento SUTRAN / MTC
+              </span>
+<span class="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">100% AL DÍA</span>
+</div>
+<p class="text-body-sm font-body-sm text-on-surface-variant">
+              Toda la flota cuenta con SOAT turístico vigente, GPS homologado en enlace satelital e inspección técnica aprobada para rutas interprovinciales.
+            </p>
+</div>
+<!-- Box 2: Últimas Reservas Registradas -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md border border-outline-variant/40 shadow-sm flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between pb-2 border-b border-outline-variant/30">
+<h4 class="text-title-sm font-title-sm font-bold text-on-surface">Últimas Reservas en Ventanilla</h4>
+<span class="text-label-sm font-label-sm text-outline">Jr. 2 de Mayo 569</span>
+</div>
+<div class="divide-y divide-outline-variant/20 mt-2">
+<!-- Reserva 1 -->
+<div class="py-2 flex items-center justify-between text-body-sm font-body-sm">
+<div>
+<div class="font-bold text-on-surface">Marcos Alva (2 boletos)</div>
+<div class="text-[11px] text-outline">Cumbemayo • Pago Yape S/ 70.00</div>
+</div>
+<span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Confirmado</span>
+</div>
+<!-- Reserva 2 -->
+<div class="py-2 flex items-center justify-between text-body-sm font-body-sm">
+<div>
+<div class="font-bold text-on-surface">Familia Quispe (4 boletos)</div>
+<div class="text-[11px] text-outline">Ventanillas Otuzco • Efectivo S/ 140.00</div>
+</div>
+<span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Confirmado</span>
+</div>
+<!-- Reserva 3: Solicitud Pendiente -->
+<div class="py-2 flex items-center justify-between text-body-sm font-body-sm">
+<div>
+<div class="font-bold text-tertiary">Recojo Hotel Laguna Seca</div>
+<div class="text-[11px] text-outline">Baños del Inca • Recojo programado</div>
+</div>
+<button class="text-[11px] font-bold text-white bg-primary hover:bg-[#0e5a52] px-2 py-0.5 rounded">Asignar</button>
+</div>
+</div>
+</div>
+<!-- Direct Contact Reminder -->
+<div class="pt-3 border-t border-outline-variant/30 mt-2 flex items-center justify-between text-[11px] text-outline">
+<span class="">Atención 24/7 de emergencias</span>
+<span class="font-bold text-primary">+51 901 195 392</span>
+</div>
+</div>
+</div>
+</section>
+</main>

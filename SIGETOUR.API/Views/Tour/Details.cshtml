@@ -1,0 +1,167 @@
+@model SIGETOUR.API.Core.Entities.TourPackage
+@{ Layout = "_Layout"; }
+
+<main class="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8">
+  <nav class="flex items-center text-label-md font-label-md text-secondary space-x-2 py-1">
+    <a class="hover:text-primary transition-colors flex items-center gap-1" href="/Tour/Catalog">
+      <span class="material-symbols-outlined text-[16px]">explore</span>
+      <span>Catálogo Oficial</span>
+    </a>
+    <span class="material-symbols-outlined text-outline-variant text-[14px]">chevron_right</span>
+    <span class="text-primary font-semibold">@Model.Title</span>
+  </nav>
+
+  <section class="space-y-4">
+    <div class="flex flex-wrap items-center gap-2.5">
+      <span class="px-3 py-1 bg-surface-container-highest text-primary font-label-sm rounded-full flex items-center gap-1 font-bold border border-primary/20">
+        <span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">landscape</span>
+        @Model.Category
+      </span>
+    </div>
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <h1 class="text-headline-lg-mobile md:text-display-lg font-display-lg text-primary tracking-tight leading-tight">
+          @Model.Title
+        </h1>
+        <div class="flex flex-wrap items-center gap-4 mt-2 text-body-md text-secondary">
+          <div class="flex items-center gap-1">
+            <span class="material-symbols-outlined text-primary text-[20px]">location_on</span>
+            <span>Cajamarca, Perú</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-3 h-auto md:h-[480px] rounded-xl overflow-hidden shadow-sm">
+    @if (Model.Images != null && Model.Images.Any())
+    {
+        var mainImage = Model.Images.FirstOrDefault(i => i.IsMain) ?? Model.Images.First();
+        <div class="md:col-span-2 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[280px]">
+          <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage.ImageUrl" alt="@Model.Title"/>
+        </div>
+        @foreach (var img in Model.Images.Where(i => i.Id != mainImage.Id).Take(3))
+        {
+          <div class="relative group overflow-hidden bg-surface-variant min-h-[160px]">
+            <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@img.ImageUrl" alt="Foto adicional"/>
+          </div>
+        }
+    }
+    else
+    {
+        <div class="md:col-span-4 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[280px] flex items-center justify-center text-on-surface-variant">
+            <span class="text-headline-md font-bold">Sin imágenes referenciales</span>
+        </div>
+    }
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+    <div class="lg:col-span-8 space-y-8">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm">
+        <div class="flex items-center gap-3 p-2">
+          <div class="w-10 h-10 rounded-lg bg-surface-variant flex items-center justify-center text-primary">
+            <span class="material-symbols-outlined text-[24px]">schedule</span>
+          </div>
+          <div>
+            <p class="text-label-sm text-secondary uppercase font-semibold">Duración</p>
+            <p class="text-title-sm font-title-sm text-on-surface">@Model.Duration</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3 p-2 border-t sm:border-t-0 sm:border-l border-outline-variant">
+          <div class="w-10 h-10 rounded-lg bg-surface-variant flex items-center justify-center text-primary">
+            <span class="material-symbols-outlined text-[24px]">hiking</span>
+          </div>
+          <div>
+            <p class="text-label-sm text-secondary uppercase font-semibold">Exigencia</p>
+            <p class="text-title-sm font-title-sm text-on-surface">@Model.Difficulty</p>
+          </div>
+        </div>
+      </div>
+
+      <section class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
+        <div class="flex items-center gap-2 border-b border-outline-variant pb-3">
+          <span class="material-symbols-outlined text-primary text-[24px]">description</span>
+          <h2 class="text-headline-sm font-headline-sm text-primary">Resumen del Circuito Turístico</h2>
+        </div>
+        <p class="text-body-lg font-body-lg text-on-surface-variant leading-relaxed">
+          @Model.Description
+        </p>
+      </section>
+
+      @if (Model.ItineraryStops != null && Model.ItineraryStops.Any())
+      {
+          <section class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-6">
+            <div class="flex items-center justify-between border-b border-outline-variant pb-3">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[24px]">route</span>
+                <h2 class="text-headline-sm font-headline-sm text-primary">Itinerario Paso a Paso</h2>
+              </div>
+            </div>
+            <div class="relative pl-6 sm:pl-8 space-y-8 before:absolute before:left-[11px] sm:before:left-[15px] before:top-3 before:bottom-3 before:w-0.5 before:bg-outline-variant">
+                @{ int step = 1; }
+                @foreach (var stop in Model.ItineraryStops.OrderBy(s => s.OrderIndex))
+                {
+                    <div class="relative flex items-start gap-4">
+                      <div class="absolute -left-[23px] sm:-left-[31px] top-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-label-sm ring-4 ring-surface-container-lowest shadow-sm">
+                        @step
+                      </div>
+                      <div class="bg-surface-container-low p-4 rounded-lg w-full border border-outline-variant">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                          <span class="text-label-md font-label-md text-primary font-bold">Hora por definir</span>
+                        </div>
+                        <h3 class="text-title-sm font-title-sm text-on-surface mt-1">@stop.Name</h3>
+                        <p class="text-body-md text-on-surface-variant mt-1">
+                          
+                        </p>
+                      </div>
+                    </div>
+                    step++;
+                }
+            </div>
+          </section>
+      }
+
+      <section class="grid grid-cols-1 gap-4">
+        <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
+          <div class="flex items-center gap-2 text-primary border-b border-outline-variant pb-3">
+            <span class="material-symbols-outlined text-[24px]">check_circle</span>
+            <h2 class="text-title-md font-title-md font-bold">Qué Incluye</h2>
+          </div>
+          <ul class="space-y-3 text-body-sm text-on-surface">
+            @if (Model.Inclusions != null)
+            {
+                foreach (var inc in Model.Inclusions)
+                {
+                    <li class="flex items-start gap-2">
+                      <span class="material-symbols-outlined text-primary text-[18px]">check</span>
+                      @inc.Description
+                    </li>
+                }
+            }
+          </ul>
+        </div>
+      </section>
+    <!-- RIGHT COLUMN: STICKY BOOKING PANEL (4 Cols) -->
+    <aside class="lg:col-span-4 sticky top-24">
+      <div class="bg-surface-container-lowest rounded-2xl p-6 border border-primary/20 shadow-lg relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-3">
+          <span class="material-symbols-outlined text-[48px] text-primary/10" style="font-variation-settings: 'FILL' 1;">tour</span>
+        </div>
+        <div class="relative z-10 space-y-6">
+          <div class="border-b border-outline-variant/60 pb-5">
+            <p class="text-label-sm font-label-sm text-secondary uppercase tracking-wider font-semibold mb-1">Precio Oficial de Mostrador</p>
+            <div class="flex items-end gap-2 text-primary">
+              <span class="text-label-lg font-bold pb-1">S/</span>
+              <span class="text-display-lg font-display-lg leading-none">@Model.BasePrice.ToString("0.00")</span>
+            </div>
+            <p class="text-xs text-outline font-medium mt-1">Por persona (No incluye IGV si requiere factura)</p>
+          </div>
+          <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20reservar%20el%20Tour%20@Uri.EscapeDataString(Model.Title)" target="_blank" class="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg uppercase tracking-wider shadow-md active:scale-95 transition-all">
+            <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+            <span>Reservar Ahora</span>
+          </a>
+        </div>
+      </div>
+    </aside>
+  </div>
+</main>

@@ -1,0 +1,260 @@
+<!DOCTYPE html><html class="h-full" lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Turismo Chilón - Panel Central Cajamarca</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "tertiary": "#b0251b",
+            "on-tertiary-container": "#fffbff",
+            "surface-variant": "#b5ede7",
+            "primary": "#00685a",
+            "outline": "#6d7a76",
+            "on-primary-container": "#f4fffa",
+            "tertiary-fixed-dim": "#ffb4a9",
+            "surface-container-lowest": "#ffffff",
+            "surface-tint": "#006b5c",
+            "tertiary-container": "#d33f30",
+            "secondary-fixed-dim": "#a2cfcf",
+            "background": "#e4fffb",
+            "surface-container-low": "#c6fef8",
+            "primary-fixed-dim": "#71d8c3",
+            "secondary-fixed": "#beebeb",
+            "surface": "#e4fffb",
+            "on-tertiary-fixed": "#410000",
+            "tertiary-fixed": "#ffdad5",
+            "on-secondary-fixed": "#002020",
+            "secondary-container": "#beebeb",
+            "surface-container": "#c1f9f3",
+            "surface-container-high": "#bbf3ed",
+            "error": "#ba1a1a",
+            "on-secondary-fixed-variant": "#224d4e",
+            "on-error-container": "#93000a",
+            "outline-variant": "#bdc9c5",
+            "surface-container-highest": "#b5ede7",
+            "surface-bright": "#e4fffb",
+            "error-container": "#ffdad6",
+            "on-surface": "#00201e",
+            "surface-dim": "#ade5df",
+            "primary-container": "#008472",
+            "on-secondary-container": "#416b6c",
+            "primary-fixed": "#8ef5df",
+            "inverse-on-surface": "#c3fcf5",
+            "on-primary-fixed": "#00201b",
+            "secondary": "#3b6566",
+            "inverse-surface": "#003734",
+            "on-primary-fixed-variant": "#005045",
+            "on-tertiary": "#ffffff",
+            "on-surface-variant": "#3d4946",
+            "on-tertiary-fixed-variant": "#910a07",
+            "on-error": "#ffffff",
+            "on-secondary": "#ffffff",
+            "on-primary": "#ffffff",
+            "on-background": "#00201e",
+            "inverse-primary": "#71d8c3"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "gutter": "1.25rem",
+            "space-xl": "2.5rem",
+            "margin": "1rem",
+            "margin-md": "2rem",
+            "margin-lg": "3.5rem",
+            "gutter-lg": "2rem",
+            "space-sm": "0.5rem",
+            "space-lg": "1.5rem",
+            "space-md": "1rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "headline-md": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "body-md": ["Plus Jakarta Sans"],
+            "title-sm": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "title-md": ["Plus Jakarta Sans"],
+            "headline-lg-mobile": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+            "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+            "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.04em", "fontWeight": "700"}],
+            "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600"}],
+            "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+            "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+            "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "title-sm": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+            "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+            "title-md": ["18px", {"lineHeight": "26px", "fontWeight": "600"}],
+            "headline-lg-mobile": ["26px", {"lineHeight": "34px", "fontWeight": "700"}],
+            "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+            "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #bdc9c5;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-surface font-body-md text-on-surface h-full flex flex-col overflow-hidden antialiased">
+<!-- TOP APP BAR -->
+<header class="bg-surface-container-lowest dark:bg-inverse-surface border-b border-outline-variant dark:border-outline shadow-sm flex justify-between items-center w-full px-space-lg py-space-sm shrink-0 z-30">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-sm bg-white p-1 rounded-lg border border-outline-variant/30">
+<img alt="Foto de perfil del Administrador de Turismo Chilón" class="h-10 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA418HlYgLM2V8ufbicRSZe3WiwFD80IhK7kjiUezcwFF9F_CeRFGUIPTJulkVhUOhEN5cmAaj3ta3_l3-UkTwCEYXMYTeor7kI8L2fQHDEo5sOt_FV8VWsQDU612MgYBMHH9AsPAWdl4YuPE8m8w_ZE42u43C21Iom_xU0OiAnStcNdpefRgQCdz1gi1QqB5ZI08SrQT6KVzYGfxDLj-5UPh5CbtpJ-wE1Fwr_bXVdjKYEqmFEgkTRksJJuWe00M9grak">
+<span class="text-title-md font-title-md font-bold text-primary dark:text-inverse-primary tracking-wide hidden sm:inline">Turismo Chilón</span>
+</div>
+<!-- Quick Passenger/Booking Search -->
+<div class="relative hidden lg:block w-80">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">search</span>
+<input class="w-full pl-9 pr-4 py-1.5 bg-surface/50 border border-outline-variant/60 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Buscar pasajero, DNI o reserva..." type="text">
+</div>
+</div>
+<!-- Central Operational Status Tag -->
+<div class="hidden xl:flex items-center gap-space-sm px-space-md py-1 bg-surface-container rounded-full border border-primary/20">
+<span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
+<span class="text-label-sm font-label-sm text-primary font-bold">OPERACIONES Y DESPACHOS EN LÍNEA</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant">• Jr. 2 de Mayo 569, Cajamarca</span>
+</div>
+<!-- Trailing Actions Cluster -->
+<div class="flex items-center gap-space-sm">
+<!-- Caja Chica Quick Button -->
+<div class="flex items-center gap-space-xs bg-primary/10 border border-primary/20 px-space-md py-1.5 rounded-lg text-primary">
+<span class="material-symbols-outlined text-[20px]">point_of_sale</span>
+<div class="flex flex-col text-left">
+<span class="text-label-sm font-label-sm leading-none text-primary font-bold">Caja Chica</span>
+<span class="text-body-sm font-body-sm leading-tight text-on-surface font-semibold">S/ 4,220.00</span>
+</div>
+</div>
+<!-- Notifications -->
+<button class="relative p-2 rounded-lg text-on-surface-variant hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-200 active:scale-95" title="Notificaciones">
+<span class="material-symbols-outlined text-[22px]">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-tertiary rounded-full"></span>
+</button>
+<!-- Help Desk -->
+<button class="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-200 active:scale-95" title="Soporte y Ayuda">
+<span class="material-symbols-outlined text-[22px]">help</span>
+</button>
+<!-- User Profile Lockup -->
+<div class="h-6 w-px bg-outline-variant/60 mx-1"></div>
+<div class="flex items-center gap-space-xs pl-1">
+<div class="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-label-md">
+          TC
+        </div>
+<div class="hidden md:flex flex-col text-left">
+<span class="text-label-md font-label-md font-bold text-on-surface">Admin Central</span>
+<span class="text-label-sm font-label-sm text-outline">Cajamarca Sede</span>
+</div>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SIDE NAV BAR -->
+<aside class="bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline h-full w-64 flex flex-col justify-between shrink-0 select-none">
+<div class="flex flex-col h-full py-space-md px-space-sm shrink-0">
+<!-- Subheader context -->
+<div class="px-space-md py-space-sm mb-space-sm border-b border-outline-variant/40 flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">directions_bus</span>
+</div>
+<div>
+<div class="text-title-sm font-title-sm font-bold text-on-surface">Panel Central</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant text-[11px]">Cajamarca Operaciones</div>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<nav class="space-y-1 flex-1">
+<!-- Item 1: Dashboard (ACTIVE) -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg bg-primary-container text-on-primary-container font-label-lg transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="">Dashboard</span>
+</a>
+<!-- Item 2: Catálogo Tours -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
+<span class="material-symbols-outlined text-[20px]">tour</span>
+<span class="">Catálogo Tours</span>
+</a>
+<!-- Item 3: Salidas y Flota -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
+<span class="material-symbols-outlined text-[20px]">directions_bus</span>
+<span class="">Salidas y Flota</span>
+</a>
+<!-- Item 4: Despacho -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
+<span class="material-symbols-outlined text-[20px]">departure_board</span>
+<span class="">Despacho</span>
+</a>
+<!-- Item 5: Caja y Finanzas -->
+<a class="flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-150 active:scale-98" asp-controller="Admin" asp-action="Tours">
+<span class="material-symbols-outlined text-[20px]">point_of_sale</span>
+<span class="">Caja y Finanzas</span>
+</a>
+<!-- Side Action CTA -->
+<div class="pt-space-md px-1">
+<button class="w-full bg-primary hover:bg-[#0e5a52] text-on-primary py-2.5 px-space-md rounded-lg font-label-lg flex items-center justify-center gap-2 shadow-sm transition-all duration-150 active:scale-95">
+<span class="material-symbols-outlined text-[20px]">add_circle</span>
+<span class="">Nuevo Tour</span>
+</button>
+</div>
+</nav>
+<!-- Agency Direct Contact Block -->
+<div class="my-space-sm p-3 bg-surface-container/60 rounded-xl border border-outline-variant/30 text-body-sm">
+<div class="text-label-sm font-label-sm text-primary font-bold mb-1">CENTRAL TELEFÓNICA</div>
+<div class="text-body-sm font-body-sm font-semibold text-on-surface">+51 901 195 392</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant">+51 944 746 364</div>
+</div>
+<!-- Footer Navigation Items -->
+<div class="border-t border-outline-variant/50 pt-2 space-y-1">
+<a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg text-on-surface-variant font-label-md hover:bg-surface-container-high transition-colors" asp-controller="Admin" asp-action="Tours">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="">Ajustes</span>
+</a>
+<a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg text-tertiary font-label-md hover:bg-error-container/30 transition-colors" asp-controller="Admin" asp-action="Tours">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+<span class="">Cerrar Sesión</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- MAIN DASHBOARD CONTENT AREA -->
+<main class="flex-1 overflow-y-auto custom-scrollbar p-space-lg flex flex-col gap-space-lg">
+    @RenderBody()
+</div>
+
+
+</body></html>
