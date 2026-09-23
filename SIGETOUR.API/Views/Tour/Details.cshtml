@@ -1,4 +1,4 @@
-﻿@model SIGETOUR.API.Core.Entities.TourPackage
+@model SIGETOUR.API.Core.Entities.TourPackage
 @{ Layout = "_Layout"; }
 
 <main class="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8">
@@ -11,25 +11,19 @@
     <span class="text-primary font-semibold">@Model.Title</span>
   </nav>
 
-  <section class="space-y-4">
+  <section class="space-y-2">
     <div class="flex flex-wrap items-center gap-2.5">
       <span class="px-3 py-1 bg-surface-container-highest text-primary font-label-sm rounded-full flex items-center gap-1 font-bold border border-primary/20">
         <span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">landscape</span>
         @Model.Category
       </span>
     </div>
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-      <div>
-        <h1 class="text-headline-lg-mobile md:text-display-lg font-display-lg text-primary tracking-tight leading-tight">
-          @Model.Title
-        </h1>
-        <div class="flex flex-wrap items-center gap-4 mt-2 text-body-md text-secondary">
-          <div class="flex items-center gap-1">
-            <span class="material-symbols-outlined text-primary text-[20px]">location_on</span>
-            <span>Cajamarca, Perú</span>
-          </div>
-        </div>
-      </div>
+    <h1 class="text-3xl md:text-5xl font-bold text-on-surface tracking-tight leading-tight">
+      @Model.Title
+    </h1>
+    <div class="flex items-center gap-1 text-body-md text-secondary">
+      <span class="material-symbols-outlined text-primary text-[20px]">location_on</span>
+      <span>Cajamarca, Perú</span>
     </div>
   </section>
 
@@ -170,6 +164,8 @@
     </aside>
   </div>
 </main>
+
+
 
 
 
