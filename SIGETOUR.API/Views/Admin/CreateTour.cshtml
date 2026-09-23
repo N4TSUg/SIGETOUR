@@ -370,18 +370,35 @@
             </text>
         }
     });
+        let currentDeleteImageId = null;
+    let currentDeleteImageBtn = null;
+
     function deleteExistingImage(id, btnElement) {
-        if (confirm("¿Estás seguro de eliminar esta imagen del tour?")) {
-            fetch('/Admin/DeleteTourImage?id=' + id, { method: 'POST' })
-            .then(res => {
-                if (res.ok) {
-                    btnElement.closest('.relative.rounded-lg').remove();
-                } else {
-                    alert('Error al eliminar la imagen.');
-                }
-            });
-        }
+        currentDeleteImageId = id;
+        currentDeleteImageBtn = btnElement;
+        document.getElementById('deleteImageModal').classList.remove('hidden');
     }
+
+    function closeImageModal() {
+        document.getElementById('deleteImageModal').classList.add('hidden');
+        currentDeleteImageId = null;
+        currentDeleteImageBtn = null;
+    }
+
+    document.getElementById('confirmImageDeleteBtn').addEventListener('click', () => {
+        if (!currentDeleteImageId) return;
+        
+        fetch('/Admin/DeleteTourImage?id=' + currentDeleteImageId, { method: 'POST' })
+        .then(res => {
+            if (res.ok) {
+                currentDeleteImageBtn.closest('.relative.rounded-lg').remove();
+                closeImageModal();
+            } else {
+                alert('Error al eliminar la imagen.');
+                closeImageModal();
+            }
+        });
+    });
 </script>
 
 <!-- SECTION 6: Galería Multimedia y Subida de Imágenes -->
@@ -465,7 +482,39 @@
     </button>
 </div>
 </div> <!-- End of left column space-y-6 -->
-</form></main>
+</form><!-- MODAL DE CONFIRMACIÓN: ELIMINAR IMAGEN -->
+<div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="deleteImageModal">
+  <div class="bg-surface-container-lowest rounded-2xl w-full max-w-md border border-tertiary/30 overflow-hidden transform transition-all duration-200 shadow-xl">
+    <div class="h-1.5 w-full bg-red-500"></div>
+    <div class="p-5 pb-3 flex items-start justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
+                <span class="material-symbols-outlined text-[24px]">delete</span>
+            </div>
+            <div>
+                <h3 class="text-title-md font-title-md text-on-surface font-bold leading-snug">¿Eliminar esta imagen?</h3>
+            </div>
+        </div>
+        <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" onclick="closeImageModal()" type="button">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+    </div>
+    <div class="px-5 py-3">
+        <p class="text-body-md font-body-md text-on-surface-variant leading-relaxed">
+            Esta acción eliminará permanentemente la imagen del servidor y no se podrá deshacer. ¿Deseas continuar?
+        </p>
+    </div>
+    <div class="p-5 pt-4 flex justify-end gap-3">
+        <button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md font-bold hover:bg-surface-container transition-all" onclick="closeImageModal()" type="button">Cancelar</button>
+        <button type="button" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700" id="confirmImageDeleteBtn">
+            <span class="material-symbols-outlined text-[18px]">delete_forever</span>
+            <span>Sí, Eliminar</span>
+        </button>
+    </div>
+  </div>
+</div>
+</main>
+
 
 
 
