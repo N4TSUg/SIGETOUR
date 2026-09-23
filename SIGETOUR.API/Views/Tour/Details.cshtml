@@ -73,7 +73,12 @@
           </div>
           <div>
             <p class="text-label-sm text-secondary uppercase font-semibold">Exigencia</p>
-            <p class="text-title-sm font-title-sm text-on-surface">@Model.Difficulty</p>
+            <p class="text-title-sm font-title-sm text-on-surface">@(Model.Difficulty switch {
+    SIGETOUR.API.Core.Enums.TourDifficulty.Ligero => "Ligero",
+    SIGETOUR.API.Core.Enums.TourDifficulty.Moderado => "Moderado",
+    SIGETOUR.API.Core.Enums.TourDifficulty.Exigente => "Exigente",
+    _ => "No especificado"
+})</p>
           </div>
         </div>
       </div>
@@ -165,6 +170,7 @@
     </aside>
   </div>
 </main>
+
 
 
 

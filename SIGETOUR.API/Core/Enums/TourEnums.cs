@@ -1,4 +1,4 @@
-namespace SIGETOUR.API.Core.Enums
+﻿namespace SIGETOUR.API.Core.Enums
 {
     public enum TourCategory
     {
@@ -17,8 +17,9 @@ namespace SIGETOUR.API.Core.Enums
 
     public enum TourDifficulty
     {
-        Facil = 1,
+        Ligero = 1,
         Moderado = 2,
         Exigente = 3
     }
 }
+

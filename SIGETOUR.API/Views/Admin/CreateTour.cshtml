@@ -72,23 +72,23 @@
 </label>
 </div>
 </div>
-<!-- Nivel de Exigencia Física -->
+<!-- Nivel de Exigencia -->
 <div class="md:col-span-2">
-<label class="block text-label-md font-label-md text-on-surface mb-1.5">Nivel de Dificultad Física</label>
-<div class="flex flex-wrap gap-3">
-<label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-bright/30 hover:bg-surface-container cursor-pointer">
-<input class="text-primary focus:ring-primary" name="dificultad" type="radio">
-<span class="text-label-md font-label-md text-on-surface">Fácil (Apto para toda la familia)</span>
-</label>
-<label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-primary bg-primary/10 cursor-pointer">
-<input checked="" class="text-primary focus:ring-primary" name="dificultad" type="radio">
-<span class="text-label-md font-label-md text-primary font-bold">Moderado (Caminata a 3,500 msnm)</span>
-</label>
-<label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-bright/30 hover:bg-surface-container cursor-pointer">
-<input class="text-primary focus:ring-primary" name="dificultad" type="radio">
-<span class="text-label-md font-label-md text-on-surface">Exigente (Trekking andino)</span>
-</label>
-</div>
+  <label class="block text-label-md font-label-md text-on-surface mb-1.5">Nivel de Exigencia</label>
+  <div class="flex flex-wrap gap-3">
+  <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-bright/30 hover:bg-surface-container cursor-pointer">
+    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="1" type="radio">
+    <span class="text-label-md font-label-md text-on-surface">Ligero (Apto para toda la familia)</span>
+  </label>
+  <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-bright/30 hover:bg-surface-container cursor-pointer">
+    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="2" type="radio">
+    <span class="text-label-md font-label-md text-on-surface">Moderado (Caminata a 3,500 msnm)</span>
+  </label>
+  <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-bright/30 hover:bg-surface-container cursor-pointer">
+    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="3" type="radio">
+    <span class="text-label-md font-label-md text-on-surface">Exigente (Trekking andino)</span>
+  </label>
+  </div>
 </div>
 </div>
 </section>
@@ -511,6 +511,8 @@
   </div>
 </div>
 </main>
+
+
 
 
 
