@@ -3,7 +3,7 @@
     Layout = "_AdminLayout";
     ViewData["Title"] = "Crear Tour";
 }
-<main class="flex-1 overflow-y-auto bg-surface p-4 lg:p-6"><form method="post" action="@(Model.Id == Guid.Empty ? "/Admin/CreateTour" : "/Admin/EditTour")"><input type="hidden" asp-for="Id" />
+<main class="flex-1 overflow-y-auto bg-surface p-4 lg:p-6"><form method="post" enctype="multipart/form-data" action="@(Model.Id == Guid.Empty ? "/Admin/CreateTour" : "/Admin/EditTour")"><input type="hidden" asp-for="Id" />
 <!-- Top Action Title Bar with Quick Breadcrumbs -->
 <div class="max-w-7xl mx-auto space-y-6">
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-outline-variant/60">
@@ -45,7 +45,7 @@
 <label class="block text-label-md font-label-md text-on-surface mb-1.5">
                     Nombre Comercial del Tour / Circuito *
                   </label>
-<input class="w-full px-3.5 py-2 text-body-md font-body-md bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary focus:border-transparent focus:bg-surface-container-lowest" type="text" asp-for="Title" placeholder="Ej: Circuito Cumbemayo" required>
+<input class="w-full px-3.5 py-2 text-body-md font-body-md bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary focus:border-transparent focus:bg-surface-container-lowest" type="text" asp-for="Title" placeholder="Ej: @(string.IsNullOrEmpty(Model.Title) ? "Nuevo Circuito/Tour" : Model.Title)" required>
 <span class="text-label-sm font-label-sm text-on-surface-variant/80 mt-1 block">Visible en boleterías, página de reservas y comprobantes electrónicos.</span>
 </div>
 <!-- Categoría Temática -->
@@ -332,7 +332,7 @@
 <!-- Price Floating Badge -->
 <div class="absolute bottom-3 right-3 bg-surface-container-lowest/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-outline-variant shadow-md text-right">
 <span class="text-label-sm font-label-sm text-on-surface-variant block leading-none">Desde</span>
-<span class="text-headline-sm font-headline-sm font-extrabold text-primary">S/ 35.00</span>
+<span class="text-headline-sm font-headline-sm font-extrabold text-primary">S/ @Model.BasePrice.ToString("0.00")</span>
 <span class="text-label-sm font-label-sm text-on-surface-variant">/ persona</span>
 </div>
 <!-- Difficulty Pill -->
@@ -345,7 +345,7 @@
 <div class="p-4 space-y-3.5">
 <div>
 <h3 class="text-title-md font-title-md font-bold text-on-surface leading-snug">
-                      Circuito Cumbemayo Arqueológico &amp; Frailones
+                      @(string.IsNullOrEmpty(Model.Title) ? "Nuevo Circuito/Tour" : Model.Title)
                     </h3>
 <p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2 mt-1">
                       Explora la obra de ingeniería hidráulica más asombrosa de América precolombina y el bosque de rocas sagrado.
@@ -384,6 +384,10 @@
 </div>
 <!-- Guaranteed Badges -->
 <div class="p-2.5 rounded-lg bg-surface-container-low/60 border border-primary/20 flex items-center justify-between text-label-sm font-label-sm"><div class="flex items-center gap-1.5 text-primary font-semibold"><span class="material-symbols-outlined text-sm">verified</span><span class="">Salida Garantizada</span></div><span class="text-secondary font-semibold">SOAT Turístico</span></div>
+<div class="col-span-1 md:col-span-2">
+  <label class="block text-label-md font-label-md text-on-surface mb-2 font-bold">Imágenes del Tour</label>
+  <input type="file" name="ImageFiles" multiple accept="image/*" class="w-full px-3.5 py-2 bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface" />
+</div>
 <!-- Mock CTA Button -->
 <button class="w-full py-2.5 rounded-lg bg-tertiary-container hover:bg-tertiary text-on-tertiary-container font-label-lg shadow-sm text-center tracking-wide uppercase font-bold text-xs transition-colors">
                     Reservar Asiento Online
@@ -441,5 +445,6 @@
 </div>
 </div>
 </form></main>
+
 
 

@@ -1,12 +1,16 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
 using System.Linq;
 using System.Threading.Tasks;
 using System;
+using System.IO;
+using System.Collections.Generic;
 
 namespace SIGETOUR.API.Controllers.UI
 {
@@ -15,15 +19,16 @@ namespace SIGETOUR.API.Controllers.UI
     {
         private readonly AppDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IWebHostEnvironment _env;
 
-        public AdminController(AppDbContext context, UserManager<ApplicationUser> userManager)
+        public AdminController(AppDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment env)
         {
             _context = context;
             _userManager = userManager;
+            _env = env;
         }
 
         // ... existing Dashboard, Tours, Bookings, Fleet, Users methods ...
-
         public async Task<IActionResult> Dashboard()
         {
             var toursCount = await _context.TourPackages.CountAsync();
@@ -94,12 +99,14 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateTour(TourPackage model)
+        public async Task<IActionResult> CreateTour(TourPackage model, IFormFileCollection ImageFiles)
         {
             model.Id = Guid.NewGuid();
             if (string.IsNullOrEmpty(model.Slug)) {
                 model.Slug = model.Title.ToLower().Replace(" ", "-");
             }
+            
+            await ProcessImages(model, ImageFiles);
             
             _context.TourPackages.Add(model);
             await _context.SaveChangesAsync();
@@ -112,14 +119,13 @@ namespace SIGETOUR.API.Controllers.UI
             var tour = await _context.TourPackages.FindAsync(id);
             if (tour == null) return NotFound();
             
-            // Re-using CreateTour view for editing, but passing the model
             return View("CreateTour", tour);
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditTour(TourPackage model)
+        public async Task<IActionResult> EditTour(TourPackage model, IFormFileCollection ImageFiles)
         {
-            var tour = await _context.TourPackages.FindAsync(model.Id);
+            var tour = await _context.TourPackages.Include(t => t.Images).FirstOrDefaultAsync(t => t.Id == model.Id);
             if (tour == null) return NotFound();
 
             tour.Title = model.Title;
@@ -137,6 +143,8 @@ namespace SIGETOUR.API.Controllers.UI
                 tour.Slug = model.Slug;
             }
 
+            await ProcessImages(tour, ImageFiles);
+
             _context.TourPackages.Update(tour);
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Tours));
@@ -153,5 +161,38 @@ namespace SIGETOUR.API.Controllers.UI
             }
             return RedirectToAction(nameof(Tours));
         }
+
+        private async Task ProcessImages(TourPackage tour, IFormFileCollection files)
+        {
+            if (files != null && files.Count > 0)
+            {
+                var uploadsFolder = Path.Combine(_env.WebRootPath, "images", "tours");
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                foreach (var file in files)
+                {
+                    if (file.Length > 0)
+                    {
+                        var uniqueFileName = Guid.NewGuid().ToString() + "_" + file.FileName;
+                        var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+                        
+                        using (var fileStream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await file.CopyToAsync(fileStream);
+                        }
+                        
+                        tour.Images.Add(new TourImage 
+                        { 
+                            ImageUrl = "/images/tours/" + uniqueFileName,
+                            IsMain = tour.Images.Count == 0 
+                        });
+                    }
+                }
+            }
+        }
     }
 }
+
