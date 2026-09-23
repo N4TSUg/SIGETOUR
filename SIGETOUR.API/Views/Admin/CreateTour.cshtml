@@ -252,6 +252,18 @@
                 <input type="checkbox" name="Inclusions" value="Extintor de incendios" class="mt-1 rounded text-primary focus:ring-primary h-4 w-4" />
                 <span class="text-body-sm font-body-sm text-on-surface">Extintor de incendios</span>
             </label>
+                    <label class="flex items-start gap-3 p-3 rounded-lg bg-surface-bright/30 border border-outline-variant/60 cursor-pointer hover:bg-surface-container-low transition-colors">
+                <input type="checkbox" name="Inclusions" value="Botiquín de Primeros Auxilios" class="mt-1 rounded text-primary focus:ring-primary h-4 w-4" />
+                <span class="text-body-sm font-body-sm text-on-surface">Botiquín de Primeros Auxilios</span>
+            </label>
+            <label class="flex items-start gap-3 p-3 rounded-lg bg-surface-bright/30 border border-outline-variant/60 cursor-pointer hover:bg-surface-container-low transition-colors">
+                <input type="checkbox" name="Inclusions" value="Boleto de Entrada al Complejo Arqueológico (Opcional)" class="mt-1 rounded text-primary focus:ring-primary h-4 w-4" />
+                <span class="text-body-sm font-body-sm text-on-surface">Boleto de Entrada al Complejo Arqueológico (Opcional)</span>
+            </label>
+            <label class="flex items-start gap-3 p-3 rounded-lg bg-surface-bright/30 border border-outline-variant/60 cursor-pointer hover:bg-surface-container-low transition-colors">
+                <input type="checkbox" name="Inclusions" value="Póliza SOAT turística vigente interprovincial" class="mt-1 rounded text-primary focus:ring-primary h-4 w-4" />
+                <span class="text-body-sm font-body-sm text-on-surface">Póliza SOAT turística vigente interprovincial</span>
+            </label>
         </div>
     </div>
 </section>
@@ -274,6 +286,40 @@
         reindexStops();
     }
 
+        function previewImages(event) {
+        const container = document.getElementById('image-preview-container');
+        const emptyMsg = document.getElementById('empty-images-msg');
+        const files = event.target.files;
+        
+        if(files.length > 0 && emptyMsg) {
+            emptyMsg.style.display = 'none';
+        }
+        
+        container.innerHTML = '';
+        
+        Array.from(files).forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const div = document.createElement('div');
+                div.className = 'relative rounded-lg border border-outline-variant overflow-hidden bg-surface-container-low group shadow-sm flex flex-col';
+                div.innerHTML = 
+                    <div class="relative h-32 w-full overflow-hidden bg-surface-container">
+                        <img src=" + e.target.result + " class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                         + (index === 0 ? <span class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-primary text-on-primary text-xs font-label-sm font-bold shadow-sm flex items-center gap-1"><span class="material-symbols-outlined text-xs">star</span><span>Principal</span></span> : '') + 
+                    </div>
+                    <div class="p-2.5 bg-surface-container-lowest flex-1 flex flex-col justify-between">
+                        <span class="text-xs font-semibold text-on-surface truncate block mb-1.5"> + file.name + </span>
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary font-bold">Nueva</span>
+                            <span class="text-xs text-on-surface-variant font-medium"> + (file.size / 1024 / 1024).toFixed(1) +  MB</span>
+                        </div>
+                    </div>
+                ;
+                container.appendChild(div);
+            }
+            reader.readAsDataURL(file);
+        });
+    }
     function reindexStops() {
         const container = document.getElementById('itinerary-stops-container');
         const stops = container.children;
@@ -313,14 +359,45 @@
     });
 </script>
 
-<!-- SECTION IMAGE UPLOAD -->
-<section class="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant/70 shadow-sm relative overflow-hidden">
-    <div class="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
-    <div class="flex items-center gap-2 mb-4">
-        <span class="material-symbols-outlined text-primary text-xl">image</span>
-        <h2 class="text-title-md font-title-md text-on-surface">Imágenes del Tour</h2>
+<!-- SECTION 5: Galería Multimedia y Subida de Imágenes -->
+<section class="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant/70 shadow-sm relative overflow-hidden mb-6">
+    <div class="absolute top-0 left-0 w-1.5 h-full bg-primary-container"></div>
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary-container text-xl">add_photo_alternate</span>
+            <h2 class="text-title-md font-title-md text-on-surface">5. Galería Multimedia y Subida de Imágenes del Tour</h2>
+        </div>
+        <!-- Note: Limit removed as requested -->
     </div>
-    <input type="file" name="ImageFiles" multiple accept="image/*" class="w-full px-3.5 py-2 bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface" />
+  
+    <!-- Drag and Drop Upload Zone -->
+    <div class="border-2 border-dashed border-primary/40 hover:border-primary rounded-xl p-6 bg-surface-bright/30 hover:bg-surface-container-low/40 transition-colors duration-150 flex flex-col items-center justify-center text-center cursor-pointer mb-5 group" onclick="document.getElementById('TourImagesInput').click()">
+        <input type="file" name="ImageFiles" id="TourImagesInput" multiple accept="image/*" class="hidden" onchange="previewImages(event)" />
+        <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-150 mb-3">
+            <span class="material-symbols-outlined text-28px">cloud_upload</span>
+        </div>
+        <p class="text-title-sm font-title-sm font-bold text-on-surface mb-1">
+            Arrastra y suelta fotografías del circuito aquí o haz clic
+        </p>
+        <p class="text-body-sm font-body-sm text-on-surface-variant max-w-md mb-3">
+            Formatos JPG, PNG o WebP (Recomendado 1200x800px). <strong>Sin límite de imágenes.</strong>
+        </p>
+        <button type="button" class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-md shadow-sm transition-all duration-150 active:scale-95 flex items-center gap-2">
+            <span class="material-symbols-outlined text-base">file_upload</span>
+            <span>Examinar Archivos / Subir Fotos</span>
+        </button>
+    </div>
+  
+    <!-- Photo Preview & Management Grid -->
+    <div>
+        <label class="block text-label-md font-label-md text-on-surface mb-3 font-semibold">Fotografías Seleccionadas para Subir</label>
+        <div id="image-preview-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <!-- Dynamic Previews will be injected here via JS -->
+            <div class="col-span-full text-center py-8 text-on-surface-variant text-sm border-2 border-dashed border-outline-variant rounded-lg" id="empty-images-msg">
+                Aún no has seleccionado imágenes.
+            </div>
+        </div>
+    </div>
 </section>
 
 <!-- ACTION BUTTON BAR -->
@@ -335,6 +412,7 @@
 </div>
 </div> <!-- End of left column space-y-6 -->
 </form></main>
+
 
 
 
