@@ -169,26 +169,21 @@ namespace SIGETOUR.API.Controllers.UI
                 tour.Slug = model.Slug;
             }
 
-                        // Update Stops
-            var oldStops = tour.ItineraryStops.ToList();
-            _context.Set<ItineraryStop>().RemoveRange(oldStops);
-            tour.ItineraryStops.Clear();
-            
+                        // Actualizar Paradas del Itinerario
+            // Eliminar directamente desde la base de datos sin tocar la coleccion en memoria
+            await _context.Set<ItineraryStop>().Where(s => s.TourPackageId == tour.Id).ExecuteDeleteAsync();
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
-                        tour.ItineraryStops.Add(new ItineraryStop { Id = Guid.NewGuid(), Name = Stops[i], OrderIndex = i });
+                        _context.Set<ItineraryStop>().Add(new ItineraryStop { Id = Guid.NewGuid(), TourPackageId = tour.Id, Name = Stops[i], OrderIndex = i });
                 }
             }
 
-            // Update Inclusions
-            var oldInclusions = tour.Inclusions.ToList();
-            _context.Set<TourInclusion>().RemoveRange(oldInclusions);
-            tour.Inclusions.Clear();
-            
+            // Actualizar Inclusiones del Tour
+            await _context.Set<TourInclusion>().Where(i => i.TourPackageId == tour.Id).ExecuteDeleteAsync();
             if (Inclusions != null) {
                 foreach (var inc in Inclusions) {
-                    tour.Inclusions.Add(new TourInclusion { Id = Guid.NewGuid(), Description = inc });
+                    _context.Set<TourInclusion>().Add(new TourInclusion { Id = Guid.NewGuid(), TourPackageId = tour.Id, Description = inc });
                 }
             }
 
@@ -262,6 +257,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 
