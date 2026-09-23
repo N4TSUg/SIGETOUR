@@ -214,15 +214,104 @@
 </div>
 </div>
 </section>
-<!-- SECTION 4: Descripción y Detalles -->
+<!-- SECTION 4: Itinerario & Servicios Incluidos -->
 <section class="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant/70 shadow-sm relative overflow-hidden mb-6">
     <div class="absolute top-0 left-0 w-1.5 h-full bg-tertiary-container"></div>
     <div class="flex items-center gap-2 mb-4">
-        <span class="material-symbols-outlined text-tertiary-container text-xl">description</span>
-        <h2 class="text-title-md font-title-md text-on-surface">4. Descripción e Itinerario</h2>
+        <span class="material-symbols-outlined text-tertiary-container text-xl">checklist_rtl</span>
+        <h2 class="text-title-md font-title-md text-on-surface">4. Hitos del Itinerario y Servicios Incluidos</h2>
     </div>
-    <textarea asp-for="Description" rows="5" class="w-full px-3.5 py-2 text-body-md font-body-md bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Escribe aquí el detalle del itinerario y lo que incluye..."></textarea>
+
+    <!-- Puntos Clave de Parada / Visita -->
+    <div class="mb-6">
+        <div class="flex justify-between items-center mb-2">
+            <label class="block text-label-md font-label-md text-on-surface font-semibold">Paradas y Miradores en Ruta (Orden Secuencial)</label>
+            <button type="button" onclick="addStop()" class="text-primary hover:text-primary-container text-sm font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-[16px]">add_circle</span> Agregar Parada
+            </button>
+        </div>
+        
+        <div id="itinerary-stops-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            <!-- Dynamic Stops will be injected here -->
+        </div>
+    </div>
+
+    <!-- Inclusiones -->
+    <div>
+        <label class="block text-label-md font-label-md text-on-surface mb-2 font-semibold">Servicios Incluidos en el Paquete</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="flex items-start gap-3 p-3 rounded-lg bg-surface-bright/30 border border-outline-variant/60 cursor-pointer hover:bg-surface-container-low transition-colors">
+                <input type="checkbox" name="Inclusions" value="Transporte turístico con A/C" class="mt-1 rounded text-primary focus:ring-primary h-4 w-4" />
+                <span class="text-body-sm font-body-sm text-on-surface">Transporte turístico con A/C</span>
+            </label>
+            <label class="flex items-start gap-3 p-3 rounded-lg bg-surface-bright/30 border border-outline-variant/60 cursor-pointer hover:bg-surface-container-low transition-colors">
+                <input type="checkbox" name="Inclusions" value="Balón de oxígeno" class="mt-1 rounded text-primary focus:ring-primary h-4 w-4" />
+                <span class="text-body-sm font-body-sm text-on-surface">Balón de oxígeno</span>
+            </label>
+            <label class="flex items-start gap-3 p-3 rounded-lg bg-surface-bright/30 border border-outline-variant/60 cursor-pointer hover:bg-surface-container-low transition-colors">
+                <input type="checkbox" name="Inclusions" value="Extintor de incendios" class="mt-1 rounded text-primary focus:ring-primary h-4 w-4" />
+                <span class="text-body-sm font-body-sm text-on-surface">Extintor de incendios</span>
+            </label>
+        </div>
+    </div>
 </section>
+
+<script>
+    let stopCount = 0;
+    function addStop(name = '') {
+        stopCount++;
+        const container = document.getElementById('itinerary-stops-container');
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 p-2.5 rounded-lg bg-surface-bright/30 border border-outline-variant/60';
+        div.innerHTML = 
+            <span class="w-5 h-5 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold"> + stopCount + </span>
+            <input type="text" name="Stops" value=" + name + " class="w-full bg-transparent border-none p-0 text-body-sm font-body-sm text-on-surface focus:ring-0" placeholder="Ej: Mirador Bellavista" required />
+            <button type="button" onclick="this.parentElement.remove(); reindexStops();" class="text-error hover:text-red-700 ml-auto">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+        ;
+        container.appendChild(div);
+        reindexStops();
+    }
+
+    function reindexStops() {
+        const container = document.getElementById('itinerary-stops-container');
+        const stops = container.children;
+        stopCount = stops.length;
+        for (let i = 0; i < stops.length; i++) {
+            stops[i].querySelector('span').innerText = (i + 1);
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        // Render existing stops if editing
+        @if (Model.ItineraryStops != null && Model.ItineraryStops.Any())
+        {
+            foreach (var stop in Model.ItineraryStops.OrderBy(s => s.OrderIndex))
+            {
+                <text>addStop('@Html.Raw(stop.Name.Replace("'", "\\'"))');</text>
+            }
+        }
+        else
+        {
+            <text>addStop();</text> // Add one empty stop by default
+        }
+        
+        // Check inclusions
+        @if (Model.Inclusions != null && Model.Inclusions.Any())
+        {
+            var inclusionsList = string.Join(",", Model.Inclusions.Select(i => i.Description));
+            <text>
+            const serverInclusions = '@Html.Raw(inclusionsList.Replace("'", "\\'"))';
+            document.querySelectorAll('input[name="Inclusions"]').forEach(checkbox => {
+                if (serverInclusions.includes(checkbox.value)) {
+                    checkbox.checked = true;
+                }
+            });
+            </text>
+        }
+    });
+</script>
 
 <!-- SECTION IMAGE UPLOAD -->
 <section class="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant/70 shadow-sm relative overflow-hidden">
@@ -246,5 +335,7 @@
 </div>
 </div> <!-- End of left column space-y-6 -->
 </form></main>
+
+
 
 

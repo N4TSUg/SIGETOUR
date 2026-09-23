@@ -28,7 +28,6 @@ namespace SIGETOUR.API.Controllers.UI
             _env = env;
         }
 
-        // ... existing Dashboard, Tours, Bookings, Fleet, Users methods ...
         public async Task<IActionResult> Dashboard()
         {
             var toursCount = await _context.TourPackages.CountAsync();
@@ -99,11 +98,24 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateTour(TourPackage model, IFormFileCollection ImageFiles)
+        public async Task<IActionResult> CreateTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] Inclusions)
         {
             model.Id = Guid.NewGuid();
             if (string.IsNullOrEmpty(model.Slug)) {
                 model.Slug = model.Title.ToLower().Replace(" ", "-");
+            }
+            
+            if (Stops != null) {
+                for (int i = 0; i < Stops.Length; i++) {
+                    if (!string.IsNullOrWhiteSpace(Stops[i]))
+                        model.ItineraryStops.Add(new ItineraryStop { Name = Stops[i], OrderIndex = i });
+                }
+            }
+            
+            if (Inclusions != null) {
+                foreach (var inc in Inclusions) {
+                    model.Inclusions.Add(new TourInclusion { Description = inc });
+                }
             }
             
             await ProcessImages(model, ImageFiles);
@@ -116,16 +128,25 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpGet]
         public async Task<IActionResult> EditTour(Guid id)
         {
-            var tour = await _context.TourPackages.FindAsync(id);
+            var tour = await _context.TourPackages
+                .Include(t => t.Inclusions)
+                .Include(t => t.ItineraryStops)
+                .FirstOrDefaultAsync(t => t.Id == id);
+                
             if (tour == null) return NotFound();
             
             return View("CreateTour", tour);
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditTour(TourPackage model, IFormFileCollection ImageFiles)
+        public async Task<IActionResult> EditTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] Inclusions)
         {
-            var tour = await _context.TourPackages.Include(t => t.Images).FirstOrDefaultAsync(t => t.Id == model.Id);
+            var tour = await _context.TourPackages
+                .Include(t => t.Images)
+                .Include(t => t.ItineraryStops)
+                .Include(t => t.Inclusions)
+                .FirstOrDefaultAsync(t => t.Id == model.Id);
+                
             if (tour == null) return NotFound();
 
             tour.Title = model.Title;
@@ -141,6 +162,23 @@ namespace SIGETOUR.API.Controllers.UI
             tour.IsActive = model.IsActive;
             if (!string.IsNullOrEmpty(model.Slug)) {
                 tour.Slug = model.Slug;
+            }
+
+            // Update Stops
+            _context.ItineraryStops.RemoveRange(tour.ItineraryStops);
+            if (Stops != null) {
+                for (int i = 0; i < Stops.Length; i++) {
+                    if (!string.IsNullOrWhiteSpace(Stops[i]))
+                        tour.ItineraryStops.Add(new ItineraryStop { Name = Stops[i], OrderIndex = i });
+                }
+            }
+
+            // Update Inclusions
+            _context.TourInclusions.RemoveRange(tour.Inclusions);
+            if (Inclusions != null) {
+                foreach (var inc in Inclusions) {
+                    tour.Inclusions.Add(new TourInclusion { Description = inc });
+                }
             }
 
             await ProcessImages(tour, ImageFiles);
@@ -195,4 +233,3 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
-
