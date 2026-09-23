@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIGETOUR.API.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SIGETOUR.API.Infrastructure.Data;
 namespace SIGETOUR.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260923073005_AddBookings")]
+    partial class AddBookings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -439,10 +442,6 @@ namespace SIGETOUR.API.Migrations
                     b.Property<int>("RequiredAdvancePercentage")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Subtitle")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -473,7 +472,6 @@ namespace SIGETOUR.API.Migrations
                             MaxCapacity = 19,
                             Modality = 1,
                             RequiredAdvancePercentage = 50,
-                            Slug = "ventanillas-de-otuzco",
                             Subtitle = "Cementerio pre-inca",
                             Title = "Ventanillas de Otuzco"
                         },
@@ -490,7 +488,6 @@ namespace SIGETOUR.API.Migrations
                             MaxCapacity = 19,
                             Modality = 1,
                             RequiredAdvancePercentage = 50,
-                            Slug = "collpa",
                             Subtitle = "Llamado de Vacas por su nombre",
                             Title = "Collpa"
                         },
@@ -507,7 +504,6 @@ namespace SIGETOUR.API.Migrations
                             MaxCapacity = 15,
                             Modality = 1,
                             RequiredAdvancePercentage = 50,
-                            Slug = "castillo-de-yanamarca",
                             Subtitle = "Estilo medieval",
                             Title = "Castillo de Yanamarca"
                         });

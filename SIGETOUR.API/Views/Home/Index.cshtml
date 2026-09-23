@@ -1,3 +1,4 @@
+﻿@model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
 <main class="flex-grow">
 <!-- Hero Section -->
 <section class="relative bg-gradient-to-b from-[#e6faf5] via-[#f0fdf9] to-white overflow-hidden pt-8 pb-20 md:pt-14 md:pb-24 border-b border-outline-variant/60">
@@ -41,7 +42,7 @@
 <!-- Hero Graphic / Media Preview -->
 <div class="lg:col-span-5">
 <div class="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white group">
-<img class="w-full h-[410px] object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A breathtaking vista of Cumbemayo in Cajamarca Peru, featuring towering natural rock formations called Los Frailones standing under a crisp bright Andean morning sky." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5UbZyU3SVvD2tu1aa_CHtteeQYkcL95cOvzvOcpIvu2wSDQFk8OL5-zpj4BP6Uc-Y1r1upOagIGL6XDZpRir4poouS_nNhq2AifsBuQaEozOwlBGaWtnIQEQ9hvuSPBJtvX6363rCI9x3MuzlbenUMZ7Vj1a43rtQrRu2GIM7MwqP97sw5n7gLF40B_reiszc5H8G7C5LPdPKUwK_HQmvoq71Fuo9LebjDlQT-LCe2SCAXdmtiNCurQ">
+<img class="w-full h-[410px] object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A breathtaking vista of Cumbemayo in Cajamarca Perú, featuring towering natural rock formations called Los Frailones standing under a crisp bright Andean morning sky." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5UbZyU3SVvD2tu1aa_CHtteeQYkcL95cOvzvOcpIvu2wSDQFk8OL5-zpj4BP6Uc-Y1r1upOagIGL6XDZpRir4poouS_nNhq2AifsBuQaEozOwlBGaWtnIQEQ9hvuSPBJtvX6363rCI9x3MuzlbenUMZ7Vj1a43rtQrRu2GIM7MwqP97sw5n7gLF40B_reiszc5H8G7C5LPdPKUwK_HQmvoq71Fuo9LebjDlQT-LCe2SCAXdmtiNCurQ">
 <div class="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md p-4 rounded-xl shadow-lg border border-outline-variant flex items-center justify-between">
 <div>
 <span class="text-[11px] font-bold text-accent-red uppercase tracking-wider block">Destino Insignia</span>
@@ -117,36 +118,55 @@
 <!-- Trust Badges & Guarantees -->
 <section class="py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-<div class="bg-white p-6 rounded-2xl border border-outline-variant shadow-sm flex items-start gap-4">
-<div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 text-primary">
-<span class="material-symbols-outlined text-2xl" data-icon="security">security</span>
-</div>
-<div>
-<h3 class="font-bold text-base text-secondary">Flota con SOAT &amp; GPS</h3>
-<p class="text-xs text-on-surface-variant mt-1">Monitoreo satelital en tiempo real y póliza de seguro vehicular turística activa.</p>
-</div>
-</div>
-<div class="bg-white p-6 rounded-2xl border border-outline-variant shadow-sm flex items-start gap-4"><div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 text-primary"><span class="material-symbols-outlined text-2xl" data-icon="schedule">schedule</span></div><div><h3 class="font-bold text-base text-secondary">Salidas Puntuales</h3><p class="text-xs text-on-surface-variant mt-1">Salidas matutinas y vespertinas diarias con total puntualidad y asistencia permanente.</p></div></div>
-<div class="bg-white p-6 rounded-2xl border border-outline-variant shadow-sm flex items-start gap-4">
-<div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 text-primary">
-<span class="material-symbols-outlined text-2xl" data-icon="storefront">storefront</span>
-</div>
-<div>
-<h3 class="font-bold text-base text-secondary">Oficina Céntrica</h3>
-<p class="text-xs text-on-surface-variant mt-1">Ubicada en Jr. 2 de Mayo 569 para embarques directos y atención personalizada.</p>
-</div>
-</div>
-<div class="bg-white p-6 rounded-2xl border border-outline-variant shadow-sm flex items-start gap-4">
-<div class="w-12 h-12 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0 text-primary">
-<span class="material-symbols-outlined text-2xl" data-icon="support_agent">support_agent</span>
-</div>
-<div>
-<h3 class="font-bold text-base text-secondary">Atención Directa</h3>
-<p class="text-xs text-on-surface-variant mt-1">Comunicación por WhatsApp y llamadas directas al 901 195 392 / 944 746 364.</p>
-</div>
-</div>
-</div>
-</section>
+    @if (Model != null && Model.Any())
+    {
+        foreach (var tour in Model)
+        {
+            <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-outline-variant flex flex-col group">
+                <div class="relative h-48 overflow-hidden bg-surface-container">
+                    @if (tour.Images != null && tour.Images.Any())
+                    {
+                        <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@tour.Images.First().ImageUrl" alt="@tour.Title">
+                    }
+                    else
+                    {
+                        <div class="w-full h-full flex flex-col items-center justify-center text-on-surface-variant/60">
+                            <span class="material-symbols-outlined text-4xl mb-2">landscape</span>
+                            <span class="text-sm font-semibold">Sin imágenes</span>
+                        </div>
+                    }
+                    <span class="absolute top-3 right-3 bg-white/95 text-secondary font-bold text-xs px-2.5 py-1 rounded-full shadow-xs">
+                        @tour.Duration
+                    </span>
+                    <span class="absolute top-3 left-3 bg-secondary text-white text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-xs">
+                        <span class="material-symbols-outlined text-[14px] text-amber-400" data-icon="star">star</span> 4.9
+                    </span>
+                </div>
+                <div class="p-5 flex flex-col flex-grow">
+                    <h3 class="font-bold text-lg text-secondary">@tour.Title</h3>
+                    <p class="text-xs text-on-surface-variant mt-2 flex-grow leading-relaxed line-clamp-2">
+                        @tour.Description
+                    </p>
+                    <div class="mt-4 pt-3 border-t border-outline-variant space-y-1.5 text-xs text-on-surface-variant">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[16px] text-primary" data-icon="explore">explore</span>
+                            Categoría: @tour.Category
+                        </div>
+                    </div>
+                    <div class="mt-5 flex items-center justify-between">
+                        <div>
+                            <span class="text-[11px] text-on-surface-variant block">Desde</span>
+                            <span class="text-xl font-extrabold text-secondary">S/ @tour.BasePrice</span>
+                        </div>
+                        <a asp-controller="Tour" asp-action="Details" asp-route-slug="@tour.Slug" class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg font-bold text-xs transition-colors">
+                            Ver Detalles
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div></section>
 <!-- Featured Tour Packages -->
 <section class="py-14 bg-white border-y border-outline-variant/60" id="tours">
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -570,3 +590,7 @@
 </section>
 </main>
 <!-- Footer -->
+
+
+
+

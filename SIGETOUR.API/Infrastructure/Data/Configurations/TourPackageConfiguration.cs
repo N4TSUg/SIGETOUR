@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Core.Enums;
@@ -57,7 +57,7 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                 new TourPackage
                 {
                     Id = pkg1Id,
-                    Title = "Ventanillas de Otuzco",
+                    Title = "Ventanillas de Otuzco", Slug = "ventanillas-de-otuzco",
                     Subtitle = "Cementerio pre-inca",
                     Category = TourCategory.ArqueologiaYPetroglifos,
                     Modality = TourModality.Regular,
@@ -73,7 +73,7 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                 new TourPackage
                 {
                     Id = pkg2Id,
-                    Title = "Collpa",
+                    Title = "Collpa", Slug = "collpa",
                     Subtitle = "Llamado de Vacas por su nombre",
                     Category = TourCategory.TradicionYAgroturismo,
                     Modality = TourModality.Regular,
@@ -89,7 +89,7 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                 new TourPackage
                 {
                     Id = pkg3Id,
-                    Title = "Castillo de Yanamarca",
+                    Title = "Castillo de Yanamarca", Slug = "castillo-de-yanamarca",
                     Subtitle = "Estilo medieval",
                     Category = TourCategory.CityTour,
                     Modality = TourModality.Regular,
@@ -106,3 +106,6 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
         }
     }
 }
+
+
+

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SIGETOUR.API.Infrastructure.Data;
@@ -11,9 +12,11 @@ using SIGETOUR.API.Infrastructure.Data;
 namespace SIGETOUR.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260923074011_AddTourSlug")]
+    partial class AddTourSlug
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -473,7 +476,7 @@ namespace SIGETOUR.API.Migrations
                             MaxCapacity = 19,
                             Modality = 1,
                             RequiredAdvancePercentage = 50,
-                            Slug = "ventanillas-de-otuzco",
+                            Slug = "",
                             Subtitle = "Cementerio pre-inca",
                             Title = "Ventanillas de Otuzco"
                         },
@@ -490,7 +493,7 @@ namespace SIGETOUR.API.Migrations
                             MaxCapacity = 19,
                             Modality = 1,
                             RequiredAdvancePercentage = 50,
-                            Slug = "collpa",
+                            Slug = "",
                             Subtitle = "Llamado de Vacas por su nombre",
                             Title = "Collpa"
                         },
@@ -507,7 +510,7 @@ namespace SIGETOUR.API.Migrations
                             MaxCapacity = 15,
                             Modality = 1,
                             RequiredAdvancePercentage = 50,
-                            Slug = "castillo-de-yanamarca",
+                            Slug = "",
                             Subtitle = "Estilo medieval",
                             Title = "Castillo de Yanamarca"
                         });

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html class="scroll-smooth" lang="es" style=""><head>
+﻿<!DOCTYPE html><html class="scroll-smooth" lang="es" style=""><head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>TURISMO CHILON Transporte &amp; Turismo | Agencia Oficial Cajamarca</title>
@@ -84,9 +84,10 @@
       -webkit-font-smoothing: antialiased;
     }
   </style>
+<link rel="icon" type="image/png" href="~/favicon.ico" />
 </head>
 <body class="bg-[#f0fdf9] text-on-surface font-body-md text-[15px] antialiased min-h-screen flex flex-col selection:bg-primary selection:text-on-primary">
-<!-- Top Announcement Bar (Trust & Exact Card Contact Data) -->
+<!-- Top Announcement Bar (Trust & Exact Card Contact Díata) -->
 <div class="bg-secondary text-surface-container-lowest py-2 px-4 text-xs font-medium border-b border-primary/20">
 <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
 <div class="flex items-center gap-3 flex-wrap">
@@ -130,23 +131,26 @@
 </div>
 </a>
 <!-- Desktop Nav Links -->
-<nav class="hidden md:flex items-center space-x-7">
-<a class="text-primary font-bold border-b-2 border-primary pb-1 text-sm tracking-wide" asp-controller="Tour" asp-action="Catalog">
-      Tours y Circuitos
-    </a>
-<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" asp-controller="Tour" asp-action="Catalog">
-      Destinos
-    </a>
-<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#flota">
-      Flota Turística
-    </a>
-<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#testimonios">
-      Nosotros
-    </a>
-<a class="text-on-surface-variant font-medium hover:text-primary transition-colors text-sm" href="#contacto">
-      Contacto
-    </a>
-</nav>
+@{
+    var controller = ViewContext.RouteData.Values["Controller"]?.ToString();
+    var action = ViewContext.RouteData.Values["Action"]?.ToString();
+    var isCatalog = controller == "Tour" && action == "Catalog";
+    var isHome = controller == "Home" && action == "Index";
+    
+    var activeClass = "text-primary font-bold border-b-2 border-primary pb-1 text-sm tracking-wide";
+    var inactiveClass = "text-on-surface-variant font-medium hover:text-primary transition-colors text-sm pb-1";
+    
+    var catalogClass = isCatalog ? activeClass : inactiveClass;
+    var homeClass = isHome ? activeClass : inactiveClass;
+}
+  <!-- Desktop Nav Links -->
+  <nav class="hidden md:flex items-center space-x-7">
+      <a class="@catalogClass" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
+      <a class="@homeClass" asp-controller="Home" asp-action="Index">Inicio</a>
+      <a class="@inactiveClass" href="@(isHome ? "#flota" : "#site-footer")">Flota Turística</a>
+      <a class="@inactiveClass" href="@(isHome ? "#testimonios" : "#site-footer")">Nosotros</a>
+      <a class="@inactiveClass" href="@(isHome ? "#contacto" : "#site-footer")">Contacto</a>
+  </nav>
 <!-- CTA Action Header -->
 <div class="hidden sm:flex items-center gap-3">
 <a class="bg-primary hover:bg-primary-dark text-white font-bold px-5 py-2.5 rounded-lg shadow-sm hover:shadow transition-all duration-150 active:scale-95 text-sm flex items-center gap-2" href="#reservar">
@@ -160,28 +164,19 @@
 </button>
 </div>
 <!-- Mobile Dropdown Menu -->
-<div class="hidden md:hidden border-t border-outline-variant bg-white px-5 pt-3 pb-6 space-y-3" id="mobile-menu">
-<a class="block py-2 text-primary font-bold text-sm" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
-<a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" asp-controller="Tour" asp-action="Catalog">Destinos</a>
-<a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="#flota">Flota Turística</a>
-<a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="#testimonios">Nosotros</a>
-<a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="#contacto">Contacto</a>
-<div class="pt-3 flex flex-col gap-2">
-<a class="w-full justify-center bg-primary hover:bg-primary-dark text-white font-bold px-4 py-3 rounded-lg shadow-sm flex items-center gap-2 text-sm" href="#reservar">
-<span class="material-symbols-outlined text-[18px]" data-icon="book_online">book_online</span>
-      Reservar Ahora
-    </a>
-<a class="w-full justify-center bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold px-4 py-3 rounded-lg shadow-sm flex items-center gap-2 text-sm" href="https://wa.me/51901195392" target="_blank">
-<span class="material-symbols-outlined text-[18px]" data-icon="chat">chat</span>
-      WhatsApp: +51 901 195 392
-    </a>
-</div>
+  <div class="hidden md:hidden border-t border-outline-variant bg-white px-5 pt-3 pb-6 space-y-3" id="mobile-menu">
+      <a class="block py-2 @(isCatalog ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
+      <a class="block py-2 @(isHome ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Home" asp-action="Index">Inicio</a>
+      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#flota" : "#site-footer")">Flota Turística</a>
+      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#testimonios" : "#site-footer")">Nosotros</a>
+      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#contacto" : "#site-footer")">Contacto</a>
+  </div>
 </div>
 </header>
 <main>
     @RenderBody()
 </main>
-<footer class="bg-secondary text-surface-container-high/90 border-t border-primary/20">
+<footer id="site-footer" class="bg-secondary text-surface-container-high/90 border-t border-primary/20">
 <div class="w-full py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10 border-b border-surface-container-high/15">
 <!-- Col 1: Brand -->
@@ -285,3 +280,8 @@
   </a>
 </div>
 </body></html>
+
+
+
+
+

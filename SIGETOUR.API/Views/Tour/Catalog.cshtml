@@ -1,4 +1,4 @@
-@model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
+﻿@model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
 @{ Layout = "_Layout"; }
 <main class="flex-1">
 <!-- HERO SECTION: Destinos y Circuitos Turísticos -->
@@ -48,7 +48,7 @@
 <input class="w-full pl-10 pr-4 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface placeholder:text-outline outline-none" placeholder="Ej. Cumbemayo, Otuzco, Porcón..." type="text">
 </div>
 </div>
-<!-- Date Selector -->
+<!-- Díate Selector -->
 <div class="lg:col-span-3">
 <label class="block text-label-sm font-label-sm text-secondary mb-1">Fecha del Tour</label>
 <div class="relative flex items-center">
@@ -240,7 +240,7 @@
                 else
                 {
                     <div class="w-full h-full flex items-center justify-center bg-surface-variant text-on-surface-variant">
-                        <span class="font-semibold">Sin im�genes referenciales</span>
+                        <span class="font-semibold">Sin imágenes referenciales</span>
                     </div>
                 }
                 <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-black/20"></div>
@@ -274,10 +274,10 @@
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        <a href="/Tour/Details/@tour.Id" class="p-2 border border-outline-variant hover:border-primary text-secondary hover:text-primary rounded-lg text-xs font-bold transition-all" title="Ver Itinerario Completo">
+                        <a href="/Tour/Details/@tour.Slug" class="p-2 border border-outline-variant hover:border-primary text-secondary hover:text-primary rounded-lg text-xs font-bold transition-all" title="Ver Itinerario Completo">
                             <span class="material-symbols-outlined text-[20px]">description</span>
                         </a>
-                        <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chil�n,%20deseo%20reservar%20el%20Tour%20@Uri.EscapeDataString(tour.Title)" target="_blank" class="px-4 py-2.5 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all">
+                        <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20reservar%20el%20Tour%20@Uri.EscapeDíataString(tour.Title)" target="_blank" class="px-4 py-2.5 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95 transition-all">
                             <span>Reservar</span>
                             <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
                         </a>
@@ -383,7 +383,7 @@
 </div>
 <!-- Simulated Map / Geographic Location Representation -->
 <div class="lg:col-span-7 h-80 rounded-2xl overflow-hidden relative border border-outline-variant/70 shadow-inner bg-surface-container-low flex flex-col justify-end p-6" data-location="Cajamarca">
-<img class="absolute inset-0 w-full h-full object-cover" data-alt="Stylized architectural graphic map of downtown Cajamarca Peru with Jr 2 de Mayo marked clearly in teal pins, Plaza de Armas, colonial grid street pattern rendered in clean light tones, petrol teal roads and soft mint green accents conveying precision travel navigation." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeq-L60p8o17y1aWsoJUS3_zCO82fgUMb_4JW4ws4-rOZ1jFsyLPcow0-GiVirPfHbjX3bvYBs-XYtkRha6dcKkeJqTN_wCPmNZ6_yRxW9ME1MWBoY4PKJ6aRdUd1a9sYQnjUV42uqe_oBKsM50uXoYX37xp-jtdqIFGVatKpH-kDvPa75OxEhkj3LKlP2fj40AKjYVel-ozENIEN6YH_PZml3jSTWQ7KAiZCxv5b4fiNmNXDyqNzfEQ">
+<img class="absolute inset-0 w-full h-full object-cover" data-alt="Stylized architectural graphic map of downtown Cajamarca Perú with Jr 2 de Mayo marked clearly in teal pins, Plaza de Armas, colonial grid street pattern rendered in clean light tones, petrol teal roads and soft mint green accents conveying precision travel navigation." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeq-L60p8o17y1aWsoJUS3_zCO82fgUMb_4JW4ws4-rOZ1jFsyLPcow0-GiVirPfHbjX3bvYBs-XYtkRha6dcKkeJqTN_wCPmNZ6_yRxW9ME1MWBoY4PKJ6aRdUd1a9sYQnjUV42uqe_oBKsM50uXoYX37xp-jtdqIFGVatKpH-kDvPa75OxEhkj3LKlP2fj40AKjYVel-ozENIEN6YH_PZml3jSTWQ7KAiZCxv5b4fiNmNXDyqNzfEQ">
 <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/90 via-inverse-surface/30 to-transparent"></div>
 <div class="relative z-10 bg-surface-container-lowest/95 backdrop-blur-md p-4 rounded-xl border border-outline-variant/80 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
 <div class="flex items-center gap-3">
@@ -395,7 +395,7 @@
 <span class="text-xs text-secondary">Jr. 2 de Mayo 569 (Embarque Directo)</span>
 </div>
 </div>
-<a class="px-4 py-2 bg-primary hover:bg-primary-container text-on-primary rounded-lg text-xs font-label-md font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 transition-colors" href="https://maps.google.com/?q=Jr.+2+de+Mayo+569+Cajamarca+Peru" target="_blank">
+<a class="px-4 py-2 bg-primary hover:bg-primary-container text-on-primary rounded-lg text-xs font-label-md font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 transition-colors" href="https://maps.google.com/?q=Jr.+2+de+Mayo+569+Cajamarca+Perú" target="_blank">
 <span class="">Abrir en Google Maps</span>
 <span class="material-symbols-outlined text-[16px]">open_in_new</span>
 </a>
@@ -405,3 +405,6 @@
 </section>
 </main>
 <!-- FOOTER (Institutional - Strictly adheres to brand & no unauthorized domain) -->
+
+
+

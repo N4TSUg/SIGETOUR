@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SIGETOUR.API.Infrastructure.Data;
@@ -25,9 +25,11 @@ namespace SIGETOUR.API.Controllers.UI
             return View(tours);
         }
 
-        public async Task<IActionResult> Details(Guid id)
+        
+        [Route("Tour/Details/{slug?}")]
+        public async Task<IActionResult> Details(string slug)
         {
-            if (id == Guid.Empty)
+            if (string.IsNullOrEmpty(slug))
             {
                 // Si no mandan ID, por ejemplo al entrar a /Tour/Details desde el header quemado, 
                 // podemos redirigir al catálogo o mostrar el primero. Redirigimos por seguridad.
@@ -38,7 +40,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(t => t.Images)
                 .Include(t => t.Inclusions)
                 .Include(t => t.ItineraryStops)
-                .FirstOrDefaultAsync(t => t.Id == id);
+                .FirstOrDefaultAsync(t => t.Slug == slug);
 
             if (tour == null)
             {
@@ -49,3 +51,6 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
+
+

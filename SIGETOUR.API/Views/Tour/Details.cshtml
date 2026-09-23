@@ -1,11 +1,11 @@
-@model SIGETOUR.API.Core.Entities.TourPackage
+ï»¿@model SIGETOUR.API.Core.Entities.TourPackage
 @{ Layout = "_Layout"; }
 
 <main class="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8">
   <nav class="flex items-center text-label-md font-label-md text-secondary space-x-2 py-1">
     <a class="hover:text-primary transition-colors flex items-center gap-1" href="/Tour/Catalog">
       <span class="material-symbols-outlined text-[16px]">explore</span>
-      <span>Catálogo Oficial</span>
+      <span>CatÃ¡logo Oficial</span>
     </a>
     <span class="material-symbols-outlined text-outline-variant text-[14px]">chevron_right</span>
     <span class="text-primary font-semibold">@Model.Title</span>
@@ -26,7 +26,7 @@
         <div class="flex flex-wrap items-center gap-4 mt-2 text-body-md text-secondary">
           <div class="flex items-center gap-1">
             <span class="material-symbols-outlined text-primary text-[20px]">location_on</span>
-            <span>Cajamarca, Perú</span>
+            <span>Cajamarca, PerÃº</span>
           </div>
         </div>
       </div>
@@ -50,7 +50,7 @@
     else
     {
         <div class="md:col-span-4 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[280px] flex items-center justify-center text-on-surface-variant">
-            <span class="text-headline-md font-bold">Sin imágenes referenciales</span>
+            <span class="text-headline-md font-bold">Sin imÃ¡genes referenciales</span>
         </div>
     }
   </section>
@@ -63,7 +63,7 @@
             <span class="material-symbols-outlined text-[24px]">schedule</span>
           </div>
           <div>
-            <p class="text-label-sm text-secondary uppercase font-semibold">Duración</p>
+            <p class="text-label-sm text-secondary uppercase font-semibold">DuraciÃ³n</p>
             <p class="text-title-sm font-title-sm text-on-surface">@Model.Duration</p>
           </div>
         </div>
@@ -81,7 +81,7 @@
       <section class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
         <div class="flex items-center gap-2 border-b border-outline-variant pb-3">
           <span class="material-symbols-outlined text-primary text-[24px]">description</span>
-          <h2 class="text-headline-sm font-headline-sm text-primary">Resumen del Circuito Turístico</h2>
+          <h2 class="text-headline-sm font-headline-sm text-primary">Resumen del Circuito TurÃ­stico</h2>
         </div>
         <p class="text-body-lg font-body-lg text-on-surface-variant leading-relaxed">
           @Model.Description
@@ -125,7 +125,7 @@
         <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-4">
           <div class="flex items-center gap-2 text-primary border-b border-outline-variant pb-3">
             <span class="material-symbols-outlined text-[24px]">check_circle</span>
-            <h2 class="text-title-md font-title-md font-bold">Qué Incluye</h2>
+            <h2 class="text-title-md font-title-md font-bold">Qu Incluye</h2>
           </div>
           <ul class="space-y-3 text-body-sm text-on-surface">
             @if (Model.Inclusions != null)
@@ -156,7 +156,7 @@
             </div>
             <p class="text-xs text-outline font-medium mt-1">Por persona (No incluye IGV si requiere factura)</p>
           </div>
-          <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20reservar%20el%20Tour%20@Uri.EscapeDataString(Model.Title)" target="_blank" class="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg uppercase tracking-wider shadow-md active:scale-95 transition-all">
+          <a href="https://wa.me/51901195392?text=Hola%20Turismo%20ChilÃ³n,%20deseo%20reservar%20el%20Tour%20@Uri.EscapeDÃ­ataString(Model.Title)" target="_blank" class="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg uppercase tracking-wider shadow-md active:scale-95 transition-all">
             <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
             <span>Reservar Ahora</span>
           </a>
@@ -165,3 +165,4 @@
     </aside>
   </div>
 </main>
+
