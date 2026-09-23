@@ -167,8 +167,11 @@ namespace SIGETOUR.API.Controllers.UI
                 tour.Slug = model.Slug;
             }
 
-            // Update Stops
-            _context.ItineraryStops.RemoveRange(tour.ItineraryStops);
+                        // Update Stops
+            var oldStops = tour.ItineraryStops.ToList();
+            _context.Set<ItineraryStop>().RemoveRange(oldStops);
+            tour.ItineraryStops.Clear();
+            
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
@@ -177,7 +180,10 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             // Update Inclusions
-            _context.TourInclusions.RemoveRange(tour.Inclusions);
+            var oldInclusions = tour.Inclusions.ToList();
+            _context.Set<TourInclusion>().RemoveRange(oldInclusions);
+            tour.Inclusions.Clear();
+            
             if (Inclusions != null) {
                 foreach (var inc in Inclusions) {
                     tour.Inclusions.Add(new TourInclusion { Description = inc });
@@ -254,6 +260,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 
