@@ -31,7 +31,7 @@
 <!-- WORKSPACE GRID: Bento Formulation (8 Cols Left) + Live Preview Sticky (4 Cols Right) -->
 <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
 <!-- LEFT FORM COLUMN (xl:col-span-8) -->
-<div class="xl:col-span-8 space-y-6">
+<div class="xl:col-span-12 space-y-6 max-w-5xl mx-auto">
 <!-- SECTION 1: Información General del Tour -->
 <section class="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant/70 shadow-sm relative overflow-hidden">
 <div class="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
@@ -214,237 +214,37 @@
 </div>
 </div>
 </section>
-<!-- SECTION 4: Itinerario & Servicios Incluidos -->
-<section class="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant/70 shadow-sm relative overflow-hidden">
-<div class="absolute top-0 left-0 w-1.5 h-full bg-tertiary-container"></div>
-<div class="flex items-center gap-2 mb-4">
-<span class="material-symbols-outlined text-tertiary-container text-xl">checklist_rtl</span>
-<h2 class="text-title-md font-title-md text-on-surface">4. Hitos del Itinerario y Servicios Incluidos</h2>
-</div>
-<!-- Puntos Clave de Parada / Visita -->
-<div class="mb-4">
-<label class="block text-label-md font-label-md text-on-surface mb-2 font-semibold">Paradas y Miradores en Ruta (Orden Secuencial)</label>
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-<div class="flex items-center gap-2 p-2.5 rounded-lg bg-surface-bright/30 border border-outline-variant/60">
-<span class="w-5 h-5 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold">1</span>
-<span class="text-body-sm font-body-sm text-on-surface font-medium">Mirador Bellavista</span>
-</div>
-<div class="flex items-center gap-2 p-2.5 rounded-lg bg-surface-bright/30 border border-outline-variant/60">
-<span class="w-5 h-5 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold">2</span>
-<span class="text-body-sm font-body-sm text-on-surface font-medium">Bosque de Rocas Los Frailones</span>
-</div>
-<div class="flex items-center gap-2 p-2.5 rounded-lg bg-surface-bright/30 border border-outline-variant/60">
-<span class="w-5 h-5 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold">3</span>
-<span class="text-body-sm font-body-sm text-on-surface font-medium">Canal Litico &amp; Santuario</span>
-</div>
-</div>
-</div>
-<!-- Inclusiones Obligatorias DIRCETUR -->
-<div>
-<label class="block text-label-md font-label-md text-on-surface mb-2 font-semibold">Servicios Incluidos en el Paquete</label>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-body-sm font-body-sm">
-<label class="flex items-center gap-2 p-2 rounded-lg bg-surface-bright/20 border border-outline-variant/40">
-<input checked="" class="rounded text-primary focus:ring-primary" type="checkbox">
-<span class="">Transporte turístico Mercedes Sprinter con A/C</span>
-</label>
-
-<label class="flex items-center gap-2 p-2 rounded-lg bg-surface-bright/20 border border-outline-variant/40">
-<input checked="" class="rounded text-primary focus:ring-primary" type="checkbox">
-<span class="">Balón de Oxígeno &amp; Botiquín de Primeros Auxilios</span>
-</label>
-<label class="flex items-center gap-2 p-2 rounded-lg bg-surface-bright/20 border border-outline-variant/40">
-<input checked="" class="rounded text-primary focus:ring-primary" type="checkbox">
-<span class="">Póliza SOAT turística vigente interprovincial</span>
-</label>
-<label class="flex items-center gap-2 p-2 rounded-lg bg-surface-bright/20 border border-outline-variant/40">
-<input class="rounded text-primary focus:ring-primary" type="checkbox">
-<span class="">Boleto de Entrada al Complejo Arqueológico (Opcional)</span>
-</label>
-<label class="flex items-center gap-2 p-2 rounded-lg bg-surface-bright/20 border border-outline-variant/40">
-<input class="rounded text-primary focus:ring-primary" type="checkbox">
-<span class="">Degustación de manjar blanco y rosquitas cajamarquinas</span>
-</label>
-</div>
-</div>
+<!-- SECTION 4: Descripción y Detalles -->
+<section class="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant/70 shadow-sm relative overflow-hidden mb-6">
+    <div class="absolute top-0 left-0 w-1.5 h-full bg-tertiary-container"></div>
+    <div class="flex items-center gap-2 mb-4">
+        <span class="material-symbols-outlined text-tertiary-container text-xl">description</span>
+        <h2 class="text-title-md font-title-md text-on-surface">4. Descripción e Itinerario</h2>
+    </div>
+    <textarea asp-for="Description" rows="5" class="w-full px-3.5 py-2 text-body-md font-body-md bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Escribe aquí el detalle del itinerario y lo que incluye..."></textarea>
 </section>
-<!-- SECTION 5: Asignación Inicial de Flota y Personal -->
+
+<!-- SECTION IMAGE UPLOAD -->
 <section class="bg-surface-container-lowest rounded-xl p-5 border border-outline-variant/70 shadow-sm relative overflow-hidden">
-<div class="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
-<div class="flex items-center gap-2 mb-4">
-<span class="material-symbols-outlined text-primary text-xl">badge</span>
-<h2 class="text-title-md font-title-md text-on-surface">5. Asignación de Recursos Iniciales (Flota)</h2>
-</div>
-<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-<!-- Unidad de Transporte -->
-<div class="sm:col-span-2">
-<label class="block text-label-md font-label-md text-on-surface mb-1.5">Vehículo Asignado por Defecto</label>
-<select class="w-full px-3.5 py-2 text-body-md font-body-md bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface">
-<option selected="">Mercedes-Benz Sprinter 515 • Placa M3A-950 (19 Asientos VIP)</option>
-<option>Mercedes-Benz Sprinter 415 • Placa B4C-210 (15 Asientos)</option>
-<option>Toyota HiAce Commuter • Placa T1B-740 (11 Asientos)</option>
-</select>
-</div>
-<!-- Conductor Designado -->
-
-<!-- Guía Oficial de Turismo -->
-
-</div>
+    <div class="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
+    <div class="flex items-center gap-2 mb-4">
+        <span class="material-symbols-outlined text-primary text-xl">image</span>
+        <h2 class="text-title-md font-title-md text-on-surface">Imágenes del Tour</h2>
+    </div>
+    <input type="file" name="ImageFiles" multiple accept="image/*" class="w-full px-3.5 py-2 bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface" />
 </section>
+
 <!-- ACTION BUTTON BAR -->
-<div class="flex items-center justify-between p-4 bg-surface-container-lowest rounded-xl border border-outline-variant">
-<button class="px-5 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container font-label-md transition-colors" type="button">
-                Descartar Cambios
-              </button>
-<div class="flex items-center gap-3">
-<button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container text-on-surface font-label-md transition-colors" type="button">
-                  Guardar como Borrador
-                </button>
-<button class="px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg shadow-md transition-all duration-150 active:scale-95 flex items-center gap-2" type="submit">
-<span class="material-symbols-outlined text-lg">check_circle</span>
-<span class="">Guardar y Publicar en la Web</span>
-</button>
+<div class="pt-6 border-t border-outline-variant/60 flex flex-col-reverse sm:flex-row justify-end gap-3 items-center mt-6">
+    <a href="/Admin/Tours" class="px-5 py-2.5 rounded-lg text-on-surface-variant hover:bg-surface-container font-label-md transition-colors w-full sm:w-auto text-center">
+        Descartar Cambios
+    </a>
+    <button class="px-6 py-2.5 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg shadow-md transition-all duration-150 active:scale-95 flex items-center gap-2 w-full sm:w-auto justify-center" type="submit">
+        <span class="material-symbols-outlined text-base">cloud_upload</span>
+        @(Model.Id == Guid.Empty ? "Publicar Nuevo Tour" : "Guardar Cambios")
+    </button>
 </div>
-</div>
-</div>
-<!-- RIGHT PREVIEW & STATS COLUMN (xl:col-span-4) -->
-<div class="xl:col-span-4 space-y-6">
-<!-- STICKY LIVE PREVIEW CARD (How customers view this tour online) -->
-<div class="sticky top-4 space-y-6">
-<!-- Preview Header Tag -->
-<div class="flex items-center justify-between px-1">
-<div class="flex items-center gap-1.5 text-label-sm font-label-sm text-secondary uppercase font-bold tracking-wider">
-<span class="material-symbols-outlined text-sm">visibility</span>
-<span class="">Vista Previa en Tiempo Real</span>
-</div>
-<span class="text-label-sm font-label-sm text-primary bg-surface-container px-2 py-0.5 rounded font-semibold">Web Pública</span>
-</div>
-<!-- Customer Web Tour Card Preview -->
-<div class="bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant shadow-lg transition-all duration-200">
-<!-- Tour Image Header with Badges -->
-<div class="relative h-48 w-full overflow-hidden">
-<img class="w-full h-full object-cover" data-alt="Impresionante vista panorámica del acueducto pre-incaico tallado en la roca de Cumbemayo en Cajamarca rodeado por los gigantescos monolitos de piedra Los Frailones bajo un cielo azul andino despejado y soleado." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC196SQWMnvIbloZsM1Qlomi2Yj9xn-Ubz0jFxcx8bksPyKSa-c53AzHfXYMreJyN5_IJ6AbqmOg_BJ47tJCO1wks5Dt0wZVIau3X9hAb61j37giPywRx63cxcbsUmV4CguDrhJwTDUkCd9dBKpWyiAV7MZwwO2q3jvq91l3SehrjFTjfuNQPvYItvuFr4Po1FOfNUpBF91goelVGRF7I-0qZy9demqsjDrFXcE_CpqwSSuiL7e9GVYEg">
-<!-- Gradient Overlay -->
-<div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20"></div>
-<!-- Tag Category -->
-<span class="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-primary/90 text-on-primary text-label-sm font-label-sm backdrop-blur-sm shadow-sm">
-                    Arqueología &amp; Petroglifos
-                  </span>
-<!-- Price Floating Badge -->
-<div class="absolute bottom-3 right-3 bg-surface-container-lowest/95 backdrop-blur-md px-3 py-1.5 rounded-xl border border-outline-variant shadow-md text-right">
-<span class="text-label-sm font-label-sm text-on-surface-variant block leading-none">Desde</span>
-<span class="text-headline-sm font-headline-sm font-extrabold text-primary">S/ @Model.BasePrice.ToString("0.00")</span>
-<span class="text-label-sm font-label-sm text-on-surface-variant">/ persona</span>
-</div>
-<!-- Difficulty Pill -->
-<div class="absolute bottom-3 left-3 flex items-center gap-1 bg-black/40 backdrop-blur-sm text-surface-bright px-2.5 py-1 rounded-lg text-label-sm font-label-sm">
-<span class="material-symbols-outlined text-xs text-secondary-fixed">hiking</span>
-<span class="">Moderado</span>
-</div>
-</div>
-<!-- Tour Details Body -->
-<div class="p-4 space-y-3.5">
-<div>
-<h3 class="text-title-md font-title-md font-bold text-on-surface leading-snug">
-                      @(string.IsNullOrEmpty(Model.Title) ? "Nuevo Circuito/Tour" : Model.Title)
-                    </h3>
-<p class="text-body-sm font-body-sm text-on-surface-variant line-clamp-2 mt-1">
-                      Explora la obra de ingeniería hidráulica más asombrosa de América precolombina y el bosque de rocas sagrado.
-                    </p>
-</div>
-<!-- Highlights Grid -->
-<div class="grid grid-cols-2 gap-2 text-label-sm font-label-sm text-on-surface">
-<div class="flex items-center gap-1.5 text-on-surface-variant">
-<span class="material-symbols-outlined text-base text-primary">schedule</span>
-<span class="">Duración: 4 Horas</span>
-</div>
-<div class="flex items-center gap-1.5 text-on-surface-variant">
-<span class="material-symbols-outlined text-base text-primary">directions_bus</span>
-<span class="">Mercedes Sprinter VIP</span>
-</div>
-<div class="flex items-center gap-1.5 text-on-surface-variant">
-<span class="material-symbols-outlined text-base text-primary">place</span>
-<span class="">Salida: Jr. 2 de Mayo 569</span>
-</div>
-<div class="flex items-center gap-1.5 text-on-surface-variant">
-<span class="material-symbols-outlined text-base text-primary">groups</span>
-<span class="">Cupos: 19 pasajeros</span>
-</div>
-</div>
-<!-- Turnos Chips -->
-<div class="pt-2 border-t border-outline-variant/60">
-<span class="text-label-sm font-label-sm text-on-surface-variant block mb-1.5">Horarios Disponibles:</span>
-<div class="flex items-center gap-2">
-<span class="px-2.5 py-1 rounded-md bg-surface-container text-primary font-label-sm font-bold text-xs">
-                        Mañana: 09:30 AM
-                      </span>
-<span class="px-2.5 py-1 rounded-md bg-surface-container text-primary font-label-sm font-bold text-xs">
-                        Tarde: 03:00 PM
-                      </span>
-</div>
-</div>
-<!-- Guaranteed Badges -->
-<div class="p-2.5 rounded-lg bg-surface-container-low/60 border border-primary/20 flex items-center justify-between text-label-sm font-label-sm"><div class="flex items-center gap-1.5 text-primary font-semibold"><span class="material-symbols-outlined text-sm">verified</span><span class="">Salida Garantizada</span></div><span class="text-secondary font-semibold">SOAT Turístico</span></div>
-<div class="col-span-1 md:col-span-2">
-  <label class="block text-label-md font-label-md text-on-surface mb-2 font-bold">Imágenes del Tour</label>
-  <input type="file" name="ImageFiles" multiple accept="image/*" class="w-full px-3.5 py-2 bg-surface-bright/40 border border-outline-variant rounded-lg text-on-surface" />
-</div>
-<!-- Mock CTA Button -->
-<button class="w-full py-2.5 rounded-lg bg-tertiary-container hover:bg-tertiary text-on-tertiary-container font-label-lg shadow-sm text-center tracking-wide uppercase font-bold text-xs transition-colors">
-                    Reservar Asiento Online
-                  </button>
-</div>
-</div>
-<!-- RESUMEN DE CIRCUITOS ACTIVOS EN CAJAMARCA -->
-<div class="bg-surface-container-lowest rounded-xl p-4 border border-outline-variant shadow-sm space-y-3">
-<div class="flex items-center justify-between pb-2 border-b border-outline-variant/60">
-<div class="text-title-sm font-title-sm font-bold text-on-surface">Circuitos en Catálogo</div>
-<span class="text-label-sm font-label-sm text-primary font-bold">5 Activos</span>
-</div>
-<div class="space-y-2 text-body-sm font-body-sm">
-<!-- Tour 1 -->
-<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-bright transition-colors">
-<div class="flex items-center gap-2">
-<span class="w-2 h-2 rounded-full bg-primary"></span>
-<div>
-<div class="font-semibold text-on-surface text-xs">Granja Porcón &amp; Bosques</div>
-<div class="text-label-sm font-label-sm text-on-surface-variant">S/ 40.00 • Diaria (09:00 AM)</div>
-</div>
-</div>
-<span class="material-symbols-outlined text-base text-on-surface-variant">edit</span>
-</div>
-<!-- Tour 2 -->
-<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-bright transition-colors">
-<div class="flex items-center gap-2">
-<span class="w-2 h-2 rounded-full bg-primary"></span>
-<div>
-<div class="font-semibold text-on-surface text-xs">Ventanillas de Otuzco &amp; Baños</div>
-<div class="text-label-sm font-label-sm text-on-surface-variant">S/ 30.00 • Diaria (03:30 PM)</div>
-</div>
-</div>
-<span class="material-symbols-outlined text-base text-on-surface-variant">edit</span>
-</div>
-<!-- Tour 3 -->
-<div class="flex items-center justify-between p-2 rounded-lg hover:bg-surface-bright transition-colors">
-<div class="flex items-center gap-2">
-<span class="w-2 h-2 rounded-full bg-primary"></span>
-<div>
-<div class="font-semibold text-on-surface text-xs">Laguna San Nicolás &amp; Totora</div>
-<div class="text-label-sm font-label-sm text-on-surface-variant">S/ 45.00 • Interdiario</div>
-</div>
-</div>
-<span class="material-symbols-outlined text-base text-on-surface-variant">edit</span>
-</div>
-</div>
-<!-- Link to full list -->
-<button class="w-full text-center text-label-sm font-label-sm text-primary font-bold pt-1 hover:underline">
-                  Ver los 12 Circuitos del Catálogo →
-                </button>
-</div>
-</div>
-</div>
-</div>
-</div>
+</div> <!-- End of left column space-y-6 -->
 </form></main>
-
 
 
