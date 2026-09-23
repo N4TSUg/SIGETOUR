@@ -61,7 +61,7 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                     Subtitle = "Cementerio pre-inca",
                     Category = TourCategory.ArqueologiaYPetroglifos,
                     Modality = TourModality.Regular,
-                    Difficulty = TourDifficulty.Facil,
+                    Difficulty = TourDifficulty.Ligero,
                     Description = "Ventanillas de Otuzco (Cementerio de la Cultura Cajamarca con más de 3 mil años de antigüedad), Jardín de las Hortensias, Artesanía de Cajamarca, Fundo los Aples o 'Tres Molinos', fábrica artesanal de quesos, mantequilla, manjar blanco, Rosquitas de manteca etc.",
                     BasePrice = 30m,
                     ChildPrice = 20m,
@@ -77,7 +77,7 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                     Subtitle = "Llamado de Vacas por su nombre",
                     Category = TourCategory.TradicionYAgroturismo,
                     Modality = TourModality.Regular,
-                    Difficulty = TourDifficulty.Facil,
+                    Difficulty = TourDifficulty.Ligero,
                     Description = "Ex - hacienda La Collpa, Laguna Artificial, Casa Hacienda, Capilla de la Virgen del Carmen, Establo Central, Llamado de Vacas por su nombre, degustación de Lácteos; visita a las Cascadas de Llacanora según temporada o talleres de cerámica utilitaria y decorativa.",
                     BasePrice = 35m,
                     ChildPrice = 25m,
@@ -93,7 +93,7 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                     Subtitle = "Estilo medieval",
                     Category = TourCategory.CityTour,
                     Modality = TourModality.Regular,
-                    Difficulty = TourDifficulty.Facil,
+                    Difficulty = TourDifficulty.Ligero,
                     Description = "El Castillo de Yanamarca es un moderno atractivo turístico con arquitectura estilo medieval en donde se puede apreciar, pinturas, esculturas de piedra y madera.",
                     BasePrice = 40m,
                     ChildPrice = 30m,
@@ -106,6 +106,7 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
         }
     }
 }
+
 
 
 
