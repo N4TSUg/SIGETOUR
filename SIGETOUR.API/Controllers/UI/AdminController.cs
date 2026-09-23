@@ -129,6 +129,7 @@ namespace SIGETOUR.API.Controllers.UI
         public async Task<IActionResult> EditTour(Guid id)
         {
             var tour = await _context.TourPackages
+                .Include(t => t.Images)
                 .Include(t => t.Inclusions)
                 .Include(t => t.ItineraryStops)
                 .FirstOrDefaultAsync(t => t.Id == id);
@@ -144,6 +145,7 @@ namespace SIGETOUR.API.Controllers.UI
             var tour = await _context.TourPackages
                 .Include(t => t.Images)
                 .Include(t => t.ItineraryStops)
+                .Include(t => t.Images)
                 .Include(t => t.Inclusions)
                 .FirstOrDefaultAsync(t => t.Id == model.Id);
                 
@@ -160,6 +162,7 @@ namespace SIGETOUR.API.Controllers.UI
             tour.Modality = model.Modality;
             tour.Difficulty = model.Difficulty;
             tour.IsActive = model.IsActive;
+            tour.RequiredAdvancePercentage = model.RequiredAdvancePercentage;
             if (!string.IsNullOrEmpty(model.Slug)) {
                 tour.Slug = model.Slug;
             }
@@ -251,4 +254,6 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
+
 
