@@ -108,13 +108,13 @@ namespace SIGETOUR.API.Controllers.UI
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
-                        model.ItineraryStops.Add(new ItineraryStop { Name = Stops[i], OrderIndex = i });
+                        model.ItineraryStops.Add(new ItineraryStop { Id = Guid.NewGuid(), Name = Stops[i], OrderIndex = i });
                 }
             }
             
             if (Inclusions != null) {
                 foreach (var inc in Inclusions) {
-                    model.Inclusions.Add(new TourInclusion { Description = inc });
+                    model.Inclusions.Add(new TourInclusion { Id = Guid.NewGuid(), Description = inc });
                 }
             }
             
@@ -175,7 +175,7 @@ namespace SIGETOUR.API.Controllers.UI
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
-                        tour.ItineraryStops.Add(new ItineraryStop { Name = Stops[i], OrderIndex = i });
+                        tour.ItineraryStops.Add(new ItineraryStop { Id = Guid.NewGuid(), Name = Stops[i], OrderIndex = i });
                 }
             }
 
@@ -186,13 +186,13 @@ namespace SIGETOUR.API.Controllers.UI
             
             if (Inclusions != null) {
                 foreach (var inc in Inclusions) {
-                    tour.Inclusions.Add(new TourInclusion { Description = inc });
+                    tour.Inclusions.Add(new TourInclusion { Id = Guid.NewGuid(), Description = inc });
                 }
             }
 
             await ProcessImages(tour, ImageFiles);
 
-            _context.TourPackages.Update(tour);
+            // _context.TourPackages.Update(tour); // Removed to prevent state overriding
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Tours));
         }
@@ -260,6 +260,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 
