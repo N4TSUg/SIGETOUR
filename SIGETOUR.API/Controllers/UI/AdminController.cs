@@ -121,7 +121,11 @@ namespace SIGETOUR.API.Controllers.UI
             await ProcessImages(model, ImageFiles);
             
             _context.TourPackages.Add(model);
-            await _context.SaveChangesAsync();
+                        try {
+                await _context.SaveChangesAsync();
+            } catch (Exception ex) {
+                return Content($"Error: {ex.Message} | Inner: {ex.InnerException?.Message} | Stack: {ex.StackTrace}");
+            }
             return RedirectToAction(nameof(Tours));
         }
 
@@ -193,7 +197,11 @@ namespace SIGETOUR.API.Controllers.UI
             await ProcessImages(tour, ImageFiles);
 
             // _context.TourPackages.Update(tour); // Removed to prevent state overriding
-            await _context.SaveChangesAsync();
+                        try {
+                await _context.SaveChangesAsync();
+            } catch (Exception ex) {
+                return Content($"Error: {ex.Message} | Inner: {ex.InnerException?.Message} | Stack: {ex.StackTrace}");
+            }
             return RedirectToAction(nameof(Tours));
         }
 
@@ -204,7 +212,11 @@ namespace SIGETOUR.API.Controllers.UI
             if (tour != null)
             {
                 _context.TourPackages.Remove(tour);
+                            try {
                 await _context.SaveChangesAsync();
+            } catch (Exception ex) {
+                return Content($"Error: {ex.Message} | Inner: {ex.InnerException?.Message} | Stack: {ex.StackTrace}");
+            }
             }
             return RedirectToAction(nameof(Tours));
         }
@@ -216,7 +228,11 @@ namespace SIGETOUR.API.Controllers.UI
             if (image != null)
             {
                 _context.Set<TourImage>().Remove(image);
+                            try {
                 await _context.SaveChangesAsync();
+            } catch (Exception ex) {
+                return Content($"Error: {ex.Message} | Inner: {ex.InnerException?.Message} | Stack: {ex.StackTrace}");
+            }
                 
                 try {
                     var filePath = Path.Combine(_env.WebRootPath, image.ImageUrl.TrimStart('/').Replace('/', '\\'));
@@ -260,6 +276,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 
