@@ -264,24 +264,7 @@
 </section>
 
 <script>
-    let stopCount = 0;
-    function addStop(name = '') {
-        stopCount++;
-        const container = document.getElementById('itinerary-stops-container');
-        const div = document.createElement('div');
-        div.className = 'flex items-center gap-2 p-2.5 rounded-lg bg-surface-bright/30 border border-outline-variant/60';
-        div.innerHTML = 
-            <span class="w-5 h-5 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold"> + stopCount + </span>
-            <input type="text" name="Stops" value=" + name + " class="w-full bg-transparent border-none p-0 text-body-sm font-body-sm text-on-surface focus:ring-0" placeholder="Ej: Mirador Bellavista" required />
-            <button type="button" onclick="this.parentElement.remove(); reindexStops();" class="text-error hover:text-red-700 ml-auto">
-                <span class="material-symbols-outlined text-[16px]">close</span>
-            </button>
-        ;
-        container.appendChild(div);
-        reindexStops();
-    }
-
-        function previewImages(event) {
+    function previewImages(event) {
         const container = document.getElementById('image-preview-container');
         const emptyMsg = document.getElementById('empty-images-msg');
         const files = event.target.files;
@@ -297,24 +280,42 @@
             reader.onload = function(e) {
                 const div = document.createElement('div');
                 div.className = 'relative rounded-lg border border-outline-variant overflow-hidden bg-surface-container-low group shadow-sm flex flex-col';
-                div.innerHTML = 
+                div.innerHTML = `
                     <div class="relative h-32 w-full overflow-hidden bg-surface-container">
-                        <img src=" + e.target.result + " class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
-                         + (index === 0 ? <span class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-primary text-on-primary text-xs font-label-sm font-bold shadow-sm flex items-center gap-1"><span class="material-symbols-outlined text-xs">star</span><span>Principal</span></span> : '') + 
+                        <img src="${e.target.result}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                        ${index === 0 ? `<span class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-primary text-on-primary text-xs font-label-sm font-bold shadow-sm flex items-center gap-1"><span class="material-symbols-outlined text-xs">star</span><span>Principal</span></span>` : ''}
                     </div>
                     <div class="p-2.5 bg-surface-container-lowest flex-1 flex flex-col justify-between">
-                        <span class="text-xs font-semibold text-on-surface truncate block mb-1.5"> + file.name + </span>
+                        <span class="text-xs font-semibold text-on-surface truncate block mb-1.5">${file.name}</span>
                         <div class="flex items-center justify-between gap-1">
                             <span class="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary font-bold">Nueva</span>
-                            <span class="text-xs text-on-surface-variant font-medium"> + (file.size / 1024 / 1024).toFixed(1) +  MB</span>
+                            <span class="text-xs text-on-surface-variant font-medium">${(file.size / 1024 / 1024).toFixed(1)} MB</span>
                         </div>
                     </div>
-                ;
+                `;
                 container.appendChild(div);
             }
             reader.readAsDataURL(file);
         });
     }
+
+    let stopCount = 0;
+    function addStop(name = '') {
+        stopCount++;
+        const container = document.getElementById('itinerary-stops-container');
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 p-2.5 rounded-lg bg-surface-bright/30 border border-outline-variant/60';
+        div.innerHTML = `
+            <span class="w-5 h-5 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold">${stopCount}</span>
+            <input type="text" name="Stops" value="${name}" class="w-full bg-transparent border-none p-0 text-body-sm font-body-sm text-on-surface focus:ring-0" placeholder="Ej: Mirador Bellavista" required />
+            <button type="button" onclick="this.parentElement.remove(); reindexStops();" class="text-error hover:text-red-700 ml-auto">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+        `;
+        container.appendChild(div);
+        reindexStops();
+    }
+
     function reindexStops() {
         const container = document.getElementById('itinerary-stops-container');
         const stops = container.children;
@@ -407,6 +408,8 @@
 </div>
 </div> <!-- End of left column space-y-6 -->
 </form></main>
+
+
 
 
 
