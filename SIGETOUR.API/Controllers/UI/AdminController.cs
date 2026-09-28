@@ -98,7 +98,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] Inclusions)
+        public async Task<IActionResult> CreateTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
         {
             model.Id = Guid.NewGuid();
             model.Subtitle ??= string.Empty;
@@ -120,6 +120,20 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
             
+            if (ShiftNames != null) {
+                for (int i = 0; i < ShiftNames.Length; i++) {
+                    if (!string.IsNullOrWhiteSpace(ShiftNames[i])) {
+                        model.Shifts.Add(new TourShift {
+                            Id = Guid.NewGuid(),
+                            ShiftName = ShiftNames[i],
+                            StartTime = TimeSpan.TryParse(ShiftStarts?.ElementAtOrDefault(i), out var st) ? st : TimeSpan.Zero,
+                            EndTime = TimeSpan.TryParse(ShiftEnds?.ElementAtOrDefault(i), out var et) ? et : TimeSpan.Zero,
+                            IsActive = true
+                        });
+                    }
+                }
+            }
+
             await ProcessImages(model, ImageFiles);
             
             _context.TourPackages.Add(model);
@@ -134,6 +148,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(t => t.Images)
                 .Include(t => t.Inclusions)
                 .Include(t => t.ItineraryStops)
+                .Include(t => t.Shifts)
                 .FirstOrDefaultAsync(t => t.Id == id);
                 
             if (tour == null) return NotFound();
@@ -142,7 +157,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] Inclusions)
+        public async Task<IActionResult> EditTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
         {
             var tour = await _context.TourPackages
                 .Include(t => t.Images)
@@ -184,6 +199,23 @@ namespace SIGETOUR.API.Controllers.UI
             if (Inclusions != null) {
                 foreach (var inc in Inclusions) {
                     _context.Set<TourInclusion>().Add(new TourInclusion { Id = Guid.NewGuid(), TourPackageId = tour.Id, Description = inc });
+                }
+            }
+
+            // Actualizar Turnos del Tour
+            await _context.Set<TourShift>().Where(s => s.TourPackageId == tour.Id).ExecuteDeleteAsync();
+            if (ShiftNames != null) {
+                for (int i = 0; i < ShiftNames.Length; i++) {
+                    if (!string.IsNullOrWhiteSpace(ShiftNames[i])) {
+                        _context.Set<TourShift>().Add(new TourShift {
+                            Id = Guid.NewGuid(),
+                            TourPackageId = tour.Id,
+                            ShiftName = ShiftNames[i],
+                            StartTime = TimeSpan.TryParse(ShiftStarts?.ElementAtOrDefault(i), out var st) ? st : TimeSpan.Zero,
+                            EndTime = TimeSpan.TryParse(ShiftEnds?.ElementAtOrDefault(i), out var et) ? et : TimeSpan.Zero,
+                            IsActive = true
+                        });
+                    }
                 }
             }
 
@@ -257,6 +289,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 
