@@ -92,20 +92,31 @@
                         <div>
                             <label class="block font-label-md text-label-md text-on-surface mb-2 font-bold">Turno</label>
                             <div class="grid grid-cols-2 gap-3">
-                                <label class="relative flex items-center justify-between p-3 border border-primary rounded-lg bg-primary/5 cursor-pointer">
-                                    <div>
-                                        <span class="block font-label-md text-label-md text-primary font-bold">Mañana</span>
-                                        <span class="block font-label-sm text-label-sm text-primary">09:00 AM</span>
-                                    </div>
-                                    <input type="radio" name="Shift" value="manana" checked class="text-primary focus:ring-primary h-4 w-4" />
-                                </label>
-                                <label class="relative flex items-center justify-between p-3 border border-outline-variant rounded-lg bg-surface-container-lowest cursor-pointer hover:bg-surface-container-low transition-colors">
-                                    <div>
-                                        <span class="block font-label-md text-label-md text-on-surface font-bold">Tarde</span>
-                                        <span class="block font-label-sm text-label-sm text-secondary">02:30 PM</span>
-                                    </div>
-                                    <input type="radio" name="Shift" value="tarde" class="text-primary focus:ring-primary h-4 w-4" />
-                                </label>
+                                @if (Model.Shifts != null && Model.Shifts.Any())
+                                {
+                                    var first = true;
+                                    foreach (var shift in Model.Shifts)
+                                    {
+                                        var startTime = DateTime.Today.Add(shift.StartTime).ToString("hh:mm tt");
+                                        var isChecked = first ? "checked" : "";
+                                        var borderClass = first ? "border-primary" : "border-outline-variant";
+                                        var bgClass = first ? "bg-primary/5" : "bg-surface-container-lowest";
+                                        var textClass = first ? "text-primary" : "text-on-surface";
+                                        
+                                        <label class="relative flex items-center justify-between p-3 border @borderClass rounded-lg @bgClass cursor-pointer hover:bg-surface-container-low transition-colors js-shift-label">
+                                            <div>
+                                                <span class="block font-label-md text-label-md @textClass font-bold js-shift-name">@shift.ShiftName</span>
+                                                <span class="block font-label-sm text-label-sm text-secondary">@startTime</span>
+                                            </div>
+                                            <input type="radio" name="Shift" value="@shift.ShiftName" @isChecked class="text-primary focus:ring-primary h-4 w-4 js-shift-radio" />
+                                        </label>
+                                        first = false;
+                                    }
+                                }
+                                else
+                                {
+                                    <p class="text-secondary text-sm">No hay turnos disponibles.</p>
+                                }
                             </div>
                         </div>
                     </div>
@@ -329,8 +340,23 @@
             summaryDate.innerText = inputDate.value ? inputDate.value : "-";
             
             // Update Shift
-            let shift = document.querySelector('input[name="Shift"]:checked').value;
-            summaryShift.innerText = shift === 'manana' ? "Mañana" : "Tarde";
+            let shiftInput = document.querySelector('input[name="Shift"]:checked');
+            if(shiftInput) {
+                summaryShift.innerText = shiftInput.value;
+                
+                // Update styles for shift labels
+                document.querySelectorAll('.js-shift-label').forEach(label => {
+                    label.classList.replace('border-primary', 'border-outline-variant');
+                    label.classList.replace('bg-primary/5', 'bg-surface-container-lowest');
+                    label.querySelector('.js-shift-name').classList.replace('text-primary', 'text-on-surface');
+                });
+                let selectedLabel = shiftInput.closest('.js-shift-label');
+                if (selectedLabel) {
+                    selectedLabel.classList.replace('border-outline-variant', 'border-primary');
+                    selectedLabel.classList.replace('bg-surface-container-lowest', 'bg-primary/5');
+                    selectedLabel.querySelector('.js-shift-name').classList.replace('text-on-surface', 'text-primary');
+                }
+            }
 
             // Update Pickup
             let boarding = document.querySelector('input[name="BoardingPoint"]:checked').value;
@@ -424,5 +450,6 @@
         renderAdditionalPassengers();
     });
 </script>
+
 
 
