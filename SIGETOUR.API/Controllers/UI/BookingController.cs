@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -22,7 +22,9 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpGet]
         public async Task<IActionResult> Checkout(Guid tourId)
         {
-            var tour = await _context.TourPackages.FindAsync(tourId);
+            var tour = await _context.TourPackages
+                .Include(t => t.Shifts)
+                .FirstOrDefaultAsync(t => t.Id == tourId);
             if (tour == null) return RedirectToAction("Catalog", "Tour");
             return View(tour);
         }
