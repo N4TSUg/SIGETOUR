@@ -63,11 +63,11 @@
 <label class="block text-label-md font-label-md text-on-surface mb-1.5">Modalidad de Salida *</label>
 <div class="grid grid-cols-2 gap-2">
 <label class="flex items-center gap-2 p-2 rounded-lg border border-primary bg-surface-container-low/40 cursor-pointer">
-<input class="text-primary focus:ring-primary" asp-for="Modality" value="@((int)SIGETOUR.API.Core.Enums.TourModality.Regular)" type="radio">
+<input class="text-primary focus:ring-primary" asp-for="Modality" value="Regular" type="radio">
 <span class="text-label-md font-label-md text-on-surface">Salida Diaria Regular</span>
 </label>
 <label class="flex items-center gap-2 p-2 rounded-lg border border-outline-variant bg-surface-bright/30 cursor-pointer">
-<input class="text-primary focus:ring-primary" asp-for="Modality" value="@((int)SIGETOUR.API.Core.Enums.TourModality.Privado)" type="radio">
+<input class="text-primary focus:ring-primary" asp-for="Modality" value="Privado" type="radio">
 <span class="text-label-md font-label-md text-on-surface">Privado / Delegación</span>
 </label>
 </div>
@@ -77,15 +77,15 @@
   <label class="block text-label-md font-label-md text-on-surface mb-1.5">Nivel de Exigencia</label>
   <div class="flex flex-wrap gap-3">
   <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-bright/30 hover:bg-surface-container cursor-pointer">
-    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="@((int)SIGETOUR.API.Core.Enums.TourDifficulty.Ligero)" type="radio">
+    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="Ligero" type="radio">
     <span class="text-label-md font-label-md text-on-surface">Ligero (Apto para toda la familia)</span>
   </label>
   <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-bright/30 hover:bg-surface-container cursor-pointer">
-    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="@((int)SIGETOUR.API.Core.Enums.TourDifficulty.Moderado)" type="radio">
+    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="Moderado" type="radio">
     <span class="text-label-md font-label-md text-on-surface">Moderado (Caminata a 3,500 msnm)</span>
   </label>
   <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-bright/30 hover:bg-surface-container cursor-pointer">
-    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="@((int)SIGETOUR.API.Core.Enums.TourDifficulty.Exigente)" type="radio">
+    <input class="text-primary focus:ring-primary" asp-for="Difficulty" value="Exigente" type="radio">
     <span class="text-label-md font-label-md text-on-surface">Exigente (Trekking andino)</span>
   </label>
   </div>
