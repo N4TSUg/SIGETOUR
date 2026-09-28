@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace SIGETOUR.API.Models
@@ -23,6 +24,9 @@ namespace SIGETOUR.API.Models
         
         [Required]
         public string CustomerName { get; set; } = string.Empty;
+
+        [Required]
+        public string CustomerDni { get; set; } = string.Empty;
         
         [Required]
         public string CustomerPhone { get; set; } = string.Empty;
@@ -34,5 +38,9 @@ namespace SIGETOUR.API.Models
         [Required]
         [Range(1, 100)]
         public int Passengers { get; set; }
+
+        // Pasajeros adicionales (desde Pasajero 2 en adelante)
+        public List<string> PassengerNames { get; set; } = new();
+        public List<string> PassengerDnis { get; set; } = new();
     }
 }

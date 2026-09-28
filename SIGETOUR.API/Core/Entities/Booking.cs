@@ -9,6 +9,7 @@ namespace SIGETOUR.API.Core.Entities
         public string ReferenceCode { get; set; } = string.Empty; // e.g. RES-001
         
         public string CustomerName { get; set; } = string.Empty;
+        public string CustomerDni { get; set; } = string.Empty;
         public string CustomerEmail { get; set; } = string.Empty;
         public string CustomerPhone { get; set; } = string.Empty;
 
@@ -23,6 +24,9 @@ namespace SIGETOUR.API.Core.Entities
         public string PickupLocation { get; set; } = string.Empty;
         public decimal PickupCost { get; set; }
 
+        /// <summary>Pasajeros adicionales almacenados en JSON</summary>
+        public string AdditionalPassengersJson { get; set; } = "[]";
+
         public ICollection<BookingItem> Items { get; set; } = new List<BookingItem>();
     }
 
@@ -33,4 +37,5 @@ namespace SIGETOUR.API.Core.Entities
         Cancelled
     }
 }
+
 
