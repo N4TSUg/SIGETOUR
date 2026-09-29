@@ -283,6 +283,15 @@
 </footer>
 <!-- Vanilla JS Interactions -->
 <script>
+    // Evita que el navegador muestre esta pagina desde el cache al presionar Atrás
+    // cuando el usuario ya tiene sesión iniciada (bfcache fix)
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+            // La página vino del back/forward cache del navegador
+            window.location.replace('/Admin/Dashboard');
+        }
+    });
+
     function togglePasswordVisibility() {
       const passwordInput = document.getElementById('password');
       const passwordIcon = document.getElementById('passwordIcon');
