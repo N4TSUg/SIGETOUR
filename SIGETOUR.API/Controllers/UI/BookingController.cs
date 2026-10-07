@@ -73,7 +73,24 @@ namespace SIGETOUR.API.Controllers.UI
             _context.Bookings.Add(booking);
             await _context.SaveChangesAsync();
 
-            return RedirectToAction("Voucher", new { id = booking.Id });
+            return RedirectToAction("Payment", new { id = booking.Id });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Payment(Guid id)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
+                .FirstOrDefaultAsync(b => b.Id == id);
+            if (booking == null) return RedirectToAction("Catalog", "Tour");
+            return View(booking);
+        }
+
+        [HttpPost]
+        public IActionResult ConfirmPayment(Guid bookingId)
+        {
+            return RedirectToAction("Voucher", new { id = bookingId });
         }
 
         public async Task<IActionResult> Voucher(Guid id)

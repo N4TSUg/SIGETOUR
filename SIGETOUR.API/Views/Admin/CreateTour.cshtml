@@ -282,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </button>
         </div>
         
-        <div id="itinerary-stops-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        <div id="itinerary-stops-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <!-- Dynamic Stops will be injected here -->
         </div>
     </div>
@@ -356,16 +356,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let stopCount = 0;
-    function addStop(name = '') {
+    function addStop(name = '', estimatedTime = '') {
         stopCount++;
         const container = document.getElementById('itinerary-stops-container');
         const div = document.createElement('div');
-        div.className = 'flex items-center gap-2 p-2.5 rounded-lg bg-surface-bright/30 border border-outline-variant/60';
+        div.className = 'flex items-center gap-2 p-2 rounded-lg bg-surface-container-low border border-outline-variant/60 itinerary-stop-row';
         div.innerHTML = `
-            <span class="w-5 h-5 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold">${stopCount}</span>
-            <input type="text" name="Stops" value="${name}" class="w-full bg-transparent border-none p-0 text-body-sm font-body-sm text-on-surface focus:ring-0" placeholder="Ej: Mirador Bellavista" required />
-            <button type="button" onclick="this.parentElement.remove(); reindexStops();" class="text-error hover:text-red-700 ml-auto">
-                <span class="material-symbols-outlined text-[16px]">close</span>
+            <span class="w-6 h-6 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold shrink-0 stop-number">${stopCount}</span>
+            <input type="text" name="StopTimes" value="${estimatedTime}" class="w-24 bg-transparent border-b border-outline-variant px-1 py-1 text-body-sm font-body-sm text-on-surface focus:border-primary focus:outline-none shrink-0" placeholder="09:00 AM" />
+            <input type="text" name="Stops" value="${name}" class="w-full bg-transparent border-none px-2 py-1 text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-0" placeholder="Nombre de la parada" required />
+            <button type="button" onclick="this.closest('.itinerary-stop-row').remove(); reindexStops();" class="text-error hover:text-red-700 shrink-0 flex items-center">
+                <span class="material-symbols-outlined text-[18px]">close</span>
             </button>
         `;
         container.appendChild(div);
@@ -374,10 +375,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function reindexStops() {
         const container = document.getElementById('itinerary-stops-container');
-        const stops = container.children;
+        const stops = container.querySelectorAll('.itinerary-stop-row');
         stopCount = stops.length;
         for (let i = 0; i < stops.length; i++) {
-            stops[i].querySelector('span').innerText = (i + 1);
+            stops[i].querySelector('.stop-number').innerText = i + 1;
         }
     }
 
@@ -387,7 +388,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             foreach (var stop in Model.ItineraryStops.OrderBy(s => s.OrderIndex))
             {
-                <text>addStop('@Html.Raw(stop.Name.Replace("'", "\\'"))');</text>
+                <text>addStop('@Html.Raw(stop.Name.Replace("'", "\\'"))', '@Html.Raw((stop.EstimatedTime ?? "").Replace("'", "\\'"))');</text>
             }
         }
         else
@@ -553,6 +554,8 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 </main>
+
+
 
 
 

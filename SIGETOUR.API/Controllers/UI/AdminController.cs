@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -98,7 +98,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
+        public async Task<IActionResult> CreateTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
         {
             model.Id = Guid.NewGuid();
             model.Subtitle ??= string.Empty;
@@ -110,7 +110,7 @@ namespace SIGETOUR.API.Controllers.UI
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
-                        model.ItineraryStops.Add(new ItineraryStop { Id = Guid.NewGuid(), Name = Stops[i], OrderIndex = i });
+                        model.ItineraryStops.Add(new ItineraryStop { Id = Guid.NewGuid(), Name = Stops[i], OrderIndex = i, EstimatedTime = StopTimes?.ElementAtOrDefault(i) });
                 }
             }
             
@@ -157,7 +157,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
+        public async Task<IActionResult> EditTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
         {
             var tour = await _context.TourPackages
                 .Include(t => t.Images)
@@ -190,7 +190,7 @@ namespace SIGETOUR.API.Controllers.UI
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
-                        _context.Set<ItineraryStop>().Add(new ItineraryStop { Id = Guid.NewGuid(), TourPackageId = tour.Id, Name = Stops[i], OrderIndex = i });
+                        _context.Set<ItineraryStop>().Add(new ItineraryStop { Id = Guid.NewGuid(), TourPackageId = tour.Id, Name = Stops[i], OrderIndex = i, EstimatedTime = StopTimes?.ElementAtOrDefault(i) });
                 }
             }
 

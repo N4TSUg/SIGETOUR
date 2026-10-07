@@ -1,0 +1,682 @@
+@model SIGETOUR.API.Core.Entities.Booking
+@{
+    Layout = null;
+    var booking = Model;
+    var tourTitle = booking.Items.FirstOrDefault()?.TourPackage?.Title ?? "Tour";
+}
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Checkout Seguro | Turismo Chilón Cajamarca</title>
+<!-- Fonts & Material Symbols -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "outline-variant": "#bdc9c5",
+            "inverse-on-surface": "#c3fcf5",
+            "on-primary-fixed": "#00201b",
+            "tertiary": "#b0251b",
+            "background": "#e4fffb",
+            "on-tertiary-fixed": "#410000",
+            "on-primary-fixed-variant": "#005045",
+            "on-background": "#00201e",
+            "error-container": "#ffdad6",
+            "inverse-surface": "#003734",
+            "on-secondary-fixed": "#002020",
+            "on-tertiary-fixed-variant": "#910a07",
+            "primary": "#00685a",
+            "primary-fixed": "#8ef5df",
+            "secondary-container": "#beebeb",
+            "on-surface-variant": "#3d4946",
+            "surface-container-low": "#c6fef8",
+            "on-tertiary-container": "#fffbff",
+            "surface-dim": "#ade5df",
+            "secondary-fixed-dim": "#a2cfcf",
+            "surface": "#e4fffb",
+            "on-error": "#ffffff",
+            "outline": "#6d7a76",
+            "surface-container-lowest": "#ffffff",
+            "on-primary": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "primary-fixed-dim": "#71d8c3",
+            "on-secondary": "#ffffff",
+            "surface-container-highest": "#b5ede7",
+            "tertiary-fixed": "#ffdad5",
+            "surface-bright": "#e4fffb",
+            "surface-tint": "#006b5c",
+            "on-error-container": "#93000a",
+            "on-primary-container": "#f4fffa",
+            "on-secondary-fixed-variant": "#224d4e",
+            "surface-container-high": "#bbf3ed",
+            "secondary-fixed": "#beebeb",
+            "secondary": "#3b6566",
+            "inverse-primary": "#71d8c3",
+            "tertiary-fixed-dim": "#ffb4a9",
+            "tertiary-container": "#d33f30",
+            "primary-container": "#008472",
+            "on-surface": "#00201e",
+            "surface-container": "#c1f9f3",
+            "error": "#ba1a1a",
+            "surface-variant": "#b5ede7",
+            "on-secondary-container": "#416b6c"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "fontFamily": {
+            "body-md": ["Plus Jakarta Sans"],
+            "display-lg": ["Plus Jakarta Sans"],
+            "label-md": ["Plus Jakarta Sans"],
+            "headline-lg": ["Plus Jakarta Sans"],
+            "title-sm": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "title-md": ["Plus Jakarta Sans"],
+            "headline-sm": ["Plus Jakarta Sans"]
+          },
+          "fontSize": {
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+            "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "600" }],
+            "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+            "title-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+            "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.04em", "fontWeight": "700" }],
+            "title-md": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+</script>
+</head>
+<body class="bg-[#f2faf8] text-on-surface font-body-md antialiased min-h-screen flex flex-col selection:bg-primary-container selection:text-white">
+
+<!-- TOP HEADER / SECURE CHECKOUT NAVBAR -->
+<header class="sticky top-0 z-50 bg-surface-container-lowest shadow-sm border-b border-outline-variant/30">
+  <div class="max-w-7xl mx-auto px-4 md:px-8 h-20 flex items-center justify-between">
+    <!-- Brand & Back Button -->
+    <div class="flex items-center gap-4 md:gap-6">
+      <a class="flex items-center gap-1 text-secondary hover:text-primary transition-colors duration-150 text-label-md font-label-md group" href="/Booking/Checkout?tourId=@(booking.Items.FirstOrDefault()?.TourPackageId)">
+        <span class="material-symbols-outlined text-base group-hover:-translate-x-1 transition-transform">arrow_back</span>
+        <span class="hidden sm:inline">Volver al Checkout</span>
+      </a>
+      <div class="h-6 w-px bg-outline-variant/50 hidden sm:block"></div>
+      <div class="flex items-center gap-3">
+        <div class="hidden lg:block">
+          <span class="block text-primary font-headline-sm text-headline-sm font-bold tracking-tight leading-none">Turismo Chilón</span>
+          <span class="text-label-sm font-label-sm text-secondary tracking-wider uppercase">Transporte &amp; Turismo Cajamarca</span>
+        </div>
+      </div>
+    </div>
+    <!-- Security Trust Badge -->
+    <div class="flex items-center gap-3 bg-[#e8f7f4] border border-[#a1ded5]/50 px-3.5 py-2 rounded-lg text-primary">
+      <span class="material-symbols-outlined text-primary text-xl" style="font-variation-settings: 'FILL' 1;">lock</span>
+      <div class="text-left">
+        <div class="text-label-sm font-label-sm font-bold tracking-wide text-primary uppercase">Checkout Seguro</div>
+        <div class="text-body-sm font-body-sm text-secondary hidden sm:block">Cifrado SSL 256-bit Certificado</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- STEPPER BAR -->
+<nav aria-label="Progreso de la Reserva" class="bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs py-4">
+  <div class="max-w-7xl mx-auto px-4 md:px-8">
+    <div class="flex items-center justify-between max-w-4xl mx-auto relative">
+      <!-- Steps 1-3: Completed -->
+      @foreach (var (label, num) in new[] { ("1. Datos del Tour", 1), ("2. Recojo & Pasajeros", 2), ("3. Datos de Contacto", 3) })
+      {
+        <div class="flex flex-col items-center group relative z-10">
+          <div class="w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm shadow-sm">
+            <span class="material-symbols-outlined text-base font-bold">check</span>
+          </div>
+          <span class="mt-2 text-label-sm font-label-sm text-secondary font-medium hidden md:inline-block">@label</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-primary-container mx-2 -mt-5 md:-mt-6"></div>
+      }
+      <!-- Step 4: Active -->
+      <div class="flex flex-col items-center group relative z-10">
+        <div class="w-9 h-9 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-sm shadow-md">
+          <span>4</span>
+        </div>
+        <span class="mt-2 text-label-sm font-label-sm text-primary font-bold">4. Pago Seguro</span>
+      </div>
+      <div class="flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6"></div>
+      <!-- Step 5: Upcoming -->
+      <div class="flex flex-col items-center group relative z-10 opacity-60">
+        <div class="w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm">
+          <span>5</span>
+        </div>
+        <span class="mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block">5. Voucher Oficial</span>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN CHECKOUT CONTENT -->
+<main class="flex-1 py-8 md:py-12">
+  <div class="max-w-7xl mx-auto px-4 md:px-8">
+    <!-- Headline & Context -->
+    <div class="mb-8 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <div class="inline-flex items-center gap-2 bg-[#ecfdf5] text-primary px-3 py-1 rounded-full text-label-sm font-label-sm font-bold tracking-wide uppercase mb-2">
+          <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+          Asientos Reservados — Confirma tu pago
+        </div>
+        <h1 class="text-headline-md md:text-headline-lg font-headline-lg text-inverse-surface tracking-tight">
+          Finaliza tu Pago y Emite tus Boletos
+        </h1>
+        <p class="text-body-md font-body-md text-secondary mt-1">
+          Selecciona el modo de abono y la pasarela preferida para la confirmación inmediata de tu tour.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 bg-surface-container-lowest px-4 py-2 rounded-lg border border-outline-variant/30 text-on-surface shadow-xs">
+        <span class="material-symbols-outlined text-primary text-xl">confirmation_number</span>
+        <span class="text-body-sm font-body-sm font-medium text-secondary">Código de reserva:</span>
+        <span class="font-bold text-label-lg font-label-lg text-primary">@Model.ReferenceCode</span>
+      </div>
+    </div>
+
+    <!-- Two Columns Layout (7 / 5 Grid) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+      <!-- LEFT COLUMN: Payment Methods & Options -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- 1. PAYMENT MODALITY SELECTION -->
+        <section class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/40 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-title-md font-title-md text-inverse-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">payments</span>
+              1. Modalidad de Abono
+            </h2>
+            <span class="text-label-sm font-label-sm text-secondary">Elige cómo deseas abonar</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Option A: Total 100% -->
+            <label class="relative flex flex-col p-4 rounded-xl border-2 border-primary bg-[#f4fffa] cursor-pointer transition-all duration-150 hover:shadow-sm">
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <input checked class="h-4 w-4 text-primary focus:ring-primary border-outline" name="payment_modality" type="radio" value="full"/>
+                  <span class="text-label-lg font-label-lg font-bold text-on-surface">Pagar Total 100%</span>
+                </div>
+                <span class="bg-primary text-white text-label-sm font-label-sm font-bold px-2 py-0.5 rounded uppercase">Recomendado</span>
+              </div>
+              <div class="text-headline-sm font-headline-sm font-extrabold text-primary mb-1">
+                S/ @Model.TotalAmount.ToString("N2") <span class="text-label-md font-label-md font-normal text-secondary">PEN</span>
+              </div>
+              <p class="text-body-sm font-body-sm text-secondary">
+                Confirmación inmediata, emisión de voucher definitivo y abordaje directo.
+              </p>
+            </label>
+            <!-- Option B: Seña 50% -->
+            <label class="relative flex flex-col p-4 rounded-xl border border-outline-variant bg-surface-container-lowest cursor-pointer transition-all duration-150 hover:border-primary/50">
+              <div class="flex items-start justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <input class="h-4 w-4 text-primary focus:ring-primary border-outline" name="payment_modality" type="radio" value="deposit"/>
+                  <span class="text-label-lg font-label-lg font-bold text-on-surface">Pagar Seña 50%</span>
+                </div>
+                <span class="bg-surface-container text-secondary text-label-sm font-label-sm font-medium px-2 py-0.5 rounded">Anticipo</span>
+              </div>
+              <div class="text-headline-sm font-headline-sm font-extrabold text-inverse-surface mb-1">
+                S/ @((Model.TotalAmount / 2).ToString("N2")) <span class="text-label-md font-label-md font-normal text-secondary">PEN</span>
+              </div>
+              <p class="text-body-sm font-body-sm text-secondary">
+                Garantiza tus asientos hoy. El saldo se abona en counter antes de partir.
+              </p>
+            </label>
+          </div>
+        </section>
+
+        <!-- 2. PAYMENT METHODS (TABS) -->
+        <section class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/40 shadow-xs">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-title-md font-title-md text-inverse-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">account_balance_wallet</span>
+              2. Selecciona tu Pasarela de Pago
+            </h2>
+            <span class="text-label-sm font-label-sm text-primary flex items-center gap-1 font-semibold">
+              <span class="material-symbols-outlined text-sm">verified_user</span> Transacción Protegida
+            </span>
+          </div>
+          <!-- Tab Navigation -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 bg-[#edf7f5] rounded-xl mb-6">
+            <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 bg-surface-container-lowest text-primary shadow-xs font-bold" id="tab-btn-yape" onclick="switchPaymentTab('yape')" type="button">
+              <span class="material-symbols-outlined text-xl mb-1 text-primary">qr_code_scanner</span>
+              <span>Yape / Plin</span>
+            </button>
+            <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 text-secondary hover:text-on-surface" id="tab-btn-card" onclick="switchPaymentTab('card')" type="button">
+              <span class="material-symbols-outlined text-xl mb-1">credit_card</span>
+              <span>Tarjeta Déb/Créd</span>
+            </button>
+            <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 text-secondary hover:text-on-surface" id="tab-btn-transfer" onclick="switchPaymentTab('transfer')" type="button">
+              <span class="material-symbols-outlined text-xl mb-1">account_balance</span>
+              <span>Bancos / CCI</span>
+            </button>
+            <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 text-secondary hover:text-on-surface" id="tab-btn-cash" onclick="switchPaymentTab('cash')" type="button">
+              <span class="material-symbols-outlined text-xl mb-1">storefront</span>
+              <span>Pago Counter</span>
+            </button>
+          </div>
+
+          <!-- TAB 1: YAPE / PLIN -->
+          <div class="block space-y-6" id="tab-yape">
+            <div class="p-4 bg-[#f0fdf9] border border-primary/20 rounded-xl flex flex-col md:flex-row items-center gap-6">
+              <div class="bg-surface-container-lowest p-3 rounded-lg border border-outline-variant/40 shadow-xs flex flex-col items-center w-48 text-center shrink-0">
+                <div class="w-36 h-36 bg-surface-container-low rounded flex items-center justify-center relative overflow-hidden border border-outline-variant/30">
+                  <div class="absolute inset-2 grid grid-cols-5 gap-1 opacity-80">
+                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
+                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-surface-container-lowest"></div>
+                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
+                    <div class="bg-surface-container-lowest"></div><div class="bg-inverse-surface rounded-xs"></div>
+                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-surface-container-lowest"></div>
+                    <div class="bg-surface-container-lowest"></div><div class="bg-primary rounded-xs"></div>
+                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-surface-container-lowest"></div>
+                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
+                    <div class="bg-surface-container-lowest"></div><div class="bg-surface-container-lowest"></div>
+                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
+                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
+                    <div class="bg-primary rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
+                    <div class="bg-inverse-surface rounded-xs"></div>
+                  </div>
+                  <span class="absolute bg-white px-2 py-1 rounded text-[10px] font-bold text-primary shadow-xs border border-primary/20">YAPE / PLIN</span>
+                </div>
+                <span class="text-label-sm font-label-sm font-bold text-primary mt-2">Escanear para Pagar</span>
+              </div>
+              <div class="space-y-3 w-full">
+                <div>
+                  <span class="text-body-sm font-body-sm text-secondary">Línea Oficial de Billetera Digital:</span>
+                  <div class="flex items-center gap-2 mt-1">
+                    <span class="text-headline-sm font-headline-sm font-extrabold text-inverse-surface tracking-tight">+51 901 195 392</span>
+                    <button class="text-label-sm font-label-sm text-primary hover:underline flex items-center gap-0.5 bg-surface-container-lowest px-2 py-1 rounded border border-outline-variant/30" onclick="navigator.clipboard.writeText('901195392')" type="button">
+                      <span class="material-symbols-outlined text-sm">content_copy</span> Copiar
+                    </button>
+                  </div>
+                  <p class="text-label-sm font-label-sm text-on-surface-variant mt-0.5">
+                    Titular: <strong class="text-inverse-surface">TURISMO CHILÓN TRANSPORTE &amp; TURISMO S.A.C.</strong>
+                  </p>
+                </div>
+                <ol class="space-y-1.5 text-body-sm font-body-sm text-secondary list-decimal list-inside bg-surface-container-lowest p-3 rounded-lg border border-outline-variant/30">
+                  <li>Abre tu aplicación <strong class="text-on-surface">Yape</strong> o <strong class="text-on-surface">Plin</strong>.</li>
+                  <li>Escanea el QR o yapea el monto al número <strong class="text-on-surface">901 195 392</strong>.</li>
+                  <li>Ingresa el código de aprobación de la operación abajo.</li>
+                </ol>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label class="block text-label-md font-label-md text-inverse-surface mb-1">
+                  Número de Operación (6 u 8 dígitos) <span class="text-tertiary">*</span>
+                </label>
+                <div class="relative">
+                  <span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-lg">tag</span>
+                  <input class="w-full pl-10 pr-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="Ej. 783921" type="text"/>
+                </div>
+              </div>
+              <div>
+                <label class="block text-label-md font-label-md text-inverse-surface mb-1">
+                  Adjuntar Captura de Pago (Opcional)
+                </label>
+                <label class="flex items-center justify-center gap-2 px-3 py-2 bg-[#f8fafc] border border-dashed border-[#cbd5e1] rounded-lg cursor-pointer hover:bg-surface-container-low transition-colors">
+                  <span class="material-symbols-outlined text-primary text-lg">upload_file</span>
+                  <span class="text-body-sm font-body-sm text-secondary truncate" id="file-label">Subir comprobante JPG/PNG</span>
+                  <input accept="image/*" class="hidden" onchange="document.getElementById('file-label').textContent = this.files[0] ? this.files[0].name : 'Subir comprobante JPG/PNG'" type="file"/>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: CREDIT / DEBIT CARD (hidden) -->
+          <div class="hidden space-y-4" id="tab-card">
+            <div class="flex items-center justify-between pb-2 border-b border-outline-variant/30">
+              <span class="text-label-sm font-label-sm text-secondary">Aceptamos todas las tarjetas peruanas e internacionales</span>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 bg-blue-50 text-blue-800 text-[10px] font-bold rounded border border-blue-200">VISA</span>
+                <span class="px-2 py-0.5 bg-red-50 text-red-800 text-[10px] font-bold rounded border border-red-200">MASTERCARD</span>
+                <span class="px-2 py-0.5 bg-sky-50 text-sky-800 text-[10px] font-bold rounded border border-sky-200">AMEX</span>
+              </div>
+            </div>
+            <div>
+              <label class="block text-label-md font-label-md text-inverse-surface mb-1">Número de Tarjeta</label>
+              <div class="relative">
+                <span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-lg">credit_card</span>
+                <input class="w-full pl-10 pr-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono" maxlength="19" placeholder="4213 5400 0000 0000" type="text"/>
+              </div>
+            </div>
+            <div>
+              <label class="block text-label-md font-label-md text-inverse-surface mb-1">Nombre del Titular (como aparece en la tarjeta)</label>
+              <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent uppercase" type="text" placeholder="NOMBRE APELLIDO"/>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-label-md font-label-md text-inverse-surface mb-1">Vencimiento (MM/AA)</label>
+                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono" maxlength="5" placeholder="08/27" type="text"/>
+              </div>
+              <div>
+                <label class="block text-label-md font-label-md text-inverse-surface mb-1">CVV / CVC</label>
+                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono" maxlength="4" placeholder="•••" type="password"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: BANK TRANSFER (hidden) -->
+          <div class="hidden space-y-4" id="tab-transfer">
+            <div class="p-3 bg-[#f0fdf9] border border-primary/20 rounded-lg text-body-sm font-body-sm text-secondary">
+              Transfiere directamente desde tu banca por internet y envíanos el voucher al WhatsApp oficial <strong class="text-on-surface font-semibold">+51 901 195 392</strong>.
+            </div>
+            <div class="space-y-3">
+              <div class="p-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest">
+                <div class="flex items-center justify-between">
+                  <div class="font-bold text-label-md text-inverse-surface flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Banco de Crédito del Perú (BCP)
+                  </div>
+                  <span class="text-label-sm font-label-sm text-secondary">Cta. Corriente Soles</span>
+                </div>
+                <div class="mt-2 text-body-sm font-body-sm text-secondary font-mono">
+                  <div>N° Cuenta: <strong class="text-on-surface">191-2489102-0-45</strong></div>
+                  <div>CCI: <strong class="text-on-surface">002-191-002489102045-52</strong></div>
+                </div>
+              </div>
+              <div class="p-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest">
+                <div class="flex items-center justify-between">
+                  <div class="font-bold text-label-md text-inverse-surface flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span> BBVA Continental
+                  </div>
+                  <span class="text-label-sm font-label-sm text-secondary">Cta. Ahorros Soles</span>
+                </div>
+                <div class="mt-2 text-body-sm font-body-sm text-secondary font-mono">
+                  <div>N° Cuenta: <strong class="text-on-surface">0011-0285-0200847291</strong></div>
+                  <div>CCI: <strong class="text-on-surface">011-285-000200847291-78</strong></div>
+                </div>
+              </div>
+              <div class="p-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest">
+                <div class="flex items-center justify-between">
+                  <div class="font-bold text-label-md text-inverse-surface flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-600"></span> Banco de la Nación
+                  </div>
+                  <span class="text-label-sm font-label-sm text-secondary">Cta. Corriente</span>
+                </div>
+                <div class="mt-2 text-body-sm font-body-sm text-secondary font-mono">
+                  <div>N° Cuenta: <strong class="text-on-surface">04-019-294821</strong></div>
+                  <div>CCI: <strong class="text-on-surface">018-019-004019294821-33</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: CASH AT COUNTER (hidden) -->
+          <div class="hidden space-y-4" id="tab-cash">
+            <div class="p-4 bg-[#fff9ed] border border-amber-200 rounded-xl space-y-3">
+              <div class="flex items-center gap-2 text-amber-800 font-bold text-title-sm font-title-sm">
+                <span class="material-symbols-outlined text-xl">schedule</span>
+                Reserva Provisional Activa por 3 Horas
+              </div>
+              <p class="text-body-sm font-body-sm text-amber-900 leading-relaxed">
+                Puedes asegurar tus asientos inmediatamente y acercarte a realizar el pago en efectivo directamente en nuestra Agencia Central:
+              </p>
+              <div class="bg-surface-container-lowest p-3 rounded-lg border border-amber-200 text-body-sm font-body-sm text-inverse-surface">
+                <div class="font-bold flex items-center gap-1.5 text-primary">
+                  <span class="material-symbols-outlined text-base">location_on</span>
+                  Jr. 2 de Mayo 569, Cajamarca (A 2 cuadras de la Plaza Mayor)
+                </div>
+                <div class="text-secondary mt-1">Horario de atención continuo: 06:30 AM a 09:00 PM</div>
+              </div>
+              <p class="text-label-sm font-label-sm text-amber-800">
+                * Si el abono no se realiza dentro de las 3 horas, el sistema liberará los asientos automáticamente.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. COMPROBANTE ELECTRÓNICO -->
+        <section class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/40 shadow-xs">
+          <h2 class="text-title-md font-title-md text-inverse-surface flex items-center gap-2 mb-4">
+            <span class="material-symbols-outlined text-primary">receipt_long</span>
+            3. Comprobante de Pago Electrónico
+          </h2>
+          <div class="space-y-4">
+            <div class="flex items-center gap-6">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input checked class="text-primary focus:ring-primary h-4 w-4" name="billing_type" type="radio" value="boleta"/>
+                <span class="text-label-md font-label-md text-on-surface font-semibold">Boleta de Venta</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input class="text-primary focus:ring-primary h-4 w-4" name="billing_type" type="radio" value="factura"/>
+                <span class="text-label-md font-label-md text-on-surface font-semibold">Factura Comercial (RUC)</span>
+              </label>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-label-sm font-label-sm text-secondary mb-1">Documento de Identidad (DNI / CE)</label>
+                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface font-mono" readonly type="text" value="@Model.CustomerDni"/>
+              </div>
+              <div>
+                <label class="block text-label-sm font-label-sm text-secondary mb-1">Nombre o Razón Social</label>
+                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface uppercase" readonly type="text" value="@Model.CustomerName"/>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. SUBMIT ACTION BUTTON -->
+        <div class="space-y-3 pt-2">
+          <form method="post" action="/Booking/ConfirmPayment">
+            <input type="hidden" name="bookingId" value="@Model.Id" />
+            @Html.AntiForgeryToken()
+            <button class="w-full py-4 px-6 bg-primary hover:bg-[#005045] active:scale-[0.99] text-white font-label-lg text-title-md font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3" type="submit">
+              <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">verified</span>
+              <span>Confirmar Pago y Emitir Voucher (S/ @Model.TotalAmount.ToString("N2") PEN)</span>
+            </button>
+          </form>
+          <div class="flex items-center justify-center gap-4 text-body-sm font-body-sm text-secondary">
+            <span class="flex items-center gap-1">
+              <span class="material-symbols-outlined text-primary text-base">shield</span>
+              Sin comisiones adicionales
+            </span>
+            <span>•</span>
+            <span class="flex items-center gap-1">
+              <span class="material-symbols-outlined text-primary text-base">cached</span>
+              Reprogramación flexible hasta 24h antes
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Booking Summary (5 Columns Sticky) -->
+      <aside class="lg:col-span-5 space-y-6 sticky top-24">
+        <!-- SUMMARY CARD -->
+        <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/40 shadow-sm overflow-hidden">
+          <!-- Tour Hero Header -->
+          <div class="relative h-20 w-full bg-primary flex items-center px-5">
+            <div class="text-white">
+              <span class="block text-label-sm font-label-sm uppercase tracking-wider text-primary-fixed opacity-80">Tour Reservado</span>
+              <h3 class="text-title-sm font-title-sm font-bold text-white leading-snug">@tourTitle</h3>
+            </div>
+          </div>
+          <!-- Tour Details -->
+          <div class="p-5 space-y-4">
+            <!-- Date & Passengers -->
+            <div class="grid grid-cols-2 gap-3 pb-4 border-b border-outline-variant/30">
+              <div class="flex items-start gap-2">
+                <span class="material-symbols-outlined text-primary text-xl mt-0.5">calendar_month</span>
+                <div>
+                  <span class="block text-label-sm font-label-sm text-secondary">Fecha de Viaje</span>
+                  <span class="font-bold text-body-md font-body-md text-inverse-surface">@Model.TravelDate.ToString("dd MMM yyyy")</span>
+                </div>
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="material-symbols-outlined text-primary text-xl mt-0.5">group</span>
+                <div>
+                  <span class="block text-label-sm font-label-sm text-secondary">Pasajeros</span>
+                  <span class="font-bold text-body-md font-body-md text-inverse-surface">@Model.TotalPassengers persona(s)</span>
+                </div>
+              </div>
+              <div class="col-span-2 flex items-start gap-2 pt-1">
+                <span class="material-symbols-outlined text-primary text-xl mt-0.5">pin_drop</span>
+                <div>
+                  <span class="block text-label-sm font-label-sm text-secondary">Punto de Embarque</span>
+                  <span class="font-bold text-body-md font-body-md text-inverse-surface">@Model.PickupLocation</span>
+                </div>
+              </div>
+            </div>
+            <!-- Customer Details -->
+            <div class="space-y-2 pb-4 border-b border-outline-variant/30">
+              <div class="text-label-sm font-label-sm text-secondary font-semibold uppercase">Titular de la Reserva</div>
+              <div class="flex items-center justify-between bg-[#f8fafc] p-2.5 rounded-lg border border-outline-variant/20">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-primary text-lg">person</span>
+                  <div>
+                    <div class="text-body-sm font-body-sm font-bold text-inverse-surface leading-tight">@Model.CustomerName</div>
+                    <div class="text-label-sm font-label-sm text-secondary">DNI: @Model.CustomerDni • Titular</div>
+                  </div>
+                </div>
+                <span class="text-label-sm font-label-sm font-bold text-primary bg-[#e6f7f4] px-2 py-0.5 rounded">@Model.TotalPassengers pax</span>
+              </div>
+            </div>
+            <!-- Financial Breakdown -->
+            <div class="space-y-2 pt-2">
+              <div class="flex items-center justify-between text-body-sm font-body-sm text-secondary">
+                <span>Subtotal Boletos (@Model.TotalPassengers pasajeros):</span>
+                <span>S/ @Model.TotalAmount.ToString("N2") PEN</span>
+              </div>
+              <div class="flex items-center justify-between text-body-sm font-body-sm text-secondary">
+                <span>Gastos de Gestión y Emisión:</span>
+                <span class="text-primary font-bold">Gratis (S/ 0.00)</span>
+              </div>
+              @if (Model.PickupCost > 0)
+              {
+                <div class="flex items-center justify-between text-body-sm font-body-sm text-secondary">
+                  <span>Recojo en Hotel:</span>
+                  <span>S/ @Model.PickupCost.ToString("N2")</span>
+                </div>
+              }
+              <div class="pt-3 border-t border-outline-variant/40 flex items-center justify-between">
+                <div>
+                  <span class="block text-title-sm font-title-sm font-bold text-inverse-surface">Total a Pagar Hoy:</span>
+                  <span class="text-label-sm font-label-sm text-primary font-medium">Pago del 100% Total</span>
+                </div>
+                <div class="text-right">
+                  <span class="text-headline-md font-headline-md font-extrabold text-primary">S/ @Model.TotalAmount.ToString("N2")</span>
+                  <span class="block text-label-sm font-label-sm text-secondary">PEN</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRUST & SUPPORT CONTACT BLOCK -->
+        <div class="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/40 shadow-xs space-y-4">
+          <h4 class="text-title-sm font-title-sm font-bold text-inverse-surface flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">support_agent</span>
+            ¿Dudas con tu pago o reserva?
+          </h4>
+          <p class="text-body-sm font-body-sm text-secondary">
+            Nuestra central de atención en Cajamarca está activa para asistirte en tiempo real.
+          </p>
+          <div class="space-y-2">
+            <a class="flex items-center justify-between p-2.5 rounded-lg bg-[#ecfdf5] border border-primary/20 text-primary hover:bg-[#dcfce7] transition-colors" href="https://wa.me/51901195392" rel="noopener noreferrer" target="_blank">
+              <div class="flex items-center gap-2 text-label-md font-label-md font-bold">
+                <span class="material-symbols-outlined text-xl">chat</span>
+                WhatsApp Oficial Turismo Chilón
+              </div>
+              <span class="font-bold text-label-sm font-label-sm">+51 901 195 392</span>
+            </a>
+            <div class="flex items-center justify-between p-2.5 rounded-lg bg-[#f8fafc] border border-outline-variant/30 text-secondary text-body-sm font-body-sm">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-lg text-outline">call</span>
+                <span>Central Telefónica:</span>
+              </div>
+              <span class="font-medium text-inverse-surface">+51 944 746 364</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between pt-2 border-t border-outline-variant/20 text-label-sm font-label-sm text-secondary">
+            <span class="flex items-center gap-1">
+              <span class="material-symbols-outlined text-primary text-sm">verified</span>
+              Acreditación DIRCETUR
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="material-symbols-outlined text-primary text-sm">verified</span>
+              MINCETUR Cajamarca
+            </span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<!-- INSTITUTIONAL FOOTER -->
+<footer class="bg-inverse-surface border-t border-outline mt-16 text-inverse-primary">
+  <div class="w-full max-w-7xl mx-auto px-4 md:px-8 py-12">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-8 pb-10 border-b border-outline/40 items-center justify-between">
+      <div class="md:col-span-6 space-y-2">
+        <div class="text-headline-md font-headline-md font-extrabold text-inverse-on-surface tracking-tight">Turismo Chilón</div>
+        <p class="text-body-sm font-body-sm text-surface-variant max-w-lg">
+          Transporte interprovincial y circuitos turísticos autorizados en el departamento de Cajamarca.
+        </p>
+      </div>
+      <div class="md:col-span-6 flex flex-wrap gap-y-2 gap-x-6 justify-start md:justify-end text-label-md font-label-md">
+        <a class="text-surface-variant hover:text-inverse-primary transition-colors duration-150" href="#">Políticas de Cancelación</a>
+        <a class="text-surface-variant hover:text-inverse-primary transition-colors duration-150" href="#">Términos y Condiciones</a>
+        <a class="text-surface-variant hover:text-inverse-primary transition-colors duration-150" href="#">Libro de Reclamaciones</a>
+        <a class="text-surface-variant hover:text-inverse-primary transition-colors duration-150" href="#">Seguro de Viaje SOAT</a>
+      </div>
+    </div>
+    <div class="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-body-sm font-body-sm text-surface-variant/80">
+      <p class="text-center md:text-left">
+        © 2025 TURISMO CHILÓN Transporte &amp; Turismo Cajamarca S.A.C. Todos los derechos reservados. RUC: 20601234567. Jr. 2 de Mayo 569, Cajamarca, Perú.
+      </p>
+      <div class="flex items-center gap-2 text-inverse-on-surface shrink-0">
+        <span class="material-symbols-outlined text-base">lock</span>
+        <span class="text-label-sm font-label-sm font-bold">Pasarela Segura SSL</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Inline JavaScript -->
+<script>
+    function switchPaymentTab(tabId) {
+        const tabs = ['yape', 'card', 'transfer', 'cash'];
+        tabs.forEach(t => {
+            const el = document.getElementById('tab-' + t);
+            const btn = document.getElementById('tab-btn-' + t);
+            if (el && btn) {
+                if (t === tabId) {
+                    el.classList.remove('hidden');
+                    el.classList.add('block');
+                    btn.className = 'flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 bg-surface-container-lowest text-primary shadow-xs font-bold';
+                    const icon = btn.querySelector('.material-symbols-outlined');
+                    if (icon) icon.classList.add('text-primary');
+                } else {
+                    el.classList.add('hidden');
+                    el.classList.remove('block');
+                    btn.className = 'flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 text-secondary hover:text-on-surface';
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>
