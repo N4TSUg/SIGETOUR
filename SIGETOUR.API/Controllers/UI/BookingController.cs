@@ -26,20 +26,32 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(t => t.Shifts)
                 .FirstOrDefaultAsync(t => t.Id == tourId);
             if (tour == null) return RedirectToAction("Catalog", "Tour");
+
+            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tourId);
+            if (featured != null && featured.PromoPrice.HasValue)
+            {
+                tour.BasePrice = featured.PromoPrice.Value;
+            }
+
             return View(tour);
         }
 
         [HttpPost]
         public async Task<IActionResult> Checkout(CheckoutRequestViewModel model)
         {
+            var tour = await _context.TourPackages.Include(t => t.Shifts).FirstOrDefaultAsync(t => t.Id == model.TourId);
+            if (tour == null) return RedirectToAction("Catalog", "Tour");
+
+            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == model.TourId);
+            if (featured != null && featured.PromoPrice.HasValue)
+            {
+                tour.BasePrice = featured.PromoPrice.Value;
+            }
+
             if (!ModelState.IsValid)
             {
-                var originalTour = await _context.TourPackages.Include(t => t.Shifts).FirstOrDefaultAsync(t => t.Id == model.TourId);
-                if (originalTour == null) return RedirectToAction("Catalog", "Tour");
-                return View(originalTour);
+                return View(tour);
             }
-            var tour = await _context.TourPackages.FindAsync(model.TourId);
-            if (tour == null) return RedirectToAction("Catalog", "Tour");
 
             decimal pickupCost = 0;
             string pickupLocation = "Agencia Central";
@@ -114,6 +126,8 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
+
 
 
 
