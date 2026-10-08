@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace SIGETOUR.API.Core.Entities
@@ -23,6 +23,13 @@ namespace SIGETOUR.API.Core.Entities
 
         public string PickupLocation { get; set; } = string.Empty;
         public decimal PickupCost { get; set; }
+        
+        public string ShiftName { get; set; } = string.Empty;
+        public decimal PaidAmount { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
+        public string OperationNumber { get; set; } = string.Empty;
+        public string InvoiceType { get; set; } = string.Empty;
+        public string InvoiceNumber { get; set; } = string.Empty;
 
         /// <summary>Pasajeros adicionales almacenados en JSON</summary>
         public string AdditionalPassengersJson { get; set; } = "[]";
