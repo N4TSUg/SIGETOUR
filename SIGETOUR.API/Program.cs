@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -84,6 +84,7 @@ using (var scope = app.Services.CreateScope())
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"EquipmentJson\" text NOT NULL DEFAULT '[]';"); } catch { }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"Status\" text NOT NULL DEFAULT 'Operativo en Ruta (En Servicio)';"); } catch { }
     try { db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS \"VehicleImages\" (\"Id\" uuid NOT NULL PRIMARY KEY, \"VehicleId\" uuid NOT NULL REFERENCES \"Vehicles\"(\"Id\") ON DELETE CASCADE, \"ImageUrl\" text NOT NULL DEFAULT '', \"IsCover\" boolean NOT NULL DEFAULT false);"); } catch { }
+    try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""FeaturedPackages"" (""Id"" uuid NOT NULL PRIMARY KEY, ""TourPackageId"" uuid NOT NULL REFERENCES ""TourPackages""(""Id"") ON DELETE CASCADE, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CommercialTitle"" text NOT NULL DEFAULT '', ""CommercialSubtitle"" text NOT NULL DEFAULT '', ""PromoBadge"" text NOT NULL DEFAULT '', ""PromoPrice"" numeric, ""SyncInventory"" boolean NOT NULL DEFAULT true);"); } catch { }
     SIGETOUR.API.Infrastructure.Data.IdentitySeeder.SeedUsersAndRolesAsync(scope.ServiceProvider).Wait();
 }
 
@@ -105,4 +106,9 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+
+
+
+
 

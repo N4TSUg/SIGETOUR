@@ -1,0 +1,90 @@
+@using SIGETOUR.API.Core.Entities
+@model IEnumerable<FeaturedPackage>
+@{
+    ViewData["Title"] = "Paquetes Populares de Inicio";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<!-- Breadcrumbs & Header Section -->
+<section class="bg-surface-container-lowest px-space-xl py-space-lg border-b border-outline-variant mb-6 rounded-t-2xl">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-headline-md font-headline-md text-on-surface font-extrabold tracking-tight">Gestión de Paquetes Populares en Cajamarca</h1>
+                <span class="px-2.5 py-0.5 rounded-full text-label-sm font-label-lg bg-surface-container-highest text-primary border border-primary/20">Landing Pública</span>
+            </div>
+            <p class="text-body-md font-body-md text-on-surface-variant max-w-4xl mt-1 leading-relaxed">Controla y reorganiza los circuitos turísticos y paquetes promocionales destacados en la portada pública. Configura el orden de visualización, visibilidad en tiempo real, descuentos promocionales y etiquetas de recomendación.</p>
+        </div>
+        <div class="flex items-center flex-wrap gap-2.5 shrink-0">
+            <a href="/" target="_blank" class="flex items-center gap-2 px-3.5 py-2.5 rounded-lg border border-primary text-primary hover:bg-surface-container-high transition-all text-label-lg font-label-lg font-bold shadow-xs">
+                <span class="material-symbols-outlined text-[19px]">visibility</span>
+                <span>Previsualizar en Portada</span>
+            </a>
+            <a asp-action="EditFeatured" class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary hover:bg-[#0e5a52] text-on-primary transition-all text-label-lg font-label-lg font-bold shadow-sm active:scale-95">
+                <span class="material-symbols-outlined text-[20px]">add</span>
+                <span>+ Agregar Paquete a Populares</span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Dashboard Metric Ribbon -->
+<section class="px-space-xl py-space-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mb-6">
+    <!-- Metric 1: Total Paquetes en Portada -->
+    <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
+        <div class="flex flex-col">
+            <span class="text-label-sm font-label-sm text-secondary">Total Paquetes en Portada</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-headline-md font-headline-md font-extrabold text-primary">@Model.Count()</span>
+                <span class="text-label-sm font-label-sm text-on-surface-variant font-medium">activos</span>
+            </div>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-primary">
+            <span class="material-symbols-outlined text-headline-sm">view_carousel</span>
+        </div>
+    </div>
+</section>
+
+<!-- Main Content Bento Grid -->
+<section class="px-space-xl pb-space-xl flex flex-col gap-space-lg w-full max-w-7xl mx-auto">
+    <div class="flex flex-col gap-4 w-full">
+        @if (Model != null && Model.Any())
+        {
+            foreach (var fp in Model)
+            {
+                <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/80 shadow-sm p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative">
+                    <div class="absolute left-0 top-0 bottom-0 w-2 bg-primary"></div>
+                    <div class="flex items-center gap-4 min-w-0 flex-1 pl-2">
+                        <div class="flex items-center gap-2">
+                            <div class="flex flex-col items-center justify-center w-11 h-11 rounded-xl bg-surface-container text-primary font-extrabold text-title-md border border-outline-variant/60">@fp.DisplayOrder</div>
+                        </div>
+                        <div class="flex flex-col min-w-0 flex-1 gap-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-surface-container-high text-primary border border-primary/20">Top @fp.DisplayOrder</span>
+                                @if (!string.IsNullOrEmpty(fp.PromoBadge)) {
+                                    <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-secondary-container text-on-secondary-container">@fp.PromoBadge</span>
+                                }
+                            </div>
+                            <h3 class="text-title-md font-bold text-on-surface truncate">@(fp.CommercialTitle != "" ? fp.CommercialTitle : fp.TourPackage?.Title)</h3>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 lg:border-l lg:border-outline-variant/60 lg:pl-5 self-end lg:self-center shrink-0">
+                        <a asp-action="EditFeatured" asp-route-id="@fp.Id" class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-label-md font-bold border border-primary/20 transition-all" title="Editar Parámetros de Portada">
+                            <span class="material-symbols-outlined text-[18px]">tune</span><span>Editar</span>
+                        </a>
+                        <form asp-action="DeleteFeatured" method="post" style="display:inline;">
+                            <input type="hidden" name="id" value="@fp.Id" />
+                            <button type="submit" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-error-container text-tertiary transition-colors" title="Retirar de Portada" onclick="return confirm('¿Retirar este paquete de la portada?');">
+                                <span class="material-symbols-outlined text-[19px]">visibility_off</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="p-8 text-center text-on-surface-variant">No hay paquetes destacados configurados.</div>
+        }
+    </div>
+</section>

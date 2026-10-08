@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -677,8 +677,102 @@ namespace SIGETOUR.API.Controllers.UI
             _context.Bookings.Update(booking);
             await _context.SaveChangesAsync();
 
-            // Redirect back to Dashboard or the Bookings list
             return RedirectToAction("Dashboard");
+        }
+
+        // --- FEATURED PACKAGES CRUD --- //
+
+        public async Task<IActionResult> Featured()
+        {
+            var featured = await _context.FeaturedPackages
+                .Include(f => f.TourPackage)
+                .OrderBy(f => f.DisplayOrder)
+                .ToListAsync();
+            return View(featured);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditFeatured(Guid? id)
+        {
+            ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+            if (id == null)
+            {
+                return View(new SIGETOUR.API.Models.FeaturedPackageDto { DisplayOrder = 1, SyncInventory = true });
+            }
+
+            var fp = await _context.FeaturedPackages.FindAsync(id);
+            if (fp == null) return NotFound();
+
+            var dto = new SIGETOUR.API.Models.FeaturedPackageDto
+            {
+                Id = fp.Id,
+                TourPackageId = fp.TourPackageId,
+                DisplayOrder = fp.DisplayOrder,
+                CommercialTitle = fp.CommercialTitle,
+                CommercialSubtitle = fp.CommercialSubtitle,
+                PromoBadge = fp.PromoBadge,
+                PromoPrice = fp.PromoPrice,
+                SyncInventory = fp.SyncInventory
+            };
+
+            return View(dto);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> EditFeatured(SIGETOUR.API.Models.FeaturedPackageDto dto)
+        {
+            ModelState.Remove("TourPackage");
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+                return View(dto);
+            }
+
+            if (dto.Id == Guid.Empty)
+            {
+                var fp = new FeaturedPackage
+                {
+                    Id = Guid.NewGuid(),
+                    TourPackageId = dto.TourPackageId,
+                    DisplayOrder = dto.DisplayOrder,
+                    CommercialTitle = dto.CommercialTitle ?? string.Empty,
+                    CommercialSubtitle = dto.CommercialSubtitle ?? string.Empty,
+                    PromoBadge = dto.PromoBadge ?? string.Empty,
+                    PromoPrice = dto.PromoPrice,
+                    SyncInventory = dto.SyncInventory
+                };
+                _context.FeaturedPackages.Add(fp);
+            }
+            else
+            {
+                var fp = await _context.FeaturedPackages.FindAsync(dto.Id);
+                if (fp == null) return NotFound();
+
+                fp.TourPackageId = dto.TourPackageId;
+                fp.DisplayOrder = dto.DisplayOrder;
+                fp.CommercialTitle = dto.CommercialTitle ?? string.Empty;
+                fp.CommercialSubtitle = dto.CommercialSubtitle ?? string.Empty;
+                fp.PromoBadge = dto.PromoBadge ?? string.Empty;
+                fp.PromoPrice = dto.PromoPrice;
+                fp.SyncInventory = dto.SyncInventory;
+
+                _context.FeaturedPackages.Update(fp);
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction("Featured");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteFeatured(Guid id)
+        {
+            var fp = await _context.FeaturedPackages.FindAsync(id);
+            if (fp != null)
+            {
+                _context.FeaturedPackages.Remove(fp);
+                await _context.SaveChangesAsync();
+            }
+            return RedirectToAction("Featured");
         }
     }
 }

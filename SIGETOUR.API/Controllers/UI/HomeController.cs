@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SIGETOUR.API.Infrastructure.Data;
 using System.Linq;
@@ -23,6 +23,14 @@ namespace SIGETOUR.API.Controllers.UI
                 .OrderBy(t => t.Title)
                 .Take(6)
                 .ToListAsync();
+                
+            var featured = await _context.FeaturedPackages
+                .Include(f => f.TourPackage)
+                .ThenInclude(t => t.Images)
+                .OrderBy(f => f.DisplayOrder)
+                .ToListAsync();
+                
+            ViewBag.FeaturedPackages = featured;
 
             return View(tours);
         }
