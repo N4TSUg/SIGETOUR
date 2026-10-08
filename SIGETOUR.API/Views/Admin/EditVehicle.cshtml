@@ -1,4 +1,4 @@
-@model SIGETOUR.API.Core.Entities.Vehicle
+﻿@model SIGETOUR.API.Core.Entities.Vehicle
 @using SIGETOUR.API.Core.Entities
 @{
     bool isCreate = Model.Id == Guid.Empty;
@@ -133,13 +133,9 @@
                                         <span class="absolute top-2 left-2 bg-primary text-on-primary text-label-sm font-bold px-2 py-0.5 rounded-lg">Portada</span>
                                     }
                                     <div class="absolute inset-0 bg-inverse-surface/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <form asp-action="DeleteVehicleImage" method="post">
-                                            <input type="hidden" name="id" value="@img.Id" />
-                                            <input type="hidden" name="vehicleId" value="@Model.Id" />
-                                            <button type="submit" class="p-2 bg-error text-on-error rounded-full" onclick="return confirm('¿Eliminar esta foto?')">
+                                        <button type="button" class="p-2 bg-error text-on-error rounded-full" onclick="if(confirm('¿Eliminar esta foto?')) document.getElementById('delete-img-form-@img.Id').submit();">
                                                 <span class="material-symbols-outlined text-[20px]">delete</span>
                                             </button>
-                                        </form>
                                     </div>
                                 </div>
                             }
@@ -339,4 +335,13 @@
         }
     }
 </script>
+
+@if (Model.Images != null) {
+    foreach(var img in Model.Images) {
+        <form id="delete-img-form-@img.Id" asp-action="DeleteVehicleImage" method="post" class="hidden">
+            <input type="hidden" name="id" value="@img.Id" />
+            <input type="hidden" name="vehicleId" value="@Model.Id" />
+        </form>
+    }
+}
 </div>
