@@ -66,6 +66,23 @@ using (var scope = app.Services.CreateScope())
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"OperationNumber\" text NOT NULL DEFAULT '';"); } catch { }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"InvoiceType\" text NOT NULL DEFAULT '';"); } catch { }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"InvoiceNumber\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"Category\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"ManufactureYear\" integer NOT NULL DEFAULT 2020;"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"ChassisNumber\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"EngineNumber\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"Color\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"FuelType\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"SoatNumber\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"SoatProvider\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"SoatIssueDate\" timestamp with time zone NULL;"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"SoatExpiryDate\" timestamp with time zone NULL;"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"CitvNumber\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"CitvProvider\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"CitvExpiryDate\" timestamp with time zone NULL;"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"TucNumber\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"ResolutionNumber\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"EquipmentJson\" text NOT NULL DEFAULT '[]';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN \"Status\" text NOT NULL DEFAULT 'Operativo en Ruta (En Servicio)';"); } catch { }
     SIGETOUR.API.Infrastructure.Data.IdentitySeeder.SeedUsersAndRolesAsync(scope.ServiceProvider).Wait();
 }
 
@@ -87,6 +104,7 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
 
 
 

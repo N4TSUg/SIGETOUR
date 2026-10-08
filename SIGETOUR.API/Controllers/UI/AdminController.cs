@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -97,24 +97,56 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (model.Id == Guid.Empty)
             {
-                // Create
                 model.Id = Guid.NewGuid();
                 _context.Vehicles.Add(model);
             }
             else
             {
-                // Edit
                 var vehicle = await _context.Vehicles.FindAsync(model.Id);
                 if (vehicle == null) return NotFound();
                 
                 vehicle.LicensePlate = model.LicensePlate;
                 vehicle.Model = model.Model;
+                vehicle.Category = model.Category;
+                vehicle.ManufactureYear = model.ManufactureYear;
+                vehicle.ChassisNumber = model.ChassisNumber;
+                vehicle.EngineNumber = model.EngineNumber;
                 vehicle.SeatCapacity = model.SeatCapacity;
-                vehicle.IsActive = model.IsActive;
+                vehicle.Color = model.Color;
+                vehicle.FuelType = model.FuelType;
+                
+                vehicle.SoatNumber = model.SoatNumber;
+                vehicle.SoatProvider = model.SoatProvider;
+                vehicle.SoatIssueDate = model.SoatIssueDate;
+                vehicle.SoatExpiryDate = model.SoatExpiryDate;
+                
+                vehicle.CitvNumber = model.CitvNumber;
+                vehicle.CitvProvider = model.CitvProvider;
+                vehicle.CitvExpiryDate = model.CitvExpiryDate;
+                
+                vehicle.TucNumber = model.TucNumber;
+                vehicle.ResolutionNumber = model.ResolutionNumber;
+                
+                vehicle.Status = model.Status;
+                vehicle.IsActive = model.Status == "Operativo en Ruta (En Servicio)";
+                
                 _context.Vehicles.Update(vehicle);
             }
-
             await _context.SaveChangesAsync();
+            return RedirectToAction("Fleet");
+        }
+        
+        [HttpPost]
+        public async Task<IActionResult> DeleteVehicle(Guid id)
+        {
+            var vehicle = await _context.Vehicles.FindAsync(id);
+            if (vehicle != null)
+            {
+                vehicle.IsActive = false;
+                vehicle.Status = "Baja Operativa";
+                _context.Vehicles.Update(vehicle);
+                await _context.SaveChangesAsync();
+            }
             return RedirectToAction("Fleet");
         }
         public async Task<IActionResult> Fleet()
@@ -360,7 +392,7 @@ namespace SIGETOUR.API.Controllers.UI
                 Status = booking.Status,
                 AdditionalPassengersJson = booking.AdditionalPassengersJson,
                 TourName = tour?.Title ?? "Tour Desconocido",
-                AvailableShifts = tour?.Shifts?.Select(s => s.Name).ToList() ?? new List<string>()
+                AvailableShifts = tour?.Shifts?.Select(s => s.ShiftName).ToList() ?? new List<string>()
             };
 
             return View(vm);
@@ -396,6 +428,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 

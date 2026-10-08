@@ -1,55 +1,256 @@
 ﻿@model SIGETOUR.API.Core.Entities.Vehicle
 @{
     bool isCreate = Model.Id == Guid.Empty;
-    ViewData["Title"] = isCreate ? "Registrar Vehículo" : "Editar Vehículo";
+    ViewData["Title"] = isCreate ? "Registrar Nuevo Vehículo" : "Editar Vehículo " + Model.LicensePlate;
     Layout = "_AdminLayout";
 }
-
-<div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+<div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto animate-in fade-in zoom-in-95 duration-200">
 <form asp-action="EditVehicle" method="post">
     <input type="hidden" asp-for="Id" />
+    <input type="hidden" asp-for="EquipmentJson" id="EquipmentJson" />
+
+<!-- Top Title and Actions -->
+<div class="sm:flex sm:justify-between sm:items-center mb-8">
+    <div class="mb-4 sm:mb-0 flex items-center gap-3">
+    <!-- Back Button -->
+    <a href="@Url.Action("Fleet", "Admin")" class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant shrink-0">
+        <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+    </a>
+    <div>
+        <h1 class="text-headline-md font-headline-md font-bold text-on-surface flex items-center gap-2">
+        @(isCreate ? "Registro de Unidad Vehicular" : "Editar Vehículo " + Model.LicensePlate)
+        </h1>
+        <p class="text-body-md font-body-md text-on-surface-variant mt-1">
+        Ficha técnica oficial para operaciones y despachos.
+        </p>
+    </div>
+    </div>
+</div>
+
+<!-- Main Layout Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Left Column (Main Form) -->
+    <div class="lg:col-span-2 space-y-6">
     
-    <div class="sm:flex sm:justify-between sm:items-center mb-8">
-      <div class="mb-4 sm:mb-0 flex items-center gap-3">
-        <a href="@Url.Action("Fleet", "Admin")" class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant">
-          <span class="material-symbols-outlined text-[24px]">arrow_back</span>
-        </a>
-        <div>
-          <h1 class="text-headline-md font-headline-md font-bold text-on-surface flex items-center gap-3">
-            @(isCreate ? "Registrar Nuevo Vehículo" : "Editar Vehículo")
-          </h1>
+    <!-- 1. IDENTIFICACIÓN Y CATEGORIZACIÓN -->
+    <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
+        <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">directions_bus</span> Identificación del Vehículo
+        </h2>
         </div>
-      </div>
-      <div class="flex gap-2">
-        <button type="submit" class="btn bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md px-6 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold">
-          <span class="material-symbols-outlined text-[18px]" data-icon="save">save</span>
-          Guardar Cambios
-        </button>
-      </div>
+        <div class="p-6 space-y-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Placa de Rodaje</label>
+            <div class="relative">
+                <input asp-for="LicensePlate" class="w-full bg-[#f8fafc] text-on-surface font-headline-sm font-bold tracking-wider pl-10 pr-12 py-2 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant transition-colors uppercase outline-none" maxlength="7" placeholder="Ej. T7C-841" required />
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">pin</span>
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-label-sm font-label-sm bg-surface-container text-primary font-bold px-1.5 py-0.5 rounded">PERÚ</span>
+            </div>
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Marca y Modelo Comercial</label>
+            <input asp-for="Model" class="w-full bg-[#f8fafc] text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant text-body-md font-body-md transition-colors outline-none" placeholder="Ej. Mercedes-Benz Sprinter 515 CDI VIP" required />
+            <span class="text-label-sm font-label-sm text-secondary mt-1 block">Versión carrozada para servicio turístico y confort.</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-3 border-t border-outline-variant/50">
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Categoría de Unidad</label>
+            <div class="relative">
+                <select asp-for="Category" class="w-full bg-[#f8fafc] text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant text-body-md font-body-md transition-colors appearance-none outline-none">
+                <option value="Van Turística VIP (14 - 19 Pas.)">Van Turística VIP (14 - 19 Pas.)</option>
+                <option value="Minibús (20 - 30 Pas.)">Minibús (20 - 30 Pas.)</option>
+                <option value="Bus Panorámico de 2 pisos">Bus Panorámico de 2 pisos</option>
+                <option value="SUV 4x4 (Servicio Privado)">SUV 4x4 (Servicio Privado)</option>
+                </select>
+                <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+            </div>
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Año de Fabricación</label>
+            <input asp-for="ManufactureYear" type="number" min="2016" max="2026" class="w-full bg-[#f8fafc] text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant text-body-md font-body-md transition-colors outline-none" required />
+            <span class="text-label-sm font-label-sm text-secondary mt-1 block">Cumple con la norma de antigüedad máxima regional.</span>
+            </div>
+        </div>
+        </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-      <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden p-6 space-y-4">
-        <div>
-          <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Placa / Matrícula</label>
-          <input asp-for="LicensePlate" required class="w-full px-3 py-2 text-body-sm rounded-lg border border-outline-variant text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Ej: T7B-952" />
+    <!-- 2. NÚMEROS DE SERIE Y CARACTERÍSTICAS TÉCNICAS -->
+    <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
+        <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">engineering</span> Datos Técnicos del Motor y Chasis
+        </h2>
         </div>
-        <div>
-          <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Marca y Modelo</label>
-          <input asp-for="Model" required class="w-full px-3 py-2 text-body-sm rounded-lg border border-outline-variant text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Ej: Mercedes-Benz Sprinter" />
+        <div class="p-6 space-y-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">N° Identificación Vehicular (VIN/Chasis)</label>
+            <input asp-for="ChassisNumber" class="w-full bg-[#f8fafc] text-on-surface font-mono py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant text-body-md transition-colors uppercase outline-none" maxlength="17" placeholder="Ej. 8AC906653KE284912" />
+            <span class="text-label-sm font-label-sm text-secondary mt-1 block">Estampado en chasis y tarjeta de propiedad SUNARP.</span>
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">N° de Serie del Motor</label>
+            <input asp-for="EngineNumber" class="w-full bg-[#f8fafc] text-on-surface font-mono py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant text-body-md transition-colors uppercase outline-none" placeholder="Ej. OM651-955-408921" />
+            <span class="text-label-sm font-label-sm text-secondary mt-1 block">Validado contra póliza de seguro automotriz.</span>
+            </div>
         </div>
-        <div>
-          <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Capacidad de Asientos</label>
-          <input asp-for="SeatCapacity" type="number" required class="w-full px-3 py-2 text-body-sm rounded-lg border border-outline-variant text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="19" />
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-3 border-t border-outline-variant/50">
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Cap. Asientos (Sin Conductor)</label>
+            <div class="relative">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">airline_seat_recline_normal</span>
+                <input asp-for="SeatCapacity" type="number" min="4" max="60" class="w-full bg-[#f8fafc] text-on-surface font-bold text-title-sm pl-10 pr-3 py-2 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant outline-none" required />
+            </div>
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Color Predominante</label>
+            <input asp-for="Color" class="w-full bg-[#f8fafc] text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant text-body-md font-body-md outline-none" placeholder="Ej. Blanco Glaciar" />
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Tipo de Combustible</label>
+            <div class="relative">
+                <select asp-for="FuelType" class="w-full bg-[#f8fafc] text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-surface-variant text-body-md font-body-md appearance-none outline-none">
+                <option value="Diésel B5 S-50 (Ultra Bajo Azufre)">Diésel B5 S-50</option>
+                <option value="Gasolina 95/97 Octanos">Gasolina 95/97 Octanos</option>
+                <option value="GNV / GLP">GNV / GLP</option>
+                </select>
+                <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+            </div>
+            </div>
         </div>
-        <div>
-          <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Estado Operativo</label>
-          <select asp-for="IsActive" class="w-full px-3 py-2 text-body-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-on-surface">
-            <option value="true">Operativo (Activo)</option>
-            <option value="false">Dado de Baja / Mantenimiento</option>
-          </select>
         </div>
-      </div>
     </div>
+    </div>
+
+    <!-- Right Column (Sidebar Forms) -->
+    <aside class="space-y-6">
+
+    <!-- 3. DOCUMENTOS Y CERTIFICACIONES -->
+    <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden flex flex-col h-full">
+        <div class="px-5 py-4 border-b border-outline-variant bg-surface-bright">
+        <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary">policy</span> Permisos y Seguros
+        </h2>
+        </div>
+        
+        <div class="p-5 flex-1 space-y-6 overflow-y-auto custom-scrollbar">
+        <!-- SOAT Section -->
+        <div class="space-y-3">
+            <h3 class="text-label-md font-label-md font-bold text-on-surface border-b border-outline-variant/60 pb-1 mb-2">Seguro SOAT</h3>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">N° Póliza Electrónica</label>
+            <input asp-for="SoatNumber" class="w-full bg-surface-container-lowest text-on-surface font-mono py-2 px-3 rounded-lg border border-outline-variant focus:border-primary text-body-md outline-none" />
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Aseguradora</label>
+            <input asp-for="SoatProvider" class="w-full bg-surface-container-lowest text-on-surface py-2 px-3 rounded-lg border border-outline-variant text-body-sm outline-none" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Emisión</label>
+                <input asp-for="SoatIssueDate" type="date" class="w-full bg-surface-container-lowest text-on-surface py-2 px-3 rounded-lg border border-outline-variant focus:border-primary text-body-md outline-none" />
+            </div>
+            <div>
+                <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Vencimiento</label>
+                <input asp-for="SoatExpiryDate" type="date" class="w-full bg-surface-container-lowest text-on-surface py-2 px-3 rounded-lg border border-outline-variant focus:border-primary text-body-md outline-none font-bold text-primary" />
+            </div>
+            </div>
+        </div>
+
+        <!-- CITV Section -->
+        <div class="space-y-3 pt-4 border-t border-outline-variant/50">
+            <h3 class="text-label-md font-label-md font-bold text-on-surface border-b border-outline-variant/60 pb-1 mb-2">Revisión Técnica (CITV)</h3>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">N° Certificado</label>
+            <input asp-for="CitvNumber" class="w-full bg-surface-container-lowest text-on-surface font-mono py-2 px-3 rounded-lg border border-outline-variant text-body-sm outline-none" />
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Planta de Revisión</label>
+            <input asp-for="CitvProvider" class="w-full bg-surface-container-lowest text-on-surface py-2 px-3 rounded-lg border border-outline-variant text-body-sm outline-none" />
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Fecha de Vencimiento</label>
+            <input asp-for="CitvExpiryDate" type="date" class="w-full bg-surface-container-lowest text-on-surface py-2 px-3 rounded-lg border border-outline-variant text-body-sm outline-none" />
+            </div>
+        </div>
+
+        <!-- Permisos de Circulación (TUC) -->
+        <div class="space-y-3 pt-4 border-t border-outline-variant/50">
+            <h3 class="text-label-md font-label-md font-bold text-on-surface border-b border-outline-variant/60 pb-1 mb-2">Permisos (DRTC)</h3>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">N° Tarjeta de Única Circulación (TUC)</label>
+            <input asp-for="TucNumber" class="w-full bg-surface-container-lowest text-on-surface font-mono py-2 px-3 rounded-lg border border-outline-variant text-body-sm outline-none" />
+            </div>
+            <div>
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Resolución Directoral</label>
+            <input asp-for="ResolutionNumber" class="w-full bg-surface-container-lowest text-on-surface font-mono py-2 px-3 rounded-lg border border-outline-variant text-body-sm outline-none" />
+            </div>
+        </div>
+
+        <!-- Operational Status Selector -->
+        <div class="pt-4 border-t border-outline-variant/50">
+            <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Estado Operativo Actual</label>
+            <select asp-for="Status" class="w-full px-3 py-2 text-body-sm font-body-sm rounded-lg bg-surface border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-on-surface font-semibold">
+                <option value="Operativo en Ruta (En Servicio)">Operativo en Ruta (En Servicio)</option>
+                <option value="En Espera / Terminal">En Espera / Terminal</option>
+                <option value="En Mantenimiento Preventivo">En Mantenimiento Preventivo</option>
+                <option value="Baja Operativa">Baja Operativa</option>
+            </select>
+        </div>
+        </div>
+
+        <!-- Action Buttons Footer -->
+        <div class="p-5 border-t border-outline-variant bg-surface space-y-2.5">
+        <div class="flex items-center gap-2">
+            <button type="submit" class="flex-1 py-2.5 px-3 rounded-lg bg-primary text-on-primary font-label-lg uppercase tracking-wide hover:bg-primary/90 transition-all text-center shadow-sm">
+            Guardar Unidad
+            </button>
+            <a href="@Url.Action("Fleet", "Admin")" class="py-2.5 px-4 rounded-lg bg-surface-container-lowest text-on-surface-variant border border-outline-variant font-label-md hover:bg-surface-container transition-colors text-center inline-block">
+            Cancelar
+            </a>
+        </div>
+        @if (!isCreate) {
+        <button type="button" class="w-full py-2 px-3 rounded-lg bg-error-container/60 hover:bg-error-container text-tertiary font-label-md border border-tertiary/20 flex items-center justify-center gap-1.5 transition-all" onclick="document.getElementById('delete-modal').classList.remove('hidden')">
+            <span class="material-symbols-outlined text-base">delete_forever</span>
+            <span>Dar de Baja / Eliminar Vehículo</span>
+        </button>
+        }
+        </div>
+    </div>
+    </aside>
+
+</div>
 </form>
+
+<!-- MODAL ELIMINAR -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm transition-all duration-200 hidden" id="delete-modal">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-outline-variant relative animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-error-container text-tertiary flex items-center justify-center shrink-0 shadow-sm ring-4 ring-tertiary/10">
+                <span class="material-symbols-outlined text-2xl">warning</span>
+            </div>
+            <div>
+                <h3 class="text-headline-sm font-headline-sm font-bold text-on-surface leading-snug">
+                    ¿Estás seguro de dar de baja el vehículo @Model.LicensePlate?
+                </h3>
+                <p class="text-body-sm font-body-sm text-outline mt-1 font-mono">@Model.Model</p>
+            </div>
+        </div>
+        
+        <form asp-action="DeleteVehicle" method="post" class="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+            <input type="hidden" name="id" value="@Model.Id" />
+            <button type="button" class="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-surface-container-lowest text-on-surface-variant border border-outline-variant font-label-md hover:bg-surface-container transition-colors" onclick="document.getElementById('delete-modal').classList.add('hidden')">
+                Cancelar
+            </button>
+            <button type="submit" class="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-tertiary text-on-tertiary font-label-md font-bold hover:bg-tertiary/90 transition-all flex items-center justify-center gap-1.5 shadow-md">
+                <span class="material-symbols-outlined text-base">delete</span>
+                <span>Sí, Dar de Baja Vehículo</span>
+            </button>
+        </form>
+    </div>
+</div>
 </div>

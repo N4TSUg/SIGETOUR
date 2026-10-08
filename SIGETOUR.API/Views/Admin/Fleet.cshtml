@@ -46,9 +46,12 @@
                                 <a href="@Url.Action("EditVehicle", "Admin", new { id = vehicle.Id })" class="inline-block p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Editar">
                                     <span class="material-symbols-outlined text-[20px]">edit</span>
                                 </a>
-                                <button class="p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-surface-container transition-colors" title="Eliminar">
-                                    <span class="material-symbols-outlined text-[20px]">delete</span>
-                                </button>
+                                <form asp-action="DeleteVehicle" method="post" class="inline-block" onsubmit="return confirm('¿Estás seguro de dar de baja este vehículo?')">
+                                    <input type="hidden" name="id" value="@vehicle.Id" />
+                                    <button type="submit" class="p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-surface-container transition-colors" title="Eliminar / Dar de Baja">
+                                        <span class="material-symbols-outlined text-[20px]">delete</span>
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                     }
@@ -65,6 +68,7 @@
         </table>
     </div>
 </div>
+
 
 
 
