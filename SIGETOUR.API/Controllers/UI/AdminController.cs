@@ -287,6 +287,69 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
         }
+        [HttpGet]
+        public async Task<IActionResult> EditBooking(Guid id)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null) return NotFound();
+
+            var vm = new SIGETOUR.API.Models.EditBookingViewModel
+            {
+                Id = booking.Id,
+                ReferenceCode = booking.ReferenceCode,
+                CustomerName = booking.CustomerName,
+                CustomerDni = booking.CustomerDni,
+                CustomerPhone = booking.CustomerPhone,
+                TravelDate = booking.TravelDate,
+                ShiftName = booking.ShiftName,
+                BoardingPoint = booking.PickupLocation,
+                TotalPassengers = booking.TotalPassengers,
+                TotalAmount = booking.TotalAmount,
+                PaidAmount = booking.PaidAmount,
+                PaymentMethod = booking.PaymentMethod,
+                OperationNumber = booking.OperationNumber,
+                InvoiceType = booking.InvoiceType,
+                InvoiceNumber = booking.InvoiceNumber,
+                Status = booking.Status,
+                AdditionalPassengersJson = booking.AdditionalPassengersJson,
+                TourName = booking.Items.FirstOrDefault()?.TourPackage?.Title ?? "Tour Desconocido"
+            };
+
+            return View(vm);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> EditBooking(SIGETOUR.API.Models.EditBookingViewModel model)
+        {
+            var booking = await _context.Bookings.FindAsync(model.Id);
+            if (booking == null) return NotFound();
+
+            booking.CustomerName = model.CustomerName;
+            booking.CustomerDni = model.CustomerDni;
+            booking.CustomerPhone = model.CustomerPhone;
+            booking.TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc);
+            booking.ShiftName = model.ShiftName;
+            booking.PickupLocation = model.BoardingPoint;
+            booking.TotalPassengers = model.TotalPassengers;
+            booking.TotalAmount = model.TotalAmount;
+            booking.PaidAmount = model.PaidAmount;
+            booking.PaymentMethod = model.PaymentMethod;
+            booking.OperationNumber = model.OperationNumber;
+            booking.InvoiceType = model.InvoiceType;
+            booking.InvoiceNumber = model.InvoiceNumber;
+            booking.Status = model.Status;
+            booking.AdditionalPassengersJson = model.AdditionalPassengersJson;
+
+            _context.Bookings.Update(booking);
+            await _context.SaveChangesAsync();
+
+            // Redirect back to Dashboard or the Bookings list
+            return RedirectToAction("Dashboard");
+        }
     }
 }
 

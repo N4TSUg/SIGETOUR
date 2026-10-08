@@ -60,6 +60,12 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<SIGETOUR.API.Infrastructure.Data.AppDbContext>();
     db.Database.EnsureCreated();
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"ItineraryStops\" ADD COLUMN \"EstimatedTime\" text;"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"ShiftName\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"PaidAmount\" numeric NOT NULL DEFAULT 0;"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"PaymentMethod\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"OperationNumber\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"InvoiceType\" text NOT NULL DEFAULT '';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN \"InvoiceNumber\" text NOT NULL DEFAULT '';"); } catch { }
     SIGETOUR.API.Infrastructure.Data.IdentitySeeder.SeedUsersAndRolesAsync(scope.ServiceProvider).Wait();
 }
 
@@ -81,6 +87,7 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
 
 
 

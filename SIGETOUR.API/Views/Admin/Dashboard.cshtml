@@ -1,4 +1,4 @@
-﻿@using SIGETOUR.API.Core.Entities
+@using SIGETOUR.API.Core.Entities
 @{
     ViewData["Title"] = "Dashboard";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
@@ -105,7 +105,7 @@
                 {
                     foreach (var booking in recentBookings)
                     {
-                        <div class="flex items-start gap-4 p-4 rounded-xl border border-outline-variant/60 bg-surface/50 hover:bg-surface-container-lowest transition-colors">
+                        <a href="@Url.Action("EditBooking", "Admin", new { id = booking.Id })" class="flex items-start gap-4 p-4 rounded-xl border border-outline-variant/60 bg-surface/50 hover:bg-surface-container-lowest transition-colors block">
                             <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
                                 <span class="material-symbols-outlined text-[20px]">person</span>
                             </div>
@@ -114,9 +114,9 @@
                                     <h4 class="font-bold text-on-surface text-label-lg truncate pr-2">@booking.CustomerName</h4>
                                     <span class="font-mono text-label-sm font-bold text-primary">@booking.ReferenceCode</span>
                                 </div>
-                                <p class="text-body-sm text-on-surface-variant truncate mb-2">@booking.TravelDate.ToString("dd MMM yyyy") - @booking.TotalPassengers pax</p>
+                                <p class="text-body-sm text-on-surface-variant truncate mb-2">@booking.TravelDate.ToString("dd MMM. yyyy") - @booking.TotalPassengers pax</p>
                             </div>
-                        </div>
+                        </a>
                     }
                 }
                 else

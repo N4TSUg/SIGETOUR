@@ -1,0 +1,238 @@
+﻿@model SIGETOUR.API.Models.EditBookingViewModel
+@{
+    ViewData["Title"] = "Editar Reserva " + Model.ReferenceCode;
+    Layout = "_AdminLayout";
+}
+
+<div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+<form asp-action="EditBooking" method="post" id="editBookingForm">
+    <input type="hidden" asp-for="Id" />
+    <input type="hidden" asp-for="ReferenceCode" />
+    <input type="hidden" asp-for="TourName" />
+    <input type="hidden" asp-for="AdditionalPassengersJson" id="AdditionalPassengersJson" />
+
+    <!-- Page Header -->
+    <div class="sm:flex sm:justify-between sm:items-center mb-8">
+      <div class="mb-4 sm:mb-0 flex items-center gap-3">
+        <a href="@Url.Action("Dashboard", "Admin")" class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant">
+          <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+        </a>
+        <div>
+          <h1 class="text-headline-md font-headline-md font-bold text-on-surface flex items-center gap-3">
+            Editar Reserva <span class="text-primary font-mono bg-surface-container-low px-2 rounded">@Model.ReferenceCode</span>
+          </h1>
+          <p class="text-body-md text-on-surface-variant flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">tour</span> @Model.TourName
+          </p>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button type="button" class="btn bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high transition-colors font-label-md px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-sm">
+          <span class="material-symbols-outlined text-[18px]" data-icon="cancel">cancel</span>
+          Anular Reserva
+        </button>
+        <button type="submit" class="btn bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md px-6 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold">
+          <span class="material-symbols-outlined text-[18px]" data-icon="save">save</span>
+          Guardar Cambios
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+      <!-- LEFT COLUMN: Operations & Contact -->
+      <div class="xl:col-span-2 space-y-6">
+
+        <!-- 1. Operational Details -->
+        <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden">
+          <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
+            <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">calendar_clock</span>
+              Detalles Operativos de la Salida
+            </h2>
+            <span class="px-2.5 py-0.5 rounded-full bg-[#ecfdf5] text-primary border border-primary/20 text-label-sm font-bold">Estado: @Model.Status</span>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Fecha de Recorrido</label>
+                <input asp-for="TravelDate" type="date" class="w-full pl-3 pr-3 py-2 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" />
+              </div>
+              
+              <div>
+                <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Turno Operativo</label>
+                <div class="grid grid-cols-2 gap-3">
+                  <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == "Turno Mañana" ? "border-primary bg-primary/5" : "border-outline-variant")">
+                    <input type="radio" asp-for="ShiftName" value="Turno Mañana" class="sr-only" />
+                    <span class="text-label-md font-label-md font-bold">Mañana</span>
+                  </label>
+                  <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == "Turno Tarde" ? "border-primary bg-primary/5" : "border-outline-variant")">
+                    <input type="radio" asp-for="ShiftName" value="Turno Tarde" class="sr-only" />
+                    <span class="text-label-md font-label-md font-bold">Tarde</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Punto de Embarque</label>
+                <select asp-for="BoardingPoint" class="w-full py-2 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <option value="Agencia Central">Agencia Central</option>
+                  <option value="Hotel Centro Histórico">Hotel (Recojo coordinado)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Passenger Manifest -->
+        <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden">
+          <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
+            <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">groups</span>
+              Manifiesto de Pasajeros
+            </h2>
+            <div class="flex items-center gap-3">
+              <span class="text-label-sm font-label-sm text-secondary bg-surface-container py-1 px-2 rounded-lg" id="passenger-count-badge">@Model.TotalPassengers Pasajeros</span>
+              <button type="button" onclick="addPassengerRow()" class="text-primary hover:text-primary-container text-label-sm font-bold flex items-center gap-1 transition-colors">
+                <span class="material-symbols-outlined text-[18px]">person_add</span> Agregar
+              </button>
+            </div>
+          </div>
+          
+          <div class="p-6 space-y-4" id="passengers-container">
+            <!-- TITULAR -->
+            <div class="passenger-card p-4 rounded-xl border-2 border-primary/20 bg-[#f8fafc] relative">
+              <div class="flex items-center justify-between mb-3 border-b border-outline-variant/40 pb-2">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-primary">how_to_reg</span>
+                  <span class="text-title-sm font-title-sm text-primary font-bold">Pasajero Titular (Contacto)</span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
+                  <input asp-for="CustomerName" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                </div>
+                <div>
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
+                  <input asp-for="CustomerDni" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                </div>
+                <div class="md:col-span-1">
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
+                  <input asp-for="CustomerPhone" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
+            <!-- ADDITIONAL PASSENGERS RENDERED HERE BY JS LATER -->
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Finance & Billing -->
+      <div class="space-y-6">
+        
+        <!-- 3. Payment Status -->
+        <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden">
+          <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright">
+            <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">payments</span>
+              Liquidación de Pago
+            </h2>
+          </div>
+          <div class="p-6">
+            
+            <div class="flex justify-between items-end mb-4 pb-4 border-b border-outline-variant">
+              <div>
+                <span class="block text-label-sm font-label-sm text-outline">Tarifa Total Calculada</span>
+                <span class="text-headline-sm font-headline-sm font-extrabold text-on-surface" id="display-total-tariff">S/ @Model.TotalAmount</span>
+                <input type="hidden" asp-for="TotalAmount" id="TotalAmountHidden" />
+                <input type="hidden" asp-for="TotalPassengers" id="TotalPassengersHidden" />
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div class="flex justify-between items-center">
+                <span class="text-body-md font-body-md text-on-surface-variant font-medium">Abono Registrado</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-body-md text-outline">S/</span>
+                  <input asp-for="PaidAmount" id="input-paid-amount" type="number" step="0.50" oninput="recalcBalance()" class="w-24 text-right py-1 px-2 rounded border border-outline-variant bg-surface-container-lowest font-bold text-title-sm text-primary focus:ring-1 focus:ring-primary" />
+                </div>
+              </div>
+
+              <div class="flex justify-between items-center pt-2">
+                <span class="text-body-md font-body-md text-on-surface-variant font-bold">Saldo Pendiente</span>
+                <span id="display-pending-balance" class="text-title-md font-title-md font-extrabold text-tertiary">
+                  S/ @(Model.TotalAmount - Model.PaidAmount)
+                </span>
+              </div>
+            </div>
+
+            <div class="mt-6 pt-5 border-t border-outline-variant">
+              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Método de Pago (Abono)</label>
+              <select asp-for="PaymentMethod" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary mb-3">
+                <option value="yape">Yape / Plin Interbancario</option>
+                <option value="transferencia">Transferencia BCP / BBVA</option>
+                <option value="efectivo">Efectivo (Caja Agencia)</option>
+                <option value="tarjeta">POS Tarjeta (Niubiz/IziPay)</option>
+              </select>
+
+              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">N° de Operación (Voucher)</label>
+              <div class="relative">
+                <input asp-for="OperationNumber" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Electronic Billing -->
+        <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden">
+          <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright">
+            <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">receipt_long</span>
+              Comprobante de Pago
+            </h2>
+          </div>
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Tipo de Comprobante</label>
+              <select asp-for="InvoiceType" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="boleta">Boleta de Venta Electrónica</option>
+                <option value="factura">Factura Electrónica (RUC)</option>
+                <option value="nota">Nota de Venta (Interno)</option>
+              </select>
+            </div>
+            
+            <div>
+              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Serie y Correlativo</label>
+              <div class="flex gap-2">
+                <input asp-for="InvoiceNumber" class="flex-1 py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono font-bold" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+</form>
+</div>
+
+<script>
+    function recalcBalance() {
+        const total = parseFloat(document.getElementById('TotalAmountHidden').value) || 0;
+        const paid = parseFloat(document.getElementById('input-paid-amount').value) || 0;
+        const balance = Math.max(0, total - paid);
+        
+        const balanceEl = document.getElementById('display-pending-balance');
+        balanceEl.innerText = S/  + balance.toFixed(2);
+        
+        if (balance === 0) {
+            balanceEl.classList.remove('text-tertiary');
+            balanceEl.classList.add('text-primary');
+        } else {
+            balanceEl.classList.remove('text-primary');
+            balanceEl.classList.add('text-tertiary');
+        }
+    }
+</script>
