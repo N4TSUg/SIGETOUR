@@ -122,6 +122,13 @@ namespace SIGETOUR.API.Controllers.UI
         public async Task<IActionResult> EditVehicle(SIGETOUR.API.Models.VehicleDto dto, List<IFormFile> VehicleImages)
         {
             ModelState.Remove("ExistingImages");
+            if (!ModelState.IsValid)
+            {
+                if (dto.Id != Guid.Empty) {
+                    dto.ExistingImages = await _context.VehicleImages.Where(vi => vi.VehicleId == dto.Id).ToListAsync();
+                }
+                return View(dto);
+            }
             if (string.IsNullOrWhiteSpace(dto.LicensePlate) || string.IsNullOrWhiteSpace(dto.Model))
             {
                 ModelState.AddModelError("", "Placa y Modelo son obligatorios.");
@@ -481,6 +488,11 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> CreateBooking(SIGETOUR.API.Models.EditBookingViewModel model, Guid TourId)
         {
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
+                return View(model);
+            }
             var tour = await _context.TourPackages.FindAsync(TourId);
             if (tour == null) {
                 ModelState.AddModelError("", "Tour no seleccionado.");
@@ -572,6 +584,19 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> EditBooking(SIGETOUR.API.Models.EditBookingViewModel model)
         {
+            if (!ModelState.IsValid)
+            {
+                // Repopulate dropdowns if necessary (like AvailableShifts)
+                // In EditBooking GET, AvailableShifts was populated from the Booking.Items
+                var existingBooking = await _context.Bookings.Include(b => b.Items).ThenInclude(i => i.TourPackage).ThenInclude(tp => tp.Shifts).FirstOrDefaultAsync(b => b.Id == model.Id);
+                if (existingBooking != null)
+                {
+                    var shifts = existingBooking.Items.FirstOrDefault()?.TourPackage?.Shifts.Select(s => s.ShiftName).ToList() ?? new List<string>();
+                    model.AvailableShifts = shifts;
+                }
+                return View(model);
+            }
+
             var booking = await _context.Bookings.FindAsync(model.Id);
             if (booking == null) return NotFound();
 
@@ -599,6 +624,8 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
+
 
 
 
