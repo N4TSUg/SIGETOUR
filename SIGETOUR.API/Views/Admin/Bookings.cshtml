@@ -10,10 +10,10 @@
         <h1 class="text-display-sm font-bold text-on-surface">Gestión de Reservas</h1>
         <p class="text-body-lg text-on-surface-variant">Historial y estado de las reservas de clientes.</p>
     </div>
-    <button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors">
+    <a href="@Url.Action("Catalog", "Tour")" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors inline-flex" title="Ir al catálogo para registrar reserva">
         <span class="material-symbols-outlined">add</span>
         Nueva Reserva Manual
-    </button>
+    </a>
 </div>
 
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
@@ -65,9 +65,9 @@
                                 }
                             </td>
                             <td class="p-4 text-right space-x-1">
-                                <button class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Ver Detalles">
+                                <a href="@Url.Action("EditBooking", "Admin", new { id = booking.Id })" class="inline-block p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Ver / Editar Detalles">
                                     <span class="material-symbols-outlined text-[20px]">visibility</span>
-                                </button>
+                                </a>
                             </td>
                         </tr>
                     }
@@ -84,4 +84,6 @@
         </table>
     </div>
 </div>
+
+
 

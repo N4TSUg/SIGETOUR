@@ -1,0 +1,55 @@
+﻿@model SIGETOUR.API.Core.Entities.Vehicle
+@{
+    bool isCreate = Model.Id == Guid.Empty;
+    ViewData["Title"] = isCreate ? "Registrar Vehículo" : "Editar Vehículo";
+    Layout = "_AdminLayout";
+}
+
+<div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+<form asp-action="EditVehicle" method="post">
+    <input type="hidden" asp-for="Id" />
+    
+    <div class="sm:flex sm:justify-between sm:items-center mb-8">
+      <div class="mb-4 sm:mb-0 flex items-center gap-3">
+        <a href="@Url.Action("Fleet", "Admin")" class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant">
+          <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+        </a>
+        <div>
+          <h1 class="text-headline-md font-headline-md font-bold text-on-surface flex items-center gap-3">
+            @(isCreate ? "Registrar Nuevo Vehículo" : "Editar Vehículo")
+          </h1>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button type="submit" class="btn bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md px-6 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold">
+          <span class="material-symbols-outlined text-[18px]" data-icon="save">save</span>
+          Guardar Cambios
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden p-6 space-y-4">
+        <div>
+          <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Placa / Matrícula</label>
+          <input asp-for="LicensePlate" required class="w-full px-3 py-2 text-body-sm rounded-lg border border-outline-variant text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Ej: T7B-952" />
+        </div>
+        <div>
+          <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Marca y Modelo</label>
+          <input asp-for="Model" required class="w-full px-3 py-2 text-body-sm rounded-lg border border-outline-variant text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Ej: Mercedes-Benz Sprinter" />
+        </div>
+        <div>
+          <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1">Capacidad de Asientos</label>
+          <input asp-for="SeatCapacity" type="number" required class="w-full px-3 py-2 text-body-sm rounded-lg border border-outline-variant text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="19" />
+        </div>
+        <div>
+          <label class="block text-label-sm font-label-sm text-on-surface-variant mb-1 font-bold">Estado Operativo</label>
+          <select asp-for="IsActive" class="w-full px-3 py-2 text-body-sm rounded-lg border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-on-surface">
+            <option value="true">Operativo (Activo)</option>
+            <option value="false">Dado de Baja / Mantenimiento</option>
+          </select>
+        </div>
+      </div>
+    </div>
+</form>
+</div>

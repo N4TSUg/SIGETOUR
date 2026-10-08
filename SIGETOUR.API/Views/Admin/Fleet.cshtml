@@ -10,10 +10,10 @@
         <h1 class="text-display-sm font-bold text-on-surface">Gestión de Flota</h1>
         <p class="text-body-lg text-on-surface-variant">Administración de vehículos y conductores.</p>
     </div>
-    <button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors">
+    <a href="@Url.Action("EditVehicle", "Admin")" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors inline-flex">
         <span class="material-symbols-outlined">add</span>
         Registrar Vehículo
-    </button>
+    </a>
 </div>
 
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
@@ -43,9 +43,9 @@
                                 </span>
                             </td>
                             <td class="p-4 text-right space-x-1">
-                                <button class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Editar">
+                                <a href="@Url.Action("EditVehicle", "Admin", new { id = vehicle.Id })" class="inline-block p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Editar">
                                     <span class="material-symbols-outlined text-[20px]">edit</span>
-                                </button>
+                                </a>
                                 <button class="p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-surface-container transition-colors" title="Eliminar">
                                     <span class="material-symbols-outlined text-[20px]">delete</span>
                                 </button>
@@ -65,4 +65,6 @@
         </table>
     </div>
 </div>
+
+
 

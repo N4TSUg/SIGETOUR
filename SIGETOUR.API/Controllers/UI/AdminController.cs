@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -77,6 +77,46 @@ namespace SIGETOUR.API.Controllers.UI
             return View(bookings);
         }
 
+                [HttpGet]
+        public async Task<IActionResult> EditVehicle(Guid? id)
+        {
+            if (id == null) 
+            {
+                // Create mode
+                return View(new SIGETOUR.API.Core.Entities.Vehicle());
+            }
+
+            var vehicle = await _context.Vehicles.FindAsync(id);
+            if (vehicle == null) return NotFound();
+
+            return View(vehicle);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> EditVehicle(SIGETOUR.API.Core.Entities.Vehicle model)
+        {
+            if (model.Id == Guid.Empty)
+            {
+                // Create
+                model.Id = Guid.NewGuid();
+                _context.Vehicles.Add(model);
+            }
+            else
+            {
+                // Edit
+                var vehicle = await _context.Vehicles.FindAsync(model.Id);
+                if (vehicle == null) return NotFound();
+                
+                vehicle.LicensePlate = model.LicensePlate;
+                vehicle.Model = model.Model;
+                vehicle.SeatCapacity = model.SeatCapacity;
+                vehicle.IsActive = model.IsActive;
+                _context.Vehicles.Update(vehicle);
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction("Fleet");
+        }
         public async Task<IActionResult> Fleet()
         {
             var vehicles = await _context.Vehicles.ToListAsync();
@@ -352,6 +392,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 
