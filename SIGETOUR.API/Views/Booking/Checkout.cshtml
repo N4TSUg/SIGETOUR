@@ -65,9 +65,7 @@
 <main class="bg-surface-container py-8 px-4 md:px-8">
     <div class="max-w-7xl mx-auto">
         <form method="post" action="/Booking/Checkout" id="checkout-form" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-    <div class="lg:col-span-12">
-        <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg empty:hidden"></div>
-    </div>
+    
             <input type="hidden" name="TourId" value="@Model.Id" />
             <input type="hidden" id="tour-price" value="@Model.BasePrice" />
 
@@ -283,7 +281,10 @@
                     </div>
                 </div>
             </div>
-        </form>
+            <div class="lg:col-span-12">
+        <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mt-6 empty:hidden"></div>
+    </div>
+</form>
     </div>
 </main>
 
@@ -453,6 +454,7 @@
         renderAdditionalPassengers();
     });
 </script>
+
 
 
 

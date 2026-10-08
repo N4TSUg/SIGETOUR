@@ -8,7 +8,6 @@
 
 <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
 <form asp-action="EditVehicle" method="post" enctype="multipart/form-data">
-    <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mb-4 empty:hidden"></div>
     <input type="hidden" asp-for="Id" />
 
     <!-- Header -->
@@ -266,6 +265,7 @@
         </aside>
 
     </div>
+    <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mt-6 empty:hidden"></div>
 </form>
 
 <!-- MODAL ELIMINAR -->
@@ -301,7 +301,8 @@
                 <span class="material-symbols-outlined text-base">delete</span>
                 Sí, Dar de Baja
             </button>
-        </form>
+            <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mt-6 empty:hidden"></div>
+</form>
     </div>
 </div>
 
@@ -342,9 +343,11 @@
         <form id="delete-img-form-@img.Id" asp-action="DeleteVehicleImage" method="post" class="hidden">
             <input type="hidden" name="id" value="@img.Id" />
             <input type="hidden" name="vehicleId" value="@Model.Id" />
-        </form>
+            <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mt-6 empty:hidden"></div>
+</form>
     }
 }
 </div>
+
 
 

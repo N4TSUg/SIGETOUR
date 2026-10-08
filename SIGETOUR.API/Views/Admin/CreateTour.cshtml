@@ -6,7 +6,6 @@
 <main class="flex-1 overflow-y-auto bg-surface p-4 lg:p-6"><form method="post" enctype="multipart/form-data" action="@(Model.Id == Guid.Empty ? "/Admin/CreateTour" : "/Admin/EditTour")"><input type="hidden" asp-for="Id" />
 <!-- Top Action Title Bar with Quick Breadcrumbs -->
 <div class="max-w-7xl mx-auto space-y-6">
-    <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mb-4 empty:hidden"></div>
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-outline-variant/60">
 <div>
 <div class="flex items-center gap-2 text-label-sm font-label-sm text-secondary mb-1">
@@ -523,6 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </button>
 </div>
 </div> <!-- End of left column space-y-6 -->
+    <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mt-6 empty:hidden"></div>
 </form><!-- MODAL DE CONFIRMACIÓN: ELIMINAR IMAGEN -->
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="deleteImageModal">
   <div class="bg-surface-container-lowest rounded-2xl w-full max-w-md border border-tertiary/30 overflow-hidden transform transition-all duration-200 shadow-xl">
@@ -555,6 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 </main>
+
 
 
 

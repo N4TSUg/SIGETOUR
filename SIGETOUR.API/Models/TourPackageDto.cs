@@ -10,16 +10,16 @@ namespace SIGETOUR.API.Models
     {
         public Guid Id { get; set; }
         
-        [Required]
+        [Required(ErrorMessage = "El título del tour es obligatorio")]
         public string Title { get; set; } = string.Empty;
-        public string Subtitle { get; set; } = string.Empty;
-        public string Slug { get; set; } = string.Empty;
+        public string? Subtitle { get; set; } = string.Empty;
+        public string? Slug { get; set; } = string.Empty;
         
         public TourCategory Category { get; set; }
         public TourModality Modality { get; set; }
         public TourDifficulty Difficulty { get; set; }
         
-        [Required]
+        [Required(ErrorMessage = "La descripción del tour es obligatoria")]
         public string Description { get; set; } = string.Empty;
         
         public decimal BasePrice { get; set; }
@@ -28,7 +28,7 @@ namespace SIGETOUR.API.Models
         public int MaxCapacity { get; set; }
         public int RequiredAdvancePercentage { get; set; }
         
-        public string Duration { get; set; } = string.Empty;
+        public string? Duration { get; set; } = string.Empty;
         
         public Guid? DefaultVehicleId { get; set; }
 
@@ -41,3 +41,4 @@ namespace SIGETOUR.API.Models
         public ICollection<ItineraryStop> ExistingItineraryStops { get; set; } = new List<ItineraryStop>();
     }
 }
+

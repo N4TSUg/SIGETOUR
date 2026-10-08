@@ -6,7 +6,6 @@
 
 <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
 <form asp-action="CreateBooking" method="post" id="editBookingForm">
-    <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mb-4 empty:hidden"></div>
     <input type="hidden" asp-for="Id" />
     <input type="hidden" asp-for="ReferenceCode" />
     <input type="hidden" asp-for="TourName" />
@@ -219,6 +218,7 @@
         </div>
       </div>
     </div>
+    <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mt-6 empty:hidden"></div>
 </form>
 </div>
 
@@ -322,6 +322,7 @@
         }
     }
 </script>
+
 
 
 
