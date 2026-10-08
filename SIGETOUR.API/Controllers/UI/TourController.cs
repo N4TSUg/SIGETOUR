@@ -47,10 +47,18 @@ namespace SIGETOUR.API.Controllers.UI
                 return NotFound();
             }
 
+            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tour.Id);
+            if (featured != null && featured.PromoPrice.HasValue)
+            {
+                tour.BasePrice = featured.PromoPrice.Value;
+            }
+
             return View(tour);
         }
     }
 }
+
+
 
 
 
