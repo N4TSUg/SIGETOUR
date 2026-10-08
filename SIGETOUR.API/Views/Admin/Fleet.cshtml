@@ -1,4 +1,4 @@
-﻿@using SIGETOUR.API.Core.Entities
+@using SIGETOUR.API.Core.Entities
 @{
     ViewData["Title"] = "Flota de Vehículos";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
@@ -21,6 +21,7 @@
         <table class="w-full text-left border-collapse">
             <thead>
                 <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant">
+                    <th class="p-4 font-semibold w-16">Foto</th>
                     <th class="p-4 font-semibold">Placa</th>
                     <th class="p-4 font-semibold">Modelo</th>
                     <th class="p-4 font-semibold">Capacidad</th>
@@ -33,22 +34,35 @@
                 {
                     foreach (var vehicle in vehicles)
                     {
+                        var coverImage = vehicle.Images?.FirstOrDefault(i => i.IsCover) ?? vehicle.Images?.FirstOrDefault();
                         <tr class="hover:bg-surface-container-low/50 transition-colors">
+                            <td class="p-3">
+                                @if (coverImage != null) {
+                                    <img src="@coverImage.ImageUrl" alt="@vehicle.LicensePlate" class="w-12 h-10 object-cover rounded-lg border border-outline-variant" />
+                                } else {
+                                    <div class="w-12 h-10 rounded-lg border border-outline-variant bg-surface-container-low flex items-center justify-center">
+                                        <span class="material-symbols-outlined text-[18px] text-outline">directions_bus</span>
+                                    </div>
+                                }
+                            </td>
                             <td class="p-4 font-bold text-primary">@vehicle.LicensePlate</td>
                             <td class="p-4">@vehicle.Model</td>
                             <td class="p-4">@vehicle.SeatCapacity pasajeros</td>
                             <td class="p-4 text-center">
-                                <span class="inline-flex items-center gap-1 text-primary bg-primary-container px-2 py-1 rounded-full font-label-sm">
-                                    <span class="material-symbols-outlined text-[14px]">check_circle</span> Operativo
-                                </span>
+                                @if (vehicle.IsActive) {
+                                    <span class="inline-flex items-center gap-1 text-primary bg-primary-container px-2 py-1 rounded-full font-label-sm">
+                                        <span class="material-symbols-outlined text-[14px]">check_circle</span> Operativo
+                                    </span>
+                                } else {
+                                    <span class="inline-flex items-center gap-1 text-error bg-error-container px-2 py-1 rounded-full font-label-sm">
+                                        <span class="material-symbols-outlined text-[14px]">cancel</span> @vehicle.Status
+                                    </span>
+                                }
                             </td>
                             <td class="p-4 text-right space-x-1">
                                 <a href="@Url.Action("EditVehicle", "Admin", new { id = vehicle.Id })" class="inline-block p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Editar">
                                     <span class="material-symbols-outlined text-[20px]">edit</span>
                                 </a>
-                                <button type="button" onclick="openDeleteModal('@vehicle.Id', '@vehicle.LicensePlate', '@vehicle.Model')" class="p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-surface-container transition-colors" title="Dar de Baja / Eliminar">
-                                    <span class="material-symbols-outlined text-[20px]">delete</span>
-                                </button>
                             </td>
                         </tr>
                     }
@@ -56,7 +70,7 @@
                 else
                 {
                     <tr>
-                        <td colspan="5" class="p-8 text-center text-on-surface-variant">
+                        <td colspan="6" class="p-8 text-center text-on-surface-variant">
                             No hay vehículos registrados en la base de datos.
                         </td>
                     </tr>
@@ -65,8 +79,3 @@
         </table>
     </div>
 </div>
-
-
-
-
-

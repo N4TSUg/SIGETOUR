@@ -17,6 +17,7 @@ namespace SIGETOUR.API.Infrastructure.Data
         public DbSet<BoardingPoint> BoardingPoints { get; set; }
         public DbSet<ItineraryStop> ItineraryStops { get; set; }
         public DbSet<Vehicle> Vehicles { get; set; }
+        public DbSet<VehicleImage> VehicleImages { get; set; }
         public DbSet<Booking> Bookings { get; set; }
         public DbSet<BookingItem> BookingItems { get; set; }
 
@@ -29,4 +30,3 @@ namespace SIGETOUR.API.Infrastructure.Data
         }
     }
 }
-

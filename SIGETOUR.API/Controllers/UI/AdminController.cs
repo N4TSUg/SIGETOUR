@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -77,43 +77,40 @@ namespace SIGETOUR.API.Controllers.UI
             return View(bookings);
         }
 
-                [HttpGet]
+        [HttpGet]
         public async Task<IActionResult> EditVehicle(Guid? id)
         {
-            if (id == null) 
+            if (id == null)
             {
-                // Create mode
                 return View(new SIGETOUR.API.Core.Entities.Vehicle());
             }
-
-            var vehicle = await _context.Vehicles.FindAsync(id);
+            var vehicle = await _context.Vehicles
+                .Include(v => v.Images)
+                .FirstOrDefaultAsync(v => v.Id == id);
             if (vehicle == null) return NotFound();
-
             return View(vehicle);
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditVehicle(SIGETOUR.API.Core.Entities.Vehicle model)
+        public async Task<IActionResult> EditVehicle(SIGETOUR.API.Core.Entities.Vehicle model, List<IFormFile> VehicleImages)
         {
-            // Remove validation for properties we might not have in the form explicitly or that are allowed to be empty
-            ModelState.Remove("Items");
-            ModelState.Remove("TourPackage");
-            
-            if (string.IsNullOrWhiteSpace(model.LicensePlate) || string.IsNullOrWhiteSpace(model.Model)) {
+            ModelState.Remove("Images");
+            if (string.IsNullOrWhiteSpace(model.LicensePlate) || string.IsNullOrWhiteSpace(model.Model))
+            {
                 ModelState.AddModelError("", "Placa y Modelo son obligatorios.");
                 return View(model);
             }
 
+            SIGETOUR.API.Core.Entities.Vehicle vehicle;
             if (model.Id == Guid.Empty)
             {
                 model.Id = Guid.NewGuid();
                 _context.Vehicles.Add(model);
+                vehicle = model;
             }
             else
             {
-                var vehicle = await _context.Vehicles.FindAsync(model.Id);
-                if (vehicle == null) return NotFound();
-                
+                vehicle = await _context.Vehicles.FindAsync(model.Id) ?? throw new Exception("Vehicle not found");
                 vehicle.LicensePlate = model.LicensePlate;
                 vehicle.Model = model.Model;
                 vehicle.Category = model.Category;
@@ -123,26 +120,67 @@ namespace SIGETOUR.API.Controllers.UI
                 vehicle.SeatCapacity = model.SeatCapacity;
                 vehicle.Color = model.Color;
                 vehicle.FuelType = model.FuelType;
-                
                 vehicle.SoatNumber = model.SoatNumber;
                 vehicle.SoatProvider = model.SoatProvider;
-                vehicle.SoatIssueDate = model.SoatIssueDate;
-                vehicle.SoatExpiryDate = model.SoatExpiryDate;
-                
+                vehicle.SoatIssueDate = model.SoatIssueDate.HasValue ? DateTime.SpecifyKind(model.SoatIssueDate.Value, DateTimeKind.Utc) : (DateTime?)null;
+                vehicle.SoatExpiryDate = model.SoatExpiryDate.HasValue ? DateTime.SpecifyKind(model.SoatExpiryDate.Value, DateTimeKind.Utc) : (DateTime?)null;
                 vehicle.CitvNumber = model.CitvNumber;
                 vehicle.CitvProvider = model.CitvProvider;
-                vehicle.CitvExpiryDate = model.CitvExpiryDate;
-                
+                vehicle.CitvExpiryDate = model.CitvExpiryDate.HasValue ? DateTime.SpecifyKind(model.CitvExpiryDate.Value, DateTimeKind.Utc) : (DateTime?)null;
                 vehicle.TucNumber = model.TucNumber;
                 vehicle.ResolutionNumber = model.ResolutionNumber;
-                
                 vehicle.Status = model.Status;
                 vehicle.IsActive = model.Status == "Operativo en Ruta (En Servicio)";
-                
                 _context.Vehicles.Update(vehicle);
             }
+
             await _context.SaveChangesAsync();
+
+            // Handle image uploads
+            if (VehicleImages != null && VehicleImages.Any())
+            {
+                var uploadsFolder = Path.Combine(_env.WebRootPath, "images", "vehicles");
+                Directory.CreateDirectory(uploadsFolder);
+                bool isFirst = !_context.VehicleImages.Any(vi => vi.VehicleId == vehicle.Id);
+
+                foreach (var file in VehicleImages)
+                {
+                    if (file.Length > 0)
+                    {
+                        var ext = Path.GetExtension(file.FileName);
+                        var fileName = Guid.NewGuid().ToString("N") + ext;
+                        var filePath = Path.Combine(uploadsFolder, fileName);
+                        using var stream = new FileStream(filePath, FileMode.Create);
+                        await file.CopyToAsync(stream);
+
+                        _context.VehicleImages.Add(new SIGETOUR.API.Core.Entities.VehicleImage
+                        {
+                            VehicleId = vehicle.Id,
+                            ImageUrl = "/images/vehicles/" + fileName,
+                            IsCover = isFirst
+                        });
+                        isFirst = false;
+                    }
+                }
+                await _context.SaveChangesAsync();
+            }
+
             return RedirectToAction("Fleet");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteVehicleImage(Guid id, Guid vehicleId)
+        {
+            var image = await _context.VehicleImages.FindAsync(id);
+            if (image != null)
+            {
+                // Try to delete from disk
+                var path = Path.Combine(_env.WebRootPath, image.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                _context.VehicleImages.Remove(image);
+                await _context.SaveChangesAsync();
+            }
+            return RedirectToAction("EditVehicle", new { id = vehicleId });
         }
         
         [HttpPost]
@@ -158,9 +196,12 @@ namespace SIGETOUR.API.Controllers.UI
             }
             return RedirectToAction("Fleet");
         }
+
         public async Task<IActionResult> Fleet()
         {
-            var vehicles = await _context.Vehicles.ToListAsync();
+            var vehicles = await _context.Vehicles
+                .Include(v => v.Images)
+                .ToListAsync();
             return View(vehicles);
         }
 
@@ -265,7 +306,7 @@ namespace SIGETOUR.API.Controllers.UI
                 tour.Slug = model.Slug;
             }
 
-                        // Actualizar Paradas del Itinerario
+            // Actualizar Paradas del Itinerario
             // Eliminar directamente desde la base de datos sin tocar la coleccion en memoria
             await _context.Set<ItineraryStop>().Where(s => s.TourPackageId == tour.Id).ExecuteDeleteAsync();
             if (Stops != null) {
@@ -319,7 +360,7 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction(nameof(Tours));
         }
 
-                [HttpPost]
+        [HttpPost]
         public async Task<IActionResult> DeleteTourImage(Guid id)
         {
             var image = await _context.Set<TourImage>().FindAsync(id);
@@ -368,8 +409,8 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
         }
+
         [HttpGet]
-                [HttpGet]
         public async Task<IActionResult> CreateBooking()
         {
             var tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
@@ -437,6 +478,7 @@ namespace SIGETOUR.API.Controllers.UI
 
             return RedirectToAction("Dashboard");
         }
+
         [HttpGet]
         public async Task<IActionResult> EditBooking(Guid id)
         {
@@ -506,17 +548,3 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
