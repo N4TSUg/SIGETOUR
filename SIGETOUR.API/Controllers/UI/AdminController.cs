@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -45,6 +45,7 @@ namespace SIGETOUR.API.Controllers.UI
             var activeTours = await _context.TourPackages
                 .Include(t => t.Images)
                 .Where(t => t.IsActive)
+                .OrderBy(t => t.Title)
                 .Take(4)
                 .ToListAsync();
 
@@ -548,3 +549,4 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+

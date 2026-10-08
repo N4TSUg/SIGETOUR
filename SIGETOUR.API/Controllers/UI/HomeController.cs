@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SIGETOUR.API.Infrastructure.Data;
 using System.Linq;
@@ -20,6 +20,7 @@ namespace SIGETOUR.API.Controllers.UI
             var tours = await _context.TourPackages
                 .Include(t => t.Images)
                 .Where(t => t.IsActive)
+                .OrderBy(t => t.Title)
                 .Take(6)
                 .ToListAsync();
 
@@ -27,3 +28,4 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
