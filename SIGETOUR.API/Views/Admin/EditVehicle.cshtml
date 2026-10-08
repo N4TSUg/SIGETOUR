@@ -1,4 +1,4 @@
-﻿@model SIGETOUR.API.Core.Entities.Vehicle
+﻿@model SIGETOUR.API.Models.VehicleDto
 @using SIGETOUR.API.Core.Entities
 @{
     bool isCreate = Model.Id == Guid.Empty;
@@ -118,15 +118,15 @@
                     <h2 class="text-title-md font-bold text-on-surface flex items-center gap-2">
                         <span class="material-symbols-outlined text-primary">photo_library</span> Galería Fotográfica del Vehículo
                     </h2>
-                    @if (Model.Images != null) {
-                        <span class="text-label-sm bg-primary-container text-on-primary-container px-2 py-1 rounded-lg font-bold">@Model.Images.Count / 6 Fotos</span>
+                    @if (Model.ExistingImages != null) {
+                        <span class="text-label-sm bg-primary-container text-on-primary-container px-2 py-1 rounded-lg font-bold">@Model.ExistingImages.Count / 6 Fotos</span>
                     }
                 </div>
                 <div class="p-6 space-y-4">
                     <!-- Existing images grid -->
-                    @if (Model.Images != null && Model.Images.Any()) {
+                    @if (Model.ExistingImages != null && Model.ExistingImages.Any()) {
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            @foreach (var img in Model.Images) {
+                            @foreach (var img in Model.ExistingImages) {
                                 <div class="relative group rounded-xl overflow-hidden border border-outline-variant aspect-video bg-surface-container-low">
                                     <img src="@img.ImageUrl" alt="Foto vehículo" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                                     @if (img.IsCover) {
@@ -336,8 +336,8 @@
     }
 </script>
 
-@if (Model.Images != null) {
-    foreach(var img in Model.Images) {
+@if (Model.ExistingImages != null) {
+    foreach(var img in Model.ExistingImages) {
         <form id="delete-img-form-@img.Id" asp-action="DeleteVehicleImage" method="post" class="hidden">
             <input type="hidden" name="id" value="@img.Id" />
             <input type="hidden" name="vehicleId" value="@Model.Id" />
@@ -345,3 +345,4 @@
     }
 }
 </div>
+
