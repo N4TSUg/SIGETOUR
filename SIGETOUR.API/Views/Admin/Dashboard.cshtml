@@ -1,4 +1,4 @@
-@using SIGETOUR.API.Core.Entities
+﻿@using SIGETOUR.API.Core.Entities
 @{
     ViewData["Title"] = "Dashboard";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
@@ -65,6 +65,7 @@
             <h2 class="text-title-md font-bold text-on-surface flex items-center gap-2">
                 <span class="material-symbols-outlined text-tertiary">tour</span> Tours Destacados
             </h2>
+            <a asp-controller="Admin" asp-action="Featured" class="text-label-sm text-primary font-bold hover:underline">Gestionar</a>
         </div>
         <div class="p-5 flex-1 space-y-4">
             @if (activeTours != null && activeTours.Any())
@@ -127,4 +128,5 @@
         </div>
     </div>
 </div>
+
 
