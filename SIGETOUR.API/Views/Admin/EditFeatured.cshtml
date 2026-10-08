@@ -1,4 +1,4 @@
-@using SIGETOUR.API.Models
+﻿@using SIGETOUR.API.Models
 @using SIGETOUR.API.Core.Entities
 @model FeaturedPackageDto
 @{
@@ -89,4 +89,8 @@
             </div>
         </div>
     </div>
+
+    <!-- Alertas de Validacin -->
+    <div asp-validation-summary="All" class="mt-8 p-4 rounded-xl bg-error-container text-on-error-container font-label-md border border-error/30" style="color: red;"></div>
 </form>
+
