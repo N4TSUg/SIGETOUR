@@ -575,21 +575,21 @@ namespace SIGETOUR.API.Controllers.UI
             var booking = await _context.Bookings.FindAsync(model.Id);
             if (booking == null) return NotFound();
 
-            booking.CustomerName = model.CustomerName;
-            booking.CustomerDni = model.CustomerDni;
-            booking.CustomerPhone = model.CustomerPhone;
+            booking.CustomerName = model.CustomerName ?? string.Empty;
+            booking.CustomerDni = model.CustomerDni ?? string.Empty;
+            booking.CustomerPhone = model.CustomerPhone ?? string.Empty;
             booking.TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc);
-            booking.ShiftName = model.ShiftName;
-            booking.PickupLocation = model.BoardingPoint;
+            booking.ShiftName = model.ShiftName ?? string.Empty;
+            booking.PickupLocation = model.BoardingPoint ?? string.Empty;
             booking.TotalPassengers = model.TotalPassengers;
             booking.TotalAmount = model.TotalAmount;
             booking.PaidAmount = model.PaidAmount;
-            booking.PaymentMethod = model.PaymentMethod;
-            booking.OperationNumber = model.OperationNumber;
-            booking.InvoiceType = model.InvoiceType;
-            booking.InvoiceNumber = model.InvoiceNumber;
+            booking.PaymentMethod = model.PaymentMethod ?? string.Empty;
+            booking.OperationNumber = model.OperationNumber ?? string.Empty;
+            booking.InvoiceType = model.InvoiceType ?? string.Empty;
+            booking.InvoiceNumber = model.InvoiceNumber ?? string.Empty;
             booking.Status = model.Status;
-            booking.AdditionalPassengersJson = model.AdditionalPassengersJson;
+            booking.AdditionalPassengersJson = string.IsNullOrWhiteSpace(model.AdditionalPassengersJson) ? "[]" : model.AdditionalPassengersJson;
 
             _context.Bookings.Update(booking);
             await _context.SaveChangesAsync();
@@ -599,6 +599,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 
