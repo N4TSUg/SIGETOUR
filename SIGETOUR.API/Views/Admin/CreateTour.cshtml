@@ -1,4 +1,4 @@
-﻿@model SIGETOUR.API.Core.Entities.TourPackage
+﻿@model SIGETOUR.API.Models.TourPackageDto
 @{
     Layout = "_AdminLayout";
     ViewData["Title"] = "Crear Tour";
@@ -6,6 +6,7 @@
 <main class="flex-1 overflow-y-auto bg-surface p-4 lg:p-6"><form method="post" enctype="multipart/form-data" action="@(Model.Id == Guid.Empty ? "/Admin/CreateTour" : "/Admin/EditTour")"><input type="hidden" asp-for="Id" />
 <!-- Top Action Title Bar with Quick Breadcrumbs -->
 <div class="max-w-7xl mx-auto space-y-6">
+    <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mb-4 empty:hidden"></div>
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-outline-variant/60">
 <div>
 <div class="flex items-center gap-2 text-label-sm font-label-sm text-secondary mb-1">
@@ -240,9 +241,9 @@ function reindexShifts() {
     });
 }
 document.addEventListener('DOMContentLoaded', () => {
-    @if (Model.Shifts != null && Model.Shifts.Any())
+    @if (Model.ExistingShifts != null && Model.ExistingShifts.Any())
     {
-        foreach (var s in Model.Shifts)
+        foreach (var s in Model.ExistingShifts)
         {
             var startStr = s.StartTime.ToString(@"hh\:mm");
             var endStr = s.EndTime.ToString(@"hh\:mm");
@@ -384,9 +385,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.addEventListener("DOMContentLoaded", () => {
         // Render existing stops if editing
-        @if (Model.ItineraryStops != null && Model.ItineraryStops.Any())
+        @if (Model.ExistingItineraryStops != null && Model.ExistingItineraryStops.Any())
         {
-            foreach (var stop in Model.ItineraryStops.OrderBy(s => s.OrderIndex))
+            foreach (var stop in Model.ExistingItineraryStops.OrderBy(s => s.OrderIndex))
             {
                 <text>addStop('@Html.Raw(stop.Name.Replace("'", "\\'"))', '@Html.Raw((stop.EstimatedTime ?? "").Replace("'", "\\'"))');</text>
             }
@@ -397,9 +398,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Check inclusions
-        @if (Model.Inclusions != null && Model.Inclusions.Any())
+        @if (Model.ExistingInclusions != null && Model.ExistingInclusions.Any())
         {
-            var inclusionsList = string.Join(",", Model.Inclusions.Select(i => i.Description));
+            var inclusionsList = string.Join(",", Model.ExistingInclusions.Select(i => i.Description));
             <text>
             const serverInclusions = '@Html.Raw(inclusionsList.Replace("'", "\\'"))';
             document.querySelectorAll('input[name="Inclusions"]').forEach(checkbox => {
@@ -474,9 +475,9 @@ document.addEventListener('DOMContentLoaded', () => {
     <div>
         <label class="block text-label-md font-label-md text-on-surface mb-3 font-semibold">Fotografías Seleccionadas para Subir</label>
                 <div id="image-preview-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            @if (Model.Images != null && Model.Images.Any())
+            @if (Model.ExistingImages != null && Model.ExistingImages.Any())
             {
-                foreach(var img in Model.Images)
+                foreach(var img in Model.ExistingImages)
                 {
                     <div class="relative rounded-lg border border-outline-variant overflow-hidden bg-surface-container-low group shadow-sm flex flex-col">
                         <div class="relative h-32 w-full overflow-hidden bg-surface-container">
@@ -554,6 +555,8 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 </main>
+
+
 
 
 

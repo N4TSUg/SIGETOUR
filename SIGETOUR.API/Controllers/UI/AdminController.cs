@@ -278,14 +278,29 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
+        public async Task<IActionResult> CreateTour(SIGETOUR.API.Models.TourPackageDto dto, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
         {
-            model.Id = Guid.NewGuid();
-            model.Subtitle ??= string.Empty;
-            model.Description ??= string.Empty;
-            if (string.IsNullOrEmpty(model.Slug)) {
-                model.Slug = model.Title.ToLower().Replace(" ", "-");
+            if (!ModelState.IsValid)
+            {
+                return View("CreateTour", dto);
             }
+            var model = new SIGETOUR.API.Core.Entities.TourPackage
+            {
+                Id = Guid.NewGuid(),
+                Title = dto.Title ?? string.Empty,
+                Subtitle = dto.Subtitle ?? string.Empty,
+                Category = dto.Category,
+                Modality = dto.Modality,
+                Difficulty = dto.Difficulty,
+                Description = dto.Description ?? string.Empty,
+                BasePrice = dto.BasePrice,
+                ChildPrice = dto.ChildPrice,
+                MaxCapacity = dto.MaxCapacity,
+                RequiredAdvancePercentage = dto.RequiredAdvancePercentage,
+                Duration = dto.Duration ?? string.Empty,
+                IsActive = true
+            };
+            model.Slug = string.IsNullOrEmpty(dto.Slug) ? model.Title.ToLower().Replace(" ", "-") : dto.Slug;
             
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
@@ -333,35 +348,78 @@ namespace SIGETOUR.API.Controllers.UI
                 
             if (tour == null) return NotFound();
             
-            return View("CreateTour", tour);
+            var dto = new SIGETOUR.API.Models.TourPackageDto
+            {
+                Id = tour.Id,
+                Title = tour.Title,
+                Subtitle = tour.Subtitle,
+                Slug = tour.Slug,
+                Category = tour.Category,
+                Modality = tour.Modality,
+                Difficulty = tour.Difficulty,
+                Description = tour.Description,
+                BasePrice = tour.BasePrice,
+                ChildPrice = tour.ChildPrice,
+                MaxCapacity = tour.MaxCapacity,
+                RequiredAdvancePercentage = tour.RequiredAdvancePercentage,
+                Duration = tour.Duration,
+                DefaultVehicleId = tour.DefaultVehicleId,
+                IsActive = tour.IsActive,
+                ExistingImages = tour.Images,
+                ExistingInclusions = tour.Inclusions,
+                ExistingShifts = tour.Shifts,
+                ExistingItineraryStops = tour.ItineraryStops
+            };
+            
+            return View("CreateTour", dto);
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditTour(TourPackage model, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
+        public async Task<IActionResult> EditTour(SIGETOUR.API.Models.TourPackageDto dto, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
         {
+            if (!ModelState.IsValid)
+            {
+                if (dto.Id != Guid.Empty)
+                {
+                    var existingTour = await _context.TourPackages
+                        .Include(t => t.Images)
+                        .Include(t => t.Inclusions)
+                        .Include(t => t.ItineraryStops)
+                        .Include(t => t.Shifts)
+                        .FirstOrDefaultAsync(t => t.Id == dto.Id);
+                    if (existingTour != null)
+                    {
+                        dto.ExistingImages = existingTour.Images;
+                        dto.ExistingInclusions = existingTour.Inclusions;
+                        dto.ExistingShifts = existingTour.Shifts;
+                        dto.ExistingItineraryStops = existingTour.ItineraryStops;
+                    }
+                }
+                return View("CreateTour", dto);
+            }
             var tour = await _context.TourPackages
                 .Include(t => t.Images)
                 .Include(t => t.ItineraryStops)
                 .Include(t => t.Images)
                 .Include(t => t.Inclusions)
-                .FirstOrDefaultAsync(t => t.Id == model.Id);
+                .FirstOrDefaultAsync(t => t.Id == dto.Id);
                 
             if (tour == null) return NotFound();
 
-            tour.Title = model.Title ?? string.Empty;
-            tour.Subtitle = model.Subtitle ?? string.Empty;
-            tour.Description = model.Description ?? string.Empty;
-            tour.BasePrice = model.BasePrice;
-            tour.ChildPrice = model.ChildPrice;
-            tour.MaxCapacity = model.MaxCapacity;
-            tour.Duration = model.Duration ?? string.Empty;
-            tour.Category = model.Category;
-            tour.Modality = model.Modality;
-            tour.Difficulty = model.Difficulty;
-            tour.IsActive = model.IsActive;
-            tour.RequiredAdvancePercentage = model.RequiredAdvancePercentage;
-            if (!string.IsNullOrEmpty(model.Slug)) {
-                tour.Slug = model.Slug;
+            tour.Title = dto.Title ?? string.Empty;
+            tour.Subtitle = dto.Subtitle ?? string.Empty;
+            tour.Description = dto.Description ?? string.Empty;
+            tour.BasePrice = dto.BasePrice;
+            tour.ChildPrice = dto.ChildPrice;
+            tour.MaxCapacity = dto.MaxCapacity;
+            tour.Duration = dto.Duration ?? string.Empty;
+            tour.Category = dto.Category;
+            tour.Modality = dto.Modality;
+            tour.Difficulty = dto.Difficulty;
+            tour.IsActive = dto.IsActive;
+            tour.RequiredAdvancePercentage = dto.RequiredAdvancePercentage;
+            if (!string.IsNullOrEmpty(dto.Slug)) {
+                tour.Slug = dto.Slug;
             }
 
             // Actualizar Paradas del Itinerario
@@ -624,6 +682,11 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
+
+
+
+
 
 
 
