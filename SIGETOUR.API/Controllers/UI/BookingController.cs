@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -32,6 +32,12 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> Checkout(CheckoutRequestViewModel model)
         {
+            if (!ModelState.IsValid)
+            {
+                var originalTour = await _context.TourPackages.Include(t => t.Shifts).FirstOrDefaultAsync(t => t.Id == model.TourId);
+                if (originalTour == null) return RedirectToAction("Catalog", "Tour");
+                return View(originalTour);
+            }
             var tour = await _context.TourPackages.FindAsync(model.TourId);
             if (tour == null) return RedirectToAction("Catalog", "Tour");
 
@@ -108,6 +114,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
 
 
 
