@@ -95,6 +95,15 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> EditVehicle(SIGETOUR.API.Core.Entities.Vehicle model)
         {
+            // Remove validation for properties we might not have in the form explicitly or that are allowed to be empty
+            ModelState.Remove("Items");
+            ModelState.Remove("TourPackage");
+            
+            if (string.IsNullOrWhiteSpace(model.LicensePlate) || string.IsNullOrWhiteSpace(model.Model)) {
+                ModelState.AddModelError("", "Placa y Modelo son obligatorios.");
+                return View(model);
+            }
+
             if (model.Id == Guid.Empty)
             {
                 model.Id = Guid.NewGuid();
@@ -360,6 +369,75 @@ namespace SIGETOUR.API.Controllers.UI
             }
         }
         [HttpGet]
+                [HttpGet]
+        public async Task<IActionResult> CreateBooking()
+        {
+            var tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
+            ViewBag.Tours = tours;
+            
+            var vm = new SIGETOUR.API.Models.EditBookingViewModel
+            {
+                ReferenceCode = "NUEVA",
+                TravelDate = DateTime.Today,
+                TotalPassengers = 1,
+                TotalAmount = 0,
+                PaidAmount = 0
+            };
+            return View(vm);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateBooking(SIGETOUR.API.Models.EditBookingViewModel model, Guid TourId)
+        {
+            var tour = await _context.TourPackages.FindAsync(TourId);
+            if (tour == null) {
+                ModelState.AddModelError("", "Tour no seleccionado.");
+                ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
+                return View(model);
+            }
+            if (string.IsNullOrWhiteSpace(model.CustomerName)) {
+                ModelState.AddModelError("", "El nombre del cliente es obligatorio.");
+                ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
+                return View(model);
+            }
+            if (tour == null) return NotFound();
+
+            var booking = new SIGETOUR.API.Core.Entities.Booking
+            {
+                ReferenceCode = "RES-" + new Random().Next(1000, 9999),
+                CustomerName = model.CustomerName ?? "",
+                CustomerDni = model.CustomerDni ?? "",
+                CustomerPhone = model.CustomerPhone ?? "",
+                CustomerEmail = "manual@agencia.com",
+                TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc),
+                ShiftName = model.ShiftName ?? "",
+                PickupLocation = model.BoardingPoint ?? "Agencia Central",
+                PickupCost = 0,
+                TotalPassengers = model.TotalPassengers,
+                TotalAmount = model.TotalAmount,
+                PaidAmount = model.PaidAmount,
+                PaymentMethod = model.PaymentMethod ?? "",
+                OperationNumber = model.OperationNumber ?? "",
+                InvoiceType = model.InvoiceType ?? "",
+                InvoiceNumber = model.InvoiceNumber ?? "",
+                Status = model.Status,
+                AdditionalPassengersJson = model.AdditionalPassengersJson ?? "[]"
+            };
+
+            booking.Items.Add(new SIGETOUR.API.Core.Entities.BookingItem
+            {
+                TourPackageId = tour.Id,
+                Passengers = model.TotalPassengers,
+                UnitPrice = tour.BasePrice,
+                SubTotal = model.TotalAmount
+            });
+
+            _context.Bookings.Add(booking);
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("Dashboard");
+        }
+        [HttpGet]
         public async Task<IActionResult> EditBooking(Guid id)
         {
             var booking = await _context.Bookings
@@ -428,6 +506,8 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
+
+
 
 
 
