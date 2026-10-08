@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -332,10 +332,13 @@ namespace SIGETOUR.API.Controllers.UI
         {
             var booking = await _context.Bookings
                 .Include(b => b.Items)
-                .ThenInclude(i => i.TourPackage)
+                    .ThenInclude(i => i.TourPackage)
+                        .ThenInclude(tp => tp.Shifts)
                 .FirstOrDefaultAsync(b => b.Id == id);
 
             if (booking == null) return NotFound();
+
+            var tour = booking.Items.FirstOrDefault()?.TourPackage;
 
             var vm = new SIGETOUR.API.Models.EditBookingViewModel
             {
@@ -356,7 +359,8 @@ namespace SIGETOUR.API.Controllers.UI
                 InvoiceNumber = booking.InvoiceNumber,
                 Status = booking.Status,
                 AdditionalPassengersJson = booking.AdditionalPassengersJson,
-                TourName = booking.Items.FirstOrDefault()?.TourPackage?.Title ?? "Tour Desconocido"
+                TourName = tour?.Title ?? "Tour Desconocido",
+                AvailableShifts = tour?.Shifts?.Select(s => s.Name).ToList() ?? new List<string>()
             };
 
             return View(vm);

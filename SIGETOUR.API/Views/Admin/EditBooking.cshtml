@@ -63,14 +63,16 @@
               <div>
                 <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Turno Operativo</label>
                 <div class="grid grid-cols-2 gap-3">
-                  <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == "Turno Mañana" ? "border-primary bg-primary/5" : "border-outline-variant")">
-                    <input type="radio" asp-for="ShiftName" value="Turno Mañana" class="sr-only" />
-                    <span class="text-label-md font-label-md font-bold">Mañana</span>
-                  </label>
-                  <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == "Turno Tarde" ? "border-primary bg-primary/5" : "border-outline-variant")">
-                    <input type="radio" asp-for="ShiftName" value="Turno Tarde" class="sr-only" />
-                    <span class="text-label-md font-label-md font-bold">Tarde</span>
-                  </label>
+                  @if(Model.AvailableShifts.Any()) {
+                      foreach (var shift in Model.AvailableShifts) {
+                          <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == shift ? "border-primary bg-primary/5" : "border-outline-variant")">
+                            <input type="radio" asp-for="ShiftName" value="@shift" class="sr-only" />
+                            <span class="text-label-md font-label-md font-bold">@shift</span>
+                          </label>
+                      }
+                  } else {
+                      <span class="text-body-sm text-outline">Sin turnos configurados</span>
+                  }
                 </div>
               </div>
 
@@ -147,8 +149,11 @@
             <div class="flex justify-between items-end mb-4 pb-4 border-b border-outline-variant">
               <div>
                 <span class="block text-label-sm font-label-sm text-outline">Tarifa Total Calculada</span>
-                <span class="text-headline-sm font-headline-sm font-extrabold text-on-surface" id="display-total-tariff">S/ @Model.TotalAmount</span>
-                <input type="hidden" asp-for="TotalAmount" id="TotalAmountHidden" />
+                <div class="flex items-center gap-2">
+                  <span class="text-headline-sm font-headline-sm font-extrabold text-on-surface">S/</span>
+                  <input type="number" step="0.50" asp-for="TotalAmount" id="TotalAmountHidden" class="w-32 py-1 px-2 text-headline-sm font-headline-sm font-extrabold text-on-surface bg-transparent border-b-2 border-outline-variant focus:border-primary focus:outline-none" oninput="updateDisplayTotal(this.value)" />
+                </div>
+                <span class="hidden" id="display-total-tariff"></span>
                 <input type="hidden" asp-for="TotalPassengers" id="TotalPassengersHidden" />
               </div>
             </div>
@@ -219,13 +224,95 @@
 </div>
 
 <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadExtraPassengers();
+        recalcBalance();
+
+        // Hook into form submit to save extra passengers
+        document.getElementById('editBookingForm').addEventListener('submit', function() {
+            saveExtraPassengersToJson();
+        });
+    });
+
+    function loadExtraPassengers() {
+        const jsonField = document.getElementById('AdditionalPassengersJson');
+        if (!jsonField || !jsonField.value) return;
+        
+        try {
+            const passengers = JSON.parse(jsonField.value);
+            passengers.forEach(p => addPassengerRow(p.Name, p.Dni, p.Phone));
+        } catch (e) {
+            console.error('Error parsing extra passengers:', e);
+        }
+    }
+
+    function addPassengerRow(name = '', dni = '', phone = '') {
+        const container = document.getElementById('passengers-container');
+        const count = container.querySelectorAll('.extra-passenger-row').length + 2;
+        
+        const div = document.createElement('div');
+        div.className = 'extra-passenger-row passenger-card p-4 rounded-xl border border-outline-variant bg-surface-bright relative mt-4';
+        div.innerHTML = 
+            <div class="flex items-center justify-between mb-3 border-b border-outline-variant/40 pb-2">
+                <div class="flex items-center gap-2">
+                  <span class="w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-label-sm font-bold">+count+</span>
+                  <span class="text-title-sm font-title-sm text-on-surface font-bold">Acompañante +count+</span>
+                </div>
+                <button type="button" onclick="this.closest('.extra-passenger-row').remove(); updatePassengerCount();" class="p-1 text-tertiary hover:bg-error-container rounded-md transition-colors flex items-center gap-1 text-label-sm font-label-sm">
+                  <span class="material-symbols-outlined text-[16px]">delete</span>
+                  <span>Retirar</span>
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
+                  <input type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="+name+" />
+                </div>
+                <div>
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
+                  <input type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="+dni+" />
+                </div>
+                <div class="md:col-span-1">
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
+                  <input type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="+phone+" />
+                </div>
+            </div>
+        ;
+        container.appendChild(div);
+        updatePassengerCount();
+    }
+
+    function updatePassengerCount() {
+        const total = document.querySelectorAll('.extra-passenger-row').length + 1;
+        document.getElementById('passenger-count-badge').innerText = total + ' Pasajeros';
+        document.getElementById('TotalPassengersHidden').value = total;
+    }
+
+    function saveExtraPassengersToJson() {
+        const rows = document.querySelectorAll('.extra-passenger-row');
+        const passengers = [];
+        rows.forEach(row => {
+            passengers.push({
+                Name: row.querySelector('.p-name').value,
+                Dni: row.querySelector('.p-dni').value,
+                Phone: row.querySelector('.p-phone').value
+            });
+        });
+        document.getElementById('AdditionalPassengersJson').value = JSON.stringify(passengers);
+    }
+
+    function updateDisplayTotal(val) {
+        document.getElementById('display-total-tariff').innerText = 'S/ ' + parseFloat(val).toFixed(2);
+        recalcBalance();
+    }
+
     function recalcBalance() {
         const total = parseFloat(document.getElementById('TotalAmountHidden').value) || 0;
         const paid = parseFloat(document.getElementById('input-paid-amount').value) || 0;
         const balance = Math.max(0, total - paid);
         
         const balanceEl = document.getElementById('display-pending-balance');
-        balanceEl.innerText = S/  + balance.toFixed(2);
+        balanceEl.innerText = 'S/ ' + balance.toFixed(2);
         
         if (balance === 0) {
             balanceEl.classList.remove('text-tertiary');
@@ -236,3 +323,5 @@
         }
     }
 </script>
+
+

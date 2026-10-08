@@ -38,5 +38,7 @@ namespace SIGETOUR.API.Models
         
         public string ReferenceCode { get; set; } = string.Empty;
         public string TourName { get; set; } = string.Empty;
+        public System.Collections.Generic.List<string> AvailableShifts { get; set; } = new();
     }
 }
+

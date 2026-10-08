@@ -52,9 +52,11 @@ namespace SIGETOUR.API.Controllers.UI
             {
                 ReferenceCode = "RES-" + new Random().Next(1000, 9999),
                 CustomerName = model.CustomerName,
+                CustomerDni = model.CustomerDni,
                 CustomerEmail = model.CustomerEmail,
                 CustomerPhone = model.CustomerPhone,
                 TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc),
+                ShiftName = model.Shift,
                 TotalPassengers = model.Passengers,
                 TotalAmount = (tour.BasePrice * model.Passengers) + pickupCost,
                 PickupLocation = pickupLocation,
