@@ -358,7 +358,11 @@
 </div>
 <div>
 <strong class="text-sm text-inverse-surface block">Dirección Central:</strong>
-<span class="text-body-sm text-secondary">Jr. 2 de Mayo 569, Cajamarca 06001, Perú</span>
+<span class="text-body-sm text-secondary block">Jr. 2 de Mayo 569, Cajamarca 06001, Perú</span>
+<a href="https://maps.google.com/?q=-7.156772,-78.516549" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline mt-1">
+<span>Abrir en Google Maps</span>
+<span class="material-symbols-outlined text-[13px]">open_in_new</span>
+</a>
 </div>
 </div>
 <div class="flex items-start gap-3">
@@ -381,24 +385,46 @@
 </div>
 </div>
 </div>
-<!-- Simulated Map / Geographic Location Representation -->
-<div class="lg:col-span-7 h-80 rounded-2xl overflow-hidden relative border border-outline-variant/70 shadow-inner bg-surface-container-low flex flex-col justify-end p-6" data-location="Cajamarca">
-<img class="absolute inset-0 w-full h-full object-cover" data-alt="Stylized architectural graphic map of downtown Cajamarca Perú with Jr 2 de Mayo marked clearly in teal pins, Plaza de Armas, colonial grid street pattern rendered in clean light tones, petrol teal roads and soft mint green accents conveying precision travel navigation." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCeq-L60p8o17y1aWsoJUS3_zCO82fgUMb_4JW4ws4-rOZ1jFsyLPcow0-GiVirPfHbjX3bvYBs-XYtkRha6dcKkeJqTN_wCPmNZ6_yRxW9ME1MWBoY4PKJ6aRdUd1a9sYQnjUV42uqe_oBKsM50uXoYX37xp-jtdqIFGVatKpH-kDvPa75OxEhkj3LKlP2fj40AKjYVel-ozENIEN6YH_PZml3jSTWQ7KAiZCxv5b4fiNmNXDyqNzfEQ">
-<div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/90 via-inverse-surface/30 to-transparent"></div>
-<div class="relative z-10 bg-surface-container-lowest/95 backdrop-blur-md p-4 rounded-xl border border-outline-variant/80 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 rounded-full bg-tertiary text-on-tertiary flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-[20px]">navigation</span>
-</div>
-<div>
-<span class="font-bold text-sm text-inverse-surface block">Turismo Chilón Cajamarca SAC</span>
-<span class="text-xs text-secondary">Jr. 2 de Mayo 569 (Embarque Directo)</span>
-</div>
-</div>
-<a class="px-4 py-2 bg-primary hover:bg-primary-container text-on-primary rounded-lg text-xs font-label-md font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 transition-colors" href="https://maps.google.com/?q=Jr.+2+de+Mayo+569+Cajamarca+Perú" target="_blank">
-<span class="">Abrir en Google Maps</span>
-<span class="material-symbols-outlined text-[16px]">open_in_new</span>
-</a>
+<!-- Google Maps Interactivo con Ubicación Exacta (-7.156772, -78.516549) -->
+<div class="lg:col-span-7 h-[420px] min-h-[360px] rounded-2xl overflow-hidden relative border border-outline-variant/70 shadow-sm bg-surface-container-low flex flex-col justify-end p-4 sm:p-6" data-location="Cajamarca">
+  <iframe 
+    title="Ubicación oficial de Turismo Chilón en Google Maps"
+    src="https://maps.google.com/maps?q=-7.156772,-78.516549&amp;t=&amp;z=18&amp;ie=UTF8&amp;iwloc=&amp;output=embed"
+    class="absolute inset-0 w-full h-full border-0" 
+    allowfullscreen="" 
+    loading="lazy" 
+    referrerpolicy="no-referrer-when-downgrade">
+  </iframe>
+  <!-- Pin Flotante Superior -->
+  <div class="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-md border border-outline-variant flex items-center gap-2.5 pointer-events-none">
+    <div class="w-3 h-3 rounded-full bg-accent-red animate-ping"></div>
+    <div>
+      <span class="text-xs font-extrabold text-secondary block">Terminal Jr. 2 de Mayo 569</span>
+      <span class="text-[11px] text-on-surface-variant block">A 3 cuadras de la Plaza de Armas</span>
+    </div>
+  </div>
+  <!-- Barra Flotante Inferior de Información y Acciones -->
+  <div class="relative z-10 bg-surface-container-lowest/95 backdrop-blur-md p-3.5 sm:p-4 rounded-xl border border-outline-variant/80 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
+        <span class="material-symbols-outlined text-[20px]">store</span>
+      </div>
+      <div>
+        <span class="font-bold text-sm text-inverse-surface block">Turismo Chilón Cajamarca SAC</span>
+        <span class="text-xs text-secondary">Jr. 2 de Mayo 569 (Embarque Directo)</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+      <a class="px-3 py-2 bg-white hover:bg-surface-container text-secondary border border-outline-variant rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 transition-all shadow-xs" href="https://www.google.com/maps/dir/?api=1&amp;destination=-7.156772,-78.516549" target="_blank" rel="noopener noreferrer">
+        <span class="material-symbols-outlined text-[16px] text-primary">directions</span>
+        <span>Cómo llegar</span>
+      </a>
+      <a class="px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1 shrink-0 transition-colors shadow-xs" href="https://maps.google.com/?q=-7.156772,-78.516549" target="_blank" rel="noopener noreferrer">
+        <span>Abrir Maps</span>
+        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+      </a>
+    </div>
+  </div>
 </div>
 </div>
 </div>
