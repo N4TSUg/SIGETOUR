@@ -466,7 +466,11 @@
 </div>
 <div>
 <strong class="text-secondary block text-xs font-bold uppercase tracking-wider">Dirección Oficial:</strong>
-<span class="text-xs text-on-surface-variant font-medium">Jr. 2 de Mayo 569, Centro Histórico, Cajamarca</span>
+<span class="text-xs text-on-surface-variant font-medium block">Jr. 2 de Mayo 569, Centro Histórico, Cajamarca</span>
+<a href="https://maps.google.com/?q=-7.156772,-78.516549" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:underline mt-1">
+<span>Abrir en Google Maps</span>
+<span class="material-symbols-outlined text-[13px]">open_in_new</span>
+</a>
 </div>
 </div>
 <div class="flex items-start gap-3.5 bg-white p-3.5 rounded-xl border border-outline-variant shadow-xs">
@@ -492,15 +496,29 @@
 </div>
 </div>
 <div class="lg:col-span-7">
-<div class="rounded-2xl overflow-hidden shadow-lg border border-outline-variant h-88 relative">
-<img class="w-full h-full object-cover" data-alt="Aerial cartographic view of Cajamarca city center" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBX1d4kdf0CCvlXseJ-Yu53XOl5ARVxrpxim-tCS-QEm26Y9SfTosUrhujxp5IRMgMWjKKIyz4MppjSlXriIvN37T3zXxcGZlTjZaBTmKn2TdioQAgOTbkLmLYEYfbZ2nNRMv5m6Yq5mlKdnFjFLB_PzpXu-M0SPafQTJNsbY5NEtlxKSXhb3mcl67aNDgdXuW13j9-ELfnQbcEUSOXZJS31G67OTo2D8UnevbOUVLCMJZB7S8KS_QMeA">
-<div class="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-md border border-outline-variant flex items-center gap-2.5">
+<div class="rounded-2xl overflow-hidden shadow-lg border border-outline-variant h-[440px] min-h-[380px] relative bg-surface-container">
+<!-- Google Maps Interactivo con Ubicacion Exacta (-7.156772, -78.516549) -->
+<iframe 
+  title="Ubicación oficial de Turismo Chilón en Google Maps"
+  src="https://maps.google.com/maps?q=-7.156772,-78.516549&amp;t=&amp;z=18&amp;ie=UTF8&amp;iwloc=&amp;output=embed"
+  class="w-full h-full border-0" 
+  allowfullscreen="" 
+  loading="lazy" 
+  referrerpolicy="no-referrer-when-downgrade">
+</iframe>
+<!-- Pin Flotante de Oficina -->
+<div class="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-md border border-outline-variant flex items-center gap-2.5 pointer-events-none">
 <div class="w-3 h-3 rounded-full bg-accent-red animate-ping"></div>
 <div>
 <span class="text-xs font-extrabold text-secondary block">Oficina: Jr. 2 de Mayo 569</span>
 <span class="text-[11px] text-on-surface-variant block">A pocas cuadras de la Plaza de Armas</span>
 </div>
 </div>
+<!-- Boton Direcciones / Como Llegar -->
+<a href="https://www.google.com/maps/dir/?api=1&amp;destination=-7.156772,-78.516549" target="_blank" rel="noopener noreferrer" class="absolute bottom-4 right-4 bg-white/95 hover:bg-white text-secondary text-xs font-bold px-3.5 py-2 rounded-xl shadow-md border border-outline-variant flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-sm">
+<span class="material-symbols-outlined text-[16px] text-primary">directions</span>
+<span>Cómo llegar</span>
+</a>
 </div>
 </div>
 </div>
