@@ -20,6 +20,14 @@
     </a>
 </div>
 
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center gap-3 mb-6">
+        <span class="material-symbols-outlined text-[22px]">check_circle</span>
+        <span class="font-semibold text-body-md">@TempData["SuccessMessage"]</span>
+    </div>
+}
+
 <!-- Barra de Búsqueda y Filtros -->
 <div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm mb-6">
     <form method="get" asp-action="Bookings" id="bookingFilterForm" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">

@@ -789,7 +789,38 @@ namespace SIGETOUR.API.Controllers.UI
             _context.Bookings.Update(booking);
             await _context.SaveChangesAsync();
 
-            return RedirectToAction("Dashboard");
+            TempData["SuccessMessage"] = $"Reserva {booking.ReferenceCode} actualizada con éxito.";
+            return RedirectToAction(nameof(Bookings));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CancelBooking(Guid id)
+        {
+            var booking = await _context.Bookings.FindAsync(id);
+            if (booking == null) return NotFound();
+
+            booking.Status = BookingStatus.Cancelled;
+            _context.Bookings.Update(booking);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} ha sido anulada con éxito.";
+            return RedirectToAction(nameof(Bookings));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReactivateBooking(Guid id)
+        {
+            var booking = await _context.Bookings.FindAsync(id);
+            if (booking == null) return NotFound();
+
+            booking.Status = BookingStatus.Confirmed;
+            _context.Bookings.Update(booking);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} ha sido reactivada con éxito.";
+            return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
         }
 
         // --- FEATURED PACKAGES CRUD --- //
