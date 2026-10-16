@@ -7,7 +7,7 @@
     bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch);
     var userRoles = ViewBag.UserRoles as Dictionary<string, string> ?? new Dictionary<string, string>();
     var currentUserId = ViewBag.CurrentUserId as string ?? "";
-    var availableRoles = ViewBag.AvailableRoles as List<string> ?? new List<string> { "SuperAdmin", "Admin", "Operador", "Cajero", "User" };
+    var availableRoles = ViewBag.AvailableRoles as List<string> ?? new List<string> { "SuperAdmin", "Admin", "Operador" };
 }
 
 <!-- Mensajes de Notificación -->
@@ -39,7 +39,7 @@
 <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
         <h1 class="text-display-sm font-bold text-on-surface">Gestión de Usuarios</h1>
-        <p class="text-body-lg text-on-surface-variant">Personal, administradores, conductores y operadores.</p>
+        <p class="text-body-lg text-on-surface-variant">Personal, administradores y operadores de Turismo Chilón.</p>
     </div>
     <button type="button" onclick="openCreateUserModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shrink-0 cursor-pointer">
         <span class="material-symbols-outlined">person_add</span>
@@ -112,7 +112,7 @@
                 {
                     foreach (var user in users)
                     {
-                        var role = userRoles.ContainsKey(user.Id) ? userRoles[user.Id] : "User";
+                        var role = userRoles.ContainsKey(user.Id) ? userRoles[user.Id] : "Operador";
                         var searchMeta = $"{user.FirstName} {user.LastName} {user.Email} {user.UserName} {role}".ToLower();
                         bool isCurrent = user.Id == currentUserId;
                         bool isSuperAdminAcc = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
@@ -161,13 +161,6 @@
                                         Operador
                                     </span>
                                 }
-                                else if (role == "Cajero")
-                                {
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-300">
-                                        <span class="material-symbols-outlined text-[13px]">point_of_sale</span>
-                                        Cajero
-                                    </span>
-                                }
                                 else
                                 {
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-surface-container text-on-surface-variant border border-outline-variant/60">
@@ -192,7 +185,7 @@
                             </td>
                             <td class="p-4 text-right pr-6 whitespace-nowrap space-x-1">
                                 <button type="button" 
-                                        onclick="openEditUserModal('@user.Id', '@Html.Raw(Html.Encode(user.FirstName))', '@Html.Raw(Html.Encode(user.LastName))', '@Html.Raw(Html.Encode(user.UserName))', '@Html.Raw(Html.Encode(user.Email))', '@Html.Raw(Html.Encode(user.PhoneNumber ?? ""))', '@role', @(user.IsActive ? "true" : "false"))"
+                                        onclick="openEditUserModal('@user.Id', '@Html.Raw(Html.Encode(user.FirstName))', '@Html.Raw(Html.Encode(user.LastName))', '@Html.Raw(Html.Encode(user.UserName))', '@Html.Raw(Html.Encode(user.Email))', '@Html.Raw(Html.Encode(user.PhoneNumber ?? ""))', '@role', @(user.IsActive ? "true" : "false"), @(isSuperAdminAcc ? "true" : "false"), @(isCurrent ? "true" : "false"))"
                                         class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" 
                                         title="Editar Usuario">
                                     <span class="material-symbols-outlined text-[20px]">edit</span>
@@ -209,7 +202,7 @@
                                 }
                                 else
                                 {
-                                    <span class="p-2 text-outline/40 cursor-not-allowed inline-block" title="@(isCurrent ? "Tu propia cuenta (En sesión)" : "Cuenta SuperAdmin protegida")">
+                                    <span class="p-2 text-outline/40 cursor-not-allowed inline-block" title="@(isCurrent ? "Tu propia cuenta (En sesión activa)" : "Cuenta raíz SuperAdmin protegida")">
                                         <span class="material-symbols-outlined text-[20px]">lock</span>
                                     </span>
                                 }
@@ -253,7 +246,7 @@
         <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
             <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
                 <span class="material-symbols-outlined text-primary">person_add</span>
-                Registrar Nuevo Usuario del Sistema
+                Registrar Nuevo Usuario
             </h3>
             <button type="button" onclick="closeCreateUserModal()" class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer">
                 <span class="material-symbols-outlined">close</span>
@@ -293,10 +286,9 @@
                 <div>
                     <label class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
                     <select name="Role" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
-                        @foreach (var r in availableRoles)
-                        {
-                            <option value="@r">@r</option>
-                        }
+                        <option value="Operador" selected>Operador</option>
+                        <option value="Admin">Admin</option>
+                        <option value="SuperAdmin">SuperAdmin</option>
                     </select>
                 </div>
             </div>
@@ -309,13 +301,13 @@
                         Generar
                     </button>
                 </div>
-                <p class="text-[11px] text-outline mt-1">Mínimo 6 caracteres. Puedes usar la generada o escribir una propia.</p>
+                <p class="text-[11px] text-outline mt-1">Mínimo 6 caracteres. Puedes usar la clave sugerida o ingresar una personalizada.</p>
             </div>
 
             <div>
                 <label class="block text-label-sm font-bold text-on-surface mb-1">Estado de la Cuenta</label>
                 <select name="IsActive" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
-                    <option value="true" selected>Activo (Permite inicio de sesión)</option>
+                    <option value="true" selected>Activo (Permite acceso al sistema)</option>
                     <option value="false">Inactivo (Acceso suspendido)</option>
                 </select>
             </div>
@@ -348,9 +340,10 @@
             </button>
         </div>
 
-        <form asp-action="EditUser" method="post" class="space-y-4">
+        <form asp-action="EditUser" method="post" id="editUserForm" class="space-y-4">
             @Html.AntiForgeryToken()
             <input type="hidden" name="Id" id="editUserId" />
+            <input type="hidden" name="Role" id="editUserHiddenRole" disabled />
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -382,29 +375,34 @@
                 <div>
                     <label class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
                     <select name="Role" id="editUserRole" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
-                        @foreach (var r in availableRoles)
-                        {
-                            <option value="@r">@r</option>
-                        }
+                        <option value="Operador">Operador</option>
+                        <option value="Admin">Admin</option>
+                        <option value="SuperAdmin">SuperAdmin</option>
                     </select>
+
+                    <!-- Mensaje dinámico cuando el rol está bloqueado -->
+                    <div id="roleLockedNotice" class="hidden mt-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">lock</span>
+                        <span id="roleLockedMessage" class="font-medium leading-tight"></span>
+                    </div>
                 </div>
             </div>
 
             <div>
                 <label class="block text-label-sm font-bold text-on-surface mb-1">Restablecer Contraseña (Opcional)</label>
                 <div class="flex gap-2">
-                    <input type="text" name="NewPassword" id="editUserNewPassword" placeholder="Dejar en blanco para mantener la contraseña actual" class="flex-1 py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                    <input type="text" name="NewPassword" id="editUserNewPassword" placeholder="Dejar en blanco para mantener la clave actual" class="flex-1 py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
                     <button type="button" onclick="generateRandomPassword('editUserNewPassword')" class="px-3 py-2 bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs rounded-lg border border-outline-variant transition-colors cursor-pointer shrink-0">
                         Generar
                     </button>
                 </div>
-                <p class="text-[11px] text-outline mt-1">Escribe una nueva contraseña solo si el usuario necesita cambiarla.</p>
+                <p class="text-[11px] text-outline mt-1">Escribe una nueva contraseña solo si el usuario requiere actualizarla.</p>
             </div>
 
             <div>
                 <label class="block text-label-sm font-bold text-on-surface mb-1">Estado de la Cuenta</label>
                 <select name="IsActive" id="editUserIsActive" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
-                    <option value="true">Activo (Permite inicio de sesión)</option>
+                    <option value="true">Activo (Permite acceso al sistema)</option>
                     <option value="false">Inactivo (Acceso suspendido)</option>
                 </select>
             </div>
@@ -433,7 +431,7 @@
             </div>
             <div>
                 <h3 class="text-title-md font-bold text-on-surface leading-tight">¿Eliminar Usuario?</h3>
-                <p class="text-body-xs text-outline mt-0.5">Esta acción revocará de inmediato los accesos del usuario.</p>
+                <p class="text-body-xs text-outline mt-0.5">Esta acción revocará inmediatamente todos los accesos del usuario.</p>
             </div>
         </div>
 
@@ -479,21 +477,58 @@
         document.getElementById('createUserModal')?.classList.add('hidden');
     }
 
-    function openEditUserModal(id, firstName, lastName, userName, email, phone, role, isActive) {
+    function openEditUserModal(id, firstName, lastName, userName, email, phone, role, isActive, isSuperAdmin, isSelf) {
         document.getElementById('editUserId').value = id;
         document.getElementById('editUserFirstName').value = firstName;
         document.getElementById('editUserLastName').value = lastName;
         document.getElementById('editUserUserName').value = userName;
         document.getElementById('editUserEmail').value = email;
         document.getElementById('editUserPhone').value = phone;
-        document.getElementById('editUserRole').value = role;
         document.getElementById('editUserIsActive').value = isActive ? 'true' : 'false';
         document.getElementById('editUserNewPassword').value = '';
+
+        const roleSelect = document.getElementById('editUserRole');
+        const hiddenRole = document.getElementById('editUserHiddenRole');
+        const notice = document.getElementById('roleLockedNotice');
+        const msg = document.getElementById('roleLockedMessage');
+
+        roleSelect.value = role;
+
+        // Reglas de UI para roles protegidos:
+        if (isSuperAdmin) {
+            roleSelect.disabled = true;
+            hiddenRole.disabled = false;
+            hiddenRole.value = 'SuperAdmin';
+            roleSelect.value = 'SuperAdmin';
+            notice.classList.remove('hidden');
+            msg.innerText = 'Rol Inmutable: La cuenta raíz "superadmin" conserva siempre el rol SuperAdmin por seguridad.';
+        } else if (isSelf) {
+            roleSelect.disabled = true;
+            hiddenRole.disabled = false;
+            hiddenRole.value = role;
+            notice.classList.remove('hidden');
+            msg.innerText = 'Rol Protegido: No puedes modificar tu propio rol mientras tu sesión esté activa para prevenir pérdida de acceso.';
+        } else {
+            roleSelect.disabled = false;
+            hiddenRole.disabled = true;
+            notice.classList.add('hidden');
+        }
+
         document.getElementById('editUserModal')?.classList.remove('hidden');
     }
+
     function closeEditUserModal() {
         document.getElementById('editUserModal')?.classList.add('hidden');
     }
+
+    // Asegurar que si el select está deshabilitado, el campo oculto envíe el rol sin problemas
+    document.getElementById('editUserForm')?.addEventListener('submit', function() {
+        const roleSelect = document.getElementById('editUserRole');
+        if (roleSelect.disabled) {
+            const hiddenRole = document.getElementById('editUserHiddenRole');
+            hiddenRole.disabled = false;
+        }
+    });
 
     function openDeleteUserModal(id, fullName, userName, email, role) {
         document.getElementById('deleteUserId').value = id;

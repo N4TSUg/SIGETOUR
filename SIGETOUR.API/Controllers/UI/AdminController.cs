@@ -569,21 +569,24 @@ namespace SIGETOUR.API.Controllers.UI
             foreach (var u in users)
             {
                 var roles = await _userManager.GetRolesAsync(u);
-                userRoles[u.Id] = roles.FirstOrDefault() ?? "User";
+                userRoles[u.Id] = roles.FirstOrDefault() ?? "Operador";
             }
 
             ViewBag.UserRoles = userRoles;
 
-            // Obtener roles disponibles
-            var rolesList = await _roleManager.Roles.Select(r => r.Name!).ToListAsync();
-            if (!rolesList.Contains("SuperAdmin")) rolesList.Add("SuperAdmin");
-            if (!rolesList.Contains("Admin")) rolesList.Add("Admin");
-            if (!rolesList.Contains("Operador")) rolesList.Add("Operador");
-            if (!rolesList.Contains("Cajero")) rolesList.Add("Cajero");
-            if (!rolesList.Contains("User")) rolesList.Add("User");
-            ViewBag.AvailableRoles = rolesList;
+            // Catálogo oficial de roles: SuperAdmin, Admin, Operador
+            string[] allowedRoles = { "SuperAdmin", "Admin", "Operador" };
+            foreach (var r in allowedRoles)
+            {
+                if (!await _roleManager.RoleExistsAsync(r))
+                {
+                    await _roleManager.CreateAsync(new IdentityRole(r));
+                }
+            }
+            ViewBag.AvailableRoles = allowedRoles.ToList();
 
             ViewBag.CurrentUserId = _userManager.GetUserId(User);
+            ViewBag.CurrentUserName = User.Identity?.Name ?? "";
             ViewBag.CurrentSearch = search;
 
             var routeParams = new Dictionary<string, string>();
@@ -650,14 +653,19 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(Users));
             }
 
-            var roleName = string.IsNullOrWhiteSpace(model.Role) ? "User" : model.Role.Trim();
+            var roleName = model.Role?.Trim();
+            if (roleName != "SuperAdmin" && roleName != "Admin" && roleName != "Operador")
+            {
+                roleName = "Operador";
+            }
+
             if (!await _roleManager.RoleExistsAsync(roleName))
             {
                 await _roleManager.CreateAsync(new IdentityRole(roleName));
             }
             await _userManager.AddToRoleAsync(user, roleName);
 
-            TempData["SuccessMessage"] = $"Usuario '{user.FirstName} {user.LastName}' (@{user.UserName}) registrado con éxito.";
+            TempData["SuccessMessage"] = $"Usuario '{user.FirstName} {user.LastName}' (@{user.UserName}) registrado con éxito con rol {roleName}.";
             return RedirectToAction(nameof(Users));
         }
 
@@ -730,21 +738,45 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
 
-            // Actualizar rol
-            var roleName = string.IsNullOrWhiteSpace(model.Role) ? "User" : model.Role.Trim();
-            if (!await _roleManager.RoleExistsAsync(roleName))
-            {
-                await _roleManager.CreateAsync(new IdentityRole(roleName));
-            }
+            // REGLAS ESTRICTAS DE SEGURIDAD PARA CAMBIO DE ROLES:
+            var isTargetSuperAdmin = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+            var currentUserId = _userManager.GetUserId(User);
+            var isSelf = (user.Id == currentUserId || string.Equals(user.UserName, User.Identity?.Name, StringComparison.OrdinalIgnoreCase));
 
             var currentRoles = await _userManager.GetRolesAsync(user);
+            string roleName = model.Role?.Trim() ?? "Operador";
+            if (roleName != "SuperAdmin" && roleName != "Admin" && roleName != "Operador")
+            {
+                roleName = "Operador";
+            }
+
+            // 1. Proteger usuario raíz 'superadmin': Su rol es INMUTABLE
+            if (isTargetSuperAdmin)
+            {
+                roleName = "SuperAdmin";
+            }
+            // 2. Proteger la propia cuenta en sesión: No puede cambiar o degradar su propio rol
+            else if (isSelf)
+            {
+                roleName = currentRoles.FirstOrDefault() ?? "Admin";
+            }
+
+            // Aplicar el cambio de rol seguro si difiere del actual
             if (!currentRoles.Contains(roleName))
             {
-                await _userManager.RemoveFromRolesAsync(user, currentRoles);
+                if (!await _roleManager.RoleExistsAsync(roleName))
+                {
+                    await _roleManager.CreateAsync(new IdentityRole(roleName));
+                }
+
+                if (currentRoles.Any())
+                {
+                    await _userManager.RemoveFromRolesAsync(user, currentRoles);
+                }
                 await _userManager.AddToRoleAsync(user, roleName);
             }
 
-            TempData["SuccessMessage"] = $"Usuario '{user.FirstName} {user.LastName}' actualizado exitosamente.";
+            TempData["SuccessMessage"] = $"Usuario '{user.FirstName} {user.LastName}' actualizado exitosamente con rol {roleName}.";
             return RedirectToAction(nameof(Users));
         }
 

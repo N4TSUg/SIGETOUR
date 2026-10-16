@@ -23,7 +23,7 @@ namespace SIGETOUR.API.Models
         [MinLength(6, ErrorMessage = "La contraseña debe tener al menos 6 caracteres")]
         public string Password { get; set; } = string.Empty;
 
-        public string Role { get; set; } = "User";
+        public string Role { get; set; } = "Operador";
 
         public bool IsActive { get; set; } = true;
     }
@@ -50,7 +50,7 @@ namespace SIGETOUR.API.Models
 
         public string? NewPassword { get; set; }
 
-        public string Role { get; set; } = "User";
+        public string Role { get; set; } = "Operador";
 
         public bool IsActive { get; set; } = true;
     }
