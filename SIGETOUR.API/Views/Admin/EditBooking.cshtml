@@ -446,17 +446,47 @@
 
     function loadExtraPassengers() {
         const jsonField = document.getElementById('AdditionalPassengersJson');
-        if (!jsonField || !jsonField.value) return;
-        
-        try {
-            const passengers = JSON.parse(jsonField.value);
-            passengers.forEach(p => addPassengerRow(p.Name, p.Dni, p.Phone));
-        } catch (e) {
-            console.error('Error parsing extra passengers:', e);
+        let loadedCount = 0;
+        if (jsonField && jsonField.value) {
+            try {
+                const passengers = JSON.parse(jsonField.value);
+                if (Array.isArray(passengers)) {
+                    passengers.forEach(p => {
+                        addPassengerRow(p.Name || '', p.Dni || '', p.Phone || '', false);
+                        loadedCount++;
+                    });
+                }
+            } catch (e) {
+                console.error('Error parsing extra passengers:', e);
+            }
         }
+
+        // Auto-render companion cards if TotalPassengers > 1 (e.g. from online bookings where AdditionalPassengersJson was empty)
+        const totalPaxHidden = document.getElementById('TotalPassengersHidden');
+        const totalPax = parseInt(totalPaxHidden ? totalPaxHidden.value : '1', 10) || 1;
+        const neededExtras = totalPax - 1;
+        while (loadedCount < neededExtras) {
+            addPassengerRow('', '', '', false);
+            loadedCount++;
+        }
+
+        updatePassengerCount(false);
     }
 
-    function addPassengerRow(name = '', dni = '', phone = '') {
+    function renumberCompanions() {
+        const container = document.getElementById('passengers-container');
+        const rows = container.querySelectorAll('.extra-passenger-row');
+        rows.forEach((row, idx) => {
+            const num = idx + 2;
+            const badge = row.querySelector('.companion-num');
+            if (badge) badge.textContent = num;
+            const title = row.querySelector('.companion-title');
+            if (title) title.textContent = 'Acompañante ' + num;
+        });
+        updatePassengerCount(true);
+    }
+
+    function addPassengerRow(name = '', dni = '', phone = '', recalculatePrice = true) {
         const container = document.getElementById('passengers-container');
         const count = container.querySelectorAll('.extra-passenger-row').length + 2;
         
@@ -465,10 +495,10 @@
         div.innerHTML = `
             <div class="flex items-center justify-between mb-3 border-b border-outline-variant/40 pb-2">
                 <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-label-sm font-bold">\${count}</span>
-                  <span class="text-title-sm font-title-sm text-on-surface font-bold">Acompañante \${count}</span>
+                  <span class="companion-num w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-label-sm font-bold">${count}</span>
+                  <span class="companion-title text-title-sm font-title-sm text-on-surface font-bold">Acompañante ${count}</span>
                 </div>
-                <button type="button" onclick="this.closest('.extra-passenger-row').remove(); updatePassengerCount();" class="p-1 text-tertiary hover:bg-error-container rounded-md transition-colors flex items-center gap-1 text-label-sm font-label-sm cursor-pointer">
+                <button type="button" class="btn-remove-companion p-1 text-tertiary hover:bg-error-container rounded-md transition-colors flex items-center gap-1 text-label-sm font-label-sm cursor-pointer">
                   <span class="material-symbols-outlined text-[16px]">delete</span>
                   <span>Retirar</span>
                 </button>
@@ -476,20 +506,30 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-2">
                   <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
-                  <input type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="\${escapeQuotes(name)}" />
+                  <input type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nombre y Apellidos del acompañante" />
                 </div>
                 <div>
                   <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
-                  <input type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="\${escapeQuotes(dni)}" />
+                  <input type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="N° Documento" />
                 </div>
                 <div class="md:col-span-1">
                   <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
-                  <input type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="\${escapeQuotes(phone)}" />
+                  <input type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Opcional" />
                 </div>
             </div>
         `;
+
+        div.querySelector('.p-name').value = name || '';
+        div.querySelector('.p-dni').value = dni || '';
+        div.querySelector('.p-phone').value = phone || '';
+
+        div.querySelector('.btn-remove-companion').addEventListener('click', function() {
+            div.remove();
+            renumberCompanions();
+        });
+
         container.appendChild(div);
-        updatePassengerCount();
+        updatePassengerCount(recalculatePrice);
     }
 
     function escapeQuotes(str) {
@@ -497,21 +537,24 @@
         return str.replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
-    function updatePassengerCount() {
+    function updatePassengerCount(recalculatePrice = false) {
         const total = document.querySelectorAll('.extra-passenger-row').length + 1;
-        document.getElementById('passenger-count-badge').innerText = total + ' Pasajeros';
-        document.getElementById('TotalPassengersHidden').value = total;
+        const countBadge = document.getElementById('passenger-count-badge');
+        if (countBadge) countBadge.innerText = total + ' Pasajeros';
+        const totalHidden = document.getElementById('TotalPassengersHidden');
+        if (totalHidden) totalHidden.value = total;
 
-        // Auto-recalculate total price based on selected tour
-        const tourSelect = document.getElementById('tourPackageSelect');
-        if (tourSelect) {
-            const selectedOpt = tourSelect.options[tourSelect.selectedIndex];
-            const price = parseFloat(selectedOpt?.getAttribute('data-price') || '0');
-            if (price > 0) {
-                const totalInput = document.getElementById('TotalAmountHidden');
-                if (totalInput) {
-                    totalInput.value = (price * totalPaxCount(total)).toFixed(2);
-                    updateDisplayTotal(totalInput.value);
+        if (recalculatePrice) {
+            const tourSelect = document.getElementById('tourPackageSelect');
+            if (tourSelect) {
+                const selectedOpt = tourSelect.options[tourSelect.selectedIndex];
+                const price = parseFloat(selectedOpt?.getAttribute('data-price') || '0');
+                if (price > 0) {
+                    const totalInput = document.getElementById('TotalAmountHidden');
+                    if (totalInput) {
+                        totalInput.value = (price * totalPaxCount(total)).toFixed(2);
+                        updateDisplayTotal(totalInput.value);
+                    }
                 }
             }
         }
@@ -525,13 +568,19 @@
         const rows = document.querySelectorAll('.extra-passenger-row');
         const passengers = [];
         rows.forEach(row => {
+            const name = row.querySelector('.p-name')?.value?.trim() || '';
+            const dni = row.querySelector('.p-dni')?.value?.trim() || '';
+            const phone = row.querySelector('.p-phone')?.value?.trim() || '';
             passengers.push({
-                Name: row.querySelector('.p-name').value,
-                Dni: row.querySelector('.p-dni').value,
-                Phone: row.querySelector('.p-phone').value
+                Name: name,
+                Dni: dni,
+                Phone: phone
             });
         });
-        document.getElementById('AdditionalPassengersJson').value = JSON.stringify(passengers);
+        const hiddenInput = document.getElementById('AdditionalPassengersJson');
+        if (hiddenInput) {
+            hiddenInput.value = JSON.stringify(passengers);
+        }
     }
 
     function updateDisplayTotal(val) {

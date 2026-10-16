@@ -53,19 +53,7 @@ namespace SIGETOUR.API.Application.Services
 
             int totalSeats = vehicle?.SeatCapacity > 0 ? vehicle.SeatCapacity : 18;
 
-            var targetDateUtc = DateTime.SpecifyKind(date.Date, DateTimeKind.Utc);
-            var query = _context.Bookings
-                .Include(b => b.Items)
-                .Where(b => b.TravelDate.Date == targetDateUtc &&
-                            b.Status != BookingStatus.Cancelled &&
-                            b.Items.Any(i => i.TourPackageId == tourId));
-
-            if (!string.IsNullOrWhiteSpace(shift) && shift != "Todos")
-            {
-                query = query.Where(b => b.ShiftName == shift);
-            }
-
-            var bookings = await query.OrderBy(b => b.BookingDate).ToListAsync();
+            var bookings = await GetMatchingBookingsAsync(date, tourId, shift);
             var passengerList = ExtractPassengers(bookings);
 
             var previewSeats = new List<ManifestPassengerItem>();
@@ -140,19 +128,7 @@ namespace SIGETOUR.API.Application.Services
 
             int totalSeats = vehicle.SeatCapacity > 0 ? vehicle.SeatCapacity : 18;
 
-            var targetDateUtc = DateTime.SpecifyKind(request.Date.Date, DateTimeKind.Utc);
-            var query = _context.Bookings
-                .Include(b => b.Items)
-                .Where(b => b.TravelDate.Date == targetDateUtc &&
-                            b.Status != BookingStatus.Cancelled &&
-                            b.Items.Any(i => i.TourPackageId == request.TourPackageId));
-
-            if (!string.IsNullOrWhiteSpace(request.ShiftName) && request.ShiftName != "Todos")
-            {
-                query = query.Where(b => b.ShiftName == request.ShiftName);
-            }
-
-            var bookings = await query.OrderBy(b => b.BookingDate).ToListAsync();
+            var bookings = await GetMatchingBookingsAsync(request.Date, request.TourPackageId, request.ShiftName);
             var passengerList = ExtractPassengers(bookings);
 
             using var workbook = new XLWorkbook();
@@ -556,6 +532,44 @@ namespace SIGETOUR.API.Application.Services
             using var memoryStream = new MemoryStream();
             workbook.SaveAs(memoryStream);
             return memoryStream.ToArray();
+        }
+
+        private async Task<List<Booking>> GetMatchingBookingsAsync(DateTime targetDate, Guid tourId, string? shift)
+        {
+            var minUtc = DateTime.SpecifyKind(targetDate.Date.AddDays(-1), DateTimeKind.Utc);
+            var maxUtc = DateTime.SpecifyKind(targetDate.Date.AddDays(2), DateTimeKind.Utc);
+
+            var candidates = await _context.Bookings
+                .Include(b => b.Items)
+                .Where(b => b.TravelDate >= minUtc && b.TravelDate <= maxUtc &&
+                            b.Status != BookingStatus.Cancelled &&
+                            b.Items.Any(i => i.TourPackageId == tourId))
+                .OrderBy(b => b.BookingDate)
+                .ToListAsync();
+
+            var targetDateStr = targetDate.ToString("yyyy-MM-dd");
+
+            var matched = candidates.Where(b =>
+                b.TravelDate.ToString("yyyy-MM-dd") == targetDateStr ||
+                b.TravelDate.ToUniversalTime().ToString("yyyy-MM-dd") == targetDateStr ||
+                b.TravelDate.AddHours(-5).ToString("yyyy-MM-dd") == targetDateStr ||
+                b.TravelDate.Date == targetDate.Date
+            ).ToList();
+
+            if (!string.IsNullOrWhiteSpace(shift) &&
+                !shift.Equals("Todos", StringComparison.OrdinalIgnoreCase) &&
+                !shift.StartsWith("Todos", StringComparison.OrdinalIgnoreCase))
+            {
+                var cleanShift = shift.ToLower().Replace("turno", "").Trim();
+                var keyword = cleanShift.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? cleanShift;
+                matched = matched.Where(b =>
+                    string.IsNullOrWhiteSpace(b.ShiftName) ||
+                    b.ShiftName.ToLower().Contains(keyword) ||
+                    cleanShift.Contains(b.ShiftName.ToLower())
+                ).ToList();
+            }
+
+            return matched;
         }
 
         private List<ManifestPassengerItem> ExtractPassengers(List<Booking> bookings)

@@ -140,8 +140,10 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (date.HasValue)
             {
-                var dUtc = DateTime.SpecifyKind(date.Value.Date, DateTimeKind.Utc);
-                query = query.Where(b => b.TravelDate.Date == dUtc);
+                var targetDate = date.Value.Date;
+                var minUtc = DateTime.SpecifyKind(targetDate.AddDays(-1), DateTimeKind.Utc);
+                var maxUtc = DateTime.SpecifyKind(targetDate.AddDays(2), DateTimeKind.Utc);
+                query = query.Where(b => b.TravelDate >= minUtc && b.TravelDate <= maxUtc);
             }
 
             if (tourId.HasValue && tourId != Guid.Empty)
@@ -152,6 +154,17 @@ namespace SIGETOUR.API.Controllers.UI
             var bookings = await query
                 .OrderByDescending(b => b.BookingDate)
                 .ToListAsync();
+
+            if (date.HasValue)
+            {
+                var targetDateStr = date.Value.ToString("yyyy-MM-dd");
+                bookings = bookings.Where(b =>
+                    b.TravelDate.ToString("yyyy-MM-dd") == targetDateStr ||
+                    b.TravelDate.ToUniversalTime().ToString("yyyy-MM-dd") == targetDateStr ||
+                    b.TravelDate.AddHours(-5).ToString("yyyy-MM-dd") == targetDateStr ||
+                    b.TravelDate.Date == date.Value.Date
+                ).ToList();
+            }
 
             ViewBag.CurrentSearch = search;
             ViewBag.CurrentStatus = status;
