@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -124,8 +125,40 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public IActionResult ConfirmPayment(Guid bookingId)
+        public async Task<IActionResult> ConfirmPayment(Guid bookingId)
         {
+            var booking = await _context.Bookings.FindAsync(bookingId);
+            if (booking != null)
+            {
+                booking.Status = BookingStatus.Confirmed;
+                booking.PaidAmount = booking.TotalAmount;
+                if (string.IsNullOrWhiteSpace(booking.PaymentMethod))
+                {
+                    booking.PaymentMethod = "Tarjeta / Pasarela Online";
+                }
+
+                var activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+                if (activeShift != null && !_context.CashTransactions.Any(t => t.BookingId == booking.Id))
+                {
+                    _context.CashTransactions.Add(new CashTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        ShiftId = activeShift.Id,
+                        TransactionType = "Ingreso",
+                        Category = "Cobro de Reserva",
+                        Amount = booking.TotalAmount,
+                        PaymentMethod = booking.PaymentMethod,
+                        ReferenceCode = booking.ReferenceCode,
+                        BookingId = booking.Id,
+                        Description = $"Pago en línea confirmado para reserva {booking.ReferenceCode} - {booking.CustomerName}",
+                        RegisteredBy = "Pasarela Online / Checkout",
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+            }
+
             return RedirectToAction("Voucher", new { id = bookingId });
         }
 
@@ -142,12 +175,3 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
-
-
-
-
-
-
-
-
-

@@ -22,6 +22,10 @@ namespace SIGETOUR.API.Infrastructure.Data
         public DbSet<VehicleImage> VehicleImages { get; set; }
         public DbSet<Booking> Bookings { get; set; }
         public DbSet<BookingItem> BookingItems { get; set; }
+        public DbSet<CashRegisterShift> CashRegisterShifts { get; set; }
+        public DbSet<CashTransaction> CashTransactions { get; set; }
+        public DbSet<PettyCashAccount> PettyCashAccounts { get; set; }
+        public DbSet<PettyCashMovement> PettyCashMovements { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

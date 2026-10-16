@@ -921,6 +921,29 @@ namespace SIGETOUR.API.Controllers.UI
             _context.Bookings.Add(booking);
             await _context.SaveChangesAsync();
 
+            if (booking.PaidAmount > 0)
+            {
+                var activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+                if (activeShift != null)
+                {
+                    _context.CashTransactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        ShiftId = activeShift.Id,
+                        TransactionType = "Ingreso",
+                        Category = "Cobro de Reserva",
+                        Amount = booking.PaidAmount,
+                        PaymentMethod = !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Efectivo",
+                        ReferenceCode = booking.ReferenceCode,
+                        BookingId = booking.Id,
+                        Description = $"Cobro reserva {booking.ReferenceCode} - {booking.CustomerName}",
+                        RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                }
+            }
+
             TempData["SuccessMessage"] = $"Reserva {booking.ReferenceCode} creada exitosamente.";
             return RedirectToAction(nameof(Bookings));
         }
@@ -1037,6 +1060,29 @@ namespace SIGETOUR.API.Controllers.UI
 
             _context.Bookings.Update(booking);
             await _context.SaveChangesAsync();
+
+            if (booking.PaidAmount > 0 && !_context.CashTransactions.Any(t => t.BookingId == booking.Id))
+            {
+                var activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+                if (activeShift != null)
+                {
+                    _context.CashTransactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        ShiftId = activeShift.Id,
+                        TransactionType = "Ingreso",
+                        Category = "Cobro de Reserva",
+                        Amount = booking.PaidAmount,
+                        PaymentMethod = !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Efectivo",
+                        ReferenceCode = booking.ReferenceCode,
+                        BookingId = booking.Id,
+                        Description = $"Cobro registrado en edición de reserva {booking.ReferenceCode} - {booking.CustomerName}",
+                        RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                }
+            }
 
             TempData["SuccessMessage"] = $"Reserva {booking.ReferenceCode} actualizada con éxito.";
             return RedirectToAction(nameof(Bookings));
@@ -1463,6 +1509,385 @@ namespace SIGETOUR.API.Controllers.UI
                 TempData["SuccessMessage"] = "Categoría eliminada con éxito.";
             }
             return RedirectToAction(nameof(Categories));
+        }
+
+        // --- MÓDULOS DE CAJA Y CAJA CHICA --- //
+
+        [HttpGet]
+        public async Task<IActionResult> Cash(string? tab = "general", string? search = null, string? filterType = null, int page = 1)
+        {
+            tab = string.IsNullOrWhiteSpace(tab) ? "general" : tab.ToLower();
+
+            // 1. Obtener Turno Activo de Caja General
+            var activeShift = await _context.CashRegisterShifts
+                .Include(s => s.Transactions)
+                    .ThenInclude(t => t.Booking)
+                .OrderByDescending(s => s.OpenedAt)
+                .FirstOrDefaultAsync(s => s.IsOpen);
+
+            // 2. Historial de Turnos Recientes
+            var recentShifts = await _context.CashRegisterShifts
+                .Include(s => s.Transactions)
+                .OrderByDescending(s => s.OpenedAt)
+                .Take(6)
+                .ToListAsync();
+
+            // 3. Obtener Cuenta de Caja Chica
+            var pettyAccount = await _context.PettyCashAccounts
+                .Include(a => a.Movements)
+                .FirstOrDefaultAsync(a => a.IsActive);
+
+            if (pettyAccount == null)
+            {
+                pettyAccount = new PettyCashAccount
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Caja Chica Principal - Oficina Cajamarca",
+                    TotalFundAmount = 4220.00m,
+                    ResponsiblePerson = "Administrador Central",
+                    IsActive = true
+                };
+                _context.PettyCashAccounts.Add(pettyAccount);
+                await _context.SaveChangesAsync();
+            }
+
+            int pageSize = 12;
+            if (page < 1) page = 1;
+
+            var vm = new SIGETOUR.API.Models.CashViewModel
+            {
+                ActiveTab = tab,
+                ActiveShift = activeShift,
+                RecentShifts = recentShifts,
+                PettyAccount = pettyAccount,
+                SearchTerm = search,
+                FilterType = filterType,
+                PettyBalance = pettyAccount.CurrentBalance,
+                PettySpent = pettyAccount.TotalSpent,
+                PettyFund = pettyAccount.TotalFundAmount
+            };
+
+            if (activeShift != null)
+            {
+                vm.TotalGeneralIncome = activeShift.TotalIncome;
+                vm.TotalGeneralExpense = activeShift.TotalExpense;
+                vm.GeneralEffectiveBalance = activeShift.ExpectedCashBalance;
+            }
+
+            var routeParams = new Dictionary<string, string> { { "tab", tab } };
+            if (!string.IsNullOrWhiteSpace(search)) routeParams["search"] = search;
+            if (!string.IsNullOrWhiteSpace(filterType)) routeParams["filterType"] = filterType;
+
+            if (tab == "petty")
+            {
+                var pettyQuery = _context.PettyCashMovements
+                    .Where(m => m.AccountId == pettyAccount.Id)
+                    .AsQueryable();
+
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var term = search.Trim().ToLower();
+                    pettyQuery = pettyQuery.Where(m =>
+                        m.Concept.ToLower().Contains(term) ||
+                        m.ExpenseCategory.ToLower().Contains(term) ||
+                        (m.Supplier != null && m.Supplier.ToLower().Contains(term)) ||
+                        (m.VoucherNumber != null && m.VoucherNumber.ToLower().Contains(term)) ||
+                        m.ResponsiblePerson.ToLower().Contains(term));
+                }
+
+                if (!string.IsNullOrWhiteSpace(filterType) && filterType != "Todos")
+                {
+                    pettyQuery = pettyQuery.Where(m => m.MovementType == filterType || m.ExpenseCategory == filterType);
+                }
+
+                int totalItems = await pettyQuery.CountAsync();
+                int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+                if (page > totalPages) page = totalPages;
+
+                vm.PagedMovements = await pettyQuery
+                    .OrderByDescending(m => m.RegisteredAt)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                vm.Pagination = new SIGETOUR.API.Models.PaginationViewModel
+                {
+                    Action = "Cash",
+                    Controller = "Admin",
+                    CurrentPage = page,
+                    TotalPages = totalPages,
+                    TotalItems = totalItems,
+                    PageSize = pageSize,
+                    RouteParams = routeParams
+                };
+            }
+            else
+            {
+                var txQuery = _context.CashTransactions
+                    .Include(t => t.Booking)
+                    .AsQueryable();
+
+                if (activeShift != null)
+                {
+                    txQuery = txQuery.Where(t => t.ShiftId == activeShift.Id);
+                }
+
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var term = search.Trim().ToLower();
+                    txQuery = txQuery.Where(t =>
+                        t.Description.ToLower().Contains(term) ||
+                        t.Category.ToLower().Contains(term) ||
+                        (t.ReferenceCode != null && t.ReferenceCode.ToLower().Contains(term)) ||
+                        t.PaymentMethod.ToLower().Contains(term) ||
+                        t.RegisteredBy.ToLower().Contains(term));
+                }
+
+                if (!string.IsNullOrWhiteSpace(filterType) && filterType != "Todos")
+                {
+                    txQuery = txQuery.Where(t => t.TransactionType == filterType || t.PaymentMethod == filterType);
+                }
+
+                int totalItems = await txQuery.CountAsync();
+                int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+                if (page > totalPages) page = totalPages;
+
+                vm.PagedTransactions = await txQuery
+                    .OrderByDescending(t => t.CreatedAt)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                vm.Pagination = new SIGETOUR.API.Models.PaginationViewModel
+                {
+                    Action = "Cash",
+                    Controller = "Admin",
+                    CurrentPage = page,
+                    TotalPages = totalPages,
+                    TotalItems = totalItems,
+                    PageSize = pageSize,
+                    RouteParams = routeParams
+                };
+            }
+
+            ViewBag.Pagination = vm.Pagination;
+            return View(vm);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> OpenCashShift(decimal initialAmount, string? notes)
+        {
+            var openShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+            if (openShift != null)
+            {
+                TempData["ErrorMessage"] = "Ya existe un turno de caja abierto actualmente.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            var todayStr = DateTime.UtcNow.ToString("yyyyMMdd");
+            var shiftCountToday = await _context.CashRegisterShifts
+                .CountAsync(s => s.OpenedAt.Date == DateTime.UtcNow.Date);
+
+            var newShift = new SIGETOUR.API.Core.Entities.CashRegisterShift
+            {
+                Id = Guid.NewGuid(),
+                ShiftNumber = $"CJ-{todayStr}-{(shiftCountToday + 1):D2}",
+                OpenedByUserName = User.Identity?.Name ?? "Admin Central",
+                OpenedAt = DateTime.UtcNow,
+                InitialAmount = Math.Max(0m, initialAmount),
+                IsOpen = true,
+                Notes = notes
+            };
+
+            _context.CashRegisterShifts.Add(newShift);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Turno {newShift.ShiftNumber} aperturado exitosamente con S/ {newShift.InitialAmount:N2} en efectivo.";
+            return RedirectToAction(nameof(Cash), new { tab = "general" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CloseCashShift(Guid shiftId, decimal actualCash, string? notes)
+        {
+            var shift = await _context.CashRegisterShifts
+                .Include(s => s.Transactions)
+                .FirstOrDefaultAsync(s => s.Id == shiftId);
+
+            if (shift == null)
+            {
+                TempData["ErrorMessage"] = "El turno de caja especificado no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            shift.IsOpen = false;
+            shift.ClosedAt = DateTime.UtcNow;
+            shift.ClosedByUserName = User.Identity?.Name ?? "Admin Central";
+            shift.ActualCash = actualCash;
+            if (!string.IsNullOrWhiteSpace(notes))
+            {
+                shift.Notes = string.IsNullOrWhiteSpace(shift.Notes) ? notes : $"{shift.Notes} | Cierre: {notes}";
+            }
+
+            _context.CashRegisterShifts.Update(shift);
+            await _context.SaveChangesAsync();
+
+            var diff = shift.CashDifference;
+            string statusMsg = diff == 0 
+                ? "¡Caja Cuadrada Perfectamente!" 
+                : (diff > 0 ? $"Sobrante de S/ {diff:N2}" : $"Faltante de S/ {Math.Abs(diff):N2}");
+
+            TempData["SuccessMessage"] = $"Turno {shift.ShiftNumber} cerrado. Arqueo: {statusMsg}.";
+            return RedirectToAction(nameof(Cash), new { tab = "general" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegisterCashTransaction(Guid shiftId, string type, string category, decimal amount, string paymentMethod, string? referenceCode, string description)
+        {
+            if (amount <= 0)
+            {
+                TempData["ErrorMessage"] = "El monto debe ser mayor a S/ 0.00.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            var shift = await _context.CashRegisterShifts.FindAsync(shiftId);
+            if (shift == null || !shift.IsOpen)
+            {
+                TempData["ErrorMessage"] = "No hay un turno de caja abierto para registrar movimientos.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            var tx = new SIGETOUR.API.Core.Entities.CashTransaction
+            {
+                Id = Guid.NewGuid(),
+                ShiftId = shiftId,
+                TransactionType = type == "Egreso" ? "Egreso" : "Ingreso",
+                Category = string.IsNullOrWhiteSpace(category) ? "Ingreso Extraordinario" : category,
+                Amount = amount,
+                PaymentMethod = string.IsNullOrWhiteSpace(paymentMethod) ? "Efectivo" : paymentMethod,
+                ReferenceCode = referenceCode,
+                Description = description,
+                RegisteredBy = User.Identity?.Name ?? "Admin Central",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.CashTransactions.Add(tx);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Movimiento de {tx.TransactionType} por S/ {tx.Amount:N2} registrado en el turno activo.";
+            return RedirectToAction(nameof(Cash), new { tab = "general" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegisterPettyCashExpense(Guid accountId, string expenseCategory, string voucherType, string? voucherNumber, string? supplier, decimal amount, string responsiblePerson, string concept)
+        {
+            if (amount <= 0)
+            {
+                TempData["ErrorMessage"] = "El monto del gasto debe ser mayor a S/ 0.00.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            var account = await _context.PettyCashAccounts
+                .Include(a => a.Movements)
+                .FirstOrDefaultAsync(a => a.Id == accountId);
+
+            if (account == null)
+            {
+                TempData["ErrorMessage"] = "La cuenta de caja chica no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            if (account.CurrentBalance < amount)
+            {
+                TempData["ErrorMessage"] = $"Saldo insuficiente en Caja Chica. Saldo disponible: S/ {account.CurrentBalance:N2}.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            var movement = new SIGETOUR.API.Core.Entities.PettyCashMovement
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountId,
+                MovementType = "Egreso",
+                ExpenseCategory = expenseCategory,
+                VoucherType = voucherType,
+                VoucherNumber = voucherNumber,
+                Supplier = supplier,
+                Amount = amount,
+                ResponsiblePerson = responsiblePerson,
+                Concept = concept,
+                RegisteredAt = DateTime.UtcNow
+            };
+
+            _context.PettyCashMovements.Add(movement);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Gasto de Caja Chica por S/ {amount:N2} registrado correctamente.";
+            return RedirectToAction(nameof(Cash), new { tab = "petty" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReplenishPettyCash(Guid accountId, decimal amount, string concept)
+        {
+            if (amount <= 0)
+            {
+                TempData["ErrorMessage"] = "El monto de reposición debe ser mayor a S/ 0.00.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            var account = await _context.PettyCashAccounts.FindAsync(accountId);
+            if (account == null)
+            {
+                TempData["ErrorMessage"] = "La cuenta de caja chica no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            var movement = new SIGETOUR.API.Core.Entities.PettyCashMovement
+            {
+                Id = Guid.NewGuid(),
+                AccountId = accountId,
+                MovementType = "Reposicion",
+                ExpenseCategory = "Reposición de Fondo",
+                VoucherType = "Recibo de Ingreso",
+                VoucherNumber = $"REP-{DateTime.UtcNow:yyyyMMdd-HHmm}",
+                Supplier = "Tesorería Central Turismo Chilón",
+                Amount = amount,
+                ResponsiblePerson = User.Identity?.Name ?? "Administrador Central",
+                Concept = string.IsNullOrWhiteSpace(concept) ? "Reposición de fondo fijo de Caja Chica" : concept,
+                RegisteredAt = DateTime.UtcNow
+            };
+
+            account.LastReplenishedAt = DateTime.UtcNow;
+            _context.PettyCashAccounts.Update(account);
+            _context.PettyCashMovements.Add(movement);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Reposición de fondo por S/ {amount:N2} realizada exitosamente.";
+            return RedirectToAction(nameof(Cash), new { tab = "petty" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdatePettyCashFund(Guid accountId, decimal newFundAmount)
+        {
+            if (newFundAmount <= 0)
+            {
+                TempData["ErrorMessage"] = "El fondo fijo debe ser mayor a S/ 0.00.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            var account = await _context.PettyCashAccounts.FindAsync(accountId);
+            if (account == null) return NotFound();
+
+            account.TotalFundAmount = newFundAmount;
+            _context.PettyCashAccounts.Update(account);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Límite del fondo fijo actualizado a S/ {newFundAmount:N2}.";
+            return RedirectToAction(nameof(Cash), new { tab = "petty" });
         }
     }
 }

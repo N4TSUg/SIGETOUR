@@ -1,0 +1,1074 @@
+@model SIGETOUR.API.Models.CashViewModel
+@{
+    ViewData["Title"] = "Caja y Finanzas";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    bool isGeneral = Model.ActiveTab == "general";
+    bool hasShift = Model.ActiveShift != null;
+}
+
+<!-- Encabezado del Módulo -->
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+        <div class="flex items-center gap-2 mb-1">
+            <span class="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-label-sm font-bold tracking-wide uppercase">
+                Tesorería &amp; Control Financiero
+            </span>
+            <span class="text-label-sm text-secondary font-medium">• @DateTime.Now.ToString("dd MMMM yyyy")</span>
+        </div>
+        <h1 class="text-display-sm font-bold text-on-surface">Control de Caja y Caja Chica</h1>
+        <p class="text-body-lg text-on-surface-variant">Arqueos de turnos diarios, cobros de reservas, registro de movimientos y control del fondo fijo de gastos menores.</p>
+    </div>
+    
+    <!-- Botones de Acción Rápida -->
+    <div class="flex items-center flex-wrap gap-2.5">
+        @if (hasShift)
+        {
+            <button type="button" onclick="openAddTransactionModal()" class="px-4 py-2.5 rounded-lg bg-surface-container-lowest hover:bg-surface-container border border-outline text-primary font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer" title="Registrar un ingreso o egreso extraordinario en el turno activo">
+                <span class="material-symbols-outlined text-[20px]">add_circle</span>
+                <span>+ Movimiento Caja</span>
+            </button>
+            <button type="button" onclick="openCloseShiftModal()" class="px-4 py-2.5 rounded-lg bg-tertiary text-on-tertiary font-bold flex items-center gap-2 hover:bg-tertiary/90 transition-all shadow-sm cursor-pointer" title="Realizar arqueo físico y cerrar el turno actual">
+                <span class="material-symbols-outlined text-[20px]">lock_clock</span>
+                <span>Cerrar Turno (Arqueo)</span>
+            </button>
+        }
+        else
+        {
+            <button type="button" onclick="openOpenShiftModal()" class="px-4 py-2.5 rounded-lg bg-primary text-on-primary font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm cursor-pointer" title="Aperturar un nuevo turno de caja general">
+                <span class="material-symbols-outlined text-[20px]">key</span>
+                <span>Aperturar Turno de Caja</span>
+            </button>
+        }
+
+        <button type="button" onclick="openAddPettyExpenseModal()" class="px-4 py-2.5 rounded-lg bg-surface-container-high hover:bg-surface-container text-on-surface font-bold flex items-center gap-2 border border-outline-variant transition-all shadow-sm cursor-pointer" title="Registrar gasto o rendición en Caja Chica">
+            <span class="material-symbols-outlined text-[20px] text-primary">receipt_long</span>
+            <span>+ Gasto Caja Chica</span>
+        </button>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center gap-3 mb-6">
+        <span class="material-symbols-outlined text-[22px]">check_circle</span>
+        <span class="font-semibold text-body-md">@TempData["SuccessMessage"]</span>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="p-4 rounded-xl bg-red-100 border border-red-200 text-red-700 flex items-center gap-3 mb-6">
+        <span class="material-symbols-outlined text-[22px]">error</span>
+        <span class="font-semibold text-body-md">@TempData["ErrorMessage"]</span>
+    </div>
+}
+
+<!-- Cintas de Métricas / KPIs Financieros -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Métrica 1: Estado del Turno Actual -->
+    <div class="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+            <span class="text-label-sm font-bold text-secondary uppercase tracking-wider">Turno de Caja</span>
+            <div class="w-9 h-9 rounded-xl @(hasShift ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700") flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">@(hasShift ? "meeting_room" : "no_meeting_room")</span>
+            </div>
+        </div>
+        <div class="mt-3">
+            @if (hasShift)
+            {
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+                    <span class="font-bold text-title-md text-on-surface">@Model.ActiveShift!.ShiftNumber</span>
+                </div>
+                <div class="text-label-sm text-outline mt-0.5">
+                    Apertura: @Model.ActiveShift.OpenedAt.ToLocalTime().ToString("hh:mm tt") • S/ @Model.ActiveShift.InitialAmount.ToString("N2") inicial
+                </div>
+            }
+            else
+            {
+                <span class="font-bold text-title-md text-on-surface-variant">Sin Turno Abierto</span>
+                <div class="text-label-sm text-outline mt-0.5">Apertura requerida para cobros</div>
+            }
+        </div>
+    </div>
+
+    <!-- Métrica 2: Ingresos del Turno -->
+    <div class="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+            <span class="text-label-sm font-bold text-secondary uppercase tracking-wider">Ingresos del Turno</span>
+            <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">trending_up</span>
+            </div>
+        </div>
+        <div class="mt-3">
+            <span class="font-extrabold text-headline-sm text-primary">S/ @Model.TotalGeneralIncome.ToString("N2")</span>
+            <div class="text-label-sm text-outline mt-0.5">
+                Efectivo: S/ @(Model.ActiveShift?.TotalCashIncome.ToString("N2") ?? "0.00") • Digital: S/ @(Model.ActiveShift?.TotalDigitalIncome.ToString("N2") ?? "0.00")
+            </div>
+        </div>
+    </div>
+
+    <!-- Métrica 3: Saldo en Efectivo en Gaveta -->
+    <div class="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+            <span class="text-label-sm font-bold text-secondary uppercase tracking-wider">Efectivo en Gaveta</span>
+            <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">payments</span>
+            </div>
+        </div>
+        <div class="mt-3">
+            <span class="font-extrabold text-headline-sm text-on-surface">S/ @Model.GeneralEffectiveBalance.ToString("N2")</span>
+            <div class="text-label-sm text-outline mt-0.5">
+                Egresos/Retiros: S/ @Model.TotalGeneralExpense.ToString("N2")
+            </div>
+        </div>
+    </div>
+
+    <!-- Métrica 4: Saldo Caja Chica -->
+    <div class="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+            <span class="text-label-sm font-bold text-secondary uppercase tracking-wider">Fondo Caja Chica</span>
+            <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-[20px]">point_of_sale</span>
+            </div>
+        </div>
+        <div class="mt-3">
+            <span class="font-extrabold text-headline-sm text-amber-900">S/ @Model.PettyBalance.ToString("N2")</span>
+            <div class="text-label-sm text-outline mt-0.5">
+                Fondo Fijo: S/ @Model.PettyFund.ToString("N2") • Gastado: S/ @Model.PettySpent.ToString("N2")
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Selector de Pestañas Principales (Tabs) -->
+<div class="flex border-b border-outline-variant mb-6 bg-surface-container-lowest rounded-t-2xl px-6 pt-3 shadow-xs">
+    <a href="@Url.Action("Cash", "Admin", new { tab = "general" })" class="flex items-center gap-2 py-3 px-5 font-bold text-body-md border-b-2 transition-all @(isGeneral ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface")">
+        <span class="material-symbols-outlined text-[20px]">point_of_sale</span>
+        <span>Caja General &amp; Turnos Diarios</span>
+        @if (hasShift)
+        {
+            <span class="w-2 h-2 rounded-full bg-green-500"></span>
+        }
+    </a>
+    <a href="@Url.Action("Cash", "Admin", new { tab = "petty" })" class="flex items-center gap-2 py-3 px-5 font-bold text-body-md border-b-2 transition-all @(!isGeneral ? "border-primary text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface")">
+        <span class="material-symbols-outlined text-[20px]">receipt_long</span>
+        <span>Caja Chica &amp; Gastos Menores</span>
+        <span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800 font-bold">S/ @Model.PettyBalance.ToString("N0") disp.</span>
+    </a>
+</div>
+
+<!-- ======================================================== -->
+<!-- CONTENIDO PESTAÑA 1: CAJA GENERAL                         -->
+<!-- ======================================================== -->
+@if (isGeneral)
+{
+    @if (hasShift)
+    {
+        <!-- Panel del Turno Activo -->
+        <div class="bg-surface-container-lowest rounded-2xl border border-primary/30 p-6 shadow-sm mb-6 relative overflow-hidden">
+            <div class="absolute top-0 left-0 bottom-0 w-2 bg-primary"></div>
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pl-2">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <span class="px-3 py-1 rounded-full bg-green-100 text-green-800 font-bold text-label-sm uppercase flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-green-600 animate-ping"></span>
+                            Turno Operativo Activo
+                        </span>
+                        <h2 class="text-headline-sm font-bold text-on-surface">@Model.ActiveShift!.ShiftNumber</h2>
+                    </div>
+                    <p class="text-body-sm text-on-surface-variant mt-1">
+                        Aperturado por <strong>@Model.ActiveShift.OpenedByUserName</strong> el @Model.ActiveShift.OpenedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") • Saldo Base Efectivo: <strong>S/ @Model.ActiveShift.InitialAmount.ToString("N2")</strong>
+                    </p>
+                    @if (!string.IsNullOrWhiteSpace(Model.ActiveShift.Notes))
+                    {
+                        <div class="mt-2 text-xs text-outline italic">Nota: @Model.ActiveShift.Notes</div>
+                    }
+                </div>
+
+                <!-- Desglose Rápido en Ficha -->
+                <div class="flex items-center gap-4 flex-wrap bg-surface-container-low/50 p-3.5 rounded-xl border border-outline-variant/60">
+                    <div class="px-3 border-r border-outline-variant/60">
+                        <span class="block text-[11px] text-outline font-semibold uppercase">Efectivo Físico</span>
+                        <span class="text-title-md font-bold text-on-surface">S/ @Model.ActiveShift.ExpectedCashBalance.ToString("N2")</span>
+                    </div>
+                    <div class="px-3 border-r border-outline-variant/60">
+                        <span class="block text-[11px] text-outline font-semibold uppercase">Billeteras / Banco</span>
+                        <span class="text-title-md font-bold text-primary">S/ @Model.ActiveShift.TotalDigitalIncome.ToString("N2")</span>
+                    </div>
+                    <div class="px-3">
+                        <span class="block text-[11px] text-outline font-semibold uppercase">Total Recaudado</span>
+                        <span class="text-title-md font-extrabold text-primary">S/ @Model.ActiveShift.TotalIncome.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Aviso de Caja Cerrada -->
+        <div class="bg-surface-container-lowest rounded-2xl border-2 border-dashed border-amber-300 p-8 shadow-sm mb-6 text-center">
+            <span class="material-symbols-outlined text-amber-500 text-5xl mb-2">lock</span>
+            <h3 class="text-title-lg font-bold text-on-surface">No hay ningún turno de caja abierto en este momento</h3>
+            <p class="text-body-md text-on-surface-variant max-w-lg mx-auto mt-1 mb-4">
+                Para iniciar el cobro en mostrador y registrar transacciones diarias, debes aperturar un nuevo turno con el monto base en gaveta.
+            </p>
+            <button type="button" onclick="openOpenShiftModal()" class="px-6 py-2.5 rounded-lg bg-primary text-on-primary font-bold text-body-md inline-flex items-center gap-2 shadow-md hover:bg-primary/90 transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-xl">key</span>
+                Aperturar Nuevo Turno Ahora
+            </button>
+        </div>
+    }
+
+    <!-- Barra de Filtros de Transacciones -->
+    <div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm mb-6">
+        <form method="get" asp-action="Cash" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            <input type="hidden" name="tab" value="general" />
+
+            <!-- Búsqueda General -->
+            <div class="md:col-span-5 relative">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+                <input type="text" name="search" value="@Model.SearchTerm" placeholder="Buscar por referencia, cliente, concepto o método..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+            </div>
+
+            <!-- Filtro por Tipo / Método -->
+            <div class="md:col-span-4">
+                <select name="filterType" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                    <option value="" selected="@(string.IsNullOrEmpty(Model.FilterType) || Model.FilterType == "Todos")">Todos los Tipos y Métodos</option>
+                    <option value="Ingreso" selected="@(Model.FilterType == "Ingreso")">Solo Ingresos (+)</option>
+                    <option value="Egreso" selected="@(Model.FilterType == "Egreso")">Solo Egresos (-)</option>
+                    <option value="Efectivo" selected="@(Model.FilterType == "Efectivo")">Efectivo en Gaveta</option>
+                    <option value="Yape" selected="@(Model.FilterType == "Yape")">Billetera Yape</option>
+                    <option value="Plin" selected="@(Model.FilterType == "Plin")">Billetera Plin</option>
+                    <option value="Transferencia BCP" selected="@(Model.FilterType == "Transferencia BCP")">Transferencia BCP</option>
+                    <option value="Tarjeta / Pasarela Online" selected="@(Model.FilterType == "Tarjeta / Pasarela Online")">Tarjeta / Pasarela Web</option>
+                </select>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="md:col-span-3 flex items-center gap-2">
+                <button type="submit" class="flex-1 py-2 px-3 bg-primary hover:bg-[#0e5a52] text-on-primary font-bold text-body-sm rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                    <span>Filtrar</span>
+                </button>
+                @if (!string.IsNullOrWhiteSpace(Model.SearchTerm) || !string.IsNullOrWhiteSpace(Model.FilterType))
+                {
+                    <a href="@Url.Action("Cash", "Admin", new { tab = "general" })" class="py-2 px-3 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg border border-outline-variant flex items-center justify-center transition-colors cursor-pointer" title="Limpiar filtros">
+                        <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla de Transacciones del Turno -->
+    <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden mb-8">
+        <div class="px-6 py-3.5 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[20px]">receipt</span>
+                <span class="text-label-md font-bold text-on-surface">
+                    Movimientos del Turno de Caja (Total: @Model.Pagination.TotalItems)
+                </span>
+            </div>
+            <span class="text-xs text-outline font-mono">12 por página</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant text-xs uppercase tracking-wider">
+                        <th class="p-3.5 font-semibold">Hora / Fecha</th>
+                        <th class="p-3.5 font-semibold text-center">Tipo</th>
+                        <th class="p-3.5 font-semibold">Concepto / Categoría</th>
+                        <th class="p-3.5 font-semibold">Referencia / Detalle</th>
+                        <th class="p-3.5 font-semibold">Método de Pago</th>
+                        <th class="p-3.5 font-semibold">Registrado Por</th>
+                        <th class="p-3.5 font-semibold text-right">Monto (S/)</th>
+                    </tr>
+                </thead>
+                <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50">
+                    @if (Model.PagedTransactions != null && Model.PagedTransactions.Any())
+                    {
+                        foreach (var tx in Model.PagedTransactions)
+                        {
+                            bool isIncome = tx.TransactionType == "Ingreso";
+                            <tr class="hover:bg-surface-container-low/40 transition-colors">
+                                <td class="p-3.5 whitespace-nowrap text-xs font-mono text-outline">
+                                    @tx.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                </td>
+                                <td class="p-3.5 text-center whitespace-nowrap">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold @(isIncome ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800")">
+                                        <span class="material-symbols-outlined text-[14px]">@(isIncome ? "add" : "remove")</span>
+                                        @tx.TransactionType
+                                    </span>
+                                </td>
+                                <td class="p-3.5 font-semibold text-body-sm text-on-surface">
+                                    @tx.Category
+                                </td>
+                                <td class="p-3.5 text-body-sm text-on-surface-variant">
+                                    <div class="font-medium text-on-surface">@tx.Description</div>
+                                    @if (!string.IsNullOrWhiteSpace(tx.ReferenceCode))
+                                    {
+                                        <span class="inline-block mt-0.5 px-1.5 py-0.5 bg-surface-container text-xs font-mono rounded text-primary font-bold">@tx.ReferenceCode</span>
+                                    }
+                                </td>
+                                <td class="p-3.5 whitespace-nowrap text-body-sm">
+                                    <div class="flex items-center gap-1.5">
+                                        @if (tx.PaymentMethod == "Efectivo")
+                                        {
+                                            <span class="material-symbols-outlined text-green-600 text-[18px]">payments</span>
+                                        }
+                                        else if (tx.PaymentMethod.Contains("Yape") || tx.PaymentMethod.Contains("Plin"))
+                                        {
+                                            <span class="material-symbols-outlined text-purple-600 text-[18px]">phone_android</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="material-symbols-outlined text-blue-600 text-[18px]">credit_card</span>
+                                        }
+                                        <span class="font-semibold text-on-surface">@tx.PaymentMethod</span>
+                                    </div>
+                                </td>
+                                <td class="p-3.5 whitespace-nowrap text-xs text-outline font-medium">
+                                    @tx.RegisteredBy
+                                </td>
+                                <td class="p-3.5 text-right whitespace-nowrap font-bold text-body-md @(isIncome ? "text-green-700 font-extrabold" : "text-red-700 font-extrabold")">
+                                    @(isIncome ? "+" : "-") S/ @tx.Amount.ToString("N2")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="p-8 text-center text-on-surface-variant">
+                                <span class="material-symbols-outlined text-outline text-4xl block mb-2">savings</span>
+                                No hay transacciones registradas en este turno o filtro de búsqueda.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_AdminPagination" model="Model.Pagination" />
+    </div>
+
+    <!-- Historial de Turnos de Caja Anteriores -->
+    <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
+        <div class="px-6 py-3.5 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
+            <h3 class="text-title-sm font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">history</span>
+                Historial de Turnos y Arqueos Recientes
+            </h3>
+            <span class="text-xs text-outline">Últimos turnos</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-body-sm">
+                <thead>
+                    <tr class="bg-surface-container-low text-on-surface-variant font-label-md border-b border-outline-variant text-xs uppercase">
+                        <th class="p-3 pl-6 font-semibold">Turno</th>
+                        <th class="p-3 font-semibold">Apertura</th>
+                        <th class="p-3 font-semibold">Cierre</th>
+                        <th class="p-3 font-semibold text-right">Saldo Inicial</th>
+                        <th class="p-3 font-semibold text-right">Recaudado</th>
+                        <th class="p-3 font-semibold text-right">Efectivo Físico</th>
+                        <th class="p-3 font-semibold text-center">Estado / Arqueo</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-outline-variant/50 text-on-surface">
+                    @if (Model.RecentShifts != null && Model.RecentShifts.Any())
+                    {
+                        foreach (var s in Model.RecentShifts)
+                        {
+                            <tr class="hover:bg-surface-container-low/30 transition-colors">
+                                <td class="p-3 pl-6 font-bold text-primary font-mono">@s.ShiftNumber</td>
+                                <td class="p-3 text-xs">@s.OpenedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")<br /><span class="text-outline">por @s.OpenedByUserName</span></td>
+                                <td class="p-3 text-xs">@(s.ClosedAt.HasValue ? s.ClosedAt.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "En curso")</td>
+                                <td class="p-3 text-right font-mono">S/ @s.InitialAmount.ToString("N2")</td>
+                                <td class="p-3 text-right font-bold text-green-700 font-mono">S/ @s.TotalIncome.ToString("N2")</td>
+                                <td class="p-3 text-right font-mono">@(s.ActualCash.HasValue ? "S/ " + s.ActualCash.Value.ToString("N2") : "--")</td>
+                                <td class="p-3 text-center">
+                                    @if (s.IsOpen)
+                                    {
+                                        <span class="px-2.5 py-0.5 rounded-full bg-green-100 text-green-800 font-bold text-xs">Abierto</span>
+                                    }
+                                    else
+                                    {
+                                        var diff = s.CashDifference;
+                                        if (diff == 0)
+                                        {
+                                            <span class="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-xs" title="Caja cuadrada">Cuadrada</span>
+                                        }
+                                        else if (diff > 0)
+                                        {
+                                            <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs" title="Sobrante">+ S/ @diff.ToString("N2")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 font-bold text-xs" title="Faltante">- S/ @Math.Abs(diff).ToString("N2")</span>
+                                        }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="p-6 text-center text-outline">No hay historial de turnos registrados.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<!-- ======================================================== -->
+<!-- CONTENIDO PESTAÑA 2: CAJA CHICA                           -->
+<!-- ======================================================== -->
+@if (!isGeneral)
+{
+    var account = Model.PettyAccount;
+    decimal pct = account?.ConsumptionPercentage ?? 0m;
+
+    <!-- Ficha de Fondo Fijo de Caja Chica -->
+    <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 shadow-sm mb-6">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                    <h2 class="text-headline-sm font-bold text-on-surface">@account?.Name</h2>
+                </div>
+                <p class="text-body-sm text-on-surface-variant">
+                    Responsable Asignado: <strong>@account?.ResponsiblePerson</strong> • Fondo Asignado: <strong>S/ @account?.TotalFundAmount.ToString("N2")</strong>
+                </p>
+            </div>
+
+            <!-- Botones de Acción de Caja Chica -->
+            <div class="flex items-center gap-2.5 flex-wrap">
+                <button type="button" onclick="openAddPettyExpenseModal()" class="px-4 py-2 bg-primary text-on-primary font-bold text-body-sm rounded-lg flex items-center gap-1.5 shadow-sm hover:bg-primary/90 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                    <span>+ Rendir Gasto</span>
+                </button>
+                <button type="button" onclick="openReplenishPettyModal()" class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-body-sm rounded-lg border border-outline-variant flex items-center gap-1.5 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px] text-green-700">payments</span>
+                    <span>Reponer Fondo</span>
+                </button>
+                <button type="button" onclick="openUpdatePettyFundModal()" class="p-2 bg-surface-container-low hover:bg-surface-container text-outline hover:text-on-surface rounded-lg border border-outline-variant transition-colors cursor-pointer" title="Modificar monto del fondo fijo">
+                    <span class="material-symbols-outlined text-[20px]">settings</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Barra de Estado del Fondo -->
+        <div class="mt-5 space-y-2">
+            <div class="flex items-center justify-between text-body-sm">
+                <div class="flex items-center gap-2">
+                    <span class="text-on-surface-variant font-medium">Consumo del Fondo:</span>
+                    <span class="font-bold text-on-surface">@pct% utilizado</span>
+                </div>
+                <div class="flex items-center gap-4 text-xs font-semibold">
+                    <span class="text-red-700">Gastado: S/ @account?.TotalSpent.ToString("N2")</span>
+                    <span class="text-green-700 font-bold">Disponible: S/ @account?.CurrentBalance.ToString("N2")</span>
+                </div>
+            </div>
+            <div class="w-full h-3 rounded-full bg-surface-container-high overflow-hidden">
+                <div class="h-full rounded-full transition-all duration-500 @(pct > 80 ? "bg-red-500" : (pct > 50 ? "bg-amber-500" : "bg-primary"))" style="width: @pct%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Búsqueda y Filtros de Caja Chica -->
+    <div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm mb-6">
+        <form method="get" asp-action="Cash" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            <input type="hidden" name="tab" value="petty" />
+
+            <div class="md:col-span-5 relative">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+                <input type="text" name="search" value="@Model.SearchTerm" placeholder="Buscar por concepto, proveedor, N° comprobante o responsable..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+            </div>
+
+            <div class="md:col-span-4">
+                <select name="filterType" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                    <option value="" selected="@(string.IsNullOrEmpty(Model.FilterType) || Model.FilterType == "Todos")">Todas las Categorías de Gasto</option>
+                    <option value="Combustible" selected="@(Model.FilterType == "Combustible")">Combustible (Diésel / Gasolina)</option>
+                    <option value="Peajes" selected="@(Model.FilterType == "Peajes")">Peajes Viales</option>
+                    <option value="Alimentación / Refrigerios" selected="@(Model.FilterType == "Alimentación / Refrigerios")">Alimentación / Refrigerios</option>
+                    <option value="Mantenimiento Menor" selected="@(Model.FilterType == "Mantenimiento Menor")">Mantenimiento Menor</option>
+                    <option value="Útiles y Limpieza" selected="@(Model.FilterType == "Útiles y Limpieza")">Útiles y Limpieza</option>
+                    <option value="Otros Gastos Menores" selected="@(Model.FilterType == "Otros Gastos Menores")">Otros Gastos Menores</option>
+                    <option value="Reposición de Fondo" selected="@(Model.FilterType == "Reposición de Fondo")">Reposición de Fondo (+)</option>
+                </select>
+            </div>
+
+            <div class="md:col-span-3 flex items-center gap-2">
+                <button type="submit" class="flex-1 py-2 px-3 bg-primary hover:bg-[#0e5a52] text-on-primary font-bold text-body-sm rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                    <span>Filtrar Gastos</span>
+                </button>
+                @if (!string.IsNullOrWhiteSpace(Model.SearchTerm) || !string.IsNullOrWhiteSpace(Model.FilterType))
+                {
+                    <a href="@Url.Action("Cash", "Admin", new { tab = "petty" })" class="py-2 px-3 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg border border-outline-variant flex items-center justify-center transition-colors cursor-pointer" title="Limpiar filtros">
+                        <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla de Rendiciones y Egresos de Caja Chica -->
+    <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
+        <div class="px-6 py-3.5 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
+                <span class="text-label-md font-bold text-on-surface">
+                    Historial de Gastos y Rendiciones de Caja Chica (Total: @Model.Pagination.TotalItems)
+                </span>
+            </div>
+            <span class="text-xs text-outline font-mono">12 por página</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant text-xs uppercase tracking-wider">
+                        <th class="p-3.5 font-semibold">Fecha / Hora</th>
+                        <th class="p-3.5 font-semibold">Categoría</th>
+                        <th class="p-3.5 font-semibold">Comprobante</th>
+                        <th class="p-3.5 font-semibold">Proveedor</th>
+                        <th class="p-3.5 font-semibold">Concepto Detallado</th>
+                        <th class="p-3.5 font-semibold">Solicitante</th>
+                        <th class="p-3.5 font-semibold text-right">Monto (S/)</th>
+                    </tr>
+                </thead>
+                <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50">
+                    @if (Model.PagedMovements != null && Model.PagedMovements.Any())
+                    {
+                        foreach (var m in Model.PagedMovements)
+                        {
+                            bool isReplenish = m.MovementType == "Reposicion";
+                            <tr class="hover:bg-surface-container-low/40 transition-colors">
+                                <td class="p-3.5 whitespace-nowrap text-xs font-mono text-outline">
+                                    @m.RegisteredAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                </td>
+                                <td class="p-3.5 whitespace-nowrap">
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold @(isReplenish ? "bg-green-100 text-green-800" : "bg-surface-container text-on-surface-variant border border-outline-variant/60")">
+                                        @m.ExpenseCategory
+                                    </span>
+                                </td>
+                                <td class="p-3.5 whitespace-nowrap text-xs font-mono">
+                                    <div class="font-bold text-on-surface">@m.VoucherType</div>
+                                    <div class="text-outline">@(m.VoucherNumber ?? "S/N")</div>
+                                </td>
+                                <td class="p-3.5 text-body-sm font-semibold text-on-surface">
+                                    @(m.Supplier ?? "Comercio Local")
+                                </td>
+                                <td class="p-3.5 text-body-sm text-on-surface-variant max-w-sm">
+                                    @m.Concept
+                                </td>
+                                <td class="p-3.5 whitespace-nowrap text-xs text-outline font-medium">
+                                    @m.ResponsiblePerson
+                                </td>
+                                <td class="p-3.5 text-right whitespace-nowrap font-extrabold text-body-md @(isReplenish ? "text-green-700" : "text-on-surface")">
+                                    @(isReplenish ? "+ " : "- ") S/ @m.Amount.ToString("N2")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="p-8 text-center text-on-surface-variant">
+                                <span class="material-symbols-outlined text-outline text-4xl block mb-2">description</span>
+                                No hay gastos registrados con los criterios seleccionados.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_AdminPagination" model="Model.Pagination" />
+    </div>
+}
+
+<!-- ======================================================== -->
+<!-- MODAL 1: APERTURA DE TURNO DE CAJA GENERAL               -->
+<!-- ======================================================== -->
+<div id="openShiftModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">key</span>
+                Apertura de Turno de Caja
+            </h3>
+            <button type="button" onclick="closeOpenShiftModal()" class="text-outline hover:text-on-surface">
+                <span class="material-symbols-outlined text-2xl">close</span>
+            </button>
+        </div>
+
+        <form asp-action="OpenCashShift" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Monto Base Inicial en Gaveta (S/) <span class="text-tertiary">*</span></label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-outline">S/</span>
+                    <input type="number" step="0.01" min="0" name="initialAmount" value="300.00" class="w-full pl-9 pr-3 py-2.5 rounded-lg border border-outline-variant bg-surface-bright text-body-md font-bold text-on-surface focus:border-primary outline-none" required />
+                </div>
+                <span class="text-xs text-outline mt-1 block">Efectivo físico disponible para cambio / vuelto inicial.</span>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Observaciones / Notas de Apertura</label>
+                <textarea name="notes" rows="2" placeholder="Ej. Inicio de jornada matutina en counter Jr. 2 de Mayo..." class="w-full p-2.5 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeOpenShiftModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface-variant font-bold text-body-sm hover:bg-surface-container">Cancelar</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 shadow-sm flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[18px]">check</span>
+                    Aperturar Turno
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 2: ARQUEO Y CIERRE DE TURNO                        -->
+<!-- ======================================================== -->
+@if (hasShift)
+{
+    var s = Model.ActiveShift!;
+    <div id="closeShiftModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+        <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-outline-variant">
+            <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <div class="w-10 h-10 rounded-xl bg-tertiary/10 text-tertiary flex items-center justify-center">
+                        <span class="material-symbols-outlined text-2xl">lock_clock</span>
+                    </div>
+                    <div>
+                        <h3 class="text-title-md font-bold text-on-surface">Arqueo y Cierre de Turno</h3>
+                        <span class="text-xs text-outline font-mono">@s.ShiftNumber</span>
+                    </div>
+                </div>
+                <button type="button" onclick="closeCloseShiftModal()" class="text-outline hover:text-on-surface">
+                    <span class="material-symbols-outlined text-2xl">close</span>
+                </button>
+            </div>
+
+            <!-- Resumen de Sistema -->
+            <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/60 space-y-2 mb-4 text-body-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-on-surface-variant">Saldo Inicial Efectivo:</span>
+                    <span class="font-bold text-on-surface font-mono">S/ @s.InitialAmount.ToString("N2")</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-on-surface-variant">Ingresos en Efectivo:</span>
+                    <span class="font-bold text-green-700 font-mono">+ S/ @s.TotalCashIncome.ToString("N2")</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-on-surface-variant">Egresos / Retiros Efectivo:</span>
+                    <span class="font-bold text-red-700 font-mono">- S/ @s.TotalCashExpense.ToString("N2")</span>
+                </div>
+                <div class="border-t border-outline-variant/50 pt-2 flex items-center justify-between font-bold">
+                    <span class="text-on-surface">Efectivo Esperado en Gaveta:</span>
+                    <span class="text-primary font-mono text-title-sm" id="expectedCashVal" data-val="@s.ExpectedCashBalance">S/ @s.ExpectedCashBalance.ToString("N2")</span>
+                </div>
+                <div class="text-[11px] text-outline pt-1">
+                    * Pagos Digitales (Yape/Plin/Tarjetas/Transferencias): S/ @s.TotalDigitalIncome.ToString("N2") (Auditados en cuentas bancarias)
+                </div>
+            </div>
+
+            <form asp-action="CloseCashShift" method="post" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="shiftId" value="@s.Id" />
+
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Conteo Físico Real en Gaveta (S/) <span class="text-tertiary">*</span></label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-outline">S/</span>
+                        <input type="number" step="0.01" min="0" name="actualCash" id="inputActualCash" value="@s.ExpectedCashBalance.ToString("0.00")" oninput="calculateDifference()" class="w-full pl-9 pr-3 py-2.5 rounded-lg border-2 border-primary/50 bg-surface-bright text-body-md font-bold text-on-surface focus:border-primary outline-none" required />
+                    </div>
+                </div>
+
+                <!-- Tarjeta Dinámica de Diferencia -->
+                <div id="diffCard" class="p-3 rounded-lg border text-body-sm font-bold flex items-center justify-between bg-green-50 border-green-200 text-green-800">
+                    <span>Estado del Arqueo:</span>
+                    <span id="diffResultText">Caja Cuadrada (S/ 0.00)</span>
+                </div>
+
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Observaciones Finales de Cierre</label>
+                    <textarea name="notes" rows="2" placeholder="Observaciones sobre diferencias de billetes, depósitos bancarios, etc..." class="w-full p-2.5 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                    <button type="button" onclick="closeCloseShiftModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface-variant font-bold text-body-sm hover:bg-surface-container">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 rounded-lg bg-tertiary text-on-tertiary font-bold text-body-sm hover:bg-tertiary/90 shadow-sm flex items-center gap-1.5" onclick="return confirm('¿Confirmas el arqueo físico y el cierre definitivo de este turno de caja?')">
+                        <span class="material-symbols-outlined text-[18px]">lock</span>
+                        Confirmar Cierre de Turno
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<!-- ======================================================== -->
+<!-- MODAL 3: REGISTRAR MOVIMIENTO EN CAJA GENERAL            -->
+<!-- ======================================================== -->
+@if (hasShift)
+{
+    <div id="addTransactionModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+        <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+            <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+                <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">add_circle</span>
+                    Registrar Movimiento en Turno
+                </h3>
+                <button type="button" onclick="closeAddTransactionModal()" class="text-outline hover:text-on-surface">
+                    <span class="material-symbols-outlined text-2xl">close</span>
+                </button>
+            </div>
+
+            <form asp-action="RegisterCashTransaction" method="post" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="shiftId" value="@Model.ActiveShift!.Id" />
+
+                <!-- Tipo de Movimiento -->
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Tipo de Movimiento <span class="text-tertiary">*</span></label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-outline-variant cursor-pointer hover:bg-surface-container has-[:checked]:bg-green-100 has-[:checked]:border-green-500 has-[:checked]:text-green-900 font-bold text-body-sm">
+                            <input type="radio" name="type" value="Ingreso" checked class="sr-only" />
+                            <span class="material-symbols-outlined text-lg">arrow_downward</span>
+                            Ingreso (+)
+                        </label>
+                        <label class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-outline-variant cursor-pointer hover:bg-surface-container has-[:checked]:bg-red-100 has-[:checked]:border-red-500 has-[:checked]:text-red-900 font-bold text-body-sm">
+                            <input type="radio" name="type" value="Egreso" class="sr-only" />
+                            <span class="material-symbols-outlined text-lg">arrow_upward</span>
+                            Egreso (-)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Categoría -->
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Categoría / Concepto <span class="text-tertiary">*</span></label>
+                    <select name="category" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" required>
+                        <option value="Cobro de Reserva">Cobro de Reserva Turística</option>
+                        <option value="Venta en Mostrador">Venta en Mostrador / Souvenirs / Snacks</option>
+                        <option value="Ingreso Extraordinario">Ingreso Extraordinario / Otros</option>
+                        <option value="Pago a Proveedor">Pago a Proveedor / Servicio Tercero</option>
+                        <option value="Retiro de Efectivo">Retiro de Efectivo / Depósito a Banco</option>
+                        <option value="Devolución">Devolución / Reembolso a Pasajero</option>
+                    </select>
+                </div>
+
+                <!-- Monto y Método -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Monto (S/) <span class="text-tertiary">*</span></label>
+                        <input type="number" step="0.01" min="0.50" name="amount" placeholder="0.00" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-md font-bold text-on-surface focus:border-primary outline-none" required />
+                    </div>
+                    <div>
+                        <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Método de Pago <span class="text-tertiary">*</span></label>
+                        <select name="paymentMethod" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" required>
+                            <option value="Efectivo">Efectivo en Gaveta</option>
+                            <option value="Yape">Billetera Yape</option>
+                            <option value="Plin">Billetera Plin</option>
+                            <option value="Transferencia BCP">Transferencia BCP</option>
+                            <option value="Transferencia BBVA">Transferencia BBVA</option>
+                            <option value="Tarjeta POS">Tarjeta POS Físico</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Referencia -->
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">N° Operación / Recibo / Reserva</label>
+                    <input type="text" name="referenceCode" placeholder="Ej. OPE-849102 o RES-4120" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" />
+                </div>
+
+                <!-- Descripción -->
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Descripción del Movimiento <span class="text-tertiary">*</span></label>
+                    <input type="text" name="description" placeholder="Ej. Cobro adicional por recojo en hotel..." class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" required />
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                    <button type="button" onclick="closeAddTransactionModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface-variant font-bold text-body-sm hover:bg-surface-container">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 shadow-sm flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px]">save</span>
+                        Guardar Movimiento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<!-- ======================================================== -->
+<!-- MODAL 4: REGISTRAR GASTO DE CAJA CHICA                   -->
+<!-- ======================================================== -->
+<div id="addPettyExpenseModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-600">receipt_long</span>
+                Rendir Gasto de Caja Chica
+            </h3>
+            <button type="button" onclick="closeAddPettyExpenseModal()" class="text-outline hover:text-on-surface">
+                <span class="material-symbols-outlined text-2xl">close</span>
+            </button>
+        </div>
+
+        <form asp-action="RegisterPettyCashExpense" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="accountId" value="@Model.PettyAccount?.Id" />
+
+            <!-- Categoría y Comprobante -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Categoría de Gasto <span class="text-tertiary">*</span></label>
+                    <select name="expenseCategory" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" required>
+                        <option value="Combustible">Combustible (Diésel/Gasolina)</option>
+                        <option value="Peajes">Peajes Viales</option>
+                        <option value="Alimentación / Refrigerios">Alimentación / Refrigerios</option>
+                        <option value="Mantenimiento Menor">Mantenimiento Menor Vehicular</option>
+                        <option value="Útiles y Limpieza">Útiles de Oficina y Limpieza</option>
+                        <option value="Otros Gastos Menores">Otros Gastos Menores</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Tipo Comprobante <span class="text-tertiary">*</span></label>
+                    <select name="voucherType" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" required>
+                        <option value="Boleta">Boleta de Venta</option>
+                        <option value="Factura">Factura Comercial</option>
+                        <option value="Recibo por Honorarios">Recibo por Honorarios</option>
+                        <option value="Vale Provisional">Vale Provisional / Ticket</option>
+                        <option value="Declaración Jurada">Declaración Jurada</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- N° Comprobante y Proveedor -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">N° Comprobante / Serie</label>
+                    <input type="text" name="voucherNumber" placeholder="Ej. B001-004812" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" />
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Proveedor / Comercio</label>
+                    <input type="text" name="supplier" placeholder="Ej. Grifo Primax Cajamarca" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" />
+                </div>
+            </div>
+
+            <!-- Monto y Solicitante -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Monto Pagado (S/) <span class="text-tertiary">*</span></label>
+                    <input type="number" step="0.01" min="0.50" max="@(Model.PettyAccount?.CurrentBalance ?? 1000)" name="amount" placeholder="0.00" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-md font-bold text-on-surface focus:border-primary outline-none" required />
+                    <span class="text-[11px] text-outline mt-0.5 block">Disponible: S/ @(Model.PettyAccount?.CurrentBalance.ToString("N2") ?? "0.00")</span>
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Solicitante / Responsable <span class="text-tertiary">*</span></label>
+                    <input type="text" name="responsiblePerson" placeholder="Ej. Conductor / Guía / Asistente" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" required />
+                </div>
+            </div>
+
+            <!-- Concepto Detallado -->
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Concepto Detallado del Gasto <span class="text-tertiary">*</span></label>
+                <textarea name="concept" rows="2" placeholder="Ej. Compra de bidón de agua y refrigerios para tour Porcón..." class="w-full p-2.5 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" required></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeAddPettyExpenseModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface-variant font-bold text-body-sm hover:bg-surface-container">Cancelar</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 shadow-sm flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[18px]">check</span>
+                    Rendir Gasto
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 5: REPOSICIÓN DE FONDO DE CAJA CHICA                -->
+<!-- ======================================================== -->
+<div id="replenishPettyModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-green-700">payments</span>
+                Reponer Fondo de Caja Chica
+            </h3>
+            <button type="button" onclick="closeReplenishPettyModal()" class="text-outline hover:text-on-surface">
+                <span class="material-symbols-outlined text-2xl">close</span>
+            </button>
+        </div>
+
+        <form asp-action="ReplenishPettyCash" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="accountId" value="@Model.PettyAccount?.Id" />
+
+            <div class="bg-surface-container-low p-3 rounded-xl border border-outline-variant/60 text-body-sm">
+                <div class="flex justify-between">
+                    <span class="text-outline">Fondo Fijo Asignado:</span>
+                    <span class="font-bold">S/ @(Model.PettyAccount?.TotalFundAmount.ToString("N2") ?? "0.00")</span>
+                </div>
+                <div class="flex justify-between mt-1">
+                    <span class="text-outline">Total Gastado Pendiente:</span>
+                    <span class="font-bold text-red-700">S/ @(Model.PettyAccount?.TotalSpent.ToString("N2") ?? "0.00")</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Monto a Reponer (S/) <span class="text-tertiary">*</span></label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-outline">S/</span>
+                    <input type="number" step="0.01" min="1" name="amount" value="@(Model.PettyAccount?.TotalSpent.ToString("0.00") ?? "100.00")" class="w-full pl-9 pr-3 py-2.5 rounded-lg border border-outline-variant bg-surface-bright text-body-md font-bold text-on-surface focus:border-primary outline-none" required />
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Concepto de Reposición</label>
+                <input type="text" name="concept" value="Reembolso de gastos menores de Caja Chica" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" />
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeReplenishPettyModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface-variant font-bold text-body-sm hover:bg-surface-container">Cancelar</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-green-700 text-white font-bold text-body-sm hover:bg-green-800 shadow-sm flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[18px]">payments</span>
+                    Abonar Reposición
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 6: AJUSTAR LÍMITE DE FONDO FIJO                     -->
+<!-- ======================================================== -->
+<div id="updatePettyFundModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-outline">settings</span>
+                Modificar Fondo Fijo de Caja Chica
+            </h3>
+            <button type="button" onclick="closeUpdatePettyFundModal()" class="text-outline hover:text-on-surface">
+                <span class="material-symbols-outlined text-2xl">close</span>
+            </button>
+        </div>
+
+        <form asp-action="UpdatePettyCashFund" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="accountId" value="@Model.PettyAccount?.Id" />
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Nuevo Monto Límite de Fondo Fijo (S/) <span class="text-tertiary">*</span></label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-outline">S/</span>
+                    <input type="number" step="10" min="100" name="newFundAmount" value="@(Model.PettyAccount?.TotalFundAmount.ToString("0.00") ?? "4220.00")" class="w-full pl-9 pr-3 py-2.5 rounded-lg border border-outline-variant bg-surface-bright text-body-md font-bold text-on-surface focus:border-primary outline-none" required />
+                </div>
+                <span class="text-xs text-outline mt-1 block">Establece el tope máximo asignado para los gastos operativos menores.</span>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeUpdatePettyFundModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface-variant font-bold text-body-sm hover:bg-surface-container">Cancelar</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 shadow-sm">
+                    Guardar Nuevo Límite
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- SCRIPTS DE CONTROL DE INTERFAZ Y MODALES                 -->
+<!-- ======================================================== -->
+<script>
+    function openOpenShiftModal() {
+        document.getElementById('openShiftModal')?.classList.remove('hidden');
+    }
+    function closeOpenShiftModal() {
+        document.getElementById('openShiftModal')?.classList.add('hidden');
+    }
+
+    function openCloseShiftModal() {
+        document.getElementById('closeShiftModal')?.classList.remove('hidden');
+        calculateDifference();
+    }
+    function closeCloseShiftModal() {
+        document.getElementById('closeShiftModal')?.classList.add('hidden');
+    }
+
+    function openAddTransactionModal() {
+        document.getElementById('addTransactionModal')?.classList.remove('hidden');
+    }
+    function closeAddTransactionModal() {
+        document.getElementById('addTransactionModal')?.classList.add('hidden');
+    }
+
+    function openAddPettyExpenseModal() {
+        document.getElementById('addPettyExpenseModal')?.classList.remove('hidden');
+    }
+    function closeAddPettyExpenseModal() {
+        document.getElementById('addPettyExpenseModal')?.classList.add('hidden');
+    }
+
+    function openReplenishPettyModal() {
+        document.getElementById('replenishPettyModal')?.classList.remove('hidden');
+    }
+    function closeReplenishPettyModal() {
+        document.getElementById('replenishPettyModal')?.classList.add('hidden');
+    }
+
+    function openUpdatePettyFundModal() {
+        document.getElementById('updatePettyFundModal')?.classList.remove('hidden');
+    }
+    function closeUpdatePettyFundModal() {
+        document.getElementById('updatePettyFundModal')?.classList.add('hidden');
+    }
+
+    function calculateDifference() {
+        const expEl = document.getElementById('expectedCashVal');
+        const inputEl = document.getElementById('inputActualCash');
+        const diffCard = document.getElementById('diffCard');
+        const diffText = document.getElementById('diffResultText');
+
+        if (!expEl || !inputEl || !diffCard || !diffText) return;
+
+        const expected = parseFloat(expEl.getAttribute('data-val') || '0');
+        const actual = parseFloat(inputEl.value || '0');
+        const diff = actual - expected;
+
+        if (Math.abs(diff) < 0.01) {
+            diffCard.className = 'p-3 rounded-lg border text-body-sm font-bold flex items-center justify-between bg-green-50 border-green-200 text-green-800';
+            diffText.innerText = 'Caja Cuadrada Perfectamente (S/ 0.00)';
+        } else if (diff > 0) {
+            diffCard.className = 'p-3 rounded-lg border text-body-sm font-bold flex items-center justify-between bg-amber-50 border-amber-200 text-amber-800';
+            diffText.innerText = `Sobrante en Efectivo: + S/ ${diff.toFixed(2)}`;
+        } else {
+            diffCard.className = 'p-3 rounded-lg border text-body-sm font-bold flex items-center justify-between bg-red-50 border-red-200 text-red-800';
+            diffText.innerText = `Faltante en Efectivo: - S/ ${Math.abs(diff).toFixed(2)}`;
+        }
+    }
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeOpenShiftModal();
+            closeCloseShiftModal();
+            closeAddTransactionModal();
+            closeAddPettyExpenseModal();
+            closeReplenishPettyModal();
+            closeUpdatePettyFundModal();
+        }
+    });
+</script>

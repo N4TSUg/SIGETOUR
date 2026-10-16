@@ -183,6 +183,165 @@ using (var scope = app.Services.CreateScope())
     }
     catch { }
 
+    try
+    {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""CashRegisterShifts"" (
+                ""Id"" uuid NOT NULL PRIMARY KEY,
+                ""ShiftNumber"" text NOT NULL DEFAULT '',
+                ""OpenedByUserName"" text NOT NULL DEFAULT '',
+                ""OpenedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ""InitialAmount"" numeric NOT NULL DEFAULT 0,
+                ""ClosedByUserName"" text,
+                ""ClosedAt"" timestamp with time zone,
+                ""IsOpen"" boolean NOT NULL DEFAULT true,
+                ""ActualCash"" numeric,
+                ""Notes"" text
+            );
+
+            CREATE TABLE IF NOT EXISTS ""CashTransactions"" (
+                ""Id"" uuid NOT NULL PRIMARY KEY,
+                ""ShiftId"" uuid NOT NULL REFERENCES ""CashRegisterShifts""(""Id"") ON DELETE CASCADE,
+                ""TransactionType"" text NOT NULL DEFAULT 'Ingreso',
+                ""Category"" text NOT NULL DEFAULT 'Cobro de Reserva',
+                ""Amount"" numeric NOT NULL DEFAULT 0,
+                ""PaymentMethod"" text NOT NULL DEFAULT 'Efectivo',
+                ""ReferenceCode"" text,
+                ""BookingId"" uuid REFERENCES ""Bookings""(""Id"") ON DELETE SET NULL,
+                ""Description"" text NOT NULL DEFAULT '',
+                ""RegisteredBy"" text NOT NULL DEFAULT '',
+                ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS ""PettyCashAccounts"" (
+                ""Id"" uuid NOT NULL PRIMARY KEY,
+                ""Name"" text NOT NULL DEFAULT 'Caja Chica Principal - Oficina Cajamarca',
+                ""TotalFundAmount"" numeric NOT NULL DEFAULT 4220.00,
+                ""ResponsiblePerson"" text NOT NULL DEFAULT 'Administrador Central',
+                ""IsActive"" boolean NOT NULL DEFAULT true,
+                ""LastReplenishedAt"" timestamp with time zone
+            );
+
+            CREATE TABLE IF NOT EXISTS ""PettyCashMovements"" (
+                ""Id"" uuid NOT NULL PRIMARY KEY,
+                ""AccountId"" uuid NOT NULL REFERENCES ""PettyCashAccounts""(""Id"") ON DELETE CASCADE,
+                ""MovementType"" text NOT NULL DEFAULT 'Egreso',
+                ""ExpenseCategory"" text NOT NULL DEFAULT 'Combustible',
+                ""VoucherType"" text NOT NULL DEFAULT 'Boleta',
+                ""VoucherNumber"" text,
+                ""Supplier"" text,
+                ""Amount"" numeric NOT NULL DEFAULT 0,
+                ""ResponsiblePerson"" text NOT NULL DEFAULT '',
+                ""Concept"" text NOT NULL DEFAULT '',
+                ""RegisteredAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+        ");
+    }
+    catch { }
+
+    try
+    {
+        if (!db.PettyCashAccounts.Any())
+        {
+            var petty = new SIGETOUR.API.Core.Entities.PettyCashAccount
+            {
+                Id = Guid.NewGuid(),
+                Name = "Caja Chica Principal - Oficina Cajamarca",
+                TotalFundAmount = 4220.00m,
+                ResponsiblePerson = "Administrador Central",
+                IsActive = true,
+                LastReplenishedAt = DateTime.UtcNow.AddDays(-2)
+            };
+
+            petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
+            {
+                Id = Guid.NewGuid(),
+                AccountId = petty.Id,
+                MovementType = "Egreso",
+                ExpenseCategory = "Combustible",
+                VoucherType = "Factura",
+                VoucherNumber = "F001-002891",
+                Supplier = "Repsol Cajamarca Norte",
+                Amount = 140.00m,
+                ResponsiblePerson = "Juan Carlos Rojas (Conductor)",
+                Concept = "Abastecimiento Diésel B5 para Van Mercedes T7C-841 ruta Cumbemayo",
+                RegisteredAt = DateTime.UtcNow.AddHours(-18)
+            });
+
+            petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
+            {
+                Id = Guid.NewGuid(),
+                AccountId = petty.Id,
+                MovementType = "Egreso",
+                ExpenseCategory = "Peajes",
+                VoucherType = "Boleta",
+                VoucherNumber = "B012-009182",
+                Supplier = "Concesionaria Vial Sierra Norte",
+                Amount = 24.50m,
+                ResponsiblePerson = "Juan Carlos Rojas",
+                Concept = "Pago Peaje ida y vuelta Circuito Porcón",
+                RegisteredAt = DateTime.UtcNow.AddHours(-14)
+            });
+
+            petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
+            {
+                Id = Guid.NewGuid(),
+                AccountId = petty.Id,
+                MovementType = "Egreso",
+                ExpenseCategory = "Alimentación / Refrigerios",
+                VoucherType = "Boleta",
+                VoucherNumber = "B002-004120",
+                Supplier = "Panadería San Antonio Cajamarca",
+                Amount = 65.00m,
+                ResponsiblePerson = "Guía Oficial Chilón",
+                Concept = "Refrigerios y aguas minerales para pasajeros de salida especial",
+                RegisteredAt = DateTime.UtcNow.AddHours(-6)
+            });
+
+            db.PettyCashAccounts.Add(petty);
+            db.SaveChanges();
+        }
+
+        if (!db.CashRegisterShifts.Any())
+        {
+            var todayStr = DateTime.UtcNow.ToString("yyyyMMdd");
+            var shift = new SIGETOUR.API.Core.Entities.CashRegisterShift
+            {
+                Id = Guid.NewGuid(),
+                ShiftNumber = $"CJ-{todayStr}-01",
+                OpenedByUserName = "Admin Central",
+                OpenedAt = DateTime.UtcNow.Date.AddHours(7),
+                InitialAmount = 300.00m,
+                IsOpen = true,
+                Notes = "Apertura de turno matutino para cobro en counter y pasarela online"
+            };
+
+            var confirmedBookings = db.Bookings.Where(b => b.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed).Take(5).ToList();
+            foreach (var b in confirmedBookings)
+            {
+                string pMethod = !string.IsNullOrWhiteSpace(b.PaymentMethod) ? b.PaymentMethod : "Efectivo";
+                shift.Transactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    ShiftId = shift.Id,
+                    TransactionType = "Ingreso",
+                    Category = "Cobro de Reserva",
+                    Amount = b.TotalAmount,
+                    PaymentMethod = pMethod,
+                    ReferenceCode = b.ReferenceCode,
+                    BookingId = b.Id,
+                    Description = $"Cobro por reserva de {b.CustomerName} - Tour con {b.TotalPassengers} pasajero(s)",
+                    RegisteredBy = "Sistema / Counter",
+                    CreatedAt = b.BookingDate
+                });
+            }
+
+            db.CashRegisterShifts.Add(shift);
+            db.SaveChanges();
+        }
+    }
+    catch { }
+
     SIGETOUR.API.Infrastructure.Data.IdentitySeeder.SeedUsersAndRolesAsync(scope.ServiceProvider).Wait();
 }
 

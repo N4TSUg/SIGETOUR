@@ -172,13 +172,13 @@
 <!-- Trailing Actions Cluster -->
 <div class="flex items-center gap-space-sm">
 <!-- Caja Chica Quick Button -->
-<div class="flex items-center gap-space-xs bg-primary/10 border border-primary/20 px-space-md py-1.5 rounded-lg text-primary">
+<a asp-controller="Admin" asp-action="Cash" asp-route-tab="petty" class="flex items-center gap-space-xs bg-primary/10 hover:bg-primary/20 border border-primary/20 px-space-md py-1.5 rounded-lg text-primary transition-all cursor-pointer" title="Ver Módulo de Caja Chica">
 <span class="material-symbols-outlined text-[20px]">point_of_sale</span>
 <div class="flex flex-col text-left">
 <span class="text-label-sm font-label-sm leading-none text-primary font-bold">Caja Chica</span>
-<span class="text-body-sm font-body-sm leading-tight text-on-surface font-semibold">S/ 4,220.00</span>
+<span class="text-body-sm font-body-sm leading-tight text-on-surface font-semibold">Fondo Fijo</span>
 </div>
-</div>
+</a>
 <!-- Notifications -->
 <button class="relative p-2 rounded-lg text-on-surface-variant hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-200 active:scale-95" title="Notificaciones">
 <span class="material-symbols-outlined text-[22px]">notifications</span>
@@ -226,6 +226,7 @@
     var featuredClass = action == "Featured" || action == "EditFeatured" ? activeClass : inactiveClass;
     var fleetClass = action == "Fleet" || action == "EditVehicle" ? activeClass : inactiveClass;
     var bookingsClass = action == "Bookings" || action == "EditBooking" ? activeClass : inactiveClass;
+    var cashClass = action == "Cash" ? activeClass : inactiveClass;
     var usersClass = action == "Users" ? activeClass : inactiveClass;
 }
   <!-- Navigation Tabs -->
@@ -261,6 +262,11 @@
   <span class="">Despacho</span>
   </a>
 <!-- Item 5: Caja y Finanzas -->
+  <a class="@cashClass" asp-controller="Admin" asp-action="Cash">
+  <span class="material-symbols-outlined text-[20px]">point_of_sale</span>
+  <span class="">Caja y Finanzas</span>
+  </a>
+<!-- Item 6: Usuarios y Roles -->
   <a class="@usersClass" asp-controller="Admin" asp-action="Users">
   <span class="material-symbols-outlined text-[20px]">group</span>
   <span class="">Usuarios y Roles</span>
