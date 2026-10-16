@@ -32,8 +32,16 @@ namespace SIGETOUR.API.Controllers.UI
                 
             ViewBag.FeaturedPackages = featured;
 
+            var vehicles = await _context.Vehicles
+                .Include(v => v.Images)
+                .Where(v => v.Status != "Baja Operativa")
+                .OrderByDescending(v => v.SeatCapacity)
+                .Take(4)
+                .ToListAsync();
+
+            ViewBag.Vehicles = vehicles;
+
             return View(tours);
         }
     }
 }
-

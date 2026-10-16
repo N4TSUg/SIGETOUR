@@ -265,50 +265,74 @@
       Unidades de <strong class="text-secondary font-semibold">TURISMO CHILON</strong> inspeccionadas periódicamente para garantizar desplazamientos seguros por toda la región Cajamarca.
     </p>
 </div>
+@{
+    var homeVehicles = ViewBag.Vehicles as IEnumerable<SIGETOUR.API.Core.Entities.Vehicle>;
+}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-<!-- Fleet Item 1 -->
-<div class="bg-white rounded-2xl border border-outline-variant shadow-sm p-6 flex flex-col md:flex-row gap-6 items-center">
-<div class="w-full md:w-1/2 h-56 rounded-xl overflow-hidden shrink-0">
-<img class="w-full h-full object-cover" data-alt="Mercedes Benz Sprinter tourist passenger van" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBC7BURpMqQ-hvVEt2bVvyXxDCGvmpK4jG1ehi1_9kro4AkrvV1FfAxmEdjKo07xbC5DhKpbe7O5wgme9RYw1M0BebEH-HTct2kvj4xkod1WccZqovwLmRq7W6JIBPN7wAeQjiYYyJp5aesWP1H0LW13piJexwt2P_flgPZYtgDB4MaGvCoapl_VT0ChWDjYnbINExV4l_60pgGfuL5aaMwVfh31dswF5ICihupM-VaqXK5M0mzyfErNw">
-</div>
-<div class="space-y-3">
-<div class="flex items-center justify-between">
-<span class="text-xs px-2.5 py-0.5 rounded-full bg-surface-container text-secondary font-bold">15 - 19 Pasajeros</span>
-<span class="text-xs text-on-surface-variant font-medium">Año 2024</span>
-</div>
-<h3 class="text-lg font-bold text-secondary">Mercedes-Benz Sprinter Tour</h3>
-<p class="text-xs text-on-surface-variant leading-relaxed">
-          Ideal para circuitos compartidos y delegaciones. Asientos altos reclinables con cinturones de seguridad certificados.
-        </p>
-<div class="grid grid-cols-2 gap-2 text-xs text-on-surface-variant pt-2">
-<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="ac_unit">ac_unit</span> Climatizado</span>
-<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="usb">usb</span> Puertos USB</span>
-<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="medical_services">medical_services</span> Botiquín/Oxígeno</span>
-<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="luggage">luggage</span> Maletero Amplio</span>
-</div>
-</div>
-</div>
-<!-- Fleet Item 2 -->
-<div class="bg-white rounded-2xl border border-outline-variant shadow-sm p-6 flex flex-col md:flex-row gap-6 items-center">
-<div class="w-full md:w-1/2 h-56 rounded-xl overflow-hidden shrink-0">
-<img class="w-full h-full object-cover" data-alt="Toyota HiAce Commuter VIP minivan" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB75Is5JazVkkNYTGVxNNn99nKpbZ2C9nhdKkd3T6PZpiyXToJgnzeXFivDxt3XRm1L0r9lpY-tSZlskG6V4jR8_R2xUJJL9isZg-jqdPqBDX3cQMI25p0VT1t3jTwkqm9ogwYmYPXdI_80JioeTNp59QwEJLr6sbIvf_xKs7GiLj8Ay-ZnL8fw8YERwb-cDSHHGM9vPDnbdhfpcIQLFu_Im0l9V4dX9SgfntQLQqwNOlsvjz50yZDiJA">
-</div>
-<div class="space-y-3">
-<div class="flex items-center justify-between">
-<span class="text-xs px-2.5 py-0.5 rounded-full bg-surface-container text-primary font-bold">8 - 11 Pasajeros</span>
-<span class="text-xs text-on-surface-variant font-medium">Servicio Privado VIP</span>
-</div>
-<h3 class="text-lg font-bold text-secondary">Toyota HiAce Gran Commuter</h3>
-<p class="text-xs text-on-surface-variant leading-relaxed">
-          Diseñada para familias, ejecutivos y traslados privados puerta a puerta hacia o desde el Aeropuerto de Cajamarca.
-        </p>
-<div class="grid grid-cols-2 gap-2 text-xs text-on-surface-variant pt-2">
-<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="wifi">wifi</span> Conexión Wi-Fi</span>
-<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="airline_seat_recline_extra">airline_seat_recline_extra</span> Asientos VIP</span>
-<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="volume_up">volume_up</span> Audio Turístico</span>
-<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="verified_user">verified_user</span> Seguridad SOAT</span>
-</div>
-</div>
+  @if (homeVehicles != null && homeVehicles.Any())
+  {
+      foreach (var v in homeVehicles)
+      {
+          var cover = v.Images?.FirstOrDefault(i => i.IsCover) ?? v.Images?.FirstOrDefault();
+          <div class="bg-white rounded-2xl border border-outline-variant shadow-sm p-6 flex flex-col md:flex-row gap-6 items-center hover:border-primary/50 transition-all group">
+            <div class="w-full md:w-1/2 h-56 rounded-xl overflow-hidden shrink-0 bg-surface-container-low relative">
+              @if (cover != null && !string.IsNullOrEmpty(cover.ImageUrl))
+              {
+                  <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                       src="@cover.ImageUrl" 
+                       alt="@v.Model" />
+              }
+              else
+              {
+                  <div class="w-full h-full flex flex-col items-center justify-center text-outline">
+                    <span class="material-symbols-outlined text-5xl text-primary/40 mb-1">directions_bus</span>
+                    <span class="text-xs font-semibold">Turismo Chilón</span>
+                  </div>
+              }
+              <span class="absolute bottom-2 left-2 bg-inverse-surface/85 backdrop-blur font-mono text-[11px] font-bold text-white px-2 py-0.5 rounded">
+                @v.LicensePlate
+              </span>
+            </div>
+            <div class="space-y-3 w-full">
+              <div class="flex items-center justify-between">
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-surface-container text-secondary font-bold">
+                  @v.SeatCapacity Pasajeros
+                </span>
+                <span class="text-xs text-on-surface-variant font-medium">Año @v.ManufactureYear</span>
+              </div>
+              <h3 class="text-lg font-bold text-secondary group-hover:text-primary transition-colors">
+                @v.Model
+              </h3>
+              <p class="text-xs text-on-surface-variant leading-relaxed line-clamp-2">
+                @(string.IsNullOrEmpty(v.Category) ? "Unidad oficial para circuitos turísticos y traslados privados en Cajamarca." : v.Category)
+              </p>
+              <div class="grid grid-cols-2 gap-2 text-xs text-on-surface-variant pt-2 border-t border-outline-variant/60">
+                <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="ac_unit">ac_unit</span> Climatizado</span>
+                <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="usb">usb</span> Puertos USB</span>
+                <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="medical_services">medical_services</span> Botiquín/Oxígeno</span>
+                <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px] text-primary" data-icon="luggage">luggage</span> Maletero Amplio</span>
+              </div>
+              <div class="pt-2 flex items-center justify-between">
+                <a asp-controller="Vehicle" asp-action="Details" asp-route-id="@v.Id" class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+                  Ver Ficha y Fotos <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                </a>
+                <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chil%C3%B3n,%20deseo%20cotizar%20el%20veh%C3%ADculo%20@Uri.EscapeDataString(v.Model)%20(Placa%20@Uri.EscapeDataString(v.LicensePlate))%20para%20un%20servicio%20privado"
+                   target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center gap-1 text-xs font-bold text-[#25D366] hover:underline">
+                  <span class="material-symbols-outlined text-[15px]">chat</span> Cotizar Privado
+                </a>
+              </div>
+            </div>
+          </div>
+      }
+  }
+  else
+  {
+      <div class="col-span-full py-8 text-center text-on-surface-variant">
+        <span class="material-symbols-outlined text-4xl mb-2 text-outline">directions_bus</span>
+        <p>No hay vehículos registrados para mostrar en este momento.</p>
+      </div>
+  }
 </div>
 <div class="mt-10 text-center">
   <a asp-controller="Vehicle" asp-action="Catalog" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-md transition-all hover:scale-102 active:scale-98">

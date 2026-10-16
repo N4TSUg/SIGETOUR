@@ -160,7 +160,7 @@ namespace SIGETOUR.API.Controllers.UI
                     TucNumber = dto.TucNumber,
                     ResolutionNumber = dto.ResolutionNumber,
                     Status = dto.Status,
-                    IsActive = dto.Status == "Operativo en Ruta (En Servicio)",
+                    IsActive = dto.Status != "Baja Operativa",
                     EquipmentJson = dto.EquipmentJson ?? "[]"
                 };
                 _context.Vehicles.Add(vehicle);
@@ -187,7 +187,7 @@ namespace SIGETOUR.API.Controllers.UI
                 vehicle.TucNumber = dto.TucNumber;
                 vehicle.ResolutionNumber = dto.ResolutionNumber;
                 vehicle.Status = dto.Status;
-                vehicle.IsActive = dto.Status == "Operativo en Ruta (En Servicio)";
+                vehicle.IsActive = dto.Status != "Baja Operativa";
                 vehicle.EquipmentJson = dto.EquipmentJson ?? "[]";
                 _context.Vehicles.Update(vehicle);
             }

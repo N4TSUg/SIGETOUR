@@ -27,7 +27,7 @@ namespace SIGETOUR.API.Controllers.UI
         {
             var query = _context.Vehicles
                 .Include(v => v.Images)
-                .Where(v => v.IsActive);
+                .Where(v => v.Status != "Baja Operativa");
 
             if (!string.IsNullOrWhiteSpace(category) && category != "Todos")
             {
@@ -39,7 +39,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .ToListAsync();
 
             var categories = await _context.Vehicles
-                .Where(v => v.IsActive && !string.IsNullOrEmpty(v.Category))
+                .Where(v => v.Status != "Baja Operativa" && !string.IsNullOrEmpty(v.Category))
                 .Select(v => v.Category!)
                 .Distinct()
                 .ToListAsync();
@@ -49,8 +49,8 @@ namespace SIGETOUR.API.Controllers.UI
                 Vehicles = vehicles.Select(MapToDto).ToList(),
                 SelectedCategory = string.IsNullOrWhiteSpace(category) ? "Todos" : category,
                 AvailableCategories = categories,
-                TotalUnits = await _context.Vehicles.CountAsync(),
-                OperationalUnits = await _context.Vehicles.CountAsync(v => v.IsActive)
+                TotalUnits = await _context.Vehicles.CountAsync(v => v.Status != "Baja Operativa"),
+                OperationalUnits = await _context.Vehicles.CountAsync(v => v.Status != "Baja Operativa")
             };
 
             return View(viewModel);
@@ -69,7 +69,7 @@ namespace SIGETOUR.API.Controllers.UI
 
             var vehicle = await _context.Vehicles
                 .Include(v => v.Images)
-                .FirstOrDefaultAsync(v => v.Id == id && v.IsActive);
+                .FirstOrDefaultAsync(v => v.Id == id && v.Status != "Baja Operativa");
 
             if (vehicle == null)
             {
@@ -78,7 +78,7 @@ namespace SIGETOUR.API.Controllers.UI
 
             var otherVehicles = await _context.Vehicles
                 .Include(v => v.Images)
-                .Where(v => v.IsActive && v.Id != id)
+                .Where(v => v.Status != "Baja Operativa" && v.Id != id)
                 .Take(3)
                 .ToListAsync();
 

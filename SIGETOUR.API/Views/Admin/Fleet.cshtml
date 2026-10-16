@@ -49,12 +49,20 @@
                             <td class="p-4">@vehicle.Model</td>
                             <td class="p-4">@vehicle.SeatCapacity pasajeros</td>
                             <td class="p-4 text-center">
-                                @if (vehicle.IsActive) {
-                                    <span class="inline-flex items-center gap-1 text-primary bg-primary-container px-2 py-1 rounded-full font-label-sm">
+                                @if (vehicle.Status == "Operativo en Ruta (En Servicio)") {
+                                    <span class="inline-flex items-center gap-1 text-primary bg-primary-container/20 text-primary px-2.5 py-1 rounded-full font-label-sm font-bold">
                                         <span class="material-symbols-outlined text-[14px]">check_circle</span> Operativo
                                     </span>
+                                } else if (vehicle.Status == "En Espera / Terminal") {
+                                    <span class="inline-flex items-center gap-1 text-[#0284c7] bg-[#e0f2fe] px-2.5 py-1 rounded-full font-label-sm font-bold">
+                                        <span class="material-symbols-outlined text-[14px]">store</span> En Espera / Terminal
+                                    </span>
+                                } else if (vehicle.Status == "En Mantenimiento Preventivo") {
+                                    <span class="inline-flex items-center gap-1 text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full font-label-sm font-bold">
+                                        <span class="material-symbols-outlined text-[14px]">build</span> Mantenimiento
+                                    </span>
                                 } else {
-                                    <span class="inline-flex items-center gap-1 text-error bg-error-container px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-error bg-error-container px-2.5 py-1 rounded-full font-label-sm font-bold">
                                         <span class="material-symbols-outlined text-[14px]">cancel</span> @vehicle.Status
                                     </span>
                                 }
