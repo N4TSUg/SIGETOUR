@@ -1,0 +1,299 @@
+@model SIGETOUR.API.Models.VehicleCatalogViewModel
+@{
+    ViewData["Title"] = "Flota Turística Certificada en Cajamarca | Turismo Chilón";
+    Layout = "_Layout";
+}
+
+<main class="min-h-screen bg-background">
+  <!-- BREADCRUMB -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+    <nav class="flex items-center text-label-md text-secondary space-x-2">
+      <a class="hover:text-primary transition-colors flex items-center gap-1 font-medium" asp-controller="Home" asp-action="Index">
+        <span class="material-symbols-outlined text-[16px]">home</span>
+        <span>Inicio</span>
+      </a>
+      <span class="material-symbols-outlined text-outline-variant text-[14px]">chevron_right</span>
+      <span class="text-primary font-bold">Flota Turística Oficial</span>
+    </nav>
+  </div>
+
+  <!-- HERO SECTION -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+    <div class="relative rounded-3xl overflow-hidden bg-gradient-to-r from-secondary via-[#0a4843] to-primary p-8 md:p-12 text-white shadow-xl">
+      <!-- Glow effects -->
+      <div class="absolute -right-16 -top-16 w-80 h-80 bg-primary-light/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -left-16 -bottom-16 w-72 h-72 bg-accent-red/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="relative z-10 max-w-3xl space-y-4">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-primary-fixed text-xs font-bold uppercase tracking-wider border border-white/15">
+          <span class="w-2 h-2 rounded-full bg-accent-red animate-pulse"></span>
+          <span>Transporte Turístico Homologado • MTC & DIRCETUR</span>
+        </div>
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight text-white">
+          Nuestra Flota Moderna y Confortable
+        </h1>
+        <p class="text-base sm:text-lg text-surface-container-high/90 leading-relaxed">
+          Vehículos inspeccionados y mantenidos rigurosamente para garantizar traslados seguros y confortables en las rutas andinas de Cajamarca. Disponibles para circuitos compartidos y servicios 100% privados.
+        </p>
+        
+        <!-- Highlights Pills -->
+        <div class="flex flex-wrap items-center gap-3 pt-3 text-xs font-semibold text-primary-fixed">
+          <span class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+            <span class="material-symbols-outlined text-[17px] text-accent-red">verified_user</span> SOAT Turístico Vigente
+          </span>
+          <span class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+            <span class="material-symbols-outlined text-[17px] text-primary-fixed">ac_unit</span> Aire Acondicionado
+          </span>
+          <span class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+            <span class="material-symbols-outlined text-[17px] text-primary-fixed">airline_seat_recline_extra</span> Asientos VIP Reclinables
+          </span>
+          <span class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+            <span class="material-symbols-outlined text-[17px] text-primary-fixed">medical_services</span> Oxígeno para Altura
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORY FILTER & METRICS BAR -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+    <div class="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 border border-outline-variant shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+      <!-- Filter Buttons -->
+      <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <a asp-action="Catalog" asp-route-category="Todos"
+           class="px-4 py-2 rounded-xl text-xs font-bold transition-all @(Model.SelectedCategory == "Todos" ? "bg-primary text-white shadow-sm" : "bg-surface-container-low text-secondary hover:bg-surface-container")">
+          Todas las Unidades (@Model.Vehicles.Count)
+        </a>
+        @foreach (var cat in Model.AvailableCategories)
+        {
+            <a asp-action="Catalog" asp-route-category="@cat"
+               class="px-4 py-2 rounded-xl text-xs font-bold transition-all @(Model.SelectedCategory == cat ? "bg-primary text-white shadow-sm" : "bg-surface-container-low text-secondary hover:bg-surface-container")">
+              @cat
+            </a>
+        }
+      </div>
+
+      <!-- Live Counter -->
+      <div class="flex items-center gap-2 text-xs font-medium text-secondary whitespace-nowrap self-end md:self-center">
+        <span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse"></span>
+        <span>Flota activa en Cajamarca: <strong class="text-primary font-bold">@Model.OperationalUnits unidades</strong></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- VEHICLES GRID -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+    @if (Model.Vehicles != null && Model.Vehicles.Any())
+    {
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          @foreach (var vehicle in Model.Vehicles)
+          {
+              var coverImage = vehicle.ExistingImages.FirstOrDefault(i => i.IsCover) ?? vehicle.ExistingImages.FirstOrDefault();
+              
+              <article class="bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant hover:border-primary/50 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group">
+                <!-- Vehicle Image Container -->
+                <div class="relative h-56 w-full overflow-hidden bg-surface-container-low">
+                  @if (coverImage != null && !string.IsNullOrEmpty(coverImage.ImageUrl))
+                  {
+                      <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                           src="@coverImage.ImageUrl" 
+                           alt="Foto de @vehicle.Model - @vehicle.LicensePlate" 
+                           loading="lazy" />
+                  }
+                  else
+                  {
+                      <div class="w-full h-full flex flex-col items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-5xl mb-1 text-primary/40">directions_bus</span>
+                        <span class="text-xs font-semibold">Turismo Chilón • Flota</span>
+                      </div>
+                  }
+
+                  <!-- Overlay Gradients -->
+                  <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-black/30 pointer-events-none"></div>
+
+                  <!-- Top Badges -->
+                  <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                    <span class="bg-white/95 backdrop-blur-md text-primary font-bold text-xs px-3 py-1 rounded-full shadow-sm">
+                      @(string.IsNullOrEmpty(vehicle.Category) ? "Transporte Turístico" : vehicle.Category)
+                    </span>
+                    <span class="bg-secondary/90 backdrop-blur-md text-white font-bold text-xs px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                      <span class="material-symbols-outlined text-[15px]">airline_seat_recline_normal</span>
+                      <span>@vehicle.SeatCapacity Pasajeros</span>
+                    </span>
+                  </div>
+
+                  <!-- Bottom Tag on Image -->
+                  <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
+                    <span class="bg-inverse-surface/90 backdrop-blur-md font-mono text-xs px-2.5 py-1 rounded-md font-bold tracking-wider border border-white/20">
+                      @vehicle.LicensePlate
+                    </span>
+                    <span class="inline-flex items-center gap-1 text-[11px] font-semibold bg-primary-container text-on-primary-container px-2 py-0.5 rounded-full">
+                      <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                      <span>@vehicle.Status</span>
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Vehicle Info Body -->
+                <div class="p-5 flex flex-col flex-grow space-y-4">
+                  <div>
+                    <div class="flex items-center justify-between text-xs text-on-surface-variant font-medium mb-1">
+                      <span>Año @vehicle.ManufactureYear</span>
+                      <span>@(string.IsNullOrEmpty(vehicle.Color) ? "Color Oficial" : vehicle.Color)</span>
+                    </div>
+                    <h2 class="text-xl font-bold text-secondary group-hover:text-primary transition-colors leading-snug">
+                      @vehicle.Model
+                    </h2>
+                  </div>
+
+                  <!-- Amenities / Equipment Icons -->
+                  <div class="grid grid-cols-2 gap-2 pt-1 pb-2 border-y border-outline-variant/60 text-xs text-on-surface-variant">
+                    <span class="flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[17px] text-primary">ac_unit</span> Climatizado
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[17px] text-primary">airline_seat_recline_extra</span> Asientos VIP
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[17px] text-primary">usb</span> Puertos USB
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[17px] text-primary">medical_services</span> Botiquín/Oxígeno
+                    </span>
+                  </div>
+
+                  <!-- Actions / CTA -->
+                  <div class="pt-2 flex items-center gap-2 mt-auto">
+                    <a asp-action="Details" asp-route-id="@vehicle.Id" 
+                       class="flex-1 py-2.5 px-3 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-xs text-center transition-all duration-150 shadow-sm flex items-center justify-center gap-1.5">
+                      <span>Ver Ficha y Fotos</span>
+                      <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </a>
+                    
+                    <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chil%C3%B3n,%20deseo%20cotizar%20el%20servicio%20privado%20del%20veh%C3%ADculo%20@Uri.EscapeDataString(vehicle.Model)%20(Placa%20@Uri.EscapeDataString(vehicle.LicensePlate))"
+                       target="_blank" rel="noopener noreferrer"
+                       class="p-2.5 rounded-xl bg-[#25D366] hover:bg-[#1ebe5d] text-white transition-all duration-150 shadow-sm flex items-center justify-center"
+                       title="Cotizar por WhatsApp">
+                      <span class="material-symbols-outlined text-[18px]">chat</span>
+                    </a>
+                  </div>
+                </div>
+              </article>
+          }
+        </div>
+    }
+    else
+    {
+        <div class="bg-surface-container-lowest rounded-2xl p-12 text-center border border-outline-variant max-w-xl mx-auto space-y-4">
+          <div class="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center mx-auto text-primary">
+            <span class="material-symbols-outlined text-3xl">directions_bus</span>
+          </div>
+          <h3 class="text-xl font-bold text-secondary">No se encontraron unidades en esta categoría</h3>
+          <p class="text-sm text-on-surface-variant">Prueba seleccionando otra categoría o restablece los filtros para ver la flota completa.</p>
+          <a asp-action="Catalog" asp-route-category="Todos" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-dark transition-all">
+            Ver Todas las Unidades
+          </a>
+        </div>
+    }
+  </section>
+
+  <!-- MODALIDADES DE SERVICIO DE TRANSPORTE -->
+  <section class="py-14 bg-white border-y border-outline-variant/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-10">
+        <span class="text-xs font-bold text-primary uppercase tracking-wider">Modalidades de Transporte</span>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-secondary mt-1">¿Cómo puedes contratar nuestra flota?</h2>
+        <p class="text-sm text-on-surface-variant mt-2">Adaptamos nuestras unidades para cualquier tipo de viaje en Cajamarca y el norte del Perú.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Servicio 1 -->
+        <div class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant shadow-sm space-y-3 hover:border-primary/40 transition-colors">
+          <div class="w-12 h-12 rounded-xl bg-primary-container/20 text-primary flex items-center justify-center">
+            <span class="material-symbols-outlined text-2xl">tour</span>
+          </div>
+          <h3 class="text-lg font-bold text-secondary">Circuitos Turísticos Diarios</h3>
+          <p class="text-xs text-on-surface-variant leading-relaxed">
+            Reserva tus asientos individuales en nuestras salidas diarias a Cumbemayo, Granja Porcón, Baños del Inca, Otuzco y Namora con guía oficial.
+          </p>
+          <a asp-controller="Tour" asp-action="Catalog" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline pt-2">
+            Ver Catálogo de Tours <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+          </a>
+        </div>
+
+        <!-- Servicio 2 -->
+        <div class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant shadow-sm space-y-3 hover:border-primary/40 transition-colors">
+          <div class="w-12 h-12 rounded-xl bg-secondary-container/30 text-secondary flex items-center justify-center">
+            <span class="material-symbols-outlined text-2xl">groups</span>
+          </div>
+          <h3 class="text-lg font-bold text-secondary">Servicio Exclusivo & Familiar</h3>
+          <p class="text-xs text-on-surface-variant leading-relaxed">
+            Unidad completa para tu familia o grupo privado. Salidas a tu propio ritmo, recojo puerta a puerta en tu hotel y paradas fotográficas libres.
+          </p>
+          <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chil%C3%B3n,%20solicito%20cotizaci%C3%B3n%20para%20un%20servicio%20privado" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline pt-2">
+            Cotizar por WhatsApp <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+          </a>
+        </div>
+
+        <!-- Servicio 3 -->
+        <div class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant shadow-sm space-y-3 hover:border-primary/40 transition-colors">
+          <div class="w-12 h-12 rounded-xl bg-accent-red/10 text-accent-red flex items-center justify-center">
+            <span class="material-symbols-outlined text-2xl">flight_takeoff</span>
+          </div>
+          <h3 class="text-lg font-bold text-secondary">Traslados Aeropuerto Caxamarca</h3>
+          <p class="text-xs text-on-surface-variant leading-relaxed">
+            Puntualidad garantizada para vuelos comerciales LATAM y SKY. Chofer en sala de llegadas con asistencia de maletas y traslado directo.
+          </p>
+          <a href="tel:+51901195392" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline pt-2">
+            Llamar al +51 901 195 392 <span class="material-symbols-outlined text-[15px]">call</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GARANTIAS DE SEGURIDAD Y ESTANDARES -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+    <div class="bg-surface-container-low rounded-3xl p-8 md:p-10 border border-outline-variant shadow-sm grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="flex items-start gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
+          <span class="material-symbols-outlined text-[22px]">policy</span>
+        </div>
+        <div>
+          <h4 class="text-sm font-bold text-secondary">SOAT Turístico Nacional</h4>
+          <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">Cobertura total médica para cada pasajero durante todo el viaje.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
+          <span class="material-symbols-outlined text-[22px]">fact_check</span>
+        </div>
+        <div>
+          <h4 class="text-sm font-bold text-secondary">Inspección Técnica CITV</h4>
+          <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">Certificado de inspección técnica vehicular homologado ante el MTC.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
+          <span class="material-symbols-outlined text-[22px]">badge</span>
+        </div>
+        <div>
+          <h4 class="text-sm font-bold text-secondary">Conductores Acreditados</h4>
+          <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">Choferes profesionales expertos en geografía y clima de sierra.</p>
+        </div>
+      </div>
+
+      <div class="flex items-start gap-3.5">
+        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
+          <span class="material-symbols-outlined text-[22px]">cleaning_services</span>
+        </div>
+        <div>
+          <h4 class="text-sm font-bold text-secondary">Higiene y Desinfección</h4>
+          <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">Limpieza profunda y sanitización integral de cabina antes de cada ruta.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>

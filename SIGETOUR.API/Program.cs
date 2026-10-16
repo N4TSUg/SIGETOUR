@@ -85,6 +85,74 @@ using (var scope = app.Services.CreateScope())
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"Status\" text NOT NULL DEFAULT 'Operativo en Ruta (En Servicio)';"); } catch { }
     try { db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS \"VehicleImages\" (\"Id\" uuid NOT NULL PRIMARY KEY, \"VehicleId\" uuid NOT NULL REFERENCES \"Vehicles\"(\"Id\") ON DELETE CASCADE, \"ImageUrl\" text NOT NULL DEFAULT '', \"IsCover\" boolean NOT NULL DEFAULT false);"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""FeaturedPackages"" (""Id"" uuid NOT NULL PRIMARY KEY, ""TourPackageId"" uuid NOT NULL REFERENCES ""TourPackages""(""Id"") ON DELETE CASCADE, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CommercialTitle"" text NOT NULL DEFAULT '', ""CommercialSubtitle"" text NOT NULL DEFAULT '', ""PromoBadge"" text NOT NULL DEFAULT '', ""PromoPrice"" numeric, ""SyncInventory"" boolean NOT NULL DEFAULT true);"); } catch { }
+    try
+    {
+        if (!db.Vehicles.Any())
+        {
+            var v1 = new SIGETOUR.API.Core.Entities.Vehicle
+            {
+                Id = Guid.NewGuid(),
+                LicensePlate = "T7C-841",
+                Model = "Mercedes-Benz Sprinter 515 VIP",
+                Category = "Van Turística VIP (14 - 19 Pas.)",
+                ManufactureYear = 2024,
+                SeatCapacity = 19,
+                Color = "Blanco Glaciar",
+                FuelType = "Diésel B5 S-50 (Ultra Bajo Azufre)",
+                SoatNumber = "748920192-RIMAC",
+                SoatProvider = "Rímac Seguros",
+                SoatExpiryDate = DateTime.UtcNow.AddMonths(10),
+                CitvNumber = "CITV-2024-84912",
+                CitvProvider = "Revitec Cajamarca",
+                CitvExpiryDate = DateTime.UtcNow.AddMonths(8),
+                TucNumber = "TUC-DRTC-004812",
+                ResolutionNumber = "RD-0452-2024-MTC/DRTC",
+                Status = "Operativo en Ruta (En Servicio)",
+                IsActive = true
+            };
+            v1.Images.Add(new SIGETOUR.API.Core.Entities.VehicleImage
+            {
+                Id = Guid.NewGuid(),
+                VehicleId = v1.Id,
+                ImageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuBC7BURpMqQ-hvVEt2bVvyXxDCGvmpK4jG1ehi1_9kro4AkrvV1FfAxmEdjKo07xbC5DhKpbe7O5wgme9RYw1M0BebEH-HTct2kvj4xkod1WccZqovwLmRq7W6JIBPN7wAeQjiYYyJp5aesWP1H0LW13piJexwt2P_flgPZYtgDB4MaGvCoapl_VT0ChWDjYnbINExV4l_60pgGfuL5aaMwVfh31dswF5ICihupM-VaqXK5M0mzyfErNw",
+                IsCover = true
+            });
+
+            var v2 = new SIGETOUR.API.Core.Entities.Vehicle
+            {
+                Id = Guid.NewGuid(),
+                LicensePlate = "M4B-912",
+                Model = "Toyota HiAce Gran Commuter",
+                Category = "Van Turística VIP (14 - 19 Pas.)",
+                ManufactureYear = 2023,
+                SeatCapacity = 14,
+                Color = "Plata Metálico",
+                FuelType = "Diésel B5 S-50 (Ultra Bajo Azufre)",
+                SoatNumber = "849201844-PACIFICO",
+                SoatProvider = "Pacífico Seguros",
+                SoatExpiryDate = DateTime.UtcNow.AddMonths(9),
+                CitvNumber = "CITV-2024-91023",
+                CitvProvider = "Revitec Cajamarca",
+                CitvExpiryDate = DateTime.UtcNow.AddMonths(7),
+                TucNumber = "TUC-DRTC-005119",
+                ResolutionNumber = "RD-0511-2023-MTC/DRTC",
+                Status = "Operativo en Ruta (En Servicio)",
+                IsActive = true
+            };
+            v2.Images.Add(new SIGETOUR.API.Core.Entities.VehicleImage
+            {
+                Id = Guid.NewGuid(),
+                VehicleId = v2.Id,
+                ImageUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuB75Is5JazVkkNYTGVxNNn99nKpbZ2C9nhdKkd3T6PZpiyXToJgnzeXFivDxt3XRm1L0r9lpY-tSZlskG6V4jR8_R2xUJJL9isZg-jqdPqBDX3cQMI25p0VT1t3jTwkqm9ogwYmYPXdI_80JioeTNp59QwEJLr6sbIvf_xKs7GiLj8Ay-ZnL8fw8YERwb-cDSHHGM9vPDnbdhfpcIQLFu_Im0l9V4dX9SgfntQLQqwNOlsvjz50yZDiJA",
+                IsCover = true
+            });
+
+            db.Vehicles.AddRange(v1, v2);
+            db.SaveChanges();
+        }
+    }
+    catch { }
+
     SIGETOUR.API.Infrastructure.Data.IdentitySeeder.SeedUsersAndRolesAsync(scope.ServiceProvider).Wait();
 }
 

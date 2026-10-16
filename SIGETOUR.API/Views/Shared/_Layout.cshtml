@@ -136,20 +136,22 @@
     var action = ViewContext.RouteData.Values["Action"]?.ToString();
     var isCatalog = controller == "Tour" && action == "Catalog";
     var isHome = controller == "Home" && action == "Index";
+    var isFleet = controller == "Vehicle";
     
     var activeClass = "text-primary font-bold border-b-2 border-primary pb-1 text-sm tracking-wide";
     var inactiveClass = "text-on-surface-variant font-medium hover:text-primary transition-colors text-sm pb-1";
     
     var catalogClass = isCatalog ? activeClass : inactiveClass;
     var homeClass = isHome ? activeClass : inactiveClass;
+    var fleetClass = isFleet ? activeClass : inactiveClass;
 }
   <!-- Desktop Nav Links -->
   <nav class="hidden md:flex items-center space-x-7">
-      <a class="@catalogClass" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
       <a class="@homeClass" asp-controller="Home" asp-action="Index">Inicio</a>
-      <a class="@inactiveClass" href="@(isHome ? "#flota" : "#site-footer")">Flota Turística</a>
-      <a class="@inactiveClass" href="@(isHome ? "#testimonios" : "#site-footer")">Nosotros</a>
-      <a class="@inactiveClass" href="@(isHome ? "#contacto" : "#site-footer")">Contacto</a>
+      <a class="@catalogClass" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
+      <a class="@fleetClass" asp-controller="Vehicle" asp-action="Catalog">Flota Turística</a>
+      <a class="@inactiveClass" href="@(isHome ? "#testimonios" : "/#testimonios")">Nosotros</a>
+      <a class="@inactiveClass" href="@(isHome ? "#contacto" : "/#contacto")">Contacto</a>
   </nav>
 <!-- CTA Action Header -->
 <div class="hidden sm:flex items-center gap-3">
@@ -165,11 +167,11 @@
 </div>
 <!-- Mobile Dropdown Menu -->
   <div class="hidden md:hidden border-t border-outline-variant bg-white px-5 pt-3 pb-6 space-y-3" id="mobile-menu">
-      <a class="block py-2 @(isCatalog ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
       <a class="block py-2 @(isHome ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Home" asp-action="Index">Inicio</a>
-      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#flota" : "#site-footer")">Flota Turística</a>
-      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#testimonios" : "#site-footer")">Nosotros</a>
-      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#contacto" : "#site-footer")">Contacto</a>
+      <a class="block py-2 @(isCatalog ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
+      <a class="block py-2 @(isFleet ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Vehicle" asp-action="Catalog">Flota Turística</a>
+      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#testimonios" : "/#testimonios")">Nosotros</a>
+      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#contacto" : "/#contacto")">Contacto</a>
   </div>
 </div>
 </header>

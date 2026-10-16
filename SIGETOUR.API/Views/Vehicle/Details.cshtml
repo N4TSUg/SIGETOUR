@@ -1,0 +1,516 @@
+@model SIGETOUR.API.Models.VehicleDetailsViewModel
+@{
+    ViewData["Title"] = $"{Model.Vehicle.Model} ({Model.Vehicle.LicensePlate}) | Flota Turismo Chilón";
+    Layout = "_Layout";
+    var images = Model.Vehicle.ExistingImages?.ToList() ?? new List<SIGETOUR.API.Core.Entities.VehicleImage>();
+    var coverImage = images.FirstOrDefault(i => i.IsCover) ?? images.FirstOrDefault();
+}
+
+<main class="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8 min-h-screen bg-background">
+  <!-- BREADCRUMB -->
+  <nav class="flex items-center text-label-md text-secondary space-x-2 py-1">
+    <a class="hover:text-primary transition-colors flex items-center gap-1 font-medium" asp-action="Catalog">
+      <span class="material-symbols-outlined text-[16px]">directions_bus</span>
+      <span>Flota Turística</span>
+    </a>
+    <span class="material-symbols-outlined text-outline-variant text-[14px]">chevron_right</span>
+    <span class="text-primary font-bold">@Model.Vehicle.Model</span>
+  </nav>
+
+  <!-- HEADER -->
+  <section class="space-y-3">
+    <div class="flex flex-wrap items-center gap-2.5">
+      <span class="px-3 py-1 bg-surface-container-highest text-primary font-label-sm rounded-full flex items-center gap-1 font-bold border border-primary/20">
+        <span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">directions_bus</span>
+        @(string.IsNullOrEmpty(Model.Vehicle.Category) ? "Transporte Turístico VIP" : Model.Vehicle.Category)
+      </span>
+      <span class="px-3 py-1 bg-primary text-white font-label-sm rounded-full flex items-center gap-1 font-bold">
+        <span class="material-symbols-outlined text-[15px]">airline_seat_recline_normal</span>
+        @Model.Vehicle.SeatCapacity Pasajeros
+      </span>
+      <span class="px-3 py-1 bg-surface-container text-secondary font-mono font-bold text-xs rounded-full border border-outline-variant">
+        Placa: @Model.Vehicle.LicensePlate
+      </span>
+      <span class="px-3 py-1 bg-primary-container/20 text-primary font-bold text-xs rounded-full flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+        @Model.Vehicle.Status
+      </span>
+    </div>
+    
+    <h1 class="text-3xl md:text-5xl font-extrabold text-secondary tracking-tight leading-tight">
+      @Model.Vehicle.Model
+    </h1>
+    
+    <div class="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-on-surface-variant font-medium">
+      <span class="flex items-center gap-1">
+        <span class="material-symbols-outlined text-primary text-[18px]">calendar_today</span>
+        Año de Fabricación: <strong class="text-secondary font-bold">@Model.Vehicle.ManufactureYear</strong>
+      </span>
+      <span class="flex items-center gap-1">
+        <span class="material-symbols-outlined text-primary text-[18px]">palette</span>
+        Color: <strong class="text-secondary font-bold">@(string.IsNullOrEmpty(Model.Vehicle.Color) ? "Blanco Glaciar" : Model.Vehicle.Color)</strong>
+      </span>
+      <span class="flex items-center gap-1">
+        <span class="material-symbols-outlined text-primary text-[18px]">local_gas_station</span>
+        Combustible: <strong class="text-secondary font-bold">@(string.IsNullOrEmpty(Model.Vehicle.FuelType) ? "Diésel Ultra Bajo Azufre" : Model.Vehicle.FuelType)</strong>
+      </span>
+      <span class="flex items-center gap-1">
+        <span class="material-symbols-outlined text-primary text-[18px]">location_on</span>
+        Base Operativa: <strong class="text-secondary font-bold">Jr. 2 de Mayo 569, Cajamarca</strong>
+      </span>
+    </div>
+  </section>
+
+  <!-- PHOTO GALLERY -->
+  <section class="space-y-3">
+    <!-- Main Photo -->
+    <div class="w-full h-80 sm:h-96 md:h-[480px] rounded-2xl overflow-hidden shadow-md border border-outline-variant relative bg-surface-container-low group">
+      @if (coverImage != null && !string.IsNullOrEmpty(coverImage.ImageUrl))
+      {
+          <img id="main-vehicle-photo" 
+               class="w-full h-full object-cover transition-all duration-300 group-hover:scale-102" 
+               src="@coverImage.ImageUrl" 
+               alt="Foto de @Model.Vehicle.Model" />
+      }
+      else
+      {
+          <div class="w-full h-full flex flex-col items-center justify-center text-outline bg-surface-container-low">
+            <span class="material-symbols-outlined text-7xl text-primary/40 mb-2">directions_bus</span>
+            <span class="text-lg font-bold text-secondary">Turismo Chilón • Ficha Vehicular</span>
+            <span class="text-xs text-on-surface-variant mt-1">Unidad @Model.Vehicle.LicensePlate</span>
+          </div>
+      }
+      
+      <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
+      
+      <!-- Photo overlay info -->
+      <div class="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white pointer-events-none">
+        <div>
+          <span class="text-sm sm:text-base font-bold block drop-shadow-md">@Model.Vehicle.Model</span>
+          <span class="text-xs text-white/90 drop-shadow-sm font-mono">Placa: @Model.Vehicle.LicensePlate • @Model.Vehicle.SeatCapacity Asientos</span>
+        </div>
+        <span class="bg-black/50 backdrop-blur-md px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1">
+          <span class="material-symbols-outlined text-[15px]">photo_camera</span>
+          <span>@(images.Count > 0 ? $"{images.Count} fotos" : "Oficial")</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Thumbnails row if multiple images -->
+    @if (images.Count > 1)
+    {
+        <div class="flex items-center gap-3 overflow-x-auto pb-2 pt-1">
+          @foreach (var img in images)
+          {
+              <button type="button" 
+                      onclick="changeMainPhoto('@img.ImageUrl')"
+                      class="relative w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden border-2 border-outline-variant hover:border-primary transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-primary shadow-xs">
+                <img src="@img.ImageUrl" alt="Foto adicional" class="w-full h-full object-cover" />
+                @if (img.IsCover)
+                {
+                    <span class="absolute bottom-1 left-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded">Portada</span>
+                }
+              </button>
+          }
+        </div>
+    }
+  </section>
+
+  <!-- MAIN 2-COLUMN GRID -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+    <!-- LEFT COLUMN (8 cols): TECHNICAL DETAILS & SPECS -->
+    <div class="lg:col-span-8 space-y-8">
+      <!-- 4 Quick Stats Badges -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm">
+        <div class="p-3 text-center sm:text-left">
+          <div class="w-10 h-10 rounded-xl bg-surface-variant flex items-center justify-center text-primary mb-2 mx-auto sm:mx-0">
+            <span class="material-symbols-outlined text-[24px]">airline_seat_recline_normal</span>
+          </div>
+          <p class="text-xs text-on-surface-variant font-medium uppercase">Capacidad</p>
+          <p class="text-base font-bold text-secondary">@Model.Vehicle.SeatCapacity Pasajeros</p>
+        </div>
+
+        <div class="p-3 text-center sm:text-left border-t sm:border-t-0 sm:border-l border-outline-variant/60">
+          <div class="w-10 h-10 rounded-xl bg-surface-variant flex items-center justify-center text-primary mb-2 mx-auto sm:mx-0">
+            <span class="material-symbols-outlined text-[24px]">speed</span>
+          </div>
+          <p class="text-xs text-on-surface-variant font-medium uppercase">Fabricación</p>
+          <p class="text-base font-bold text-secondary">Año @Model.Vehicle.ManufactureYear</p>
+        </div>
+
+        <div class="p-3 text-center sm:text-left border-t sm:border-t-0 sm:border-l border-outline-variant/60">
+          <div class="w-10 h-10 rounded-xl bg-surface-variant flex items-center justify-center text-primary mb-2 mx-auto sm:mx-0">
+            <span class="material-symbols-outlined text-[24px]">local_gas_station</span>
+          </div>
+          <p class="text-xs text-on-surface-variant font-medium uppercase">Combustible</p>
+          <p class="text-base font-bold text-secondary truncate">@(string.IsNullOrEmpty(Model.Vehicle.FuelType) ? "Diésel B5" : Model.Vehicle.FuelType)</p>
+        </div>
+
+        <div class="p-3 text-center sm:text-left border-t sm:border-t-0 sm:border-l border-outline-variant/60">
+          <div class="w-10 h-10 rounded-xl bg-surface-variant flex items-center justify-center text-primary mb-2 mx-auto sm:mx-0">
+            <span class="material-symbols-outlined text-[24px]">verified</span>
+          </div>
+          <p class="text-xs text-on-surface-variant font-medium uppercase">Homologación</p>
+          <p class="text-base font-bold text-primary">Conforme MTC</p>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 1: FICHA TÉCNICA OFICIAL -->
+      <section class="bg-surface-container-lowest p-6 sm:p-7 rounded-2xl border border-outline-variant shadow-sm space-y-5">
+        <div class="flex items-center gap-2.5 border-b border-outline-variant pb-3.5">
+          <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shadow-xs">
+            <span class="material-symbols-outlined text-[20px]">engineering</span>
+          </div>
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-secondary">Ficha Técnica Oficial del Vehículo</h2>
+            <p class="text-xs text-on-surface-variant">Datos registrados para operaciones de transporte turístico.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+          <div class="p-3.5 bg-surface-container-low rounded-xl border border-outline-variant/60">
+            <span class="text-xs text-on-surface-variant font-medium block">Placa de Rodaje</span>
+            <span class="font-mono text-base font-bold text-primary tracking-wider">@Model.Vehicle.LicensePlate</span>
+          </div>
+
+          <div class="p-3.5 bg-surface-container-low rounded-xl border border-outline-variant/60">
+            <span class="text-xs text-on-surface-variant font-medium block">Marca y Modelo</span>
+            <span class="font-bold text-secondary">@Model.Vehicle.Model</span>
+          </div>
+
+          <div class="p-3.5 bg-surface-container-low rounded-xl border border-outline-variant/60">
+            <span class="text-xs text-on-surface-variant font-medium block">Categoría de Unidad</span>
+            <span class="font-bold text-secondary">@(string.IsNullOrEmpty(Model.Vehicle.Category) ? "Van Turística VIP" : Model.Vehicle.Category)</span>
+          </div>
+
+          <div class="p-3.5 bg-surface-container-low rounded-xl border border-outline-variant/60">
+            <span class="text-xs text-on-surface-variant font-medium block">Capacidad Homologada</span>
+            <span class="font-bold text-secondary">@Model.Vehicle.SeatCapacity Asientos con Cinturón de Seguridad</span>
+          </div>
+
+          <div class="p-3.5 bg-surface-container-low rounded-xl border border-outline-variant/60">
+            <span class="text-xs text-on-surface-variant font-medium block">Número de Chasis / VIN</span>
+            <span class="font-mono text-xs font-semibold text-secondary">@(string.IsNullOrEmpty(Model.Vehicle.ChassisNumber) ? "Registrado ante MTC y SUNARP" : Model.Vehicle.ChassisNumber)</span>
+          </div>
+
+          <div class="p-3.5 bg-surface-container-low rounded-xl border border-outline-variant/60">
+            <span class="text-xs text-on-surface-variant font-medium block">Número de Motor</span>
+            <span class="font-mono text-xs font-semibold text-secondary">@(string.IsNullOrEmpty(Model.Vehicle.EngineNumber) ? "Conforme a Ficha Técnica Registrada" : Model.Vehicle.EngineNumber)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 2: DOCUMENTACIÓN, SEGUROS Y CERTIFICACIONES -->
+      <section class="bg-surface-container-lowest p-6 sm:p-7 rounded-2xl border border-outline-variant shadow-sm space-y-5">
+        <div class="flex items-center gap-2.5 border-b border-outline-variant pb-3.5">
+          <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shadow-xs">
+            <span class="material-symbols-outlined text-[20px]">policy</span>
+          </div>
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-secondary">Seguros y Certificaciones de Ley</h2>
+            <p class="text-xs text-on-surface-variant">Unidad 100% legalizada y en regla para viajes interprovinciales y rutas turísticas.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- SOAT -->
+          <div class="p-4 bg-surface-bright rounded-xl border border-outline-variant space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-secondary uppercase flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-primary text-[18px]">verified_user</span> Póliza SOAT
+              </span>
+              <span class="text-[11px] font-bold bg-primary-container text-on-primary-container px-2 py-0.5 rounded">Vigente</span>
+            </div>
+            <p class="text-xs text-on-surface-variant">
+              N° Póliza: <strong class="text-secondary font-mono">@(string.IsNullOrEmpty(Model.Vehicle.SoatNumber) ? "Póliza Oficial Registrada" : Model.Vehicle.SoatNumber)</strong>
+            </p>
+            <p class="text-xs text-on-surface-variant">
+              Aseguradora: <strong class="text-secondary">@(string.IsNullOrEmpty(Model.Vehicle.SoatProvider) ? "Compañía Autorizada SBS" : Model.Vehicle.SoatProvider)</strong>
+            </p>
+            @if (Model.Vehicle.SoatExpiryDate.HasValue)
+            {
+                <p class="text-[11px] text-primary font-semibold">
+                  Fecha Vencimiento: @Model.Vehicle.SoatExpiryDate.Value.ToString("dd/MM/yyyy")
+                </p>
+            }
+          </div>
+
+          <!-- CITV -->
+          <div class="p-4 bg-surface-bright rounded-xl border border-outline-variant space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-secondary uppercase flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-primary text-[18px]">fact_check</span> Inspección CITV
+              </span>
+              <span class="text-[11px] font-bold bg-primary-container text-on-primary-container px-2 py-0.5 rounded">Aprobado</span>
+            </div>
+            <p class="text-xs text-on-surface-variant">
+              Certificado N°: <strong class="text-secondary font-mono">@(string.IsNullOrEmpty(Model.Vehicle.CitvNumber) ? "CITV Homologado MTC" : Model.Vehicle.CitvNumber)</strong>
+            </p>
+            <p class="text-xs text-on-surface-variant">
+              Planta: <strong class="text-secondary">@(string.IsNullOrEmpty(Model.Vehicle.CitvProvider) ? "Centro de Inspección Autorizado" : Model.Vehicle.CitvProvider)</strong>
+            </p>
+            @if (Model.Vehicle.CitvExpiryDate.HasValue)
+            {
+                <p class="text-[11px] text-primary font-semibold">
+                  Fecha Vencimiento: @Model.Vehicle.CitvExpiryDate.Value.ToString("dd/MM/yyyy")
+                </p>
+            }
+          </div>
+
+          <!-- TUC -->
+          <div class="p-4 bg-surface-bright rounded-xl border border-outline-variant space-y-2">
+            <span class="text-xs font-bold text-secondary uppercase flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-primary text-[18px]">badge</span> Permiso DRTC / MTC
+            </span>
+            <p class="text-xs text-on-surface-variant">
+              Tarjeta Única de Circulación (TUC): <strong class="text-secondary font-mono">@(string.IsNullOrEmpty(Model.Vehicle.TucNumber) ? "TUC-DRTC-004812" : Model.Vehicle.TucNumber)</strong>
+            </p>
+          </div>
+
+          <!-- Resolucion -->
+          <div class="p-4 bg-surface-bright rounded-xl border border-outline-variant space-y-2">
+            <span class="text-xs font-bold text-secondary uppercase flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-primary text-[18px]">description</span> Resolución Directoral
+            </span>
+            <p class="text-xs text-on-surface-variant">
+              Resolución: <strong class="text-secondary font-mono">@(string.IsNullOrEmpty(Model.Vehicle.ResolutionNumber) ? "RD-MTC-0452-2024" : Model.Vehicle.ResolutionNumber)</strong>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 3: EQUIPAMIENTO Y CONFORT A BORDO -->
+      <section class="bg-surface-container-lowest p-6 sm:p-7 rounded-2xl border border-outline-variant shadow-sm space-y-5">
+        <div class="flex items-center gap-2.5 border-b border-outline-variant pb-3.5">
+          <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center shadow-xs">
+            <span class="material-symbols-outlined text-[20px]">airline_seat_recline_extra</span>
+          </div>
+          <div>
+            <h2 class="text-lg sm:text-xl font-bold text-secondary">Comodidades y Equipamiento a Bordo</h2>
+            <p class="text-xs text-on-surface-variant">Detalles que garantizan un viaje placentero y seguro.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm text-on-surface-variant">
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
+            <span class="material-symbols-outlined text-primary text-xl shrink-0">ac_unit</span>
+            <div>
+              <strong class="text-secondary block font-bold">Aire Acondicionado & Calefacción</strong>
+              <span class="text-xs">Climatización integral para el frío de montaña en Cumbemayo o el sol de Baños del Inca.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
+            <span class="material-symbols-outlined text-primary text-xl shrink-0">airline_seat_recline_extra</span>
+            <div>
+              <strong class="text-secondary block font-bold">Asientos Turísticos Reclinables</strong>
+              <span class="text-xs">Espaldar alto con soporte lumbar y cinturón de seguridad certificado en cada asiento.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
+            <span class="material-symbols-outlined text-primary text-xl shrink-0">usb</span>
+            <div>
+              <strong class="text-secondary block font-bold">Puertos de Carga USB</strong>
+              <span class="text-xs">Carga tus celulares y cámaras durante todo el trayecto sin quedarte sin batería.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
+            <span class="material-symbols-outlined text-primary text-xl shrink-0">volume_up</span>
+            <div>
+              <strong class="text-secondary block font-bold">Micrófono & Audio para Guía</strong>
+              <span class="text-xs">Sistema de sonido estéreo para relatos y explicaciones históricas del guía oficial.</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
+            <span class="material-symbols-outlined text-primary text-xl shrink-0">medical_services</span>
+            <div>
+              <strong class="text-secondary block font-bold">Botiquín y Oxígeno de Emergencia</strong>
+              <span class="text-xs">Balón de oxígeno medicinal listo para asistencia inmediata ante mal de altura (soroche).</span>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
+            <span class="material-symbols-outlined text-primary text-xl shrink-0">luggage</span>
+            <div>
+              <strong class="text-secondary block font-bold">Maletero Amplio</strong>
+              <span class="text-xs">Espacio generoso para maletas de mano y compras de lácteos y artesanías típicas.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECCIÓN 4: CIRCUITOS HABITUALES -->
+      <section class="bg-surface-container-lowest p-6 sm:p-7 rounded-2xl border border-outline-variant shadow-sm space-y-4">
+        <div class="flex items-center gap-2 border-b border-outline-variant pb-3">
+          <span class="material-symbols-outlined text-primary text-[22px]">route</span>
+          <h2 class="text-lg sm:text-xl font-bold text-secondary">Rutas Habituales de Esta Unidad</h2>
+        </div>
+        <p class="text-xs text-on-surface-variant">Esta unidad realiza despachos frecuentes en los siguientes circuitos de Cajamarca:</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-semibold text-secondary">
+          <span class="p-2.5 bg-surface-container-low rounded-lg flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">landscape</span> Cumbemayo (3,500 m)
+          </span>
+          <span class="p-2.5 bg-surface-container-low rounded-lg flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">forest</span> Granja Porcón
+          </span>
+          <span class="p-2.5 bg-surface-container-low rounded-lg flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">hot_tub</span> Baños del Inca
+          </span>
+          <span class="p-2.5 bg-surface-container-low rounded-lg flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">account_balance</span> Ventanillas de Otuzco
+          </span>
+          <span class="p-2.5 bg-surface-container-low rounded-lg flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">water</span> Namora & San Nicolás
+          </span>
+          <span class="p-2.5 bg-surface-container-low rounded-lg flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">flight</span> Aeropuerto Cajamarca
+          </span>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN (4 cols): STICKY BOOKING / QUOTATION CARD -->
+    <aside class="lg:col-span-4 sticky top-24 space-y-6">
+      <div class="bg-surface-container-lowest rounded-3xl p-6 border border-primary/25 shadow-xl relative overflow-hidden space-y-5">
+        <div class="absolute top-0 right-0 p-4 opacity-10 pointer-events-none text-primary">
+          <span class="material-symbols-outlined text-7xl">directions_bus</span>
+        </div>
+
+        <div>
+          <span class="inline-flex items-center gap-1 text-primary font-bold text-xs uppercase tracking-wider bg-surface-container px-2.5 py-1 rounded-full">
+            <span class="material-symbols-outlined text-[15px]">shield</span> Servicio Certificado
+          </span>
+          <h3 class="text-xl font-extrabold text-secondary mt-2">Cotizar Alquiler o Servicio Privado</h3>
+          <p class="text-xs text-on-surface-variant mt-1 leading-relaxed">
+            Reserva esta unidad para traslados exclusivos, eventos familiares o grupos corporativos en Cajamarca.
+          </p>
+        </div>
+
+        <!-- Vehicle mini preview -->
+        <div class="p-3 bg-surface-container-low rounded-2xl flex items-center gap-3 border border-outline-variant/60">
+          @if (coverImage != null)
+          {
+              <img src="@coverImage.ImageUrl" alt="@Model.Vehicle.Model" class="w-16 h-12 object-cover rounded-xl shrink-0" />
+          }
+          else
+          {
+              <div class="w-16 h-12 rounded-xl bg-surface-container flex items-center justify-center text-primary shrink-0">
+                <span class="material-symbols-outlined text-2xl">directions_bus</span>
+              </div>
+          }
+          <div class="min-w-0">
+            <h4 class="text-xs font-bold text-secondary truncate">@Model.Vehicle.Model</h4>
+            <p class="text-[11px] text-on-surface-variant font-mono">Placa: @Model.Vehicle.LicensePlate</p>
+            <p class="text-[11px] text-primary font-semibold">@Model.Vehicle.SeatCapacity pasajeros max.</p>
+          </div>
+        </div>
+
+        <!-- Call to action buttons -->
+        <div class="space-y-2.5 pt-1">
+          <!-- WhatsApp CTA Button -->
+          <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chil%C3%B3n,%20deseo%20cotizar%20el%20servicio%20privado%20del%20veh%C3%ADculo%20@Uri.EscapeDataString(Model.Vehicle.Model)%20(Placa%20@Uri.EscapeDataString(Model.Vehicle.LicensePlate))%20para%20un%20servicio%20en%20Cajamarca"
+             target="_blank" rel="noopener noreferrer"
+             class="w-full py-3.5 px-4 rounded-xl bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-95">
+            <span class="material-symbols-outlined text-[20px]">chat</span>
+            <span>Cotizar por WhatsApp</span>
+          </a>
+
+          <!-- Phone Direct Call -->
+          <a href="tel:+51901195392"
+             class="w-full py-3 px-4 rounded-xl bg-surface-container-low hover:bg-surface-container text-secondary font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-outline-variant transition-all">
+            <span class="material-symbols-outlined text-[18px] text-primary">call</span>
+            <span>Llamar: +51 901 195 392</span>
+          </a>
+
+          <!-- Ver Tours Disponibles -->
+          <a asp-controller="Tour" asp-action="Catalog"
+             class="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-surface-container-low text-primary font-bold text-xs flex items-center justify-center gap-1.5 border border-primary/30 transition-all text-center">
+            <span class="material-symbols-outlined text-[16px]">explore</span>
+            <span>Ver Salidas Diarias Compartidas</span>
+          </a>
+        </div>
+
+        <!-- Trust Badges -->
+        <div class="pt-4 border-t border-outline-variant/60 space-y-2 text-xs text-on-surface-variant">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">check_circle</span>
+            <span>Despacho oficial: Jr. 2 de Mayo 569</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">receipt_long</span>
+            <span>Emisión de Boleta y Factura Comercial</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[17px]">credit_card</span>
+            <span>Aceptamos Yape, Plin, BCP y Tarjetas</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- OTHER VEHICLES SECTION -->
+  @if (Model.OtherVehicles != null && Model.OtherVehicles.Any())
+  {
+      <section class="pt-10 border-t border-outline-variant/60 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <span class="text-xs font-bold text-primary uppercase tracking-wider">Flota Complementaria</span>
+            <h3 class="text-2xl font-bold text-secondary">Otras Unidades Disponibles</h3>
+          </div>
+          <a asp-action="Catalog" class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+            Ver Toda la Flota <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
+          </a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          @foreach (var other in Model.OtherVehicles)
+          {
+              var otherCover = other.ExistingImages.FirstOrDefault(i => i.IsCover) ?? other.ExistingImages.FirstOrDefault();
+              <div class="bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant shadow-sm hover:shadow-md transition-all flex flex-col group">
+                <div class="h-44 w-full bg-surface-container-low overflow-hidden relative">
+                  @if (otherCover != null)
+                  {
+                      <img src="@otherCover.ImageUrl" alt="@other.Model" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  }
+                  else
+                  {
+                      <div class="w-full h-full flex items-center justify-center text-outline">
+                        <span class="material-symbols-outlined text-4xl text-primary/40">directions_bus</span>
+                      </div>
+                  }
+                  <span class="absolute top-2 right-2 bg-secondary/90 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+                    @other.SeatCapacity Pasajeros
+                  </span>
+                </div>
+                <div class="p-4 flex flex-col flex-grow justify-between space-y-3">
+                  <div>
+                    <span class="text-[11px] text-on-surface-variant font-medium block">Año @other.ManufactureYear</span>
+                    <h4 class="text-sm font-bold text-secondary truncate">@other.Model</h4>
+                  </div>
+                  <a asp-action="Details" asp-route-id="@other.Id" class="py-2 px-3 bg-surface-container hover:bg-primary hover:text-white rounded-lg text-xs font-bold text-primary transition-colors text-center block">
+                    Ver Unidad
+                  </a>
+                </div>
+              </div>
+          }
+        </div>
+      </section>
+  }
+</main>
+
+<script>
+  function changeMainPhoto(url) {
+    const mainPhoto = document.getElementById('main-vehicle-photo');
+    if (mainPhoto) {
+      mainPhoto.style.opacity = '0.5';
+      setTimeout(() => {
+        mainPhoto.src = url;
+        mainPhoto.style.opacity = '1';
+      }, 150);
+    }
+  }
+</script>
