@@ -7,6 +7,8 @@
     bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch);
     var userRoles = ViewBag.UserRoles as Dictionary<string, string> ?? new Dictionary<string, string>();
     var currentUserId = ViewBag.CurrentUserId as string ?? "";
+    var currentUserName = ViewBag.CurrentUserName as string ?? User.Identity?.Name ?? "";
+    bool isLoggedAsSuperAdmin = string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase);
     var availableRoles = ViewBag.AvailableRoles as List<string> ?? new List<string> { "SuperAdmin", "Admin", "Operador" };
 }
 
@@ -116,6 +118,7 @@
                         var searchMeta = $"{user.FirstName} {user.LastName} {user.Email} {user.UserName} {role}".ToLower();
                         bool isCurrent = user.Id == currentUserId;
                         bool isSuperAdminAcc = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+                        bool canEditThisUser = !isSuperAdminAcc || isLoggedAsSuperAdmin;
 
                         <tr class="hover:bg-surface-container-low/50 transition-colors user-row" data-search="@searchMeta">
                             <td class="p-4">
@@ -184,12 +187,21 @@
                                 }
                             </td>
                             <td class="p-4 text-right pr-6 whitespace-nowrap space-x-1">
-                                <button type="button" 
-                                        onclick="openEditUserModal('@user.Id', '@Html.Raw(Html.Encode(user.FirstName))', '@Html.Raw(Html.Encode(user.LastName))', '@Html.Raw(Html.Encode(user.UserName))', '@Html.Raw(Html.Encode(user.Email))', '@Html.Raw(Html.Encode(user.PhoneNumber ?? ""))', '@role', @(user.IsActive ? "true" : "false"), @(isSuperAdminAcc ? "true" : "false"), @(isCurrent ? "true" : "false"))"
-                                        class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" 
-                                        title="Editar Usuario">
-                                    <span class="material-symbols-outlined text-[20px]">edit</span>
-                                </button>
+                                @if (canEditThisUser)
+                                {
+                                    <button type="button" 
+                                            onclick="openEditUserModal('@user.Id', '@Html.Raw(Html.Encode(user.FirstName))', '@Html.Raw(Html.Encode(user.LastName))', '@Html.Raw(Html.Encode(user.UserName))', '@Html.Raw(Html.Encode(user.Email))', '@Html.Raw(Html.Encode(user.PhoneNumber ?? ""))', '@role', @(user.IsActive ? "true" : "false"), @(isSuperAdminAcc ? "true" : "false"), @(isCurrent ? "true" : "false"))"
+                                            class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" 
+                                            title="Editar Usuario">
+                                        <span class="material-symbols-outlined text-[20px]">edit</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="p-2 text-outline/40 cursor-not-allowed inline-block" title="Protección de cuenta: Solo el propio SuperAdmin tiene autorización para modificar sus datos">
+                                        <span class="material-symbols-outlined text-[20px] text-amber-700/60">shield_lock</span>
+                                    </span>
+                                }
 
                                 @if (!isCurrent && !isSuperAdminAcc)
                                 {
@@ -288,7 +300,10 @@
                     <select name="Role" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
                         <option value="Operador" selected>Operador</option>
                         <option value="Admin">Admin</option>
-                        <option value="SuperAdmin">SuperAdmin</option>
+                        @if (isLoggedAsSuperAdmin)
+                        {
+                            <option value="SuperAdmin">SuperAdmin</option>
+                        }
                     </select>
                 </div>
             </div>
@@ -377,7 +392,10 @@
                     <select name="Role" id="editUserRole" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
                         <option value="Operador">Operador</option>
                         <option value="Admin">Admin</option>
-                        <option value="SuperAdmin">SuperAdmin</option>
+                        @if (isLoggedAsSuperAdmin)
+                        {
+                            <option value="SuperAdmin">SuperAdmin</option>
+                        }
                     </select>
 
                     <!-- Mensaje dinámico cuando el rol está bloqueado -->
@@ -491,10 +509,12 @@
         const hiddenRole = document.getElementById('editUserHiddenRole');
         const notice = document.getElementById('roleLockedNotice');
         const msg = document.getElementById('roleLockedMessage');
+        const userNameInput = document.getElementById('editUserUserName');
+        const isActiveSelect = document.getElementById('editUserIsActive');
 
         roleSelect.value = role;
 
-        // Reglas de UI para roles protegidos:
+        // Reglas de UI para roles y cuentas protegidas:
         if (isSuperAdmin) {
             roleSelect.disabled = true;
             hiddenRole.disabled = false;
@@ -502,13 +522,27 @@
             roleSelect.value = 'SuperAdmin';
             notice.classList.remove('hidden');
             msg.innerText = 'Rol Inmutable: La cuenta raíz "superadmin" conserva siempre el rol SuperAdmin por seguridad.';
+
+            // Username es inmutable y la cuenta siempre debe permanecer activa
+            userNameInput.readOnly = true;
+            userNameInput.classList.add('bg-surface-container', 'opacity-80', 'cursor-not-allowed');
+            isActiveSelect.disabled = true;
+            isActiveSelect.value = 'true';
         } else if (isSelf) {
+            userNameInput.readOnly = false;
+            userNameInput.classList.remove('bg-surface-container', 'opacity-80', 'cursor-not-allowed');
+            isActiveSelect.disabled = false;
+
             roleSelect.disabled = true;
             hiddenRole.disabled = false;
             hiddenRole.value = role;
             notice.classList.remove('hidden');
             msg.innerText = 'Rol Protegido: No puedes modificar tu propio rol mientras tu sesión esté activa para prevenir pérdida de acceso.';
         } else {
+            userNameInput.readOnly = false;
+            userNameInput.classList.remove('bg-surface-container', 'opacity-80', 'cursor-not-allowed');
+            isActiveSelect.disabled = false;
+
             roleSelect.disabled = false;
             hiddenRole.disabled = true;
             notice.classList.add('hidden');
@@ -521,12 +555,16 @@
         document.getElementById('editUserModal')?.classList.add('hidden');
     }
 
-    // Asegurar que si el select está deshabilitado, el campo oculto envíe el rol sin problemas
+    // Asegurar que si el select está deshabilitado, los campos se envíen correctamente
     document.getElementById('editUserForm')?.addEventListener('submit', function() {
         const roleSelect = document.getElementById('editUserRole');
-        if (roleSelect.disabled) {
+        if (roleSelect && roleSelect.disabled) {
             const hiddenRole = document.getElementById('editUserHiddenRole');
-            hiddenRole.disabled = false;
+            if (hiddenRole) hiddenRole.disabled = false;
+        }
+        const isActiveSelect = document.getElementById('editUserIsActive');
+        if (isActiveSelect && isActiveSelect.disabled) {
+            isActiveSelect.disabled = false;
         }
     });
 

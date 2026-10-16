@@ -620,6 +620,12 @@ namespace SIGETOUR.API.Controllers.UI
             var cleanUserName = model.UserName.Trim();
             var cleanEmail = model.Email.Trim();
 
+            if (string.Equals(cleanUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = "El nombre de usuario 'superadmin' es exclusivo del sistema y no puede ser registrado.";
+                return RedirectToAction(nameof(Users));
+            }
+
             var existingByName = await _userManager.FindByNameAsync(cleanUserName);
             if (existingByName != null)
             {
@@ -659,6 +665,14 @@ namespace SIGETOUR.API.Controllers.UI
                 roleName = "Operador";
             }
 
+            var currentUserName = User.Identity?.Name ?? "";
+            bool isLoggedAsSuperAdmin = string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+            if (string.Equals(roleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase) && !isLoggedAsSuperAdmin)
+            {
+                TempData["ErrorMessage"] = "Solo el SuperAdmin tiene autorización para asignar el rol SuperAdmin a otro usuario.";
+                return RedirectToAction(nameof(Users));
+            }
+
             if (!await _roleManager.RoleExistsAsync(roleName))
             {
                 await _roleManager.CreateAsync(new IdentityRole(roleName));
@@ -687,11 +701,34 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(Users));
             }
 
+            var currentUserName = User.Identity?.Name ?? "";
+            var isTargetSuperAdmin = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+
+            // Regla de seguridad estricta: Cualquier tipo de edición del superadmin
+            // que no sea realizada por el propio superadmin no es permisible para nadie.
+            if (isTargetSuperAdmin && !string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = "Acción no permisible: La cuenta 'superadmin' únicamente puede ser modificada por el propio SuperAdmin.";
+                return RedirectToAction(nameof(Users));
+            }
+
             var cleanUserName = model.UserName.Trim();
             var cleanEmail = model.Email.Trim();
 
             if (!string.Equals(user.UserName, cleanUserName, StringComparison.OrdinalIgnoreCase))
             {
+                if (isTargetSuperAdmin)
+                {
+                    TempData["ErrorMessage"] = "El nombre de usuario de la cuenta raíz 'superadmin' es inmutable y no puede ser cambiado.";
+                    return RedirectToAction(nameof(Users));
+                }
+
+                if (string.Equals(cleanUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+                {
+                    TempData["ErrorMessage"] = "El nombre de usuario 'superadmin' está reservado y protegido por el sistema.";
+                    return RedirectToAction(nameof(Users));
+                }
+
                 var existingByName = await _userManager.FindByNameAsync(cleanUserName);
                 if (existingByName != null && existingByName.Id != user.Id)
                 {
@@ -715,7 +752,16 @@ namespace SIGETOUR.API.Controllers.UI
             user.FirstName = model.FirstName.Trim();
             user.LastName = model.LastName.Trim();
             user.PhoneNumber = model.PhoneNumber?.Trim();
-            user.IsActive = model.IsActive;
+            
+            // La cuenta raíz 'superadmin' siempre debe permanecer activa
+            if (isTargetSuperAdmin)
+            {
+                user.IsActive = true;
+            }
+            else
+            {
+                user.IsActive = model.IsActive;
+            }
 
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
@@ -739,7 +785,6 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             // REGLAS ESTRICTAS DE SEGURIDAD PARA CAMBIO DE ROLES:
-            var isTargetSuperAdmin = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
             var currentUserId = _userManager.GetUserId(User);
             var isSelf = (user.Id == currentUserId || string.Equals(user.UserName, User.Identity?.Name, StringComparison.OrdinalIgnoreCase));
 
@@ -759,6 +804,12 @@ namespace SIGETOUR.API.Controllers.UI
             else if (isSelf)
             {
                 roleName = currentRoles.FirstOrDefault() ?? "Admin";
+            }
+            // 3. Proteger elevación a SuperAdmin: Solo el propio SuperAdmin puede asignar SuperAdmin a otros
+            else if (string.Equals(roleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase) && !string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = "Solo el SuperAdmin tiene autorización para asignar el rol SuperAdmin a otro usuario.";
+                return RedirectToAction(nameof(Users));
             }
 
             // Aplicar el cambio de rol seguro si difiere del actual
