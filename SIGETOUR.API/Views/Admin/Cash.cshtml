@@ -181,6 +181,9 @@
                             Turno Operativo Activo
                         </span>
                         <h2 class="text-headline-sm font-bold text-on-surface">@Model.ActiveShift!.ShiftNumber</h2>
+                        <button type="button" onclick="openEditShiftModal('@Model.ActiveShift.Id', '@Model.ActiveShift.ShiftNumber', '@Model.ActiveShift.InitialAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)', '@Html.Raw(Html.Encode(Model.ActiveShift.Notes ?? ""))')" class="p-1 rounded-lg hover:bg-surface-container text-outline hover:text-primary transition-colors cursor-pointer" title="Modificar Datos del Turno (Saldo Inicial o Notas)">
+                            <span class="material-symbols-outlined text-[19px]">edit</span>
+                        </button>
                     </div>
                     <p class="text-body-sm text-on-surface-variant mt-1">
                         Aperturado por <strong>@Model.ActiveShift.OpenedByUserName</strong> el @Model.ActiveShift.OpenedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm") • Saldo Base Efectivo: <strong>S/ @Model.ActiveShift.InitialAmount.ToString("N2")</strong>
@@ -289,6 +292,7 @@
                         <th class="p-3.5 font-semibold">Método de Pago</th>
                         <th class="p-3.5 font-semibold">Registrado Por</th>
                         <th class="p-3.5 font-semibold text-right">Monto (S/)</th>
+                        <th class="p-3.5 font-semibold text-right pr-6">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50">
@@ -340,13 +344,27 @@
                                 <td class="p-3.5 text-right whitespace-nowrap font-bold text-body-md @(isIncome ? "text-green-700 font-extrabold" : "text-red-700 font-extrabold")">
                                     @(isIncome ? "+" : "-") S/ @tx.Amount.ToString("N2")
                                 </td>
+                                <td class="p-3.5 text-right pr-6 whitespace-nowrap space-x-1">
+                                    <button type="button" 
+                                            onclick="openEditTxModal('@tx.Id', '@tx.TransactionType', '@Html.Raw(Html.Encode(tx.Category))', '@tx.Amount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)', '@tx.PaymentMethod', '@Html.Raw(Html.Encode(tx.ReferenceCode ?? ""))', '@Html.Raw(Html.Encode(tx.Description))')"
+                                            class="inline-flex items-center justify-center p-1.5 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" 
+                                            title="Editar Movimiento de Caja">
+                                        <span class="material-symbols-outlined text-[19px]">edit</span>
+                                    </button>
+                                    <button type="button" 
+                                            onclick="openDeleteTxModal('@tx.Id', '@Html.Raw(Html.Encode(tx.Description))', '@tx.Amount.ToString("N2")', '@tx.TransactionType')"
+                                            class="inline-flex items-center justify-center p-1.5 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer" 
+                                            title="Eliminar / Anular Movimiento">
+                                        <span class="material-symbols-outlined text-[19px]">delete</span>
+                                    </button>
+                                </td>
                             </tr>
                         }
                     }
                     else
                     {
                         <tr>
-                            <td colspan="7" class="p-8 text-center text-on-surface-variant">
+                            <td colspan="8" class="p-8 text-center text-on-surface-variant">
                                 <span class="material-symbols-outlined text-outline text-4xl block mb-2">savings</span>
                                 No hay transacciones registradas en este turno o filtro de búsqueda.
                             </td>
@@ -552,6 +570,7 @@
                         <th class="p-3.5 font-semibold">Concepto Detallado</th>
                         <th class="p-3.5 font-semibold">Solicitante</th>
                         <th class="p-3.5 font-semibold text-right">Monto (S/)</th>
+                        <th class="p-3.5 font-semibold text-right pr-6">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50">
@@ -585,13 +604,27 @@
                                 <td class="p-3.5 text-right whitespace-nowrap font-extrabold text-body-md @(isReplenish ? "text-green-700" : "text-on-surface")">
                                     @(isReplenish ? "+ " : "- ") S/ @m.Amount.ToString("N2")
                                 </td>
+                                <td class="p-3.5 text-right pr-6 whitespace-nowrap space-x-1">
+                                    <button type="button" 
+                                            onclick="openEditPettyModal('@m.Id', '@m.MovementType', '@Html.Raw(Html.Encode(m.ExpenseCategory))', '@m.VoucherType', '@Html.Raw(Html.Encode(m.VoucherNumber ?? ""))', '@Html.Raw(Html.Encode(m.Supplier ?? ""))', '@m.Amount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)', '@Html.Raw(Html.Encode(m.ResponsiblePerson))', '@Html.Raw(Html.Encode(m.Concept))')"
+                                            class="inline-flex items-center justify-center p-1.5 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" 
+                                            title="Editar Gasto de Caja Chica">
+                                        <span class="material-symbols-outlined text-[19px]">edit</span>
+                                    </button>
+                                    <button type="button" 
+                                            onclick="openDeletePettyModal('@m.Id', '@Html.Raw(Html.Encode(m.Concept))', '@m.Amount.ToString("N2")', '@m.VoucherType', '@Html.Raw(Html.Encode(m.VoucherNumber ?? ""))')"
+                                            class="inline-flex items-center justify-center p-1.5 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer" 
+                                            title="Eliminar / Anular Gasto">
+                                        <span class="material-symbols-outlined text-[19px]">delete</span>
+                                    </button>
+                                </td>
                             </tr>
                         }
                     }
                     else
                     {
                         <tr>
-                            <td colspan="7" class="p-8 text-center text-on-surface-variant">
+                            <td colspan="8" class="p-8 text-center text-on-surface-variant">
                                 <span class="material-symbols-outlined text-outline text-4xl block mb-2">description</span>
                                 No hay gastos registrados con los criterios seleccionados.
                             </td>
@@ -1131,6 +1164,319 @@
 </div>
 
 <!-- ======================================================== -->
+<!-- MODAL: EDITAR MOVIMIENTO DE CAJA GENERAL                 -->
+<!-- ======================================================== -->
+<div id="editTransactionModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">edit_note</span>
+                Modificar Movimiento de Caja General
+            </h3>
+            <button type="button" onclick="closeEditTxModal()" class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <form asp-action="UpdateCashTransaction" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="editTxId" />
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Tipo de Movimiento</label>
+                    <select name="type" id="editTxType" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
+                        <option value="Ingreso">Ingreso (+)</option>
+                        <option value="Egreso">Egreso (-)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Monto (S/)</label>
+                    <input type="number" step="0.01" min="0.01" name="amount" id="editTxAmount" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-bold text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Categoría</label>
+                    <select name="category" id="editTxCategory" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
+                        <option value="Cobro de Reserva">Cobro de Reserva</option>
+                        <option value="Venta de Paquete Turístico">Venta de Paquete Turístico</option>
+                        <option value="Ingreso Extraordinario">Ingreso Extraordinario</option>
+                        <option value="Gasto Operativo">Gasto Operativo</option>
+                        <option value="Comisiones">Comisiones</option>
+                        <option value="Devolución a Cliente">Devolución a Cliente</option>
+                        <option value="Otros Ingresos">Otros Ingresos</option>
+                        <option value="Otros Egresos">Otros Egresos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Medio de Pago</label>
+                    <select name="paymentMethod" id="editTxPaymentMethod" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Yape">Yape</option>
+                        <option value="Plin">Plin</option>
+                        <option value="Transferencia BCP">Transferencia BCP</option>
+                        <option value="Transferencia BBVA">Transferencia BBVA</option>
+                        <option value="Tarjeta Débito/Crédito">Tarjeta Débito/Crédito</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">N° Operación / Referencia (Opcional)</label>
+                <input type="text" name="referenceCode" id="editTxReferenceCode" placeholder="Ej. OP-483921" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Concepto o Descripción <span class="text-red-500">*</span></label>
+                <textarea name="description" id="editTxDescription" rows="3" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeEditTxModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">save</span>
+                    <span>Guardar Cambios</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: ELIMINAR / ANULAR MOVIMIENTO DE CAJA GENERAL      -->
+<!-- ======================================================== -->
+<div id="deleteTransactionModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-start gap-3.5 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">warning</span>
+            </div>
+            <div>
+                <h3 class="text-title-md font-bold text-on-surface leading-tight">¿Eliminar o Anular Movimiento?</h3>
+                <p class="text-body-xs text-outline mt-0.5">Esta acción recalculará inmediatamente los saldos del turno activo.</p>
+            </div>
+        </div>
+
+        <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/60 space-y-2 mb-5">
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-on-surface-variant font-medium">Tipo:</span>
+                <span id="deleteTxTypeBadge" class="font-bold"></span>
+            </div>
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-on-surface-variant font-medium">Monto:</span>
+                <span id="deleteTxAmount" class="font-extrabold text-title-sm"></span>
+            </div>
+            <div class="text-body-sm pt-1 border-t border-outline-variant/40">
+                <span class="text-outline text-xs block mb-0.5">Descripción:</span>
+                <span id="deleteTxDescription" class="font-semibold text-on-surface"></span>
+            </div>
+        </div>
+
+        <form asp-action="DeleteCashTransaction" method="post" class="flex items-center justify-end gap-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="deleteTxId" />
+            <button type="button" onclick="closeDeleteTxModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-body-sm transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">delete</span>
+                <span>Sí, Eliminar Movimiento</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: EDITAR GASTO O MOVIMIENTO DE CAJA CHICA           -->
+<!-- ======================================================== -->
+<div id="editPettyExpenseModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-outline-variant max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">edit_document</span>
+                Modificar Registro de Caja Chica
+            </h3>
+            <button type="button" onclick="closeEditPettyModal()" class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <form asp-action="UpdatePettyCashMovement" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="editPettyId" />
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Tipo Movimiento</label>
+                    <select name="movementType" id="editPettyMovementType" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
+                        <option value="Egreso">Egreso / Gasto (-)</option>
+                        <option value="Reposicion">Reposición (+)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Monto (S/)</label>
+                    <input type="number" step="0.01" min="0.01" name="amount" id="editPettyAmount" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-bold text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Categoría del Gasto</label>
+                    <select name="expenseCategory" id="editPettyCategory" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
+                        <option value="Combustible">Combustible</option>
+                        <option value="Peajes">Peajes</option>
+                        <option value="Alimentación / Refrigerios">Alimentación / Refrigerios</option>
+                        <option value="Mantenimiento Menor">Mantenimiento Menor</option>
+                        <option value="Útiles y Limpieza">Útiles y Limpieza</option>
+                        <option value="Otros Gastos Menores">Otros Gastos Menores</option>
+                        <option value="Reposición de Fondo">Reposición de Fondo</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Tipo de Comprobante</label>
+                    <select name="voucherType" id="editPettyVoucherType" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
+                        <option value="Boleta de Venta">Boleta de Venta</option>
+                        <option value="Factura">Factura</option>
+                        <option value="Recibo por Honorarios">Recibo por Honorarios</option>
+                        <option value="Ticket de Peaje">Ticket de Peaje</option>
+                        <option value="Declaración Jurada">Declaración Jurada</option>
+                        <option value="Recibo Interno">Recibo Interno</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">N° Comprobante</label>
+                    <input type="text" name="voucherNumber" id="editPettyVoucherNumber" placeholder="Ej. B001-492" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Proveedor / Comercio</label>
+                    <input type="text" name="supplier" id="editPettySupplier" placeholder="Ej. Grifo Primax" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Responsable / Solicitante <span class="text-red-500">*</span></label>
+                <input type="text" name="responsiblePerson" id="editPettyResponsible" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Concepto Detallado del Gasto <span class="text-red-500">*</span></label>
+                <textarea name="concept" id="editPettyConcept" rows="3" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeEditPettyModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">save</span>
+                    <span>Guardar Cambios</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: ELIMINAR / ANULAR GASTO DE CAJA CHICA             -->
+<!-- ======================================================== -->
+<div id="deletePettyExpenseModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-start gap-3.5 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">delete_forever</span>
+            </div>
+            <div>
+                <h3 class="text-title-md font-bold text-on-surface leading-tight">¿Eliminar Gasto de Caja Chica?</h3>
+                <p class="text-body-xs text-outline mt-0.5">El fondo disponible de la caja chica se recalculará automáticamente.</p>
+            </div>
+        </div>
+
+        <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/60 space-y-2 mb-5">
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-on-surface-variant font-medium">Monto:</span>
+                <span id="deletePettyAmount" class="font-extrabold text-title-sm text-red-700"></span>
+            </div>
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-on-surface-variant font-medium">Comprobante:</span>
+                <span id="deletePettyVoucher" class="font-bold text-on-surface font-mono text-xs"></span>
+            </div>
+            <div class="text-body-sm pt-1 border-t border-outline-variant/40">
+                <span class="text-outline text-xs block mb-0.5">Concepto:</span>
+                <span id="deletePettyConcept" class="font-semibold text-on-surface"></span>
+            </div>
+        </div>
+
+        <form asp-action="DeletePettyCashMovement" method="post" class="flex items-center justify-end gap-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="deletePettyId" />
+            <button type="button" onclick="closeDeletePettyModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-body-sm transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">delete</span>
+                <span>Sí, Eliminar Gasto</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: MODIFICAR DATOS DEL TURNO ACTIVO                  -->
+<!-- ======================================================== -->
+<div id="editShiftModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">edit</span>
+                Modificar Turno de Caja
+            </h3>
+            <button type="button" onclick="closeEditShiftModal()" class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <form asp-action="UpdateCashShift" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="shiftId" id="editShiftId" />
+
+            <div class="bg-surface-container-low p-3 rounded-xl border border-outline-variant/60 flex items-center justify-between">
+                <span class="text-body-sm text-outline font-medium">Turno:</span>
+                <span id="editShiftNumber" class="font-bold text-primary font-mono text-body-md"></span>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Saldo Base Inicial en Efectivo (S/)</label>
+                <input type="number" step="0.01" min="0" name="initialAmount" id="editShiftInitialAmount" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-bold text-on-surface focus:outline-none focus:border-primary" />
+                <p class="text-body-xs text-outline mt-1">Modifica este valor si hubo un error de tipeo al aperturar la caja.</p>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Notas u Observaciones del Turno</label>
+                <textarea name="notes" id="editShiftNotes" rows="3" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" placeholder="Observaciones sobre la apertura o incidencias"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeEditShiftModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">save</span>
+                    <span>Actualizar Turno</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
 <!-- SCRIPTS DE CONTROL DE INTERFAZ Y MODALES                 -->
 <!-- ======================================================== -->
 <script>
@@ -1184,6 +1530,74 @@
         document.getElementById('updatePettyFundModal')?.classList.add('hidden');
     }
 
+    // Funciones para Modales de Edición y Eliminación de Movimientos de Caja
+    function openEditTxModal(id, type, category, amount, paymentMethod, referenceCode, description) {
+        document.getElementById('editTxId').value = id;
+        document.getElementById('editTxType').value = type;
+        document.getElementById('editTxCategory').value = category;
+        document.getElementById('editTxAmount').value = amount;
+        document.getElementById('editTxPaymentMethod').value = paymentMethod;
+        document.getElementById('editTxReferenceCode').value = referenceCode;
+        document.getElementById('editTxDescription').value = description;
+        document.getElementById('editTransactionModal')?.classList.remove('hidden');
+    }
+    function closeEditTxModal() {
+        document.getElementById('editTransactionModal')?.classList.add('hidden');
+    }
+
+    function openDeleteTxModal(id, description, amount, type) {
+        document.getElementById('deleteTxId').value = id;
+        document.getElementById('deleteTxDescription').innerText = description;
+        document.getElementById('deleteTxAmount').innerText = 'S/ ' + amount;
+        const badge = document.getElementById('deleteTxTypeBadge');
+        if (badge) {
+            badge.innerText = type;
+            badge.className = type === 'Ingreso' ? 'font-bold text-green-700' : 'font-bold text-red-700';
+        }
+        document.getElementById('deleteTransactionModal')?.classList.remove('hidden');
+    }
+    function closeDeleteTxModal() {
+        document.getElementById('deleteTransactionModal')?.classList.add('hidden');
+    }
+
+    function openEditPettyModal(id, movementType, category, voucherType, voucherNumber, supplier, amount, responsible, concept) {
+        document.getElementById('editPettyId').value = id;
+        document.getElementById('editPettyMovementType').value = movementType;
+        document.getElementById('editPettyCategory').value = category;
+        document.getElementById('editPettyVoucherType').value = voucherType;
+        document.getElementById('editPettyVoucherNumber').value = voucherNumber;
+        document.getElementById('editPettySupplier').value = supplier;
+        document.getElementById('editPettyAmount').value = amount;
+        document.getElementById('editPettyResponsible').value = responsible;
+        document.getElementById('editPettyConcept').value = concept;
+        document.getElementById('editPettyExpenseModal')?.classList.remove('hidden');
+    }
+    function closeEditPettyModal() {
+        document.getElementById('editPettyExpenseModal')?.classList.add('hidden');
+    }
+
+    function openDeletePettyModal(id, concept, amount, voucherType, voucherNumber) {
+        document.getElementById('deletePettyId').value = id;
+        document.getElementById('deletePettyConcept').innerText = concept;
+        document.getElementById('deletePettyAmount').innerText = 'S/ ' + amount;
+        document.getElementById('deletePettyVoucher').innerText = voucherType + (voucherNumber ? ' (' + voucherNumber + ')' : '');
+        document.getElementById('deletePettyExpenseModal')?.classList.remove('hidden');
+    }
+    function closeDeletePettyModal() {
+        document.getElementById('deletePettyExpenseModal')?.classList.add('hidden');
+    }
+
+    function openEditShiftModal(id, number, initialAmount, notes) {
+        document.getElementById('editShiftId').value = id;
+        document.getElementById('editShiftNumber').innerText = number;
+        document.getElementById('editShiftInitialAmount').value = initialAmount;
+        document.getElementById('editShiftNotes').value = notes;
+        document.getElementById('editShiftModal')?.classList.remove('hidden');
+    }
+    function closeEditShiftModal() {
+        document.getElementById('editShiftModal')?.classList.add('hidden');
+    }
+
     function calculateDifference() {
         const expEl = document.getElementById('expectedCashVal');
         const inputEl = document.getElementById('inputActualCash');
@@ -1218,6 +1632,11 @@
             closeAddPettyExpenseModal();
             closeReplenishPettyModal();
             closeUpdatePettyFundModal();
+            closeEditTxModal();
+            closeDeleteTxModal();
+            closeEditPettyModal();
+            closeDeletePettyModal();
+            closeEditShiftModal();
         }
     });
 </script>

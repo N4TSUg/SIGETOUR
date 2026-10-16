@@ -1897,6 +1897,130 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction(nameof(Cash), new { tab = "petty" });
         }
 
+        // --- EDICIÓN Y ANULACIÓN DE REGISTROS DE CAJA Y CAJA CHICA --- //
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateCashTransaction(Guid id, string type, string category, decimal amount, string paymentMethod, string? referenceCode, string description)
+        {
+            if (amount <= 0)
+            {
+                TempData["ErrorMessage"] = "El monto debe ser mayor a S/ 0.00.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            var tx = await _context.CashTransactions.FindAsync(id);
+            if (tx == null)
+            {
+                TempData["ErrorMessage"] = "El movimiento de caja no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            tx.TransactionType = type == "Egreso" ? "Egreso" : "Ingreso";
+            tx.Category = string.IsNullOrWhiteSpace(category) ? tx.Category : category;
+            tx.Amount = amount;
+            tx.PaymentMethod = string.IsNullOrWhiteSpace(paymentMethod) ? tx.PaymentMethod : paymentMethod;
+            tx.ReferenceCode = referenceCode;
+            tx.Description = description;
+
+            _context.CashTransactions.Update(tx);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Movimiento de caja modificado exitosamente (S/ {amount:N2}).";
+            return RedirectToAction(nameof(Cash), new { tab = "general" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteCashTransaction(Guid id)
+        {
+            var tx = await _context.CashTransactions.FindAsync(id);
+            if (tx == null)
+            {
+                TempData["ErrorMessage"] = "El movimiento de caja no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            _context.CashTransactions.Remove(tx);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Movimiento de caja eliminado / anulado exitosamente.";
+            return RedirectToAction(nameof(Cash), new { tab = "general" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdatePettyCashMovement(Guid id, string movementType, string expenseCategory, string voucherType, string? voucherNumber, string? supplier, decimal amount, string responsiblePerson, string concept)
+        {
+            if (amount <= 0)
+            {
+                TempData["ErrorMessage"] = "El importe debe ser mayor a S/ 0.00.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            var m = await _context.PettyCashMovements.FindAsync(id);
+            if (m == null)
+            {
+                TempData["ErrorMessage"] = "El registro de caja chica no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            m.MovementType = movementType == "Reposicion" ? "Reposicion" : "Egreso";
+            m.ExpenseCategory = string.IsNullOrWhiteSpace(expenseCategory) ? m.ExpenseCategory : expenseCategory;
+            m.VoucherType = voucherType;
+            m.VoucherNumber = voucherNumber;
+            m.Supplier = supplier;
+            m.Amount = amount;
+            m.ResponsiblePerson = string.IsNullOrWhiteSpace(responsiblePerson) ? m.ResponsiblePerson : responsiblePerson;
+            m.Concept = concept;
+
+            _context.PettyCashMovements.Update(m);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Registro de Caja Chica actualizado exitosamente.";
+            return RedirectToAction(nameof(Cash), new { tab = "petty" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeletePettyCashMovement(Guid id)
+        {
+            var m = await _context.PettyCashMovements.FindAsync(id);
+            if (m == null)
+            {
+                TempData["ErrorMessage"] = "El registro de caja chica no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "petty" });
+            }
+
+            _context.PettyCashMovements.Remove(m);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Registro de Caja Chica eliminado / anulado exitosamente.";
+            return RedirectToAction(nameof(Cash), new { tab = "petty" });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateCashShift(Guid shiftId, decimal initialAmount, decimal? actualCash, string? notes)
+        {
+            var shift = await _context.CashRegisterShifts.FindAsync(shiftId);
+            if (shift == null)
+            {
+                TempData["ErrorMessage"] = "El turno de caja especificado no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            shift.InitialAmount = Math.Max(0m, initialAmount);
+            if (actualCash.HasValue) shift.ActualCash = Math.Max(0m, actualCash.Value);
+            if (!string.IsNullOrWhiteSpace(notes)) shift.Notes = notes;
+
+            _context.CashRegisterShifts.Update(shift);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Datos del turno {shift.ShiftNumber} actualizados exitosamente.";
+            return RedirectToAction(nameof(Cash), new { tab = "general" });
+        }
+
         // --- EXPORTACIÓN DE REPORTES EN HOJAS DE CÁLCULO (EXCEL .XLSX) --- //
 
         [HttpGet]
