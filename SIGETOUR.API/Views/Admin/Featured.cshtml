@@ -35,7 +35,11 @@
         <div class="flex flex-col">
             <span class="text-label-sm font-label-sm text-secondary">Total Paquetes en Portada</span>
             <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-headline-md font-headline-md font-extrabold text-primary">@Model.Count()</span>
+                @{
+                    var pvm = ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel;
+                    int totalFeatured = pvm?.TotalItems ?? (Model?.Count() ?? 0);
+                }
+                <span class="text-headline-md font-headline-md font-extrabold text-primary">@totalFeatured</span>
                 <span class="text-label-sm font-label-sm text-on-surface-variant font-medium">activos</span>
             </div>
         </div>
@@ -86,5 +90,9 @@
         {
             <div class="p-8 text-center text-on-surface-variant">No hay paquetes destacados configurados.</div>
         }
+
+        <div class="rounded-2xl border border-outline-variant/80 overflow-hidden bg-surface-container-lowest shadow-sm">
+            <partial name="_AdminPagination" model="ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel" />
+        </div>
     </div>
 </section>

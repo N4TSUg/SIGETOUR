@@ -111,9 +111,13 @@
         <div class="flex items-center gap-2">
             <span class="material-symbols-outlined text-primary text-[20px]">departure_board</span>
             <span class="text-label-md font-bold text-on-surface" id="bookingResultsCount">
-                @if (bookings != null && bookings.Any())
+                @{
+                    var pvm = ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel;
+                    int totalCount = pvm?.TotalItems ?? (bookings?.Count() ?? 0);
+                }
+                @if (totalCount > 0)
                 {
-                    @:Mostrando @bookings.Count() reservas de despacho registradas
+                    @:Total: @totalCount reservas registradas
                 }
                 else
                 {
@@ -331,6 +335,8 @@
             </tbody>
         </table>
     </div>
+
+    <partial name="_AdminPagination" model="ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel" />
 </div>
 
 <!-- ======================================================== -->

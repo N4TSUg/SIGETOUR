@@ -1,0 +1,115 @@
+@model SIGETOUR.API.Models.PaginationViewModel
+@if (Model != null && Model.TotalItems > 0)
+{
+    Func<int, string> getPageUrl = (pageNumber) =>
+    {
+        var routeValues = new Microsoft.AspNetCore.Routing.RouteValueDictionary();
+        if (Model.RouteParams != null)
+        {
+            foreach (var kvp in Model.RouteParams)
+            {
+                if (!string.IsNullOrWhiteSpace(kvp.Value))
+                {
+                    routeValues[kvp.Key] = kvp.Value;
+                }
+            }
+        }
+        routeValues["page"] = pageNumber;
+        return Url.Action(Model.Action, Model.Controller, routeValues) ?? "#";
+    };
+
+    int startPage = Math.Max(1, Model.CurrentPage - 2);
+    int endPage = Math.Min(Model.TotalPages, Model.CurrentPage + 2);
+
+    <div class="px-6 py-3.5 border-t border-outline-variant bg-surface-bright flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
+        <!-- Resumen de items -->
+        <div class="text-body-sm text-on-surface-variant flex items-center gap-1.5 order-2 sm:order-1">
+            <span>Mostrando</span>
+            <span class="font-bold text-on-surface">@Model.FromItem</span>
+            <span>a</span>
+            <span class="font-bold text-on-surface">@Model.ToItem</span>
+            <span>de</span>
+            <span class="font-bold text-on-surface">@Model.TotalItems</span>
+            <span>registros</span>
+            <span class="text-outline hidden md:inline">•</span>
+            <span class="text-xs text-outline hidden md:inline">12 por página</span>
+        </div>
+
+        <!-- Botones de Navegación -->
+        @if (Model.TotalPages > 1)
+        {
+            <nav class="flex items-center gap-1 order-1 sm:order-2" aria-label="Paginación de registros">
+                <!-- Botón Anterior -->
+                @if (Model.HasPrevious)
+                {
+                    <a href="@getPageUrl(Model.CurrentPage - 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-body-sm flex items-center gap-1 transition-colors" title="Página anterior">
+                        <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                        <span class="hidden sm:inline">Anterior</span>
+                    </a>
+                }
+                else
+                {
+                    <span class="px-3 py-1.5 rounded-lg border border-outline-variant/50 bg-surface-container-lowest/50 text-outline font-semibold text-body-sm flex items-center gap-1 opacity-50 cursor-not-allowed">
+                        <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                        <span class="hidden sm:inline">Anterior</span>
+                    </span>
+                }
+
+                <!-- Primera página si está lejos -->
+                @if (startPage > 1)
+                {
+                    <a href="@getPageUrl(1)" class="w-8 h-8 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-body-sm flex items-center justify-center transition-colors">1</a>
+                    @if (startPage > 2)
+                    {
+                        <span class="px-1 text-outline text-body-sm font-bold">...</span>
+                    }
+                }
+
+                <!-- Páginas intermedias -->
+                @for (int p = startPage; p <= endPage; p++)
+                {
+                    if (p == Model.CurrentPage)
+                    {
+                        <span class="w-8 h-8 rounded-lg bg-primary text-on-primary font-bold text-body-sm flex items-center justify-center shadow-xs">@p</span>
+                    }
+                    else
+                    {
+                        <a href="@getPageUrl(p)" class="w-8 h-8 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-body-sm flex items-center justify-center transition-colors">@p</a>
+                    }
+                }
+
+                <!-- Última página si está lejos -->
+                @if (endPage < Model.TotalPages)
+                {
+                    @if (endPage < Model.TotalPages - 1)
+                    {
+                        <span class="px-1 text-outline text-body-sm font-bold">...</span>
+                    }
+                    <a href="@getPageUrl(Model.TotalPages)" class="w-8 h-8 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-body-sm flex items-center justify-center transition-colors">@Model.TotalPages</a>
+                }
+
+                <!-- Botón Siguiente -->
+                @if (Model.HasNext)
+                {
+                    <a href="@getPageUrl(Model.CurrentPage + 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container text-on-surface font-semibold text-body-sm flex items-center gap-1 transition-colors" title="Página siguiente">
+                        <span class="hidden sm:inline">Siguiente</span>
+                        <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+                    </a>
+                }
+                else
+                {
+                    <span class="px-3 py-1.5 rounded-lg border border-outline-variant/50 bg-surface-container-lowest/50 text-outline font-semibold text-body-sm flex items-center gap-1 opacity-50 cursor-not-allowed">
+                        <span class="hidden sm:inline">Siguiente</span>
+                        <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+                    </span>
+                }
+            </nav>
+        }
+        else
+        {
+            <div class="text-xs text-outline font-medium order-1 sm:order-2">
+                Página 1 de 1
+            </div>
+        }
+    </div>
+}

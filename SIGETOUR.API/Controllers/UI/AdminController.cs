@@ -63,7 +63,7 @@ namespace SIGETOUR.API.Controllers.UI
             return View();
         }
 
-        public async Task<IActionResult> Tours(string? search, Guid? categoryId, string? status)
+        public async Task<IActionResult> Tours(string? search, Guid? categoryId, string? status, int page = 1)
         {
             var query = _context.TourPackages
                 .Include(t => t.Images)
@@ -92,17 +92,42 @@ namespace SIGETOUR.API.Controllers.UI
                 query = query.Where(t => t.IsActive == isActive);
             }
 
-            var tours = await query.OrderBy(t => t.Title).ToListAsync();
+            int totalItems = await query.CountAsync();
+            int pageSize = 12;
+            int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            var tours = await query.OrderBy(t => t.Title)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
 
             ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
             ViewBag.CurrentSearch = search;
             ViewBag.CurrentCategoryId = categoryId;
             ViewBag.CurrentStatus = status;
 
+            var routeParams = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(search)) routeParams["search"] = search;
+            if (categoryId.HasValue && categoryId.Value != Guid.Empty) routeParams["categoryId"] = categoryId.Value.ToString();
+            if (!string.IsNullOrWhiteSpace(status)) routeParams["status"] = status;
+
+            ViewBag.Pagination = new PaginationViewModel
+            {
+                Action = "Tours",
+                Controller = "Admin",
+                CurrentPage = page,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                PageSize = pageSize,
+                RouteParams = routeParams
+            };
+
             return View(tours);
         }
 
-        public async Task<IActionResult> Bookings(string? search, string? status, DateTime? date, Guid? tourId)
+        public async Task<IActionResult> Bookings(string? search, string? status, DateTime? date, Guid? tourId, int page = 1)
         {
             var query = _context.Bookings
                 .Include(b => b.Items)
@@ -166,6 +191,14 @@ namespace SIGETOUR.API.Controllers.UI
                 ).ToList();
             }
 
+            int totalItems = bookings.Count;
+            int pageSize = 12;
+            int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            var pagedBookings = bookings.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
             ViewBag.CurrentSearch = search;
             ViewBag.CurrentStatus = status;
             ViewBag.CurrentDate = date?.ToString("yyyy-MM-dd");
@@ -179,7 +212,24 @@ namespace SIGETOUR.API.Controllers.UI
                 .OrderBy(v => v.Model)
                 .ToListAsync();
 
-            return View(bookings);
+            var routeParams = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(search)) routeParams["search"] = search;
+            if (!string.IsNullOrWhiteSpace(status)) routeParams["status"] = status;
+            if (date.HasValue) routeParams["date"] = date.Value.ToString("yyyy-MM-dd");
+            if (tourId.HasValue && tourId.Value != Guid.Empty) routeParams["tourId"] = tourId.Value.ToString();
+
+            ViewBag.Pagination = new PaginationViewModel
+            {
+                Action = "Bookings",
+                Controller = "Admin",
+                CurrentPage = page,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                PageSize = pageSize,
+                RouteParams = routeParams
+            };
+
+            return View(pagedBookings);
         }
 
         [HttpGet]
@@ -422,7 +472,7 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction("Fleet");
         }
 
-        public async Task<IActionResult> Fleet(string? search, string? status)
+        public async Task<IActionResult> Fleet(string? search, string? status, int page = 1)
         {
             var query = _context.Vehicles
                 .Include(v => v.Images)
@@ -445,17 +495,40 @@ namespace SIGETOUR.API.Controllers.UI
                 query = query.Where(v => v.Status == status);
             }
 
+            int totalItems = await query.CountAsync();
+            int pageSize = 12;
+            int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
             var vehicles = await query
                 .OrderBy(v => v.LicensePlate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
 
             ViewBag.CurrentSearch = search;
             ViewBag.CurrentStatus = status;
 
+            var routeParams = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(search)) routeParams["search"] = search;
+            if (!string.IsNullOrWhiteSpace(status)) routeParams["status"] = status;
+
+            ViewBag.Pagination = new PaginationViewModel
+            {
+                Action = "Fleet",
+                Controller = "Admin",
+                CurrentPage = page,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                PageSize = pageSize,
+                RouteParams = routeParams
+            };
+
             return View(vehicles);
         }
 
-        public async Task<IActionResult> Users(string? search)
+        public async Task<IActionResult> Users(string? search, int page = 1)
         {
             var query = _userManager.Users.AsQueryable();
 
@@ -469,8 +542,34 @@ namespace SIGETOUR.API.Controllers.UI
                     (u.UserName != null && u.UserName.ToLower().Contains(term)));
             }
 
-            var users = await query.ToListAsync();
+            int totalItems = await query.CountAsync();
+            int pageSize = 12;
+            int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            var users = await query
+                .OrderBy(u => u.UserName)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
             ViewBag.CurrentSearch = search;
+
+            var routeParams = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(search)) routeParams["search"] = search;
+
+            ViewBag.Pagination = new PaginationViewModel
+            {
+                Action = "Users",
+                Controller = "Admin",
+                CurrentPage = page,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                PageSize = pageSize,
+                RouteParams = routeParams
+            };
+
             return View(users);
         }
 
@@ -1001,12 +1100,35 @@ namespace SIGETOUR.API.Controllers.UI
 
         // --- FEATURED PACKAGES CRUD --- //
 
-        public async Task<IActionResult> Featured()
+        public async Task<IActionResult> Featured(int page = 1)
         {
-            var featured = await _context.FeaturedPackages
+            var query = _context.FeaturedPackages
                 .Include(f => f.TourPackage)
+                .AsQueryable();
+
+            int totalItems = await query.CountAsync();
+            int pageSize = 12;
+            int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            var featured = await query
                 .OrderBy(f => f.DisplayOrder)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
+
+            ViewBag.Pagination = new PaginationViewModel
+            {
+                Action = "Featured",
+                Controller = "Admin",
+                CurrentPage = page,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                PageSize = pageSize,
+                RouteParams = new Dictionary<string, string>()
+            };
+
             return View(featured);
         }
 
@@ -1097,7 +1219,7 @@ namespace SIGETOUR.API.Controllers.UI
         // --- CRUD DE CATEGORÍAS DE TOURS --- //
 
         [HttpGet]
-        public async Task<IActionResult> Categories(string? search)
+        public async Task<IActionResult> Categories(string? search, int page = 1)
         {
             var query = _context.Categories
                 .Include(c => c.TourPackages)
@@ -1110,8 +1232,16 @@ namespace SIGETOUR.API.Controllers.UI
                                          (c.Description != null && c.Description.ToLower().Contains(term)));
             }
 
+            int totalItems = await query.CountAsync();
+            int pageSize = 12;
+            int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
             var categories = await query
                 .OrderBy(c => c.DisplayOrder)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
 
             var dtos = categories.Select(c => new SIGETOUR.API.Models.CategoryDto
@@ -1126,6 +1256,20 @@ namespace SIGETOUR.API.Controllers.UI
             }).ToList();
 
             ViewBag.CurrentSearch = search;
+
+            var routeParams = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(search)) routeParams["search"] = search;
+
+            ViewBag.Pagination = new PaginationViewModel
+            {
+                Action = "Categories",
+                Controller = "Admin",
+                CurrentPage = page,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                PageSize = pageSize,
+                RouteParams = routeParams
+            };
 
             return View(dtos);
         }

@@ -79,9 +79,13 @@
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
     <div class="px-6 py-3 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
         <span class="text-label-md font-bold text-on-surface" id="tourResultsCount">
-            @if (tours != null && tours.Any())
+            @{
+                var pvm = ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel;
+                int totalCount = pvm?.TotalItems ?? (tours?.Count() ?? 0);
+            }
+            @if (totalCount > 0)
             {
-                @:Mostrando @tours.Count() tours y circuitos
+                @:Total: @totalCount tours y circuitos
             }
             else
             {
@@ -191,6 +195,8 @@
             </tbody>
         </table>
     </div>
+
+    <partial name="_AdminPagination" model="ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel" />
 </div>
 
 <!-- MODAL DE CONFIRMACIÓN: ELIMINAR TOUR -->

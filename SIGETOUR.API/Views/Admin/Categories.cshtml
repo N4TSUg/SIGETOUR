@@ -115,7 +115,11 @@
                 <span class="material-symbols-outlined text-primary">view_list</span>
                 Listado de Categorías Registradas
             </h2>
-            <span class="text-label-sm text-on-surface-variant">@Model.Count() categorías en total</span>
+            @{
+                var pvm = ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel;
+                int totalCount = pvm?.TotalItems ?? (Model?.Count() ?? 0);
+            }
+            <span class="text-label-sm text-on-surface-variant">@totalCount categorías en total</span>
         </div>
 
         <div class="overflow-x-auto">
@@ -218,6 +222,8 @@
                 </tbody>
             </table>
         </div>
+
+        <partial name="_AdminPagination" model="ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel" />
     </div>
 </div>
 

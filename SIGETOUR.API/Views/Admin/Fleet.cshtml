@@ -62,9 +62,13 @@
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
     <div class="px-6 py-3 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
         <span class="text-label-md font-bold text-on-surface" id="fleetResultsCount">
-            @if (vehicles != null && vehicles.Any())
+            @{
+                var pvm = ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel;
+                int totalCount = pvm?.TotalItems ?? (vehicles?.Count() ?? 0);
+            }
+            @if (totalCount > 0)
             {
-                @:Mostrando @vehicles.Count() unidades vehiculares
+                @:Total: @totalCount unidades vehiculares
             }
             else
             {
@@ -163,6 +167,8 @@
             </tbody>
         </table>
     </div>
+
+    <partial name="_AdminPagination" model="ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel" />
 </div>
 
 <script>
