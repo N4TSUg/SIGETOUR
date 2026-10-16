@@ -3,21 +3,99 @@
     ViewData["Title"] = "Tours y Circuitos";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
     var tours = Model as IEnumerable<TourPackage>;
+    var categories = ViewBag.Categories as IEnumerable<Category> ?? Enumerable.Empty<Category>();
+    var currentSearch = ViewBag.CurrentSearch as string;
+    var currentCategoryId = ViewBag.CurrentCategoryId as Guid?;
+    var currentStatus = ViewBag.CurrentStatus as string;
+    bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch) || (currentCategoryId.HasValue && currentCategoryId.Value != Guid.Empty) || (!string.IsNullOrWhiteSpace(currentStatus) && currentStatus != "Todos");
 }
 
-<div class="mb-6 flex justify-between items-center">
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
         <h1 class="text-display-sm font-bold text-on-surface">Tours y Circuitos</h1>
-        <p class="text-body-lg text-on-surface-variant">Administración de paquetes turísticos.</p>
+        <p class="text-body-lg text-on-surface-variant">Administración, catálogo y estado de paquetes turísticos.</p>
     </div>
-    <a asp-action="CreateTour" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors">
-        <span class="material-symbols-outlined">add</span>
-        Nuevo Tour</a>
+    <div class="flex items-center gap-3">
+        <a asp-action="Categories" class="px-4 py-2 rounded-lg border border-outline-variant hover:bg-surface-container text-on-surface-variant font-label-md flex items-center gap-2 transition-colors">
+            <span class="material-symbols-outlined text-[18px]">category</span>
+            <span>Categorías</span>
+        </a>
+        <a asp-action="CreateTour" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm">
+            <span class="material-symbols-outlined">add</span>
+            Nuevo Tour
+        </a>
+    </div>
+</div>
+
+<!-- Barra de Búsqueda y Filtros de Tours -->
+<div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm mb-6">
+    <form method="get" asp-action="Tours" id="tourFilterForm" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <!-- Input de Búsqueda General -->
+        <div class="md:col-span-5 relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+            <input type="text" id="tourSearchInput" name="search" value="@currentSearch" placeholder="Buscar por título, subtítulo, duración o descripción..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+            @if (!string.IsNullOrWhiteSpace(currentSearch))
+            {
+                <a href="@Url.Action("Tours", "Admin", new { categoryId = currentCategoryId, status = currentStatus })" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface material-symbols-outlined text-[16px]">close</a>
+            }
+        </div>
+
+        <!-- Filtro por Categoría -->
+        <div class="md:col-span-3">
+            <select name="categoryId" id="tourCategorySelect" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                <option value="" selected="@(!currentCategoryId.HasValue || currentCategoryId.Value == Guid.Empty)">Todas las Categorías</option>
+                @foreach (var cat in categories)
+                {
+                    <option value="@cat.Id" selected="@(currentCategoryId.HasValue && currentCategoryId.Value == cat.Id)">@cat.Name</option>
+                }
+            </select>
+        </div>
+
+        <!-- Filtro por Estado -->
+        <div class="md:col-span-2">
+            <select name="status" id="tourStatusSelect" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                <option value="Todos" selected="@(string.IsNullOrEmpty(currentStatus) || currentStatus == "Todos")">Todos los Estados</option>
+                <option value="Activo" selected="@(currentStatus == "Activo")">Activos</option>
+                <option value="Inactivo" selected="@(currentStatus == "Inactivo")">Inactivos</option>
+            </select>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="md:col-span-2 flex items-center gap-2">
+            <button type="submit" class="flex-1 py-2 px-3 bg-primary hover:bg-[#0e5a52] text-on-primary font-bold text-body-sm rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                <span>Filtrar</span>
+            </button>
+            @if (hasFilters)
+            {
+                <a href="@Url.Action("Tours", "Admin")" class="py-2 px-2.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg border border-outline-variant flex items-center justify-center transition-colors cursor-pointer" title="Limpiar todos los filtros">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                </a>
+            }
+        </div>
+    </form>
 </div>
 
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
+    <div class="px-6 py-3 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
+        <span class="text-label-md font-bold text-on-surface" id="tourResultsCount">
+            @if (tours != null && tours.Any())
+            {
+                @:Mostrando @tours.Count() tours y circuitos
+            }
+            else
+            {
+                @:0 tours encontrados
+            }
+        </span>
+        @if (hasFilters)
+        {
+            <span class="text-xs text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">Filtro aplicado</span>
+        }
+    </div>
+
     <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
+        <table class="w-full text-left border-collapse" id="toursTable">
             <thead>
                 <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant">
                     <th class="p-4 font-semibold">Tour / Circuito</th>
@@ -28,12 +106,15 @@
                     <th class="p-4 font-semibold text-right">Acciones</th>
                 </tr>
             </thead>
-            <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50">
+            <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50" id="toursTableBody">
                 @if (tours != null && tours.Any())
                 {
                     foreach (var tour in tours)
                     {
-                        <tr class="hover:bg-surface-container-low/50 transition-colors">
+                        var categoryName = tour.Category?.Name ?? "Sin categoría";
+                        var statusStr = tour.IsActive ? "activo" : "inactivo";
+                        var searchMeta = $"{tour.Title} {tour.Subtitle} {tour.Description} {tour.Duration} {categoryName}".ToLower();
+                        <tr class="hover:bg-surface-container-low/50 transition-colors tour-row" data-search="@searchMeta" data-category="@(tour.CategoryId?.ToString() ?? "")" data-status="@statusStr">
                             <td class="p-4">
                                 <div class="flex items-center gap-3">
                                     <div class="w-10 h-10 rounded-lg overflow-hidden bg-surface-container flex-shrink-0">
@@ -48,13 +129,19 @@
                                             </div>
                                         }
                                     </div>
-                                    <div class="font-bold text-on-surface">@tour.Title</div>
+                                    <div>
+                                        <div class="font-bold text-on-surface">@tour.Title</div>
+                                        @if (!string.IsNullOrWhiteSpace(tour.Subtitle))
+                                        {
+                                            <div class="text-xs text-on-surface-variant line-clamp-1">@tour.Subtitle</div>
+                                        }
+                                    </div>
                                 </div>
                             </td>
                             <td class="p-4">
                                 <span class="px-2.5 py-1 rounded-md bg-secondary-container text-on-secondary-container font-label-sm inline-flex items-center gap-1.5 font-medium">
                                     <span class="material-symbols-outlined text-[15px]">@(tour.Category?.Icon ?? "label")</span>
-                                    @(tour.Category?.Name ?? "Sin categoría")
+                                    @categoryName
                                 </span>
                             </td>
                             <td class="p-4">@tour.Duration</td>
@@ -62,38 +149,49 @@
                             <td class="p-4 text-center">
                                 @if (tour.IsActive)
                                 {
-                                    <span class="inline-flex items-center gap-1 text-green-800 bg-green-100 px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-green-800 bg-green-100 px-2 py-1 rounded-full font-label-sm font-semibold">
                                         <span class="material-symbols-outlined text-[14px]">check_circle</span> Activo
                                     </span>
                                 }
                                 else
                                 {
-                                    <span class="inline-flex items-center gap-1 text-red-800 bg-red-100 px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-red-800 bg-red-100 px-2 py-1 rounded-full font-label-sm font-semibold">
                                         <span class="material-symbols-outlined text-[14px]">cancel</span> Inactivo
                                     </span>
                                 }
                             </td>
                             <td class="p-4 text-right space-x-1">
                                 <a asp-action="EditTour" asp-route-id="@tour.Id" class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors inline-block" title="Editar"><span class="material-symbols-outlined text-[20px]">edit</span></a>
-                                <button type="button" class="p-2 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-surface-container transition-colors" title="Eliminar" onclick="openDeleteModal('@tour.Id', '@tour.Title')"><span class="material-symbols-outlined text-[20px]">delete</span></button>
+                                <button type="button" class="p-2 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Eliminar" onclick="openDeleteModal('@tour.Id', '@tour.Title')"><span class="material-symbols-outlined text-[20px]">delete</span></button>
                             </td>
                         </tr>
                     }
                 }
                 else
                 {
-                    <tr>
+                    <tr id="noToursServerRow">
                         <td colspan="6" class="p-8 text-center text-on-surface-variant">
-                            No hay tours registrados en la base de datos.
+                            <span class="material-symbols-outlined text-outline text-4xl block mb-2">tour</span>
+                            No se encontraron tours con los criterios seleccionados.
+                            @if (hasFilters)
+                            {
+                                <div class="mt-3">
+                                    <a href="@Url.Action("Tours", "Admin")" class="text-primary font-bold hover:underline">Limpiar filtros</a>
+                                </div>
+                            }
                         </td>
                     </tr>
                 }
+                <tr id="noToursClientRow" class="hidden">
+                    <td colspan="6" class="p-8 text-center text-on-surface-variant">
+                        <span class="material-symbols-outlined text-outline text-4xl block mb-2">search_off</span>
+                        No hay tours que coincidan con la búsqueda en tiempo real.
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
-
-
 
 <!-- MODAL DE CONFIRMACIÓN: ELIMINAR TOUR -->
 <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="deleteTourModal">
@@ -109,7 +207,7 @@
               <span class="text-label-sm font-label-sm text-red-600 font-bold tracking-wider uppercase">Acción Destructiva Irreversible</span>
           </div>
       </div>
-      <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" onclick="closeDeleteModal()" type="button">
+      <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer" onclick="closeDeleteModal()" type="button">
           <span class="material-symbols-outlined">close</span>
       </button>
   </div>
@@ -126,10 +224,10 @@
       </div>
   </div>
   <div class="p-6 pt-4 bg-surface-container-high/20 border-t border-outline-variant/40 flex flex-col-reverse sm:flex-row justify-end gap-3">
-      <button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md font-bold hover:bg-surface-container transition-all" onclick="closeDeleteModal()" type="button">Cancelar</button>
+      <button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md font-bold hover:bg-surface-container transition-all cursor-pointer" onclick="closeDeleteModal()" type="button">Cancelar</button>
       <form asp-action="DeleteTour" method="post" id="deleteTourForm">
           <input type="hidden" name="id" id="deleteTourIdInput" />
-          <button type="submit" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700" disabled id="confirmDeleteActionBtn">
+          <button type="submit" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700 cursor-pointer" disabled id="confirmDeleteActionBtn">
               <span class="material-symbols-outlined text-[18px]">delete_forever</span>
               <span>Sí, Eliminar Definitivamente</span>
           </button>
@@ -137,6 +235,7 @@
   </div>
 </div>
 </div>
+
 <script>
   function openDeleteModal(id, name) {
       document.getElementById('deleteTourIdInput').value = id;
@@ -150,5 +249,34 @@
   }
   document.getElementById('confirmDeleteInput').addEventListener('input', (e) => {
       document.getElementById('confirmDeleteActionBtn').disabled = (e.target.value.trim().toUpperCase() !== 'ELIMINAR');
+  });
+
+  document.addEventListener('DOMContentLoaded', function() {
+      const searchInput = document.getElementById('tourSearchInput');
+      const rows = document.querySelectorAll('.tour-row');
+      const noToursClientRow = document.getElementById('noToursClientRow');
+      const countLabel = document.getElementById('tourResultsCount');
+
+      if (searchInput) {
+          searchInput.addEventListener('input', function() {
+              const query = this.value.trim().toLowerCase();
+              let visibleCount = 0;
+
+              rows.forEach(row => {
+                  const text = row.getAttribute('data-search') || '';
+                  const match = !query || text.includes(query);
+                  row.style.display = match ? '' : 'none';
+                  if (match) visibleCount++;
+              });
+
+              if (noToursClientRow) {
+                  noToursClientRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
+              }
+
+              if (countLabel && rows.length > 0) {
+                  countLabel.innerText = `Mostrando ${visibleCount} de ${rows.length} tours`;
+              }
+          });
+      }
   });
 </script>

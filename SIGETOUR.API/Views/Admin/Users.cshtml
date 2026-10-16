@@ -1,24 +1,69 @@
-﻿@using SIGETOUR.API.Core.Entities
+@using SIGETOUR.API.Core.Entities
 @{
     ViewData["Title"] = "Usuarios del Sistema";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
     var users = Model as IEnumerable<ApplicationUser>;
+    var currentSearch = ViewBag.CurrentSearch as string;
+    bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch);
 }
 
-<div class="mb-6 flex justify-between items-center">
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
         <h1 class="text-display-sm font-bold text-on-surface">Gestión de Usuarios</h1>
-        <p class="text-body-lg text-on-surface-variant">Personal, administradores y conductores.</p>
+        <p class="text-body-lg text-on-surface-variant">Personal, administradores, conductores y operadores.</p>
     </div>
-    <button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors">
+    <button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm shrink-0">
         <span class="material-symbols-outlined">person_add</span>
         Nuevo Usuario
     </button>
 </div>
 
+<!-- Barra de Búsqueda de Usuarios -->
+<div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm mb-6">
+    <form method="get" asp-action="Users" id="userFilterForm" class="flex flex-col sm:flex-row items-center gap-3">
+        <div class="relative flex-1 w-full">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+            <input type="text" id="userSearchInput" name="search" value="@currentSearch" placeholder="Buscar por nombre, apellido, correo electrónico o usuario..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+            @if (hasFilters)
+            {
+                <a href="@Url.Action("Users", "Admin")" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface material-symbols-outlined text-[16px]">close</a>
+            }
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button type="submit" class="py-2 px-4 bg-primary hover:bg-[#0e5a52] text-on-primary font-bold text-body-sm rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">search</span>
+                <span>Buscar</span>
+            </button>
+            @if (hasFilters)
+            {
+                <a href="@Url.Action("Users", "Admin")" class="py-2 px-3 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg border border-outline-variant flex items-center justify-center transition-colors cursor-pointer" title="Limpiar búsqueda">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
+    <div class="px-6 py-3 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
+        <span class="text-label-md font-bold text-on-surface" id="userResultsCount">
+            @if (users != null && users.Any())
+            {
+                @:Mostrando @users.Count() usuarios registrados
+            }
+            else
+            {
+                @:0 usuarios encontrados
+            }
+        </span>
+        @if (hasFilters)
+        {
+            <span class="text-xs text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">Filtro aplicado</span>
+        }
+    </div>
+
     <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
+        <table class="w-full text-left border-collapse" id="usersTable">
             <thead>
                 <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant">
                     <th class="p-4 font-semibold">Nombre Completo</th>
@@ -27,12 +72,13 @@
                     <th class="p-4 font-semibold text-right">Acciones</th>
                 </tr>
             </thead>
-            <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50">
+            <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50" id="usersTableBody">
                 @if (users != null && users.Any())
                 {
                     foreach (var user in users)
                     {
-                        <tr class="hover:bg-surface-container-low/50 transition-colors">
+                        var searchMeta = $"{user.FirstName} {user.LastName} {user.Email} {user.UserName}".ToLower();
+                        <tr class="hover:bg-surface-container-low/50 transition-colors user-row" data-search="@searchMeta">
                             <td class="p-4 font-bold text-on-surface">@user.FirstName @user.LastName</td>
                             <td class="p-4 text-on-surface-variant">@user.Email</td>
                             <td class="p-4">
@@ -41,10 +87,10 @@
                                 </span>
                             </td>
                             <td class="p-4 text-right space-x-1">
-                                <button class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Editar">
+                                <button class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Editar">
                                     <span class="material-symbols-outlined text-[20px]">edit</span>
                                 </button>
-                                <button class="p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-surface-container transition-colors" title="Eliminar">
+                                <button class="p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Eliminar">
                                     <span class="material-symbols-outlined text-[20px]">delete</span>
                                 </button>
                             </td>
@@ -53,14 +99,57 @@
                 }
                 else
                 {
-                    <tr>
+                    <tr id="noUsersServerRow">
                         <td colspan="4" class="p-8 text-center text-on-surface-variant">
-                            No hay usuarios registrados en la base de datos.
+                            <span class="material-symbols-outlined text-outline text-4xl block mb-2">person_off</span>
+                            No se encontraron usuarios con los criterios de búsqueda.
+                            @if (hasFilters)
+                            {
+                                <div class="mt-3">
+                                    <a href="@Url.Action("Users", "Admin")" class="text-primary font-bold hover:underline">Limpiar búsqueda</a>
+                                </div>
+                            }
                         </td>
                     </tr>
                 }
+                <tr id="noUsersClientRow" class="hidden">
+                    <td colspan="4" class="p-8 text-center text-on-surface-variant">
+                        <span class="material-symbols-outlined text-outline text-4xl block mb-2">search_off</span>
+                        No hay usuarios que coincidan con la búsqueda en tiempo real.
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('userSearchInput');
+    const rows = document.querySelectorAll('.user-row');
+    const noUsersClientRow = document.getElementById('noUsersClientRow');
+    const countLabel = document.getElementById('userResultsCount');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const text = row.getAttribute('data-search') || '';
+                const match = !query || text.includes(query);
+                row.style.display = match ? '' : 'none';
+                if (match) visibleCount++;
+            });
+
+            if (noUsersClientRow) {
+                noUsersClientRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
+            }
+
+            if (countLabel && rows.length > 0) {
+                countLabel.innerText = `Mostrando ${visibleCount} de ${rows.length} usuarios`;
+            }
+        });
+    }
+});
+</script>

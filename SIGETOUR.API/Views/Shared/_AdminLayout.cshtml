@@ -141,10 +141,15 @@
 <span class="text-title-md font-title-md font-bold text-primary dark:text-inverse-primary tracking-wide hidden sm:inline">Turismo Chilón</span>
 </a>
 <!-- Quick Passenger/Booking Search -->
-<div class="relative hidden lg:block w-80">
-<span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-[18px]">search</span>
-<input class="w-full pl-9 pr-4 py-1.5 bg-surface/50 border border-outline-variant/60 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Buscar pasajero, DNI o reserva..." type="text">
+<form method="get" action="@Url.Action("Bookings", "Admin")" id="globalAdminSearchForm" class="relative hidden lg:block w-80 xl:w-96">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-outline text-[18px]">search</span>
+<input id="globalAdminSearchInput" name="search" autocomplete="off" class="w-full pl-9 pr-9 py-1.5 bg-surface/50 border border-outline-variant/60 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Buscar pasajero, DNI, tour, reserva..." type="text">
+<button type="button" id="clearGlobalSearchBtn" class="material-symbols-outlined absolute right-2.5 text-outline hover:text-on-surface text-[16px] hidden cursor-pointer">close</button>
 </div>
+<div id="globalSearchResults" class="absolute left-0 right-0 top-full mt-2 bg-surface-container-lowest rounded-xl shadow-2xl border border-outline-variant hidden z-50 max-h-[420px] overflow-y-auto divide-y divide-outline-variant/50">
+</div>
+</form>
 </div>
 <!-- Central Operational Status Tag -->
 <div class="hidden xl:flex items-center gap-space-sm px-space-md py-1 bg-surface-container rounded-full border border-primary/20">
@@ -278,10 +283,159 @@
 <!-- MAIN DASHBOARD CONTENT AREA -->
 <main class="flex-1 overflow-y-auto custom-scrollbar p-space-lg flex flex-col gap-space-lg">
     @RenderBody()
+</main>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('globalAdminSearchInput');
+    const searchResults = document.getElementById('globalSearchResults');
+    const clearBtn = document.getElementById('clearGlobalSearchBtn');
+    let debounceTimer = null;
 
-</body></html>
+    if (!searchInput || !searchResults) return;
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (clearBtn) {
+            clearBtn.classList.toggle('hidden', query.length === 0);
+        }
+
+        clearTimeout(debounceTimer);
+        if (query.length < 2) {
+            searchResults.innerHTML = '';
+            searchResults.classList.add('hidden');
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/Admin/QuickSearch?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    renderGlobalSearchResults(data, query);
+                })
+                .catch(err => {
+                    console.error('Error in QuickSearch:', err);
+                });
+        }, 250);
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            searchResults.innerHTML = '';
+            searchResults.classList.add('hidden');
+            clearBtn.classList.add('hidden');
+            searchInput.focus();
+        });
+    }
+
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.add('hidden');
+        }
+    });
+
+    searchInput.addEventListener('focus', function() {
+        if (searchResults.children.length > 0 && this.value.trim().length >= 2) {
+            searchResults.classList.remove('hidden');
+        }
+    });
+
+    function renderGlobalSearchResults(data, query) {
+        searchResults.innerHTML = '';
+        const total = (data.bookings?.length || 0) + (data.tours?.length || 0) + (data.vehicles?.length || 0);
+
+        if (total === 0) {
+            searchResults.innerHTML = `
+                <div class="p-4 text-center text-on-surface-variant text-body-sm">
+                    <span class="material-symbols-outlined text-outline text-2xl block mb-1">search_off</span>
+                    No se encontraron coincidencias para "<span class="font-bold text-on-surface">${escapeHtml(query)}</span>"
+                    <p class="text-xs text-outline mt-1">Presiona <kbd class="px-1.5 py-0.5 bg-surface-container rounded border border-outline-variant font-mono">Enter</kbd> para buscar en Reservas</p>
+                </div>`;
+            searchResults.classList.remove('hidden');
+            return;
+        }
+
+        let html = '';
+
+        if (data.bookings && data.bookings.length > 0) {
+            html += `<div class="p-2 bg-surface-container-low text-label-sm font-bold text-secondary uppercase tracking-wider flex items-center justify-between">
+                <span>Reservas (${data.bookings.length})</span>
+                <a href="/Admin/Bookings?search=${encodeURIComponent(query)}" class="text-primary hover:underline lowercase font-normal text-xs">ver todas &rarr;</a>
+            </div>`;
+            data.bookings.forEach(b => {
+                html += `
+                    <a href="${b.url}" class="block p-3 hover:bg-surface-container transition-colors">
+                        <div class="flex items-center justify-between">
+                            <span class="font-mono font-bold text-primary text-xs bg-primary/10 px-1.5 py-0.5 rounded">${escapeHtml(b.reference)}</span>
+                            <span class="text-label-sm font-bold text-on-surface">S/ ${b.amount}</span>
+                        </div>
+                        <div class="text-body-sm font-semibold text-on-surface mt-1">${escapeHtml(b.customer)}</div>
+                        <div class="text-xs text-on-surface-variant flex items-center gap-2 mt-0.5">
+                            ${b.dni ? `<span>DNI: ${escapeHtml(b.dni)}</span> &bull;` : ''}
+                            <span>Viaje: ${escapeHtml(b.date)}</span> &bull;
+                            <span class="font-medium">${escapeHtml(b.status)}</span>
+                        </div>
+                    </a>
+                `;
+            });
+        }
+
+        if (data.tours && data.tours.length > 0) {
+            html += `<div class="p-2 bg-surface-container-low text-label-sm font-bold text-secondary uppercase tracking-wider flex items-center justify-between">
+                <span>Tours (${data.tours.length})</span>
+                <a href="/Admin/Tours?search=${encodeURIComponent(query)}" class="text-primary hover:underline lowercase font-normal text-xs">ver todos &rarr;</a>
+            </div>`;
+            data.tours.forEach(t => {
+                html += `
+                    <a href="${t.url}" class="flex items-center gap-3 p-3 hover:bg-surface-container transition-colors">
+                        <img src="${t.image}" alt="${escapeHtml(t.title)}" class="w-10 h-10 rounded-lg object-cover bg-surface-container border border-outline-variant shrink-0" onerror="this.src='/images/placeholder.jpg'" />
+                        <div class="flex-1 min-w-0">
+                            <div class="text-body-sm font-bold text-on-surface truncate">${escapeHtml(t.title)}</div>
+                            <div class="text-xs font-semibold text-primary">S/ ${t.price}</div>
+                        </div>
+                        <span class="material-symbols-outlined text-outline text-[18px]">chevron_right</span>
+                    </a>
+                `;
+            });
+        }
+
+        if (data.vehicles && data.vehicles.length > 0) {
+            html += `<div class="p-2 bg-surface-container-low text-label-sm font-bold text-secondary uppercase tracking-wider flex items-center justify-between">
+                <span>Vehículos (${data.vehicles.length})</span>
+                <a href="/Admin/Fleet?search=${encodeURIComponent(query)}" class="text-primary hover:underline lowercase font-normal text-xs">ver todos &rarr;</a>
+            </div>`;
+            data.vehicles.forEach(v => {
+                html += `
+                    <a href="${v.url}" class="flex items-center justify-between p-3 hover:bg-surface-container transition-colors">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary text-[18px]">directions_bus</span>
+                            <div>
+                                <span class="font-mono font-bold text-on-surface text-body-sm">${escapeHtml(v.plate)}</span>
+                                <span class="text-xs text-on-surface-variant block">${escapeHtml(v.model)}</span>
+                            </div>
+                        </div>
+                        <span class="text-label-sm px-2 py-0.5 rounded-full bg-surface-container font-medium text-xs">${escapeHtml(v.status)}</span>
+                    </a>
+                `;
+            });
+        }
+
+        searchResults.innerHTML = html;
+        searchResults.classList.remove('hidden');
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+});
+</script>
+
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
 
 
 

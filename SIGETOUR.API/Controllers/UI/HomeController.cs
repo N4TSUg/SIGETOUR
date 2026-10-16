@@ -44,6 +44,19 @@ namespace SIGETOUR.API.Controllers.UI
 
             ViewBag.Vehicles = vehicles;
 
+            var allTours = await _context.TourPackages
+                .Where(t => t.IsActive)
+                .OrderBy(t => t.Title)
+                .Select(t => new { t.Id, t.Title, t.Slug, t.CategoryId })
+                .ToListAsync();
+            ViewBag.AllTours = allTours;
+
+            var categories = await _context.Categories
+                .Where(c => c.IsActive)
+                .OrderBy(c => c.DisplayOrder)
+                .ToListAsync();
+            ViewBag.Categories = categories;
+
             return View(tours);
         }
     }

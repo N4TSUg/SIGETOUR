@@ -82,6 +82,32 @@
         </div>
     </div>
 
+    <!-- Search Bar for Categories -->
+    <div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm">
+        <form method="get" asp-action="Categories" id="categoryFilterForm" class="flex flex-col sm:flex-row items-center gap-3">
+            <div class="relative flex-1 w-full">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+                <input type="text" id="categorySearchInput" name="search" value="@ViewBag.CurrentSearch" placeholder="Buscar categoría por nombre o descripción..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+                @if (!string.IsNullOrWhiteSpace(ViewBag.CurrentSearch as string))
+                {
+                    <a href="@Url.Action("Categories", "Admin")" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface material-symbols-outlined text-[16px]">close</a>
+                }
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <button type="submit" class="py-2 px-4 bg-primary hover:bg-[#0e5a52] text-on-primary font-bold text-body-sm rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">search</span>
+                    <span>Buscar</span>
+                </button>
+                @if (!string.IsNullOrWhiteSpace(ViewBag.CurrentSearch as string))
+                {
+                    <a href="@Url.Action("Categories", "Admin")" class="py-2 px-3 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg border border-outline-variant flex items-center justify-center transition-colors cursor-pointer" title="Limpiar búsqueda">
+                        <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+
     <!-- Table Section -->
     <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
         <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
@@ -109,7 +135,7 @@
                     {
                         foreach (var cat in Model)
                         {
-                            <tr class="hover:bg-surface-container-low/50 transition-colors">
+                            <tr class="hover:bg-surface-container-low/50 transition-colors category-row" data-search="@($"{cat.Name} {cat.Description}".ToLower())">
                                 <td class="p-4 pl-6">
                                     <span class="w-8 h-8 rounded-lg bg-surface-container text-primary font-bold text-label-md flex items-center justify-center border border-outline-variant">
                                         @cat.DisplayOrder
@@ -167,13 +193,28 @@
                         <tr>
                             <td colspan="6" class="p-12 text-center text-on-surface-variant">
                                 <span class="material-symbols-outlined text-4xl text-outline mb-2">category</span>
-                                <p class="text-body-md font-medium">No hay categorías registradas en la base de datos.</p>
-                                <a asp-action="CreateCategory" class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md font-bold hover:bg-primary/90 transition-colors">
-                                    <span class="material-symbols-outlined text-[18px]">add</span> Crear Primera Categoría
-                                </a>
+                                <p class="text-body-md font-medium">No se encontraron categorías con los criterios de búsqueda.</p>
+                                @if (!string.IsNullOrWhiteSpace(ViewBag.CurrentSearch as string))
+                                {
+                                    <div class="mt-3">
+                                        <a href="@Url.Action("Categories", "Admin")" class="text-primary font-bold hover:underline">Limpiar búsqueda</a>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <a asp-action="CreateCategory" class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md font-bold hover:bg-primary/90 transition-colors">
+                                        <span class="material-symbols-outlined text-[18px]">add</span> Crear Primera Categoría
+                                    </a>
+                                }
                             </td>
                         </tr>
                     }
+                    <tr id="noCategoriesClientRow" class="hidden">
+                        <td colspan="6" class="p-12 text-center text-on-surface-variant">
+                            <span class="material-symbols-outlined text-4xl text-outline mb-2">search_off</span>
+                            <p class="text-body-md font-medium">No hay categorías que coincidan con la búsqueda en tiempo real.</p>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -247,5 +288,31 @@
     }
     document.getElementById('confirmDeleteCategoryInput').addEventListener('input', (e) => {
         document.getElementById('confirmDeleteCategoryActionBtn').disabled = (e.target.value.trim().toUpperCase() !== 'ELIMINAR');
+    });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('categorySearchInput');
+        const rows = document.querySelectorAll('.category-row');
+        const noCatClientRow = document.getElementById('noCategoriesClientRow');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(row => {
+                    const text = row.getAttribute('data-search') || '';
+                    const match = !query || text.includes(query);
+                    row.style.display = match ? '' : 'none';
+                    if (match) visibleCount++;
+                });
+
+                if (noCatClientRow) {
+                    noCatClientRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
+                }
+            });
+        }
     });
 </script>

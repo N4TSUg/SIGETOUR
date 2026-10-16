@@ -1,9 +1,10 @@
+using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SIGETOUR.API.Core.Enums;
 using SIGETOUR.API.Infrastructure.Data;
-using System;
-using System.Threading.Tasks;
 
 namespace SIGETOUR.API.Controllers.UI
 {
@@ -16,13 +17,91 @@ namespace SIGETOUR.API.Controllers.UI
             _context = context;
         }
 
-        public async Task<IActionResult> Catalog()
+        public async Task<IActionResult> Catalog(
+            string? q,
+            Guid? categoryId,
+            string? date,
+            string? shift,
+            string? modality,
+            string? difficulty,
+            decimal? maxPrice,
+            string? sortBy)
         {
-            var tours = await _context.TourPackages
+            var query = _context.TourPackages
                 .Include(t => t.Images)
                 .Include(t => t.Category)
-                .Where(t => t.IsActive)
+                .Include(t => t.Shifts)
+                .Where(t => t.IsActive);
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var term = q.Trim().ToLower();
+                query = query.Where(t => 
+                    t.Title.ToLower().Contains(term) || 
+                    t.Subtitle.ToLower().Contains(term) || 
+                    t.Description.ToLower().Contains(term) ||
+                    (t.Category != null && t.Category.Name.ToLower().Contains(term)));
+            }
+
+            if (categoryId.HasValue && categoryId.Value != Guid.Empty)
+            {
+                query = query.Where(t => t.CategoryId == categoryId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(modality) && modality != "Todos")
+            {
+                if (Enum.TryParse<TourModality>(modality, true, out var modEnum))
+                {
+                    query = query.Where(t => t.Modality == modEnum);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(difficulty) && difficulty != "Todos")
+            {
+                if (Enum.TryParse<TourDifficulty>(difficulty, true, out var diffEnum))
+                {
+                    query = query.Where(t => t.Difficulty == diffEnum);
+                }
+            }
+
+            if (maxPrice.HasValue && maxPrice.Value > 0)
+            {
+                query = query.Where(t => t.BasePrice <= maxPrice.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(shift) && shift != "Todos" && shift != "Cualquier Turno")
+            {
+                query = query.Where(t => t.Shifts.Any(s => s.ShiftName.ToLower().Contains(shift.ToLower())));
+            }
+
+            // Sorting
+            query = sortBy switch
+            {
+                "price-asc" => query.OrderBy(t => t.BasePrice),
+                "price-desc" => query.OrderByDescending(t => t.BasePrice),
+                "title" => query.OrderBy(t => t.Title),
+                _ => query.OrderBy(t => t.Title)
+            };
+
+            var tours = await query.ToListAsync();
+
+            // Load categories with count of active tours
+            var categories = await _context.Categories
+                .Where(c => c.IsActive)
+                .Include(c => c.TourPackages)
+                .OrderBy(c => c.DisplayOrder)
                 .ToListAsync();
+
+            ViewBag.Categories = categories;
+            ViewBag.CurrentQ = q;
+            ViewBag.CurrentCategoryId = categoryId;
+            ViewBag.CurrentDate = date;
+            ViewBag.CurrentShift = shift;
+            ViewBag.CurrentModality = modality;
+            ViewBag.CurrentDifficulty = difficulty;
+            ViewBag.CurrentMaxPrice = maxPrice;
+            ViewBag.CurrentSortBy = sortBy;
+
             return View(tours);
         }
 

@@ -1,24 +1,90 @@
-﻿@using SIGETOUR.API.Core.Entities
+@using SIGETOUR.API.Core.Entities
 @{
     ViewData["Title"] = "Reservas";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
     var bookings = Model as IEnumerable<Booking>;
+    var currentSearch = ViewBag.CurrentSearch as string;
+    var currentStatus = ViewBag.CurrentStatus as string;
+    var currentDate = ViewBag.CurrentDate as string;
+    bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch) || (!string.IsNullOrWhiteSpace(currentStatus) && currentStatus != "Todos") || !string.IsNullOrWhiteSpace(currentDate);
 }
 
-<div class="mb-6 flex justify-between items-center">
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
         <h1 class="text-display-sm font-bold text-on-surface">Gestión de Reservas</h1>
-        <p class="text-body-lg text-on-surface-variant">Historial y estado de las reservas de clientes.</p>
+        <p class="text-body-lg text-on-surface-variant">Historial, búsqueda y control de estados de reservas.</p>
     </div>
-    <a href="@Url.Action("CreateBooking", "Admin")" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors inline-flex" title="Ir al catálogo para registrar reserva">
+    <a href="@Url.Action("CreateBooking", "Admin")" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors inline-flex shadow-sm shrink-0" title="Ir al formulario para registrar reserva manual">
         <span class="material-symbols-outlined">add</span>
         Nueva Reserva Manual
     </a>
 </div>
 
+<!-- Barra de Búsqueda y Filtros -->
+<div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm mb-6">
+    <form method="get" asp-action="Bookings" id="bookingFilterForm" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <!-- Input de Búsqueda General -->
+        <div class="md:col-span-5 relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+            <input type="text" id="bookingSearchInput" name="search" value="@currentSearch" placeholder="Buscar por código, cliente, DNI, teléfono u operación..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+            @if (!string.IsNullOrWhiteSpace(currentSearch))
+            {
+                <a href="@Url.Action("Bookings", "Admin", new { status = currentStatus, date = currentDate })" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface material-symbols-outlined text-[16px]">close</a>
+            }
+        </div>
+
+        <!-- Filtro por Estado -->
+        <div class="md:col-span-3">
+            <select name="status" id="bookingStatusSelect" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                <option value="Todos" selected="@(string.IsNullOrEmpty(currentStatus) || currentStatus == "Todos")">Todos los Estados</option>
+                <option value="Confirmed" selected="@(currentStatus == "Confirmed")">Confirmados</option>
+                <option value="Pending" selected="@(currentStatus == "Pending")">Pendientes</option>
+                <option value="Cancelled" selected="@(currentStatus == "Cancelled")">Cancelados</option>
+            </select>
+        </div>
+
+        <!-- Filtro por Fecha de Viaje -->
+        <div class="md:col-span-2">
+            <input type="date" name="date" id="bookingDateInput" value="@currentDate" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" title="Filtrar por fecha de viaje" />
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="md:col-span-2 flex items-center gap-2">
+            <button type="submit" class="flex-1 py-2 px-3 bg-primary hover:bg-[#0e5a52] text-on-primary font-bold text-body-sm rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                <span>Filtrar</span>
+            </button>
+            @if (hasFilters)
+            {
+                <a href="@Url.Action("Bookings", "Admin")" class="py-2 px-2.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg border border-outline-variant flex items-center justify-center transition-colors cursor-pointer" title="Limpiar todos los filtros">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
+<!-- Tabla de Reservas -->
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
+    <div class="px-6 py-3 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
+        <span class="text-label-md font-bold text-on-surface" id="bookingResultsCount">
+            @if (bookings != null && bookings.Any())
+            {
+                @:Mostrando @bookings.Count() reservas registradas
+            }
+            else
+            {
+                @:0 reservas encontradas
+            }
+        </span>
+        @if (hasFilters)
+        {
+            <span class="text-xs text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">Filtro aplicado</span>
+        }
+    </div>
+
     <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
+        <table class="w-full text-left border-collapse" id="bookingsTable">
             <thead>
                 <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant">
                     <th class="p-4 font-semibold">Código</th>
@@ -30,36 +96,48 @@
                     <th class="p-4 font-semibold text-right">Acciones</th>
                 </tr>
             </thead>
-            <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50">
+            <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50" id="bookingsTableBody">
                 @if (bookings != null && bookings.Any())
                 {
                     foreach (var booking in bookings)
                     {
-                        <tr class="hover:bg-surface-container-low/50 transition-colors">
+                        var statusStr = booking.Status.ToString();
+                        var searchMeta = $"{booking.ReferenceCode} {booking.CustomerName} {booking.CustomerEmail} {booking.CustomerPhone} {booking.CustomerDni} {booking.OperationNumber}".ToLower();
+                        <tr class="hover:bg-surface-container-low/50 transition-colors booking-row" data-search="@searchMeta" data-status="@statusStr" data-date="@booking.TravelDate.ToString("yyyy-MM-dd")">
                             <td class="p-4 font-mono font-bold text-primary">@booking.ReferenceCode</td>
                             <td class="p-4">
                                 <div class="font-bold text-on-surface">@booking.CustomerName</div>
                                 <div class="text-label-sm text-on-surface-variant">@booking.CustomerEmail</div>
+                                @if (!string.IsNullOrWhiteSpace(booking.CustomerPhone))
+                                {
+                                    <div class="text-xs text-outline">Tel: @booking.CustomerPhone</div>
+                                }
                             </td>
-                            <td class="p-4">@booking.TravelDate.ToString("dd MMM yyyy")</td>
+                            <td class="p-4">
+                                <div>@booking.TravelDate.ToString("dd MMM yyyy")</div>
+                                @if (!string.IsNullOrWhiteSpace(booking.ShiftName))
+                                {
+                                    <span class="text-xs text-outline font-medium">Turno: @booking.ShiftName</span>
+                                }
+                            </td>
                             <td class="p-4">@booking.TotalPassengers pax</td>
-                            <td class="p-4 font-bold">S/ @booking.TotalAmount</td>
+                            <td class="p-4 font-bold text-on-surface">S/ @booking.TotalAmount</td>
                             <td class="p-4 text-center">
                                 @if (booking.Status == BookingStatus.Confirmed)
                                 {
-                                    <span class="inline-flex items-center gap-1 text-green-800 bg-green-100 px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-green-800 bg-green-100 px-2.5 py-1 rounded-full font-label-sm font-semibold">
                                         <span class="material-symbols-outlined text-[14px]">check_circle</span> Confirmado
                                     </span>
                                 }
                                 else if (booking.Status == BookingStatus.Pending)
                                 {
-                                    <span class="inline-flex items-center gap-1 text-yellow-800 bg-yellow-100 px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-yellow-800 bg-yellow-100 px-2.5 py-1 rounded-full font-label-sm font-semibold">
                                         <span class="material-symbols-outlined text-[14px]">pending</span> Pendiente
                                     </span>
                                 }
                                 else
                                 {
-                                    <span class="inline-flex items-center gap-1 text-red-800 bg-red-100 px-2 py-1 rounded-full font-label-sm">
+                                    <span class="inline-flex items-center gap-1 text-red-800 bg-red-100 px-2.5 py-1 rounded-full font-label-sm font-semibold">
                                         <span class="material-symbols-outlined text-[14px]">cancel</span> Cancelado
                                     </span>
                                 }
@@ -74,17 +152,57 @@
                 }
                 else
                 {
-                    <tr>
+                    <tr id="noResultsServerRow">
                         <td colspan="7" class="p-8 text-center text-on-surface-variant">
-                            No hay reservas registradas en la base de datos.
+                            <span class="material-symbols-outlined text-outline text-4xl block mb-2">calendar_today</span>
+                            No se encontraron reservas con los criterios seleccionados.
+                            @if (hasFilters)
+                            {
+                                <div class="mt-3">
+                                    <a href="@Url.Action("Bookings", "Admin")" class="text-primary font-bold hover:underline">Limpiar filtros</a>
+                                </div>
+                            }
                         </td>
                     </tr>
                 }
+                <tr id="noResultsClientRow" class="hidden">
+                    <td colspan="7" class="p-8 text-center text-on-surface-variant">
+                        <span class="material-symbols-outlined text-outline text-4xl block mb-2">search_off</span>
+                        No hay reservas que coincidan con la búsqueda en tiempo real.
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('bookingSearchInput');
+    const rows = document.querySelectorAll('.booking-row');
+    const noResultsClientRow = document.getElementById('noResultsClientRow');
+    const countLabel = document.getElementById('bookingResultsCount');
 
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            let visibleCount = 0;
 
+            rows.forEach(row => {
+                const text = row.getAttribute('data-search') || '';
+                const match = !query || text.includes(query);
+                row.style.display = match ? '' : 'none';
+                if (match) visibleCount++;
+            });
 
+            if (noResultsClientRow) {
+                noResultsClientRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
+            }
+
+            if (countLabel && rows.length > 0) {
+                countLabel.innerText = `Mostrando ${visibleCount} de ${rows.length} reservas`;
+            }
+        });
+    }
+});
+</script>

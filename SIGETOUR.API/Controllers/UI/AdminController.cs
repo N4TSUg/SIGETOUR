@@ -59,23 +59,89 @@ namespace SIGETOUR.API.Controllers.UI
             return View();
         }
 
-        public async Task<IActionResult> Tours()
+        public async Task<IActionResult> Tours(string? search, Guid? categoryId, string? status)
         {
-            var tours = await _context.TourPackages
+            var query = _context.TourPackages
                 .Include(t => t.Images)
                 .Include(t => t.Category)
-                .OrderBy(t => t.Title)
-                .ToListAsync();
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(t =>
+                    t.Title.ToLower().Contains(term) ||
+                    t.Subtitle.ToLower().Contains(term) ||
+                    t.Description.ToLower().Contains(term) ||
+                    t.Duration.ToLower().Contains(term) ||
+                    (t.Category != null && t.Category.Name.ToLower().Contains(term)));
+            }
+
+            if (categoryId.HasValue && categoryId.Value != Guid.Empty)
+            {
+                query = query.Where(t => t.CategoryId == categoryId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(status) && status != "Todos")
+            {
+                bool isActive = status == "Activo";
+                query = query.Where(t => t.IsActive == isActive);
+            }
+
+            var tours = await query.OrderBy(t => t.Title).ToListAsync();
+
+            ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
+            ViewBag.CurrentSearch = search;
+            ViewBag.CurrentCategoryId = categoryId;
+            ViewBag.CurrentStatus = status;
+
             return View(tours);
         }
 
-        public async Task<IActionResult> Bookings()
+        public async Task<IActionResult> Bookings(string? search, string? status, DateTime? date)
         {
-            var bookings = await _context.Bookings
+            var query = _context.Bookings
                 .Include(b => b.Items)
                 .ThenInclude(i => i.TourPackage)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(b =>
+                    b.ReferenceCode.ToLower().Contains(term) ||
+                    b.CustomerName.ToLower().Contains(term) ||
+                    b.CustomerDni.ToLower().Contains(term) ||
+                    b.CustomerEmail.ToLower().Contains(term) ||
+                    b.CustomerPhone.ToLower().Contains(term) ||
+                    b.OperationNumber.ToLower().Contains(term) ||
+                    b.InvoiceNumber.ToLower().Contains(term) ||
+                    b.AdditionalPassengersJson.ToLower().Contains(term) ||
+                    b.Items.Any(i => i.TourPackage.Title.ToLower().Contains(term)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status) && status != "Todos")
+            {
+                if (Enum.TryParse<BookingStatus>(status, true, out var stEnum))
+                {
+                    query = query.Where(b => b.Status == stEnum);
+                }
+            }
+
+            if (date.HasValue)
+            {
+                var dUtc = DateTime.SpecifyKind(date.Value.Date, DateTimeKind.Utc);
+                query = query.Where(b => b.TravelDate.Date == dUtc);
+            }
+
+            var bookings = await query
                 .OrderByDescending(b => b.BookingDate)
                 .ToListAsync();
+
+            ViewBag.CurrentSearch = search;
+            ViewBag.CurrentStatus = status;
+            ViewBag.CurrentDate = date?.ToString("yyyy-MM-dd");
+
             return View(bookings);
         }
 
@@ -256,17 +322,55 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction("Fleet");
         }
 
-        public async Task<IActionResult> Fleet()
+        public async Task<IActionResult> Fleet(string? search, string? status)
         {
-            var vehicles = await _context.Vehicles
+            var query = _context.Vehicles
                 .Include(v => v.Images)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(v =>
+                    v.LicensePlate.ToLower().Contains(term) ||
+                    v.Model.ToLower().Contains(term) ||
+                    v.Category.ToLower().Contains(term) ||
+                    v.Color.ToLower().Contains(term) ||
+                    v.SoatNumber.ToLower().Contains(term) ||
+                    v.CitvNumber.ToLower().Contains(term));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status) && status != "Todos")
+            {
+                query = query.Where(v => v.Status == status);
+            }
+
+            var vehicles = await query
+                .OrderBy(v => v.LicensePlate)
                 .ToListAsync();
+
+            ViewBag.CurrentSearch = search;
+            ViewBag.CurrentStatus = status;
+
             return View(vehicles);
         }
 
-        public async Task<IActionResult> Users()
+        public async Task<IActionResult> Users(string? search)
         {
-            var users = await _userManager.Users.ToListAsync();
+            var query = _userManager.Users.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(u =>
+                    (u.FirstName != null && u.FirstName.ToLower().Contains(term)) ||
+                    (u.LastName != null && u.LastName.ToLower().Contains(term)) ||
+                    (u.Email != null && u.Email.ToLower().Contains(term)) ||
+                    (u.UserName != null && u.UserName.ToLower().Contains(term)));
+            }
+
+            var users = await query.ToListAsync();
+            ViewBag.CurrentSearch = search;
             return View(users);
         }
 
@@ -786,10 +890,20 @@ namespace SIGETOUR.API.Controllers.UI
         // --- CRUD DE CATEGORÍAS DE TOURS --- //
 
         [HttpGet]
-        public async Task<IActionResult> Categories()
+        public async Task<IActionResult> Categories(string? search)
         {
-            var categories = await _context.Categories
+            var query = _context.Categories
                 .Include(c => c.TourPackages)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(c => c.Name.ToLower().Contains(term) || 
+                                         (c.Description != null && c.Description.ToLower().Contains(term)));
+            }
+
+            var categories = await query
                 .OrderBy(c => c.DisplayOrder)
                 .ToListAsync();
 
@@ -804,7 +918,94 @@ namespace SIGETOUR.API.Controllers.UI
                 AssociatedToursCount = c.TourPackages.Count
             }).ToList();
 
+            ViewBag.CurrentSearch = search;
+
             return View(dtos);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> QuickSearch(string? q)
+        {
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                return Json(new { bookings = new object[] { }, tours = new object[] { }, vehicles = new object[] { } });
+            }
+
+            var term = q.Trim().ToLower();
+
+            var rawBookings = await _context.Bookings
+                .Where(b => b.ReferenceCode.ToLower().Contains(term) ||
+                            b.CustomerName.ToLower().Contains(term) ||
+                            b.CustomerDni.ToLower().Contains(term) ||
+                            b.OperationNumber.ToLower().Contains(term))
+                .OrderByDescending(b => b.BookingDate)
+                .Take(5)
+                .Select(b => new {
+                    b.Id,
+                    b.ReferenceCode,
+                    b.CustomerName,
+                    b.CustomerDni,
+                    b.Status,
+                    b.TotalAmount,
+                    b.TravelDate
+                })
+                .ToListAsync();
+
+            var bookings = rawBookings.Select(b => new {
+                id = b.Id,
+                reference = b.ReferenceCode,
+                customer = b.CustomerName,
+                dni = b.CustomerDni,
+                status = b.Status.ToString(),
+                amount = b.TotalAmount,
+                date = b.TravelDate.ToString("dd/MM/yyyy"),
+                url = Url.Action("EditBooking", "Admin", new { id = b.Id })
+            });
+
+            var rawTours = await _context.TourPackages
+                .Include(t => t.Images)
+                .Where(t => t.Title.ToLower().Contains(term) ||
+                            t.Subtitle.ToLower().Contains(term))
+                .OrderBy(t => t.Title)
+                .Take(5)
+                .Select(t => new {
+                    t.Id,
+                    t.Title,
+                    t.BasePrice,
+                    Images = t.Images.Select(i => new { i.ImageUrl, i.IsMain }).ToList()
+                })
+                .ToListAsync();
+
+            var tours = rawTours.Select(t => new {
+                id = t.Id,
+                title = t.Title,
+                price = t.BasePrice,
+                image = t.Images.FirstOrDefault(i => i.IsMain)?.ImageUrl ?? t.Images.FirstOrDefault()?.ImageUrl ?? "/images/placeholder.jpg",
+                url = Url.Action("EditTour", "Admin", new { id = t.Id })
+            });
+
+            var rawVehicles = await _context.Vehicles
+                .Where(v => v.LicensePlate.ToLower().Contains(term) ||
+                            v.Model.ToLower().Contains(term))
+                .OrderBy(v => v.LicensePlate)
+                .Take(5)
+                .Select(v => new {
+                    v.Id,
+                    v.LicensePlate,
+                    v.Model,
+                    v.Status
+                })
+                .ToListAsync();
+
+            var vehicles = rawVehicles.Select(v => new {
+                id = v.Id,
+                plate = v.LicensePlate,
+                model = v.Model,
+                status = v.Status,
+                url = Url.Action("EditVehicle", "Admin", new { id = v.Id })
+            });
+
+            return Json(new { bookings, tours, vehicles });
         }
 
         [HttpGet]
