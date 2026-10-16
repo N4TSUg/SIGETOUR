@@ -123,20 +123,20 @@
     }
     .custom-scrollbar {
       scrollbar-width: thin;
-      scrollbar-color: #00685a #c1f9f3;
+      scrollbar-color: #00685a #d0f7f2;
     }
     .custom-scrollbar::-webkit-scrollbar {
-      width: 10px;
+      width: 12px;
       height: 10px;
     }
     .custom-scrollbar::-webkit-scrollbar-track {
-      background: #c1f9f3;
-      border-radius: 6px;
+      background: #e4fffb;
+      border-left: 1px solid #bdc9c5;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
       background-color: #00685a;
       border-radius: 6px;
-      border: 2px solid #c1f9f3;
+      border: 2px solid #e4fffb;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
       background-color: #004d42;
@@ -144,7 +144,7 @@
   </style>
 <link rel="icon" type="image/png" href="~/favicon.ico" />
 </head>
-<body class="bg-surface font-body-md text-on-surface h-full flex flex-col overflow-hidden antialiased">
+<body class="bg-surface font-body-md text-on-surface h-screen max-h-screen flex flex-col overflow-hidden antialiased">
 <!-- TOP APP BAR -->
 <header class="bg-surface-container-lowest dark:bg-inverse-surface border-b border-outline-variant dark:border-outline shadow-sm flex justify-between items-center w-full px-space-lg py-space-sm shrink-0 z-30">
 <div class="flex items-center gap-space-md">
@@ -201,9 +201,9 @@
 </div>
 </div>
 </header>
-<div class="flex flex-1 min-h-0 overflow-hidden">
+<div class="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden">
 <!-- SIDE NAV BAR -->
-<aside class="bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline h-full w-64 flex flex-col justify-between shrink-0 select-none">
+<aside class="bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline h-full w-64 flex flex-col justify-between shrink-0 select-none overflow-y-auto custom-scrollbar">
 <div class="flex flex-col h-full py-space-md px-space-sm shrink-0">
 <!-- Subheader context -->
 <div class="px-space-md py-space-sm mb-space-sm border-b border-outline-variant/40 flex items-center gap-space-sm">
@@ -299,7 +299,7 @@
 </div>
 </aside>
 <!-- MAIN DASHBOARD CONTENT AREA -->
-<main class="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-space-lg flex flex-col gap-space-lg">
+<main class="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden custom-scrollbar p-4 sm:p-6 lg:p-8 pb-24">
     @RenderBody()
 </main>
 </div>
