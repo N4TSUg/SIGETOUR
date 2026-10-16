@@ -192,9 +192,42 @@
                         </h2>
                     </div>
 
-                    <div class="mb-6">
-                        <label class="block font-label-md text-label-md text-on-surface mb-2 font-bold">Número de Pasajeros</label>
-                        <input type="number" name="Passengers" id="input-passengers" value="1" min="1" max="15" required class="w-32 bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-on-surface font-body-md focus:ring-2 focus:ring-primary outline-none text-center" />
+                    <style>
+                        /* Ocultar flechitas nativas del navegador en inputs numéricos */
+                        input[type=number].no-spin::-webkit-inner-spin-button,
+                        input[type=number].no-spin::-webkit-outer-spin-button {
+                            -webkit-appearance: none;
+                            margin: 0;
+                        }
+                        input[type=number].no-spin {
+                            -moz-appearance: textfield;
+                        }
+                    </style>
+
+                    <!-- Control de Cantidad de Pasajeros con botones + y - -->
+                    <div class="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                        <div>
+                            <label class="block font-label-md text-label-md text-on-surface mb-2 font-bold flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-primary text-[20px]">group</span>
+                                Número de Pasajeros
+                            </label>
+                            <div class="inline-flex items-center rounded-xl border border-outline-variant bg-surface-container-low p-1 shadow-xs">
+                                <button type="button" id="btn-decrease-pax" class="w-10 h-10 rounded-lg bg-surface-container-lowest hover:bg-surface-container text-on-surface flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer" title="Reducir un pasajero (-)">
+                                    <span class="material-symbols-outlined text-[20px]">remove</span>
+                                </button>
+                                <input type="number" name="Passengers" id="input-passengers" value="1" min="1" max="15" required class="no-spin w-16 h-10 bg-transparent text-center font-bold text-headline-sm text-on-surface outline-none focus:outline-none" />
+                                <button type="button" id="btn-increase-pax" class="w-10 h-10 rounded-lg bg-primary hover:bg-[#0e5a52] text-on-primary flex items-center justify-center transition-all cursor-pointer shadow-xs" title="Añadir un acompañante (+)">
+                                    <span class="material-symbols-outlined text-[22px]">add</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <button type="button" id="btn-add-companion-quick" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-primary/30 bg-primary/10 text-primary font-bold hover:bg-primary hover:text-on-primary transition-all text-body-sm shadow-xs cursor-pointer">
+                                <span class="material-symbols-outlined text-[20px]">person_add</span>
+                                <span>+ Agregar Acompañante</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Datos Titular -->
@@ -395,10 +428,57 @@
             calculateTotal();
         }
 
+        const btnDecreasePax = document.getElementById('btn-decrease-pax');
+        const btnIncreasePax = document.getElementById('btn-increase-pax');
+        const btnAddCompanionQuick = document.getElementById('btn-add-companion-quick');
+
+        function updateStepperState() {
+            let pax = parseInt(inputPassengers.value) || 1;
+            if (btnDecreasePax) btnDecreasePax.disabled = (pax <= 1);
+            if (btnIncreasePax) btnIncreasePax.disabled = (pax >= 15);
+            if (btnAddCompanionQuick) btnAddCompanionQuick.disabled = (pax >= 15);
+        }
+
+        function addCompanion() {
+            let pax = parseInt(inputPassengers.value) || 1;
+            if (pax < 15) {
+                inputPassengers.value = pax + 1;
+                renderAdditionalPassengers();
+                updateSummary();
+                updateStepperState();
+                
+                // Enfocar automáticamente el nombre del nuevo acompañante
+                const cards = document.querySelectorAll('#additional-passengers-container .passenger-card');
+                const lastCard = cards[cards.length - 1];
+                if (lastCard) {
+                    const firstInput = lastCard.querySelector('input[name="PassengerNames"]');
+                    if (firstInput) firstInput.focus();
+                }
+            }
+        }
+
+        function decreasePassenger() {
+            let pax = parseInt(inputPassengers.value) || 1;
+            if (pax > 1) {
+                inputPassengers.value = pax - 1;
+                renderAdditionalPassengers();
+                updateSummary();
+                updateStepperState();
+            }
+        }
+
+        if (btnIncreasePax) btnIncreasePax.addEventListener('click', addCompanion);
+        if (btnAddCompanionQuick) btnAddCompanionQuick.addEventListener('click', addCompanion);
+        if (btnDecreasePax) btnDecreasePax.addEventListener('click', decreasePassenger);
+
         inputDate.addEventListener("change", updateSummary);
         inputPassengers.addEventListener("input", function() {
-            updateSummary();
+            let val = parseInt(this.value);
+            if (val > 15) this.value = 15;
+            if (val < 1) this.value = 1;
             renderAdditionalPassengers();
+            updateSummary();
+            updateStepperState();
         });
         inputHotelZone.addEventListener("change", updateSummary);
         inputName.addEventListener("input", updateSummary);
@@ -406,20 +486,27 @@
         radiosShift.forEach(r => r.addEventListener("change", updateSummary));
         radiosBoarding.forEach(r => r.addEventListener("change", updateSummary));
 
-        // Genera formularios de pasajeros adicionales dinámicamente
+        // Genera formularios de acompañantes adicionales dinámicamente con botón Retirar
         function renderAdditionalPassengers() {
             const container = document.getElementById('additional-passengers-container');
             const pax = parseInt(inputPassengers.value) || 1;
-            const existing = container.querySelectorAll('.passenger-card').length;
+            const existingCards = container.querySelectorAll('.passenger-card');
+            const existingCount = existingCards.length;
 
-            // Agregar los que faltan
-            for (let i = existing + 2; i <= pax; i++) {
+            // Agregar las tarjetas que faltan
+            for (let i = existingCount + 2; i <= pax; i++) {
                 const card = document.createElement('div');
-                card.className = 'passenger-card p-4 rounded-lg border border-outline-variant bg-surface-container-low';
+                card.className = 'passenger-card p-4 rounded-xl border border-outline-variant bg-surface-container-low transition-all duration-200';
                 card.innerHTML = `
-                    <div class="flex items-center gap-2 mb-3">
-                        <span class="w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-xs font-bold">${i}</span>
-                        <span class="font-label-md text-label-md font-bold text-on-surface">Pasajero ${i}</span>
+                    <div class="flex items-center justify-between mb-3 border-b border-outline-variant/40 pb-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="w-7 h-7 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-xs font-bold js-companion-number">${i}</span>
+                            <span class="font-label-md text-label-md font-bold text-on-surface js-companion-title">Acompañante #${i - 1} (Pasajero ${i})</span>
+                        </div>
+                        <button type="button" class="btn-remove-companion inline-flex items-center gap-1.5 text-xs font-bold text-red-600 hover:text-white bg-red-50 hover:bg-red-600 border border-red-200 hover:border-red-600 px-3 py-1.5 rounded-lg transition-all cursor-pointer shadow-xs" title="Retirar este acompañante">
+                            <span class="material-symbols-outlined text-[16px]">person_remove</span>
+                            <span>Retirar</span>
+                        </button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="md:col-span-2">
@@ -440,18 +527,55 @@
                         </div>
                     </div>
                 `;
+
+                // Event listener para retirar este acompañante
+                const btnRemove = card.querySelector('.btn-remove-companion');
+                if (btnRemove) {
+                    btnRemove.addEventListener('click', function() {
+                        card.remove();
+                        reindexCompanions();
+                    });
+                }
+
                 container.appendChild(card);
             }
 
-            // Quitar los que sobran
-            const cards = container.querySelectorAll('.passenger-card');
-            for (let i = cards.length - 1; i >= pax - 1; i--) {
-                if (cards[i]) cards[i].remove();
+            // Quitar los que sobran si se disminuyó la cantidad manualmente
+            const currentCards = container.querySelectorAll('.passenger-card');
+            for (let i = currentCards.length - 1; i >= pax - 1; i--) {
+                if (currentCards[i]) currentCards[i].remove();
             }
+
+            updateStepperState();
+        }
+
+        // Renumera las tarjetas de acompañantes restantes cuando una es retirada
+        function reindexCompanions() {
+            const container = document.getElementById('additional-passengers-container');
+            const cards = container.querySelectorAll('.passenger-card');
+
+            cards.forEach((card, idx) => {
+                const passengerNum = idx + 2;
+                const companionNum = idx + 1;
+
+                const badge = card.querySelector('.js-companion-number');
+                if (badge) badge.innerText = passengerNum;
+
+                const title = card.querySelector('.js-companion-title');
+                if (title) title.innerText = `Acompañante #${companionNum} (Pasajero ${passengerNum})`;
+
+                const nameInput = card.querySelector('input[name="PassengerNames"]');
+                if (nameInput) nameInput.placeholder = `Nombre completo del pasajero ${passengerNum}`;
+            });
+
+            inputPassengers.value = cards.length + 1;
+            updateStepperState();
+            updateSummary();
         }
 
         updateSummary();
         renderAdditionalPassengers();
+        updateStepperState();
     });
 </script>
 
