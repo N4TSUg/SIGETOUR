@@ -77,6 +77,10 @@
             Reactivar Reserva
           </button>
         }
+        <button type="button" onclick="openDeleteBookingModal()" class="bg-surface-container border border-red-400 text-red-700 hover:bg-red-50 transition-colors font-label-md px-3.5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm font-bold cursor-pointer" title="Eliminar reserva permanentemente">
+          <span class="material-symbols-outlined text-[18px]">delete</span>
+          Eliminar
+        </button>
         <button type="submit" class="bg-primary text-on-primary hover:bg-[#0e5a52] transition-colors font-label-md px-6 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold cursor-pointer">
           <span class="material-symbols-outlined text-[18px]">save</span>
           Guardar Cambios
@@ -360,6 +364,54 @@
     </div>
 </div>
 
+<!-- MODAL DE ELIMINACIÓN DEFINITIVA DE RESERVA -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="deleteBookingModal">
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-lg border border-outline-variant shadow-2xl overflow-hidden transform transition-all duration-200">
+        <div class="h-2 w-full bg-red-600"></div>
+        <div class="p-6 pb-4 flex items-start justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
+                    <span class="material-symbols-outlined text-[28px]">delete_forever</span>
+                </div>
+                <div>
+                    <h3 class="text-headline-sm font-bold text-on-surface leading-snug">¿Eliminar reserva definitivamente?</h3>
+                    <span class="text-label-sm text-red-600 font-bold tracking-wider uppercase">Código @Model.ReferenceCode</span>
+                </div>
+            </div>
+            <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer" onclick="closeDeleteBookingModal()" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <p class="text-body-md text-on-surface leading-relaxed">
+                Estás a punto de borrar definitivamente la reserva de <strong class="font-bold text-primary">@Model.CustomerName</strong>.
+            </p>
+            <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-body-sm text-red-800 space-y-1">
+                <div class="flex items-center gap-1.5 font-bold">
+                    <span class="material-symbols-outlined text-[18px]">warning</span>
+                    <span>Advertencia de depuración:</span>
+                </div>
+                <ul class="list-disc list-inside text-xs space-y-0.5 pl-1">
+                    <li>Esta acción no se puede deshacer.</li>
+                    <li>Se eliminarán todos los acompañantes y detalles asociados a esta reserva.</li>
+                    <li>Ideal para limpiar reservas de prueba en el sistema.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="p-6 pt-4 bg-surface-container-high/20 border-t border-outline-variant/40 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md font-bold hover:bg-surface-container transition-all cursor-pointer" onclick="closeDeleteBookingModal()" type="button">Cancelar</button>
+            <form asp-action="DeleteBooking" method="post" id="deleteBookingForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button type="submit" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                    <span>Sí, Eliminar Permanentemente</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- FORMULARIO OCULTO PARA REACTIVAR -->
 <form asp-action="ReactivateBooking" method="post" id="reactivateForm" class="hidden">
     @Html.AntiForgeryToken()
@@ -432,6 +484,13 @@
     }
     function closeCancelModal() {
         document.getElementById('cancelBookingModal')?.classList.add('hidden');
+    }
+
+    function openDeleteBookingModal() {
+        document.getElementById('deleteBookingModal')?.classList.remove('hidden');
+    }
+    function closeDeleteBookingModal() {
+        document.getElementById('deleteBookingModal')?.classList.add('hidden');
     }
 
     function initEditBooking() {

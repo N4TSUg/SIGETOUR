@@ -973,6 +973,32 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteBooking(Guid id)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null)
+            {
+                TempData["ErrorMessage"] = "La reserva seleccionada no existe o ya fue eliminada.";
+                return RedirectToAction(nameof(Bookings));
+            }
+
+            if (booking.Items != null && booking.Items.Any())
+            {
+                _context.BookingItems.RemoveRange(booking.Items);
+            }
+
+            _context.Bookings.Remove(booking);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} a nombre de {booking.CustomerName} ha sido eliminada permanentemente.";
+            return RedirectToAction(nameof(Bookings));
+        }
+
         // --- FEATURED PACKAGES CRUD --- //
 
         public async Task<IActionResult> Featured()
