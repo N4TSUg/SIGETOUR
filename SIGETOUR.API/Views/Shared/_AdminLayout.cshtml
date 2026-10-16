@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html><html class="h-full" lang="es" style=""><head>
+<!DOCTYPE html><html class="h-full" lang="es" style=""><head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>Turismo Chilón - Panel Central Cajamarca</title>
@@ -204,10 +204,11 @@
     var inactiveClass = "flex items-center gap-space-sm px-space-md py-space-sm rounded-lg text-on-surface-variant dark:text-surface-variant font-label-md hover:bg-surface-container-high dark:hover:bg-surface-variant transition-all duration-150 active:scale-98";
     
     var dashClass = action == "Dashboard" ? activeClass : inactiveClass;
-    var toursClass = action == "Tours" ? activeClass : inactiveClass;
+    var toursClass = action == "Tours" || action == "CreateTour" || action == "EditTour" ? activeClass : inactiveClass;
+    var categoriesClass = action == "Categories" || action == "EditCategory" || action == "CreateCategory" ? activeClass : inactiveClass;
     var featuredClass = action == "Featured" || action == "EditFeatured" ? activeClass : inactiveClass;
-    var fleetClass = action == "Fleet" ? activeClass : inactiveClass;
-    var bookingsClass = action == "Bookings" ? activeClass : inactiveClass;
+    var fleetClass = action == "Fleet" || action == "EditVehicle" ? activeClass : inactiveClass;
+    var bookingsClass = action == "Bookings" || action == "EditBooking" ? activeClass : inactiveClass;
     var usersClass = action == "Users" ? activeClass : inactiveClass;
 }
   <!-- Navigation Tabs -->
@@ -221,6 +222,11 @@
     <a class="@toursClass" asp-controller="Admin" asp-action="Tours">
       <span class="material-symbols-outlined text-[20px]">tour</span>
       <span class="">Catálogo Tours</span>
+    </a>
+    <!-- Item 2.2: Categorías de Tours -->
+    <a class="@categoriesClass" asp-controller="Admin" asp-action="Categories">
+      <span class="material-symbols-outlined text-[20px]">category</span>
+      <span class="">Categorías de Tours</span>
     </a>
     <!-- Item 2.5: Tours Destacados -->
     <a class="@featuredClass" asp-controller="Admin" asp-action="Featured">
@@ -244,10 +250,10 @@
   </a>
 <!-- Side Action CTA -->
 <div class="pt-space-md px-1">
-<button class="w-full bg-primary hover:bg-[#0e5a52] text-on-primary py-2.5 px-space-md rounded-lg font-label-lg flex items-center justify-center gap-2 shadow-sm transition-all duration-150 active:scale-95">
+<a asp-controller="Admin" asp-action="CreateTour" class="w-full bg-primary hover:bg-[#0e5a52] text-on-primary py-2.5 px-space-md rounded-lg font-label-lg flex items-center justify-center gap-2 shadow-sm transition-all duration-150 active:scale-95">
 <span class="material-symbols-outlined text-[20px]">add_circle</span>
 <span class="">Nuevo Tour</span>
-</button>
+</a>
 </div>
 </nav>
 <!-- Agency Direct Contact Block -->

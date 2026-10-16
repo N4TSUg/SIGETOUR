@@ -1,4 +1,4 @@
-﻿@using SIGETOUR.API.Core.Entities
+@using SIGETOUR.API.Core.Entities
 @{
     ViewData["Title"] = "Tours y Circuitos";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
@@ -52,8 +52,9 @@
                                 </div>
                             </td>
                             <td class="p-4">
-                                <span class="px-2 py-1 rounded-md bg-secondary-container text-on-secondary-container font-label-sm">
-                                    @tour.Category
+                                <span class="px-2.5 py-1 rounded-md bg-secondary-container text-on-secondary-container font-label-sm inline-flex items-center gap-1.5 font-medium">
+                                    <span class="material-symbols-outlined text-[15px]">@(tour.Category?.Icon ?? "label")</span>
+                                    @(tour.Category?.Name ?? "Sin categoría")
                                 </span>
                             </td>
                             <td class="p-4">@tour.Duration</td>

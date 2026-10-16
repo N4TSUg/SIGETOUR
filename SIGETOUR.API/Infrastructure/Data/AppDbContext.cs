@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SIGETOUR.API.Core.Entities;
 
@@ -12,6 +12,7 @@ namespace SIGETOUR.API.Infrastructure.Data
 
         public DbSet<TourPackage> TourPackages { get; set; }
         public DbSet<FeaturedPackage> FeaturedPackages { get; set; }
+        public DbSet<Category> Categories { get; set; }
         public DbSet<TourImage> TourImages { get; set; }
         public DbSet<TourInclusion> TourInclusions { get; set; }
         public DbSet<TourShift> TourShifts { get; set; }
@@ -31,4 +32,3 @@ namespace SIGETOUR.API.Infrastructure.Data
         }
     }
 }
-

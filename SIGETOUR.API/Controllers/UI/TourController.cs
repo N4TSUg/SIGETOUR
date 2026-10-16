@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SIGETOUR.API.Infrastructure.Data;
@@ -20,19 +20,17 @@ namespace SIGETOUR.API.Controllers.UI
         {
             var tours = await _context.TourPackages
                 .Include(t => t.Images)
+                .Include(t => t.Category)
                 .Where(t => t.IsActive)
                 .ToListAsync();
             return View(tours);
         }
 
-        
         [Route("Tour/Details/{slug?}")]
         public async Task<IActionResult> Details(string slug)
         {
             if (string.IsNullOrEmpty(slug))
             {
-                // Si no mandan ID, por ejemplo al entrar a /Tour/Details desde el header quemado, 
-                // podemos redirigir al catálogo o mostrar el primero. Redirigimos por seguridad.
                 return RedirectToAction(nameof(Catalog));
             }
 
@@ -40,6 +38,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(t => t.Images)
                 .Include(t => t.Inclusions)
                 .Include(t => t.ItineraryStops)
+                .Include(t => t.Category)
                 .FirstOrDefaultAsync(t => t.Slug == slug);
 
             if (tour == null)
@@ -57,9 +56,3 @@ namespace SIGETOUR.API.Controllers.UI
         }
     }
 }
-
-
-
-
-
-

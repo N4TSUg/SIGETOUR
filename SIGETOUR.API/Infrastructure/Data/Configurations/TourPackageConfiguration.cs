@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Core.Enums;
@@ -49,6 +49,11 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                    .HasForeignKey(t => t.DefaultVehicleId)
                    .OnDelete(DeleteBehavior.SetNull);
 
+            builder.HasOne(t => t.Category)
+                   .WithMany(c => c.TourPackages)
+                   .HasForeignKey(t => t.CategoryId)
+                   .OnDelete(DeleteBehavior.SetNull);
+
             var pkg1Id = Guid.Parse("11111111-1111-1111-1111-111111111111");
             var pkg2Id = Guid.Parse("22222222-2222-2222-2222-222222222222");
             var pkg3Id = Guid.Parse("33333333-3333-3333-3333-333333333333");
@@ -59,7 +64,6 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                     Id = pkg1Id,
                     Title = "Ventanillas de Otuzco", Slug = "ventanillas-de-otuzco",
                     Subtitle = "Cementerio pre-inca",
-                    Category = TourCategory.ArqueologiaYPetroglifos,
                     Modality = TourModality.Regular,
                     Difficulty = TourDifficulty.Ligero,
                     Description = "Ventanillas de Otuzco (Cementerio de la Cultura Cajamarca con más de 3 mil años de antigüedad), Jardín de las Hortensias, Artesanía de Cajamarca, Fundo los Aples o 'Tres Molinos', fábrica artesanal de quesos, mantequilla, manjar blanco, Rosquitas de manteca etc.",
@@ -75,7 +79,6 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                     Id = pkg2Id,
                     Title = "Collpa", Slug = "collpa",
                     Subtitle = "Llamado de Vacas por su nombre",
-                    Category = TourCategory.TradicionYAgroturismo,
                     Modality = TourModality.Regular,
                     Difficulty = TourDifficulty.Ligero,
                     Description = "Ex - hacienda La Collpa, Laguna Artificial, Casa Hacienda, Capilla de la Virgen del Carmen, Establo Central, Llamado de Vacas por su nombre, degustación de Lácteos; visita a las Cascadas de Llacanora según temporada o talleres de cerámica utilitaria y decorativa.",
@@ -91,7 +94,6 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
                     Id = pkg3Id,
                     Title = "Castillo de Yanamarca", Slug = "castillo-de-yanamarca",
                     Subtitle = "Estilo medieval",
-                    Category = TourCategory.CityTour,
                     Modality = TourModality.Regular,
                     Difficulty = TourDifficulty.Ligero,
                     Description = "El Castillo de Yanamarca es un moderno atractivo turístico con arquitectura estilo medieval en donde se puede apreciar, pinturas, esculturas de piedra y madera.",
@@ -106,7 +108,3 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
         }
     }
 }
-
-
-
-

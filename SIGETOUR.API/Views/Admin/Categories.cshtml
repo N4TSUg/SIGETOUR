@@ -1,0 +1,251 @@
+@model IEnumerable<SIGETOUR.API.Models.CategoryDto>
+@{
+    ViewData["Title"] = "Categorías de Tours";
+    Layout = "_AdminLayout";
+}
+
+<div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-7xl mx-auto space-y-6">
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center gap-3">
+            <span class="material-symbols-outlined text-[22px]">check_circle</span>
+            <span class="font-semibold text-body-md">@TempData["SuccessMessage"]</span>
+        </div>
+    }
+
+    <!-- Header Section -->
+    <section class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2 text-label-sm font-label-sm text-secondary mb-1">
+                <span>Catálogo de Rutas</span>
+                <span class="material-symbols-outlined text-xs">chevron_right</span>
+                <span class="text-primary font-bold">Categorías Temáticas</span>
+            </div>
+            <h1 class="text-headline-md font-headline-md font-extrabold text-on-surface flex items-center gap-2.5">
+                <span class="material-symbols-outlined text-primary text-[32px]">category</span>
+                Categorías de Tours y Circuitos
+            </h1>
+            <p class="text-body-md font-body-md text-on-surface-variant mt-1 max-w-3xl">
+                Organiza y clasifica la oferta turística de Turismo Chilón. Las categorías activas se reflejan en los filtros de búsqueda, fichas de catálogo y en el formulario de creación/edición de tours.
+            </p>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+            <a href="/Tour/Catalog" target="_blank" class="px-4 py-2.5 rounded-lg border border-outline-variant hover:bg-surface-container text-on-surface-variant font-label-md flex items-center gap-2 transition-colors">
+                <span class="material-symbols-outlined text-[18px]">visibility</span>
+                <span>Ver Catálogo</span>
+            </a>
+            <a asp-action="CreateCategory" class="px-5 py-2.5 rounded-lg bg-primary hover:bg-[#0e5a52] text-on-primary font-label-lg font-bold shadow-sm transition-all flex items-center gap-2 active:scale-95">
+                <span class="material-symbols-outlined text-[20px]">add</span>
+                <span>Nueva Categoría</span>
+            </a>
+        </div>
+    </section>
+
+    <!-- Metrics Ribbon -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-label-sm font-label-sm text-secondary block font-medium">Total Categorías</span>
+                <span class="text-headline-md font-headline-md font-extrabold text-primary">@Model.Count()</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">category</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-label-sm font-label-sm text-secondary block font-medium">Categorías Activas</span>
+                <span class="text-headline-md font-headline-md font-extrabold text-green-700">@Model.Count(c => c.IsActive)</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-green-100 text-green-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">check_circle</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-label-sm font-label-sm text-secondary block font-medium">Inactivas / Ocultas</span>
+                <span class="text-headline-md font-headline-md font-extrabold text-amber-700">@Model.Count(c => !c.IsActive)</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">visibility_off</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-label-sm font-label-sm text-secondary block font-medium">Tours Clasificados</span>
+                <span class="text-headline-md font-headline-md font-extrabold text-secondary">@Model.Sum(c => c.AssociatedToursCount)</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">tour</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Section -->
+    <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
+            <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">view_list</span>
+                Listado de Categorías Registradas
+            </h2>
+            <span class="text-label-sm text-on-surface-variant">@Model.Count() categorías en total</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-outline-variant bg-surface-container-low text-label-md font-label-md text-on-surface-variant uppercase tracking-wider">
+                        <th class="p-4 pl-6">Orden</th>
+                        <th class="p-4">Categoría</th>
+                        <th class="p-4">Descripción</th>
+                        <th class="p-4 text-center">Tours Vinculados</th>
+                        <th class="p-4 text-center">Estado</th>
+                        <th class="p-4 pr-6 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-outline-variant/60 text-body-md text-on-surface">
+                    @if (Model != null && Model.Any())
+                    {
+                        foreach (var cat in Model)
+                        {
+                            <tr class="hover:bg-surface-container-low/50 transition-colors">
+                                <td class="p-4 pl-6">
+                                    <span class="w-8 h-8 rounded-lg bg-surface-container text-primary font-bold text-label-md flex items-center justify-center border border-outline-variant">
+                                        @cat.DisplayOrder
+                                    </span>
+                                </td>
+                                <td class="p-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+                                            <span class="material-symbols-outlined text-[22px]">@(string.IsNullOrWhiteSpace(cat.Icon) ? "landscape" : cat.Icon)</span>
+                                        </div>
+                                        <div>
+                                            <span class="font-bold text-on-surface text-body-md block">@cat.Name</span>
+                                            <span class="text-label-sm text-outline font-mono">icono: @(string.IsNullOrWhiteSpace(cat.Icon) ? "landscape" : cat.Icon)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-4 max-w-md">
+                                    <span class="text-on-surface-variant text-body-sm line-clamp-2">
+                                        @(string.IsNullOrWhiteSpace(cat.Description) ? "Sin descripción detallada" : cat.Description)
+                                    </span>
+                                </td>
+                                <td class="p-4 text-center">
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-label-sm font-bold @(cat.AssociatedToursCount > 0 ? "bg-primary-container text-on-primary-container" : "bg-surface-container text-on-surface-variant")">
+                                        <span class="material-symbols-outlined text-[15px]">tour</span>
+                                        @cat.AssociatedToursCount @(cat.AssociatedToursCount == 1 ? "tour" : "tours")
+                                    </span>
+                                </td>
+                                <td class="p-4 text-center">
+                                    @if (cat.IsActive)
+                                    {
+                                        <span class="inline-flex items-center gap-1 text-green-800 bg-green-100 px-2.5 py-1 rounded-full font-label-sm font-bold">
+                                            <span class="material-symbols-outlined text-[15px]">check_circle</span> Activa
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex items-center gap-1 text-on-surface-variant bg-surface-container px-2.5 py-1 rounded-full font-label-sm font-bold">
+                                            <span class="material-symbols-outlined text-[15px]">visibility_off</span> Oculta
+                                        </span>
+                                    }
+                                </td>
+                                <td class="p-4 pr-6 text-right space-x-1 whitespace-nowrap">
+                                    <a asp-action="EditCategory" asp-route-id="@cat.Id" class="inline-block p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Editar Categoría">
+                                        <span class="material-symbols-outlined text-[20px]">edit</span>
+                                    </a>
+                                    <button type="button" class="inline-block p-2 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-surface-container transition-colors" title="Eliminar Categoría" onclick="openDeleteCategoryModal('@cat.Id', '@cat.Name', @cat.AssociatedToursCount)">
+                                        <span class="material-symbols-outlined text-[20px]">delete</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="p-12 text-center text-on-surface-variant">
+                                <span class="material-symbols-outlined text-4xl text-outline mb-2">category</span>
+                                <p class="text-body-md font-medium">No hay categorías registradas en la base de datos.</p>
+                                <a asp-action="CreateCategory" class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary text-on-primary rounded-lg font-label-md font-bold hover:bg-primary/90 transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">add</span> Crear Primera Categoría
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE CONFIRMACIÓN: ELIMINAR CATEGORÍA -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="deleteCategoryModal">
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-xl border border-outline-variant shadow-2xl overflow-hidden transform transition-all duration-200">
+        <div class="h-2 w-full bg-red-600"></div>
+        <div class="p-6 pb-4 flex items-start justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
+                    <span class="material-symbols-outlined text-[28px]">warning</span>
+                </div>
+                <div>
+                    <h3 class="text-headline-sm font-headline-sm text-on-surface font-bold leading-snug">¿Eliminar esta categoría?</h3>
+                    <span class="text-label-sm font-label-sm text-red-600 font-bold tracking-wider uppercase">Confirmación Requerida</span>
+                </div>
+            </div>
+            <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors" onclick="closeDeleteCategoryModal()" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <p class="text-body-md font-body-md text-on-surface leading-relaxed">
+                Estás a punto de dar de baja la categoría 
+                <strong class="text-on-surface font-bold text-primary" id="deleteCategoryNameText"></strong>.
+            </p>
+            <div class="p-4 rounded-xl bg-surface-container-low border border-outline-variant">
+                <div class="flex items-center gap-2 text-on-surface font-bold text-label-md mb-1">
+                    <span class="material-symbols-outlined text-[18px] text-primary">info</span>
+                    <span>Tours asociados</span>
+                </div>
+                <p class="text-body-sm text-on-surface-variant">
+                    Esta categoría tiene actualmente <strong class="text-primary font-bold" id="deleteCategoryCountText">0</strong> tours asociados. Al eliminarla, los tours <strong>no se borrarán</strong>, pero quedarán sin categoría asignada hasta que los reasignes.
+                </p>
+            </div>
+            <div class="p-4 rounded-xl bg-red-50 border border-red-200">
+                <label class="block text-label-md font-label-md text-on-surface mb-2 font-bold">
+                    Para confirmar la eliminación, escribe la palabra <span class="text-red-600 font-mono font-bold">ELIMINAR</span>:
+                </label>
+                <input class="w-full uppercase font-mono tracking-wider text-body-md rounded-lg border-outline-variant focus:border-red-600 focus:ring-red-600 bg-surface-container-lowest text-on-surface px-3 py-2" id="confirmDeleteCategoryInput" placeholder="Escribe 'ELIMINAR'" type="text" autocomplete="off"/>
+            </div>
+        </div>
+        <div class="p-6 pt-4 bg-surface-container-high/20 border-t border-outline-variant/40 flex flex-col-reverse sm:flex-row justify-end gap-3">
+            <button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md font-bold hover:bg-surface-container transition-all" onclick="closeDeleteCategoryModal()" type="button">Cancelar</button>
+            <form asp-action="DeleteCategory" method="post" id="deleteCategoryForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="deleteCategoryIdInput" />
+                <button type="submit" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700" disabled id="confirmDeleteCategoryActionBtn">
+                    <span class="material-symbols-outlined text-[18px]">delete_forever</span>
+                    <span>Sí, Eliminar Categoría</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openDeleteCategoryModal(id, name, toursCount) {
+        document.getElementById('deleteCategoryIdInput').value = id;
+        document.getElementById('deleteCategoryNameText').innerText = '"' + name + '"';
+        document.getElementById('deleteCategoryCountText').innerText = toursCount;
+        document.getElementById('confirmDeleteCategoryInput').value = '';
+        document.getElementById('confirmDeleteCategoryActionBtn').disabled = true;
+        document.getElementById('deleteCategoryModal').classList.remove('hidden');
+    }
+    function closeDeleteCategoryModal() {
+        document.getElementById('deleteCategoryModal').classList.add('hidden');
+    }
+    document.getElementById('confirmDeleteCategoryInput').addEventListener('input', (e) => {
+        document.getElementById('confirmDeleteCategoryActionBtn').disabled = (e.target.value.trim().toUpperCase() !== 'ELIMINAR');
+    });
+</script>

@@ -19,6 +19,7 @@ namespace SIGETOUR.API.Controllers.UI
         {
             var tours = await _context.TourPackages
                 .Include(t => t.Images)
+                .Include(t => t.Category)
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.Title)
                 .Take(6)
@@ -26,7 +27,9 @@ namespace SIGETOUR.API.Controllers.UI
                 
             var featured = await _context.FeaturedPackages
                 .Include(f => f.TourPackage)
-                .ThenInclude(t => t.Images)
+                .ThenInclude(t => t!.Category)
+                .Include(f => f.TourPackage)
+                .ThenInclude(t => t!.Images)
                 .OrderBy(f => f.DisplayOrder)
                 .ToListAsync();
                 

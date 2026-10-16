@@ -63,6 +63,7 @@ namespace SIGETOUR.API.Controllers.UI
         {
             var tours = await _context.TourPackages
                 .Include(t => t.Images)
+                .Include(t => t.Category)
                 .OrderBy(t => t.Title)
                 .ToListAsync();
             return View(tours);
@@ -272,9 +273,10 @@ namespace SIGETOUR.API.Controllers.UI
         // --- NEW CRUD METHODS FOR TOURS --- //
 
         [HttpGet]
-        public IActionResult CreateTour()
+        public async Task<IActionResult> CreateTour()
         {
-            return View(new TourPackage());
+            ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
+            return View(new SIGETOUR.API.Models.TourPackageDto());
         }
 
         [HttpPost]
@@ -282,6 +284,7 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (!ModelState.IsValid)
             {
+                ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
                 return View("CreateTour", dto);
             }
             var model = new SIGETOUR.API.Core.Entities.TourPackage
@@ -289,7 +292,7 @@ namespace SIGETOUR.API.Controllers.UI
                 Id = Guid.NewGuid(),
                 Title = dto.Title ?? string.Empty,
                 Subtitle = dto.Subtitle ?? string.Empty,
-                Category = dto.Category,
+                CategoryId = dto.CategoryId,
                 Modality = dto.Modality,
                 Difficulty = dto.Difficulty,
                 Description = dto.Description ?? string.Empty,
@@ -340,6 +343,7 @@ namespace SIGETOUR.API.Controllers.UI
         public async Task<IActionResult> EditTour(Guid id)
         {
             var tour = await _context.TourPackages
+                .Include(t => t.Category)
                 .Include(t => t.Images)
                 .Include(t => t.Inclusions)
                 .Include(t => t.ItineraryStops)
@@ -348,13 +352,16 @@ namespace SIGETOUR.API.Controllers.UI
                 
             if (tour == null) return NotFound();
             
+            ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
+
             var dto = new SIGETOUR.API.Models.TourPackageDto
             {
                 Id = tour.Id,
                 Title = tour.Title,
                 Subtitle = tour.Subtitle,
                 Slug = tour.Slug,
-                Category = tour.Category,
+                CategoryId = tour.CategoryId,
+                CategoryName = tour.Category?.Name,
                 Modality = tour.Modality,
                 Difficulty = tour.Difficulty,
                 Description = tour.Description,
@@ -379,9 +386,11 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (!ModelState.IsValid)
             {
+                ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
                 if (dto.Id != Guid.Empty)
                 {
                     var existingTour = await _context.TourPackages
+                        .Include(t => t.Category)
                         .Include(t => t.Images)
                         .Include(t => t.Inclusions)
                         .Include(t => t.ItineraryStops)
@@ -400,7 +409,6 @@ namespace SIGETOUR.API.Controllers.UI
             var tour = await _context.TourPackages
                 .Include(t => t.Images)
                 .Include(t => t.ItineraryStops)
-                .Include(t => t.Images)
                 .Include(t => t.Inclusions)
                 .FirstOrDefaultAsync(t => t.Id == dto.Id);
                 
@@ -413,7 +421,7 @@ namespace SIGETOUR.API.Controllers.UI
             tour.ChildPrice = dto.ChildPrice;
             tour.MaxCapacity = dto.MaxCapacity;
             tour.Duration = dto.Duration ?? string.Empty;
-            tour.Category = dto.Category;
+            tour.CategoryId = dto.CategoryId;
             tour.Modality = dto.Modality;
             tour.Difficulty = dto.Difficulty;
             tour.IsActive = dto.IsActive;
@@ -773,6 +781,136 @@ namespace SIGETOUR.API.Controllers.UI
                 await _context.SaveChangesAsync();
             }
             return RedirectToAction("Featured");
+        }
+
+        // --- CRUD DE CATEGORÍAS DE TOURS --- //
+
+        [HttpGet]
+        public async Task<IActionResult> Categories()
+        {
+            var categories = await _context.Categories
+                .Include(c => c.TourPackages)
+                .OrderBy(c => c.DisplayOrder)
+                .ToListAsync();
+
+            var dtos = categories.Select(c => new SIGETOUR.API.Models.CategoryDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Description = c.Description,
+                Icon = c.Icon,
+                IsActive = c.IsActive,
+                DisplayOrder = c.DisplayOrder,
+                AssociatedToursCount = c.TourPackages.Count
+            }).ToList();
+
+            return View(dtos);
+        }
+
+        [HttpGet]
+        public IActionResult CreateCategory()
+        {
+            return View("EditCategory", new SIGETOUR.API.Models.CategoryDto
+            {
+                DisplayOrder = 1,
+                IsActive = true,
+                Icon = "landscape"
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditCategory(Guid? id)
+        {
+            if (id == null || id == Guid.Empty)
+            {
+                return View(new SIGETOUR.API.Models.CategoryDto
+                {
+                    DisplayOrder = 1,
+                    IsActive = true,
+                    Icon = "landscape"
+                });
+            }
+
+            var category = await _context.Categories
+                .Include(c => c.TourPackages)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (category == null) return NotFound();
+
+            var dto = new SIGETOUR.API.Models.CategoryDto
+            {
+                Id = category.Id,
+                Name = category.Name,
+                Description = category.Description,
+                Icon = category.Icon ?? "landscape",
+                IsActive = category.IsActive,
+                DisplayOrder = category.DisplayOrder,
+                AssociatedToursCount = category.TourPackages.Count
+            };
+
+            return View(dto);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditCategory(SIGETOUR.API.Models.CategoryDto dto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return View(dto);
+            }
+
+            if (dto.Id == Guid.Empty)
+            {
+                var newCategory = new SIGETOUR.API.Core.Entities.Category
+                {
+                    Id = Guid.NewGuid(),
+                    Name = dto.Name.Trim(),
+                    Description = dto.Description?.Trim(),
+                    Icon = string.IsNullOrWhiteSpace(dto.Icon) ? "landscape" : dto.Icon.Trim(),
+                    IsActive = dto.IsActive,
+                    DisplayOrder = dto.DisplayOrder,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Categories.Add(newCategory);
+            }
+            else
+            {
+                var category = await _context.Categories.FindAsync(dto.Id);
+                if (category == null) return NotFound();
+
+                category.Name = dto.Name.Trim();
+                category.Description = dto.Description?.Trim();
+                category.Icon = string.IsNullOrWhiteSpace(dto.Icon) ? "landscape" : dto.Icon.Trim();
+                category.IsActive = dto.IsActive;
+                category.DisplayOrder = dto.DisplayOrder;
+
+                _context.Categories.Update(category);
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Categoría guardada exitosamente.";
+            return RedirectToAction(nameof(Categories));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteCategory(Guid id)
+        {
+            var category = await _context.Categories.FindAsync(id);
+            if (category != null)
+            {
+                var tours = await _context.TourPackages.Where(t => t.CategoryId == id).ToListAsync();
+                foreach (var t in tours)
+                {
+                    t.CategoryId = null;
+                }
+
+                _context.Categories.Remove(category);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = "Categoría eliminada con éxito.";
+            }
+            return RedirectToAction(nameof(Categories));
         }
     }
 }

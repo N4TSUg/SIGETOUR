@@ -86,6 +86,34 @@ using (var scope = app.Services.CreateScope())
     try { db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS \"VehicleImages\" (\"Id\" uuid NOT NULL PRIMARY KEY, \"VehicleId\" uuid NOT NULL REFERENCES \"Vehicles\"(\"Id\") ON DELETE CASCADE, \"ImageUrl\" text NOT NULL DEFAULT '', \"IsCover\" boolean NOT NULL DEFAULT false);"); } catch { }
     try { db.Database.ExecuteSqlRaw("UPDATE \"Vehicles\" SET \"IsActive\" = true WHERE \"Status\" != 'Baja Operativa';"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""FeaturedPackages"" (""Id"" uuid NOT NULL PRIMARY KEY, ""TourPackageId"" uuid NOT NULL REFERENCES ""TourPackages""(""Id"") ON DELETE CASCADE, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CommercialTitle"" text NOT NULL DEFAULT '', ""CommercialSubtitle"" text NOT NULL DEFAULT '', ""PromoBadge"" text NOT NULL DEFAULT '', ""PromoPrice"" numeric, ""SyncInventory"" boolean NOT NULL DEFAULT true);"); } catch { }
+    try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Categories"" (""Id"" uuid NOT NULL PRIMARY KEY, ""Name"" text NOT NULL, ""Description"" text, ""Icon"" text, ""IsActive"" boolean NOT NULL DEFAULT true, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP);"); } catch { }
+    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" ADD COLUMN IF NOT EXISTS ""CategoryId"" uuid REFERENCES ""Categories""(""Id"") ON DELETE SET NULL;"); } catch { }
+    try
+    {
+        if (!db.Categories.Any())
+        {
+            var cat1 = new SIGETOUR.API.Core.Entities.Category { Id = Guid.NewGuid(), Name = "Arqueología y Petroglifos", Description = "Rutas ancestrales, ventanillas y petroglifos preincas", Icon = "history_edu", DisplayOrder = 1, IsActive = true };
+            var cat2 = new SIGETOUR.API.Core.Entities.Category { Id = Guid.NewGuid(), Name = "Termalismo y Spa", Description = "Aguas termales medicinales y baños relajantes", Icon = "hot_tub", DisplayOrder = 2, IsActive = true };
+            var cat3 = new SIGETOUR.API.Core.Entities.Category { Id = Guid.NewGuid(), Name = "Naturaleza y Aventura", Description = "Bosques de piedras, lagunas, cascadas y trekking", Icon = "landscape", DisplayOrder = 3, IsActive = true };
+            var cat4 = new SIGETOUR.API.Core.Entities.Category { Id = Guid.NewGuid(), Name = "Tradición y Agroturismo", Description = "Granjas lecheras, talleres artesanales y gastronomía típica", Icon = "agriculture", DisplayOrder = 4, IsActive = true };
+            var cat5 = new SIGETOUR.API.Core.Entities.Category { Id = Guid.NewGuid(), Name = "City Tour y Tradición", Description = "Centro histórico, iglesias coloniales y Cuarto del Rescate", Icon = "location_city", DisplayOrder = 5, IsActive = true };
+            db.Categories.AddRange(cat1, cat2, cat3, cat4, cat5);
+            db.SaveChanges();
+
+            // Link existing tours
+            var existingTours = db.TourPackages.Where(t => t.CategoryId == null).ToList();
+            foreach (var t in existingTours)
+            {
+                var lower = t.Title.ToLower();
+                if (lower.Contains("cumbemayo")) t.CategoryId = cat3.Id;
+                else if (lower.Contains("baños") || lower.Contains("inca")) t.CategoryId = cat2.Id;
+                else if (lower.Contains("otuzco")) t.CategoryId = cat1.Id;
+                else t.CategoryId = cat5.Id;
+            }
+            db.SaveChanges();
+        }
+    }
+    catch { }
     try
     {
         if (!db.Vehicles.Any())

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using SIGETOUR.API.Core.Enums;
 using SIGETOUR.API.Core.Entities;
@@ -15,7 +15,9 @@ namespace SIGETOUR.API.Models
         public string? Subtitle { get; set; } = string.Empty;
         public string? Slug { get; set; } = string.Empty;
         
-        public TourCategory Category { get; set; }
+        public Guid? CategoryId { get; set; }
+        public string? CategoryName { get; set; }
+        public TourCategory? Category { get; set; }
         public TourModality Modality { get; set; }
         public TourDifficulty Difficulty { get; set; }
         

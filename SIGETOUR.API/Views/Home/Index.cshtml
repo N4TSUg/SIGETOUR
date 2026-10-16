@@ -1,4 +1,4 @@
-﻿@model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
+@model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
 <main class="flex-grow">
 <!-- Hero Section -->
 <section class="relative bg-gradient-to-b from-[#e6faf5] via-[#f0fdf9] to-white overflow-hidden pt-8 pb-20 md:pt-14 md:pb-24 border-b border-outline-variant/60">
@@ -154,7 +154,7 @@
                         <div class="mt-4 pt-3 border-t border-outline-variant space-y-1.5 text-xs text-on-surface-variant">
                             <div class="flex items-center gap-2">
                                 <span class="material-symbols-outlined text-[16px] text-primary" data-icon="explore">explore</span>
-                                Categora: @tour.Category
+                                Categoría: @(tour.Category?.Name ?? "General")
                             </div>
                         </div>
                         <div class="mt-5 flex items-center justify-between">
@@ -200,6 +200,7 @@
                     foreach (var fp in featuredList)
                     {
                         var t = fp.TourPackage;
+                        if (t == null) continue;
                         <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-outline-variant flex flex-col group">
                             <div class="relative h-48 overflow-hidden">
                                 @if (t.Images != null && t.Images.Any())
@@ -223,7 +224,7 @@
                                 <p class="text-xs text-on-surface-variant mt-2 flex-grow leading-relaxed">@(string.IsNullOrEmpty(fp.CommercialSubtitle) ? t.Description : fp.CommercialSubtitle)</p>
                                 <div class="mt-4 pt-3 border-t border-outline-variant space-y-1.5 text-xs text-on-surface-variant">
                                     <div class="flex items-center gap-2">
-                                        <span class="material-symbols-outlined text-[16px] text-primary" data-icon="check_circle">check_circle</span>Categora: @t.Category
+                                        <span class="material-symbols-outlined text-[16px] text-primary" data-icon="check_circle">check_circle</span>Categoría: @(t.Category?.Name ?? "General")
                                     </div>
                                 </div>
                                 <div class="mt-5 flex items-center justify-between">

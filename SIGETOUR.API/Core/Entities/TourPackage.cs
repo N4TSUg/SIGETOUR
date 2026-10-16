@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using SIGETOUR.API.Core.Enums;
 
@@ -11,7 +11,9 @@ namespace SIGETOUR.API.Core.Entities
         public string Subtitle { get; set; } = string.Empty;
         public string Slug { get; set; } = string.Empty;
         
-        public TourCategory Category { get; set; }
+        public Guid? CategoryId { get; set; }
+        public Category? Category { get; set; }
+
         public TourModality Modality { get; set; }
         public TourDifficulty Difficulty { get; set; }
         
@@ -38,4 +40,3 @@ namespace SIGETOUR.API.Core.Entities
         public ICollection<ItineraryStop> ItineraryStops { get; set; } = new List<ItineraryStop>();
     }
 }
-
