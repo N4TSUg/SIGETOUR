@@ -13,53 +13,58 @@
     </p>
 </div>
 
-<!-- WIZARD PROGRESS STEPPER -->
-<section class="bg-surface-container-lowest border-b border-outline-variant py-4 px-4 md:px-8">
-    <div class="max-w-7xl mx-auto">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <!-- Paso 1 -->
-            <div class="flex items-center space-x-2" id="step1-indicator">
-                <div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-label-md text-label-md ring-2 ring-primary ring-offset-2">
-                    1
-                </div>
-                <div>
-                    <span class="block font-label-sm text-label-sm text-primary uppercase">Paso 1</span>
-                    <span class="block font-label-md text-label-md text-primary font-bold">Fecha y Turno</span>
-                </div>
-            </div>
-            <!-- Paso 2 -->
-            <div class="flex items-center space-x-2 opacity-60" id="step2-indicator">
-                <div class="w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-md text-label-md">
-                    2
-                </div>
-                <div>
-                    <span class="block font-label-sm text-label-sm text-secondary font-semibold uppercase">Paso 2</span>
-                    <span class="block font-label-md text-label-md text-secondary font-bold">Pasajeros</span>
-                </div>
-            </div>
-            <!-- Paso 3 -->
-            <div class="flex items-center space-x-2 opacity-60 hidden md:flex" id="step3-indicator">
-                <div class="w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-md text-label-md">
-                    3
-                </div>
-                <div>
-                    <span class="block font-label-sm text-label-sm text-secondary uppercase">Paso 3</span>
-                    <span class="block font-label-md text-label-md text-secondary font-bold">Datos de Contacto</span>
-                </div>
-            </div>
-            <!-- Paso 4 -->
-            <div class="flex items-center space-x-2 opacity-60 hidden md:flex">
-                <div class="w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-md text-label-md">
-                    4
-                </div>
-                <div>
-                    <span class="block font-label-sm text-label-sm text-secondary uppercase">Paso 4</span>
-                    <span class="block font-label-md text-label-md text-secondary font-bold">Confirmación</span>
-                </div>
-            </div>
+<!-- STEPPER BAR -->
+<nav aria-label="Progreso de la Reserva" class="bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs py-4">
+  <div class="max-w-7xl mx-auto px-4 md:px-8">
+    <div class="flex items-center justify-between max-w-4xl mx-auto relative">
+      
+      <!-- Step 1: Datos del Tour -->
+      <div id="step1-item" class="flex flex-col items-center group relative z-10 transition-all duration-200">
+        <div id="step1-circle" class="w-9 h-9 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-sm shadow-md transition-all">
+          <span id="step1-icon">1</span>
         </div>
+        <span id="step1-label" class="mt-2 text-label-sm font-label-sm text-primary font-bold hidden md:inline-block">1. Datos del Tour</span>
+      </div>
+      <div id="line-1-2" class="flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300"></div>
+
+      <!-- Step 2: Recojo & Pasajeros -->
+      <div id="step2-item" class="flex flex-col items-center group relative z-10 opacity-60 transition-all duration-200">
+        <div id="step2-circle" class="w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm transition-all">
+          <span id="step2-icon">2</span>
+        </div>
+        <span id="step2-label" class="mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block">2. Recojo & Pasajeros</span>
+      </div>
+      <div id="line-2-3" class="flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300"></div>
+
+      <!-- Step 3: Datos de Contacto -->
+      <div id="step3-item" class="flex flex-col items-center group relative z-10 opacity-60 transition-all duration-200">
+        <div id="step3-circle" class="w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm transition-all">
+          <span id="step3-icon">3</span>
+        </div>
+        <span id="step3-label" class="mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block">3. Datos de Contacto</span>
+      </div>
+      <div id="line-3-4" class="flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300"></div>
+
+      <!-- Step 4: Pago Seguro -->
+      <div id="step4-item" class="flex flex-col items-center group relative z-10 opacity-60 transition-all duration-200">
+        <div id="step4-circle" class="w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm transition-all">
+          <span>4</span>
+        </div>
+        <span id="step4-label" class="mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block">4. Pago Seguro</span>
+      </div>
+      <div id="line-4-5" class="flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300"></div>
+
+      <!-- Step 5: Voucher Oficial -->
+      <div id="step5-item" class="flex flex-col items-center group relative z-10 opacity-60 transition-all duration-200">
+        <div id="step5-circle" class="w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm transition-all">
+          <span>5</span>
+        </div>
+        <span id="step5-label" class="mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block">5. Voucher Oficial</span>
+      </div>
+
     </div>
-</section>
+  </div>
+</nav>
 
 <!-- CHECKOUT CONTENT -->
 <main class="bg-surface-container py-8 px-4 md:px-8">
@@ -341,10 +346,10 @@
         const hotelForm = document.getElementById('hotel-form');
         const inputHotelZone = document.getElementById('input-hotelzone');
 
-        const step1 = document.getElementById('step1-indicator');
-        const step2 = document.getElementById('step2-indicator');
-        const step3 = document.getElementById('step3-indicator');
         const inputName = document.getElementById('input-name');
+        const inputDni = document.getElementById('input-dni');
+        const inputPhone = document.getElementById('input-phone');
+        const inputEmail = document.getElementById('input-email');
 
         function formatMoney(amount) {
             return "S/ " + amount.toFixed(2);
@@ -370,6 +375,100 @@
             summaryPaxCount.innerText = pax + "x Pasajero" + (pax > 1 ? "s" : "");
             summaryPaxTotal.innerText = formatMoney(baseCost);
             summaryGrandTotal.innerText = formatMoney(total);
+        }
+
+        function updateCheckoutStepper() {
+            const hasDate = Boolean(inputDate && inputDate.value);
+            const hasShift = Boolean(document.querySelector('input[name="Shift"]:checked'));
+            const isStep1Done = hasDate && hasShift;
+
+            const hasBoarding = Boolean(document.querySelector('input[name="BoardingPoint"]:checked'));
+            const paxCount = parseInt(inputPassengers.value) || 1;
+            const isStep2Done = isStep1Done && hasBoarding && paxCount >= 1;
+
+            const nameVal = (inputName ? inputName.value : '').trim();
+            const dniVal = (inputDni ? inputDni.value : '').trim();
+            const isStep3Done = isStep2Done && (nameVal.length >= 3) && (dniVal.length >= 6);
+
+            const c1 = document.getElementById('step1-circle'), i1 = document.getElementById('step1-icon'), l1 = document.getElementById('step1-label'), item1 = document.getElementById('step1-item');
+            const c2 = document.getElementById('step2-circle'), i2 = document.getElementById('step2-icon'), l2 = document.getElementById('step2-label'), item2 = document.getElementById('step2-item');
+            const c3 = document.getElementById('step3-circle'), i3 = document.getElementById('step3-icon'), l3 = document.getElementById('step3-label'), item3 = document.getElementById('step3-item');
+            const c4 = document.getElementById('step4-circle'), l4 = document.getElementById('step4-label'), item4 = document.getElementById('step4-item');
+            const line12 = document.getElementById('line-1-2');
+            const line23 = document.getElementById('line-2-3');
+            const line34 = document.getElementById('line-3-4');
+
+            if (!c1) return;
+
+            // Step 1
+            if (isStep1Done) {
+                c1.className = "w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm shadow-sm transition-all";
+                i1.innerHTML = '<span class="material-symbols-outlined text-base font-bold">check</span>';
+                l1.className = "mt-2 text-label-sm font-label-sm text-secondary font-medium hidden md:inline-block";
+                item1.classList.remove('opacity-60');
+                if (line12) line12.className = "flex-1 h-0.5 bg-primary-container mx-2 -mt-5 md:-mt-6 transition-all duration-300";
+            } else {
+                c1.className = "w-9 h-9 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-sm shadow-md transition-all";
+                i1.innerText = "1";
+                l1.className = "mt-2 text-label-sm font-label-sm text-primary font-bold inline-block";
+                item1.classList.remove('opacity-60');
+                if (line12) line12.className = "flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300";
+            }
+
+            // Step 2
+            if (isStep2Done) {
+                c2.className = "w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm shadow-sm transition-all";
+                i2.innerHTML = '<span class="material-symbols-outlined text-base font-bold">check</span>';
+                l2.className = "mt-2 text-label-sm font-label-sm text-secondary font-medium hidden md:inline-block";
+                item2.classList.remove('opacity-60');
+                if (line23) line23.className = "flex-1 h-0.5 bg-primary-container mx-2 -mt-5 md:-mt-6 transition-all duration-300";
+            } else if (isStep1Done) {
+                c2.className = "w-9 h-9 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-sm shadow-md transition-all";
+                i2.innerText = "2";
+                l2.className = "mt-2 text-label-sm font-label-sm text-primary font-bold inline-block";
+                item2.classList.remove('opacity-60');
+                if (line23) line23.className = "flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300";
+            } else {
+                c2.className = "w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm transition-all";
+                i2.innerText = "2";
+                l2.className = "mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block";
+                item2.classList.add('opacity-60');
+                if (line23) line23.className = "flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300";
+            }
+
+            // Step 3
+            if (isStep3Done) {
+                c3.className = "w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm shadow-sm transition-all";
+                i3.innerHTML = '<span class="material-symbols-outlined text-base font-bold">check</span>';
+                l3.className = "mt-2 text-label-sm font-label-sm text-secondary font-medium hidden md:inline-block";
+                item3.classList.remove('opacity-60');
+                if (line34) line34.className = "flex-1 h-0.5 bg-primary-container mx-2 -mt-5 md:-mt-6 transition-all duration-300";
+
+                // Step 4 highlighted as next
+                if (c4) c4.className = "w-9 h-9 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-sm shadow-md transition-all";
+                if (l4) l4.className = "mt-2 text-label-sm font-label-sm text-primary font-bold inline-block";
+                if (item4) item4.classList.remove('opacity-60');
+            } else if (isStep2Done) {
+                c3.className = "w-9 h-9 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-sm shadow-md transition-all";
+                i3.innerText = "3";
+                l3.className = "mt-2 text-label-sm font-label-sm text-primary font-bold inline-block";
+                item3.classList.remove('opacity-60');
+                if (line34) line34.className = "flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300";
+
+                if (c4) c4.className = "w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm transition-all";
+                if (l4) l4.className = "mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block";
+                if (item4) item4.classList.add('opacity-60');
+            } else {
+                c3.className = "w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm transition-all";
+                i3.innerText = "3";
+                l3.className = "mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block";
+                item3.classList.add('opacity-60');
+                if (line34) line34.className = "flex-1 h-0.5 bg-outline-variant/40 mx-2 -mt-5 md:-mt-6 transition-all duration-300";
+
+                if (c4) c4.className = "w-9 h-9 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant flex items-center justify-center font-bold text-sm transition-all";
+                if (l4) l4.className = "mt-2 text-label-sm font-label-sm text-on-surface-variant hidden md:inline-block";
+                if (item4) item4.classList.add('opacity-60');
+            }
         }
 
         function updateSummary() {
@@ -413,19 +512,8 @@
                 document.getElementById('label-agencia').classList.replace('bg-primary/5', 'bg-surface-container-lowest');
             }
             
-            // Update Stepper
-            if (inputDate.value) {
-                step1.querySelector('div').classList.replace('bg-surface-variant', 'bg-primary-container');
-                step1.querySelector('div').classList.replace('text-on-surface-variant', 'text-on-primary-container');
-                step1.classList.remove('opacity-60');
-                step2.classList.remove('opacity-60');
-            }
-            
-            if (inputName.value.length > 2) {
-                step3.classList.remove('opacity-60');
-            }
-
             calculateTotal();
+            updateCheckoutStepper();
         }
 
         const btnDecreasePax = document.getElementById('btn-decrease-pax');
@@ -482,6 +570,9 @@
         });
         inputHotelZone.addEventListener("change", updateSummary);
         inputName.addEventListener("input", updateSummary);
+        if (inputDni) inputDni.addEventListener("input", updateCheckoutStepper);
+        if (inputPhone) inputPhone.addEventListener("input", updateCheckoutStepper);
+        if (inputEmail) inputEmail.addEventListener("input", updateCheckoutStepper);
         
         radiosShift.forEach(r => r.addEventListener("change", updateSummary));
         radiosBoarding.forEach(r => r.addEventListener("change", updateSummary));

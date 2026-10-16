@@ -1,8 +1,34 @@
-﻿@model SIGETOUR.API.Core.Entities.Booking
+@model SIGETOUR.API.Core.Entities.Booking
 @{
     ViewData["Title"] = "Voucher de Reserva";
     var tour = Model.Items.FirstOrDefault()?.TourPackage;
 }
+
+<!-- STEPPER BAR -->
+<nav aria-label="Progreso de la Reserva" class="bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs py-4">
+  <div class="max-w-7xl mx-auto px-4 md:px-8">
+    <div class="flex items-center justify-between max-w-4xl mx-auto relative">
+      <!-- Steps 1-4: Completed -->
+      @foreach (var (label, num) in new[] { ("1. Datos del Tour", 1), ("2. Recojo & Pasajeros", 2), ("3. Datos de Contacto", 3), ("4. Pago Seguro", 4) })
+      {
+        <div class="flex flex-col items-center group relative z-10">
+          <div class="w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm shadow-sm">
+            <span class="material-symbols-outlined text-base font-bold">check</span>
+          </div>
+          <span class="mt-2 text-label-sm font-label-sm text-secondary font-medium hidden md:inline-block">@label</span>
+        </div>
+        <div class="flex-1 h-0.5 bg-primary-container mx-2 -mt-5 md:-mt-6"></div>
+      }
+      <!-- Step 5: Completed & Active Voucher -->
+      <div class="flex flex-col items-center group relative z-10">
+        <div class="w-9 h-9 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-sm shadow-md">
+          <span class="material-symbols-outlined text-base font-bold">check</span>
+        </div>
+        <span class="mt-2 text-label-sm font-label-sm text-primary font-bold">5. Voucher Oficial</span>
+      </div>
+    </div>
+  </div>
+</nav>
 
 <div class="bg-surface-container py-12 px-4 md:px-8 min-h-screen">
     <div class="max-w-3xl mx-auto bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant p-8 text-center">
