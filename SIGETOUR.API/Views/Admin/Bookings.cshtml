@@ -8,6 +8,7 @@
     var currentDate = ViewBag.CurrentDate as string;
     var currentTourId = ViewBag.CurrentTourId as Guid?;
     var availableTours = ViewBag.AvailableTours as IEnumerable<TourPackage> ?? Enumerable.Empty<TourPackage>();
+    var availableVehicles = ViewBag.AvailableVehicles as IEnumerable<Vehicle> ?? Enumerable.Empty<Vehicle>();
     bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch) || (!string.IsNullOrWhiteSpace(currentStatus) && currentStatus != "Todos") || !string.IsNullOrWhiteSpace(currentDate) || (currentTourId.HasValue && currentTourId.Value != Guid.Empty);
 }
 
@@ -20,9 +21,13 @@
             <span class="text-label-sm text-secondary font-medium">• @DateTime.Now.ToString("dd MMMM yyyy")</span>
         </div>
         <h1 class="text-display-sm font-bold text-on-surface">Despacho de Salidas y Reservas</h1>
-        <p class="text-body-lg text-on-surface-variant">Historial, control de salidas programadas y preparación de manifiestos oficiales de viaje MTC.</p>
+        <p class="text-body-lg text-on-surface-variant">Historial, control de salidas programadas y emisión de manifiestos oficiales de viaje MTC.</p>
     </div>
     <div class="flex items-center gap-2.5">
+        <button type="button" onclick="openManifestModal()" class="px-4 py-2 rounded-lg bg-surface-container-lowest hover:bg-surface-container border border-outline text-primary font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer" title="Generar y Exportar Manifiesto Oficial de Pasajeros en Excel">
+            <span class="material-symbols-outlined text-[20px]">table_view</span>
+            Exportar Manifiesto (Excel)
+        </button>
         <a href="@Url.Action("CreateBooking", "Admin")" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors inline-flex shadow-sm shrink-0" title="Ir al formulario para registrar reserva manual">
             <span class="material-symbols-outlined">add</span>
             Nueva Reserva Manual
@@ -281,6 +286,9 @@
 
                             <!-- ACCIONES -->
                             <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                                <button type="button" onclick="openManifestForBooking('@booking.TravelDate.ToString("yyyy-MM-dd")', '@tour?.Id', '@booking.ShiftName', '@tour?.DefaultVehicleId')" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Exportar Manifiesto de esta Salida en Excel">
+                                    <span class="material-symbols-outlined text-[20px]">table_view</span>
+                                </button>
                                 <a href="@Url.Action("EditBooking", "Admin", new { id = booking.Id })" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Ver / Editar Reserva">
                                     <span class="material-symbols-outlined text-[20px]">edit_note</span>
                                 </a>
@@ -314,6 +322,152 @@
     </div>
 </div>
 
+<!-- ======================================================== -->
+<!-- MODAL DE EXPORTACIÓN DE MANIFIESTO DE SALIDA             -->
+<!-- ======================================================== -->
+<div id="manifestModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm transition-all duration-200 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-outline-variant relative max-h-[92vh] overflow-y-auto">
+        <!-- Encabezado Modal -->
+        <div class="flex items-start justify-between border-b border-outline-variant/60 pb-4 mb-5">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-2xl">table_view</span>
+                </div>
+                <div>
+                    <h3 class="text-headline-sm font-bold text-on-surface leading-tight">Exportar Manifiesto de Pasajeros MTC</h3>
+                    <p class="text-body-sm text-on-surface-variant mt-0.5">Genera el archivo Excel oficial con la capacidad exacta de asientos del vehículo asignado a la salida.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeManifestModal()" class="p-1 rounded-lg hover:bg-surface-container text-outline hover:text-on-surface transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">close</span>
+            </button>
+        </div>
+
+        <form id="manifestExportForm" method="post" asp-action="ExportManifestExcel" target="_blank" class="space-y-5">
+            <!-- SELECCIÓN PRINCIPAL DE LA SALIDA -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Fecha de Recorrido -->
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Fecha de la Salida <span class="text-tertiary">*</span></label>
+                    <input type="date" name="Date" id="manifestDate" value="@(currentDate ?? DateTime.Today.ToString("yyyy-MM-dd"))" onchange="fetchManifestPreview()" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none" required />
+                </div>
+
+                <!-- Circuito / Tour -->
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Circuito Turístico <span class="text-tertiary">*</span></label>
+                    <select name="TourPackageId" id="manifestTour" onchange="onTourChangedManifest()" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none" required>
+                        @foreach (var tour in availableTours)
+                        {
+                            <option value="@tour.Id" data-vehicle="@tour.DefaultVehicleId" selected="@(currentTourId == tour.Id)">
+                                @tour.Title
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <!-- Turno de Salida -->
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Turno Operativo</label>
+                    <select name="ShiftName" id="manifestShift" onchange="fetchManifestPreview()" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+                        <option value="">Todos los turnos de la jornada</option>
+                        <option value="Mañana (09:00 AM)">Mañana (09:00 AM)</option>
+                        <option value="Tarde (02:30 PM)">Tarde (02:30 PM)</option>
+                        <option value="Día Completo">Día Completo</option>
+                    </select>
+                </div>
+
+                <!-- Vehículo Elegido (Determina la cantidad de asientos de la tabla Excel) -->
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1 flex items-center justify-between">
+                        <span>Vehículo Asignado a la Salida <span class="text-tertiary">*</span></span>
+                        <span class="text-[11px] text-primary font-bold" id="previewTotalSeatsBadge">-- Asientos</span>
+                    </label>
+                    <select name="VehicleId" id="manifestVehicle" onchange="fetchManifestPreview()" class="w-full py-2.5 px-3 rounded-lg border-2 border-primary/40 bg-surface-bright text-body-sm font-bold text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none cursor-pointer" required>
+                        @if (availableVehicles.Any())
+                        {
+                            foreach (var v in availableVehicles)
+                            {
+                                <option value="@v.Id" data-capacity="@v.SeatCapacity" data-plate="@v.LicensePlate" data-model="@v.Model">
+                                    @v.Model (@v.LicensePlate) &bull; @v.SeatCapacity Asientos
+                                </option>
+                            }
+                        }
+                        else
+                        {
+                            <option value="" data-capacity="18" data-plate="T7C-000" data-model="Unidad Estándar">Unidad Estándar (18 Asientos)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- DATOS OPERATIVOS DEL SERVICIO (TRIPULACIÓN Y DESPACHO) -->
+            <div class="bg-surface-container-low/50 p-4 rounded-xl border border-outline-variant/60 space-y-3">
+                <span class="text-label-sm font-bold text-secondary uppercase tracking-wider block">Ficha Operativa de Tripulación (Formatos MTC)</span>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-body-sm">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-outline mb-1">Conductor Asignado</label>
+                        <input type="text" name="DriverName" id="manifestDriver" value="Conductor Oficial Chilón" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-outline mb-1">N° Licencia de Conducir / DNI</label>
+                        <input type="text" name="DriverLicense" id="manifestDriverLicense" value="Q-42910834" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-outline mb-1">Guía Oficial de Turismo</label>
+                        <input type="text" name="GuideName" id="manifestGuide" value="Guía Oficial Turismo Chilón" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-outline mb-1">Carnet DIRCETUR / DNI Guía</label>
+                        <input type="text" name="GuideCarnet" id="manifestGuideCarnet" value="DIRCETUR-CAJ-042" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[11px] font-semibold text-outline mb-1">Punto de Concentración / Salida General</label>
+                        <input type="text" name="DeparturePoint" id="manifestDeparturePoint" value="Oficina Principal - Jr. Dos de Mayo 534, Cajamarca" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- TARJETA DE VISTA PREVIA Y VALIDACIÓN DE ASIENTOS -->
+            <div class="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-label-md font-bold text-primary flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px]">airline_seat_recline_extra</span>
+                        Balance de Asientos de la Salida
+                    </span>
+                    <div class="flex items-center gap-2 text-xs">
+                        <span id="previewOccupiedBadge" class="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold">0 Pasajeros</span>
+                        <span id="previewAvailableBadge" class="px-2 py-0.5 rounded-full bg-surface-container text-secondary font-medium">-- Libres</span>
+                        <span id="previewOccupancyBadge" class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-bold">0% Ocupación</span>
+                    </div>
+                </div>
+
+                <!-- Barra de Progreso de Ocupación -->
+                <div class="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
+                    <div id="previewProgressBar" class="bg-primary h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+
+                <!-- Mensaje Explicativo de la Tabla del Excel -->
+                <p class="text-xs text-on-surface-variant leading-relaxed">
+                    <span class="material-symbols-outlined text-[14px] text-primary align-middle">check_circle</span>
+                    La tabla del archivo Excel generado contendrá <b>exactamente <span id="summaryCapacity">--</span> filas</b> numeradas del <b>Asiento 01</b> al <b>Asiento <span id="summaryCapacityEnd">--</span></b> según la capacidad de la unidad <b id="summaryVehicleName">elegida</b>. Los asientos no reservados quedarán etiquetados como <i>Asiento Disponible / Libre</i> con espacio en blanco para control físico y firma durante el abordaje.
+                </p>
+            </div>
+
+            <!-- Botones de Acción del Modal -->
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeManifestModal()" class="px-5 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md hover:bg-surface-container transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-6 py-2.5 rounded-lg bg-primary hover:bg-[#0e5a52] text-on-primary font-bold flex items-center gap-2 shadow-md transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">download</span>
+                    Descargar Manifiesto Excel (.xlsx)
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('bookingSearchInput');
@@ -342,5 +496,120 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Cerrar modal con ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeManifestModal();
+    });
+
+    // Inicializar preview si hay tour seleccionado
+    if (document.getElementById('manifestTour')?.value) {
+        fetchManifestPreview();
+    }
 });
+
+function openManifestModal() {
+    const modal = document.getElementById('manifestModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        fetchManifestPreview();
+    }
+}
+
+function closeManifestModal() {
+    const modal = document.getElementById('manifestModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function openManifestForBooking(date, tourId, shift, vehicleId) {
+    if (date) {
+        const dInput = document.getElementById('manifestDate');
+        if (dInput) dInput.value = date;
+    }
+    if (tourId) {
+        const tSelect = document.getElementById('manifestTour');
+        if (tSelect) tSelect.value = tourId;
+    }
+    if (shift) {
+        const sSelect = document.getElementById('manifestShift');
+        if (sSelect) sSelect.value = shift;
+    }
+    if (vehicleId && vehicleId !== 'null' && vehicleId !== '') {
+        const vSelect = document.getElementById('manifestVehicle');
+        if (vSelect) vSelect.value = vehicleId;
+    }
+    openManifestModal();
+}
+
+function onTourChangedManifest() {
+    const tourSelect = document.getElementById('manifestTour');
+    if (tourSelect) {
+        const selectedOpt = tourSelect.options[tourSelect.selectedIndex];
+        const defaultVehicle = selectedOpt?.getAttribute('data-vehicle');
+        if (defaultVehicle && defaultVehicle !== '') {
+            const vehicleSelect = document.getElementById('manifestVehicle');
+            if (vehicleSelect) {
+                for (let i = 0; i < vehicleSelect.options.length; i++) {
+                    if (vehicleSelect.options[i].value === defaultVehicle) {
+                        vehicleSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    fetchManifestPreview();
+}
+
+async function fetchManifestPreview() {
+    const dateInput = document.getElementById('manifestDate');
+    const tourSelect = document.getElementById('manifestTour');
+    const shiftSelect = document.getElementById('manifestShift');
+    const vehicleSelect = document.getElementById('manifestVehicle');
+
+    const date = dateInput?.value;
+    const tourId = tourSelect?.value;
+    const shift = shiftSelect?.value;
+    const vehicleId = vehicleSelect?.value;
+
+    const selectedVehicleOpt = vehicleSelect?.options[vehicleSelect.selectedIndex];
+    const capacity = selectedVehicleOpt?.getAttribute('data-capacity') || '18';
+    const plate = selectedVehicleOpt?.getAttribute('data-plate') || '';
+    const model = selectedVehicleOpt?.getAttribute('data-model') || '';
+
+    const formattedCap = capacity.toString().padStart(2, '0');
+    const summaryCap = document.getElementById('summaryCapacity');
+    if (summaryCap) summaryCap.innerText = formattedCap;
+    const summaryCapEnd = document.getElementById('summaryCapacityEnd');
+    if (summaryCapEnd) summaryCapEnd.innerText = formattedCap;
+
+    const summaryVeh = document.getElementById('summaryVehicleName');
+    if (summaryVeh) summaryVeh.innerText = model ? `${model} (${plate})` : 'unidad seleccionada';
+
+    const countBadge = document.getElementById('previewTotalSeatsBadge');
+    if (countBadge) countBadge.innerText = `${capacity} Asientos Oficiales`;
+
+    if (!tourId || !date) return;
+
+    try {
+        const url = `/Admin/GetManifestPreview?date=${encodeURIComponent(date)}&tourId=${encodeURIComponent(tourId)}&vehicleId=${encodeURIComponent(vehicleId || '')}&shift=${encodeURIComponent(shift || '')}`;
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            const occBadge = document.getElementById('previewOccupiedBadge');
+            if (occBadge) occBadge.innerText = `${data.occupiedSeats} Pasajeros`;
+
+            const availBadge = document.getElementById('previewAvailableBadge');
+            if (availBadge) availBadge.innerText = `${data.availableSeats} Asientos Libres`;
+
+            const pctBadge = document.getElementById('previewOccupancyBadge');
+            if (pctBadge) pctBadge.innerText = `${data.occupancyPercentage}% Ocupación`;
+
+            const bar = document.getElementById('previewProgressBar');
+            if (bar) bar.style.width = `${Math.min(100, data.occupancyPercentage)}%`;
+        }
+    } catch (err) {
+        console.error('Error fetching manifest preview:', err);
+    }
+}
 </script>

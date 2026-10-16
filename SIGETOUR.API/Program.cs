@@ -49,6 +49,7 @@ builder.Services.AddAutoMapper(config => {
 
 // 5. Inyección de Dependencias
 builder.Services.AddScoped<ITourPackageService, TourPackageService>();
+builder.Services.AddScoped<IManifestExportService, ManifestExportService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
+using SIGETOUR.API.Application.Interfaces;
+using SIGETOUR.API.Models;
 using System.Linq;
 using System.Threading.Tasks;
 using System;
@@ -20,12 +22,14 @@ namespace SIGETOUR.API.Controllers.UI
         private readonly AppDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IWebHostEnvironment _env;
+        private readonly IManifestExportService _manifestService;
 
-        public AdminController(AppDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment env)
+        public AdminController(AppDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment env, IManifestExportService manifestService)
         {
             _context = context;
             _userManager = userManager;
             _env = env;
+            _manifestService = manifestService;
         }
 
         public async Task<IActionResult> Dashboard()
@@ -157,8 +161,75 @@ namespace SIGETOUR.API.Controllers.UI
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.Title)
                 .ToListAsync();
+            ViewBag.AvailableVehicles = await _context.Vehicles
+                .Where(v => v.IsActive)
+                .OrderBy(v => v.Model)
+                .ToListAsync();
 
             return View(bookings);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetManifestPreview(DateTime date, Guid tourId, Guid? vehicleId, string? shift)
+        {
+            if (tourId == Guid.Empty) return BadRequest("Debe seleccionar un tour.");
+            try
+            {
+                var preview = await _manifestService.GetManifestPreviewAsync(date, tourId, vehicleId, shift);
+                return Json(preview);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpGet]
+        [HttpPost]
+        public async Task<IActionResult> ExportManifestExcel([FromForm] ManifestExportRequest? formRequest, [FromQuery] ManifestExportRequest? queryRequest)
+        {
+            var req = formRequest ?? queryRequest;
+            if (req == null || req.TourPackageId == Guid.Empty)
+            {
+                var tourIdStr = Request.Query["tourPackageId"].ToString();
+                if (Guid.TryParse(tourIdStr, out var tid))
+                {
+                    req = new ManifestExportRequest
+                    {
+                        TourPackageId = tid,
+                        Date = DateTime.TryParse(Request.Query["date"].ToString(), out var d) ? d : DateTime.Today,
+                        ShiftName = Request.Query["shiftName"].ToString(),
+                        VehicleId = Guid.TryParse(Request.Query["vehicleId"].ToString(), out var vid) ? vid : Guid.Empty,
+                        DriverName = Request.Query["driverName"].ToString(),
+                        DriverLicense = Request.Query["driverLicense"].ToString(),
+                        GuideName = Request.Query["guideName"].ToString(),
+                        GuideCarnet = Request.Query["guideCarnet"].ToString(),
+                        DeparturePoint = Request.Query["departurePoint"].ToString()
+                    };
+                }
+            }
+
+            if (req == null || req.TourPackageId == Guid.Empty)
+            {
+                return BadRequest("Debe seleccionar un tour y fecha válidos para generar el manifiesto.");
+            }
+
+            try
+            {
+                var fileBytes = await _manifestService.GenerateManifestExcelAsync(req);
+                var tour = await _context.TourPackages.FindAsync(req.TourPackageId);
+                var vehicle = await _context.Vehicles.FindAsync(req.VehicleId);
+
+                var cleanTour = tour != null ? string.Concat(tour.Title.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_") : "Tour";
+                var cleanPlate = vehicle != null ? vehicle.LicensePlate.Replace(" ", "-") : "Unidad";
+                var fileName = $"Manifiesto_MTC_{cleanPlate}_{req.Date:yyyyMMdd}_{cleanTour}.xlsx";
+
+                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Error al generar el manifiesto: {ex.Message}");
+            }
         }
 
         [HttpGet]
