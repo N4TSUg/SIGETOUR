@@ -21,6 +21,7 @@ namespace SIGETOUR.API.Controllers.UI
     {
         private readonly AppDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IWebHostEnvironment _env;
         private readonly IManifestExportService _manifestService;
         private readonly ICashReportExportService _cashReportService;
@@ -28,12 +29,14 @@ namespace SIGETOUR.API.Controllers.UI
         public AdminController(
             AppDbContext context, 
             UserManager<ApplicationUser> userManager, 
+            RoleManager<IdentityRole> roleManager,
             IWebHostEnvironment env, 
             IManifestExportService manifestService,
             ICashReportExportService cashReportService)
         {
             _context = context;
             _userManager = userManager;
+            _roleManager = roleManager;
             _env = env;
             _manifestService = manifestService;
             _cashReportService = cashReportService;
@@ -561,6 +564,26 @@ namespace SIGETOUR.API.Controllers.UI
                 .Take(pageSize)
                 .ToListAsync();
 
+            // Cargar roles de cada usuario
+            var userRoles = new Dictionary<string, string>();
+            foreach (var u in users)
+            {
+                var roles = await _userManager.GetRolesAsync(u);
+                userRoles[u.Id] = roles.FirstOrDefault() ?? "User";
+            }
+
+            ViewBag.UserRoles = userRoles;
+
+            // Obtener roles disponibles
+            var rolesList = await _roleManager.Roles.Select(r => r.Name!).ToListAsync();
+            if (!rolesList.Contains("SuperAdmin")) rolesList.Add("SuperAdmin");
+            if (!rolesList.Contains("Admin")) rolesList.Add("Admin");
+            if (!rolesList.Contains("Operador")) rolesList.Add("Operador");
+            if (!rolesList.Contains("Cajero")) rolesList.Add("Cajero");
+            if (!rolesList.Contains("User")) rolesList.Add("User");
+            ViewBag.AvailableRoles = rolesList;
+
+            ViewBag.CurrentUserId = _userManager.GetUserId(User);
             ViewBag.CurrentSearch = search;
 
             var routeParams = new Dictionary<string, string>();
@@ -578,6 +601,187 @@ namespace SIGETOUR.API.Controllers.UI
             };
 
             return View(users);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateUser(CreateUserViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                var firstError = ModelState.Values.SelectMany(v => v.Errors).FirstOrDefault()?.ErrorMessage ?? "Datos del formulario inválidos.";
+                TempData["ErrorMessage"] = firstError;
+                return RedirectToAction(nameof(Users));
+            }
+
+            var cleanUserName = model.UserName.Trim();
+            var cleanEmail = model.Email.Trim();
+
+            var existingByName = await _userManager.FindByNameAsync(cleanUserName);
+            if (existingByName != null)
+            {
+                TempData["ErrorMessage"] = $"El nombre de usuario '{cleanUserName}' ya se encuentra registrado.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var existingByEmail = await _userManager.FindByEmailAsync(cleanEmail);
+            if (existingByEmail != null)
+            {
+                TempData["ErrorMessage"] = $"El correo '{cleanEmail}' ya se encuentra registrado.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = cleanUserName,
+                Email = cleanEmail,
+                FirstName = model.FirstName.Trim(),
+                LastName = model.LastName.Trim(),
+                PhoneNumber = model.PhoneNumber?.Trim(),
+                EmailConfirmed = true,
+                IsActive = model.IsActive
+            };
+
+            var result = await _userManager.CreateAsync(user, model.Password);
+            if (!result.Succeeded)
+            {
+                var errorMsg = string.Join("; ", result.Errors.Select(e => e.Description));
+                TempData["ErrorMessage"] = $"Error al registrar usuario: {errorMsg}";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var roleName = string.IsNullOrWhiteSpace(model.Role) ? "User" : model.Role.Trim();
+            if (!await _roleManager.RoleExistsAsync(roleName))
+            {
+                await _roleManager.CreateAsync(new IdentityRole(roleName));
+            }
+            await _userManager.AddToRoleAsync(user, roleName);
+
+            TempData["SuccessMessage"] = $"Usuario '{user.FirstName} {user.LastName}' (@{user.UserName}) registrado con éxito.";
+            return RedirectToAction(nameof(Users));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditUser(EditUserViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                var firstError = ModelState.Values.SelectMany(v => v.Errors).FirstOrDefault()?.ErrorMessage ?? "Datos del formulario inválidos.";
+                TempData["ErrorMessage"] = firstError;
+                return RedirectToAction(nameof(Users));
+            }
+
+            var user = await _userManager.FindByIdAsync(model.Id);
+            if (user == null)
+            {
+                TempData["ErrorMessage"] = "El usuario seleccionado no existe.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var cleanUserName = model.UserName.Trim();
+            var cleanEmail = model.Email.Trim();
+
+            if (!string.Equals(user.UserName, cleanUserName, StringComparison.OrdinalIgnoreCase))
+            {
+                var existingByName = await _userManager.FindByNameAsync(cleanUserName);
+                if (existingByName != null && existingByName.Id != user.Id)
+                {
+                    TempData["ErrorMessage"] = $"El nombre de usuario '{cleanUserName}' ya está en uso.";
+                    return RedirectToAction(nameof(Users));
+                }
+                user.UserName = cleanUserName;
+            }
+
+            if (!string.Equals(user.Email, cleanEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                var existingByEmail = await _userManager.FindByEmailAsync(cleanEmail);
+                if (existingByEmail != null && existingByEmail.Id != user.Id)
+                {
+                    TempData["ErrorMessage"] = $"El correo '{cleanEmail}' ya está en uso.";
+                    return RedirectToAction(nameof(Users));
+                }
+                user.Email = cleanEmail;
+            }
+
+            user.FirstName = model.FirstName.Trim();
+            user.LastName = model.LastName.Trim();
+            user.PhoneNumber = model.PhoneNumber?.Trim();
+            user.IsActive = model.IsActive;
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                var errorMsg = string.Join("; ", updateResult.Errors.Select(e => e.Description));
+                TempData["ErrorMessage"] = $"Error al actualizar datos: {errorMsg}";
+                return RedirectToAction(nameof(Users));
+            }
+
+            // Cambiar contraseña si se especificó una nueva
+            if (!string.IsNullOrWhiteSpace(model.NewPassword))
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var passResult = await _userManager.ResetPasswordAsync(user, token, model.NewPassword);
+                if (!passResult.Succeeded)
+                {
+                    var passError = string.Join("; ", passResult.Errors.Select(e => e.Description));
+                    TempData["ErrorMessage"] = $"Datos actualizados, pero no se pudo cambiar la contraseña: {passError}";
+                    return RedirectToAction(nameof(Users));
+                }
+            }
+
+            // Actualizar rol
+            var roleName = string.IsNullOrWhiteSpace(model.Role) ? "User" : model.Role.Trim();
+            if (!await _roleManager.RoleExistsAsync(roleName))
+            {
+                await _roleManager.CreateAsync(new IdentityRole(roleName));
+            }
+
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            if (!currentRoles.Contains(roleName))
+            {
+                await _userManager.RemoveFromRolesAsync(user, currentRoles);
+                await _userManager.AddToRoleAsync(user, roleName);
+            }
+
+            TempData["SuccessMessage"] = $"Usuario '{user.FirstName} {user.LastName}' actualizado exitosamente.";
+            return RedirectToAction(nameof(Users));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+            {
+                TempData["ErrorMessage"] = "El usuario seleccionado no existe.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var currentUserId = _userManager.GetUserId(User);
+            if (user.Id == currentUserId || string.Equals(user.UserName, User.Identity?.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = "No puedes eliminar tu propia cuenta de usuario mientras tengas la sesión activa.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            if (string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = "La cuenta principal 'superadmin' está protegida por el sistema y no puede ser eliminada.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                var errorMsg = string.Join("; ", result.Errors.Select(e => e.Description));
+                TempData["ErrorMessage"] = $"Error al eliminar usuario: {errorMsg}";
+                return RedirectToAction(nameof(Users));
+            }
+
+            TempData["SuccessMessage"] = $"Usuario '{user.FirstName} {user.LastName}' (@{user.UserName}) eliminado correctamente.";
+            return RedirectToAction(nameof(Users));
         }
 
         // --- NEW CRUD METHODS FOR TOURS --- //

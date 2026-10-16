@@ -1,10 +1,39 @@
 @using SIGETOUR.API.Core.Entities
 @{
-    ViewData["Title"] = "Usuarios del Sistema";
+    ViewData["Title"] = "Gestión de Usuarios - Turismo Chilón";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
     var users = Model as IEnumerable<ApplicationUser>;
     var currentSearch = ViewBag.CurrentSearch as string;
     bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch);
+    var userRoles = ViewBag.UserRoles as Dictionary<string, string> ?? new Dictionary<string, string>();
+    var currentUserId = ViewBag.CurrentUserId as string ?? "";
+    var availableRoles = ViewBag.AvailableRoles as List<string> ?? new List<string> { "SuperAdmin", "Admin", "Operador", "Cajero", "User" };
+}
+
+<!-- Mensajes de Notificación -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="mb-5 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-green-600 text-[22px]">check_circle</span>
+            <span class="font-medium text-body-sm">@TempData["SuccessMessage"]</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="text-green-600 hover:text-green-800 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-red-600 text-[22px]">error</span>
+            <span class="font-medium text-body-sm">@TempData["ErrorMessage"]</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="text-red-600 hover:text-red-800 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+    </div>
 }
 
 <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -12,9 +41,9 @@
         <h1 class="text-display-sm font-bold text-on-surface">Gestión de Usuarios</h1>
         <p class="text-body-lg text-on-surface-variant">Personal, administradores, conductores y operadores.</p>
     </div>
-    <button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-sm shrink-0">
+    <button type="button" onclick="openCreateUserModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shrink-0 cursor-pointer">
         <span class="material-symbols-outlined">person_add</span>
-        Nuevo Usuario
+        <span>Nuevo Usuario</span>
     </button>
 </div>
 
@@ -44,8 +73,9 @@
     </form>
 </div>
 
+<!-- Tabla de Usuarios -->
 <div class="bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant overflow-hidden">
-    <div class="px-6 py-3 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
+    <div class="px-6 py-3.5 border-b border-outline-variant bg-surface-bright flex items-center justify-between">
         <span class="text-label-md font-bold text-on-surface" id="userResultsCount">
             @{
                 var pvm = ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel;
@@ -69,11 +99,12 @@
     <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse" id="usersTable">
             <thead>
-                <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant">
+                <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant text-xs uppercase tracking-wider">
                     <th class="p-4 font-semibold">Nombre Completo</th>
-                    <th class="p-4 font-semibold">Email</th>
+                    <th class="p-4 font-semibold">Email &amp; Usuario</th>
+                    <th class="p-4 font-semibold">Rol Asignado</th>
                     <th class="p-4 font-semibold">Estado</th>
-                    <th class="p-4 font-semibold text-right">Acciones</th>
+                    <th class="p-4 font-semibold text-right pr-6">Acciones</th>
                 </tr>
             </thead>
             <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50" id="usersTableBody">
@@ -81,22 +112,107 @@
                 {
                     foreach (var user in users)
                     {
-                        var searchMeta = $"{user.FirstName} {user.LastName} {user.Email} {user.UserName}".ToLower();
+                        var role = userRoles.ContainsKey(user.Id) ? userRoles[user.Id] : "User";
+                        var searchMeta = $"{user.FirstName} {user.LastName} {user.Email} {user.UserName} {role}".ToLower();
+                        bool isCurrent = user.Id == currentUserId;
+                        bool isSuperAdminAcc = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+
                         <tr class="hover:bg-surface-container-low/50 transition-colors user-row" data-search="@searchMeta">
-                            <td class="p-4 font-bold text-on-surface">@user.FirstName @user.LastName</td>
-                            <td class="p-4 text-on-surface-variant">@user.Email</td>
                             <td class="p-4">
-                                <span class="inline-flex items-center gap-1 text-primary bg-primary-container px-2 py-1 rounded-full font-label-sm">
-                                    <span class="material-symbols-outlined text-[14px]">check_circle</span> Activo
-                                </span>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-label-md shrink-0 border border-primary/20">
+                                        @(string.IsNullOrWhiteSpace(user.FirstName) ? "U" : user.FirstName.Substring(0, 1).ToUpper())@(string.IsNullOrWhiteSpace(user.LastName) ? "" : user.LastName.Substring(0, 1).ToUpper())
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-on-surface">@user.FirstName @user.LastName</div>
+                                        @if (!string.IsNullOrWhiteSpace(user.PhoneNumber))
+                                        {
+                                            <div class="text-xs text-outline font-mono flex items-center gap-1">
+                                                <span class="material-symbols-outlined text-[13px]">phone</span>
+                                                @user.PhoneNumber
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
                             </td>
-                            <td class="p-4 text-right space-x-1">
-                                <button class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Editar">
+                            <td class="p-4 text-on-surface-variant">
+                                <div class="text-on-surface font-medium">@user.Email</div>
+                                <div class="text-xs font-mono text-outline">@@@user.UserName</div>
+                            </td>
+                            <td class="p-4 whitespace-nowrap">
+                                @if (role == "SuperAdmin")
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                        <span class="material-symbols-outlined text-[13px]">shield_person</span>
+                                        SuperAdmin
+                                    </span>
+                                }
+                                else if (role == "Admin")
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800 border border-teal-300">
+                                        <span class="material-symbols-outlined text-[13px]">admin_panel_settings</span>
+                                        Administrador
+                                    </span>
+                                }
+                                else if (role == "Operador")
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                                        <span class="material-symbols-outlined text-[13px]">directions_bus</span>
+                                        Operador
+                                    </span>
+                                }
+                                else if (role == "Cajero")
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-300">
+                                        <span class="material-symbols-outlined text-[13px]">point_of_sale</span>
+                                        Cajero
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-surface-container text-on-surface-variant border border-outline-variant/60">
+                                        <span class="material-symbols-outlined text-[13px]">person</span>
+                                        @role
+                                    </span>
+                                }
+                            </td>
+                            <td class="p-4 whitespace-nowrap">
+                                @if (user.IsActive)
+                                {
+                                    <span class="inline-flex items-center gap-1 text-primary bg-primary-container/20 border border-primary/30 px-2.5 py-0.5 rounded-full font-label-sm font-bold text-xs">
+                                        <span class="material-symbols-outlined text-[14px] text-primary">check_circle</span> Activo
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center gap-1 text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full font-label-sm font-bold text-xs">
+                                        <span class="material-symbols-outlined text-[14px] text-red-600">block</span> Inactivo
+                                    </span>
+                                }
+                            </td>
+                            <td class="p-4 text-right pr-6 whitespace-nowrap space-x-1">
+                                <button type="button" 
+                                        onclick="openEditUserModal('@user.Id', '@Html.Raw(Html.Encode(user.FirstName))', '@Html.Raw(Html.Encode(user.LastName))', '@Html.Raw(Html.Encode(user.UserName))', '@Html.Raw(Html.Encode(user.Email))', '@Html.Raw(Html.Encode(user.PhoneNumber ?? ""))', '@role', @(user.IsActive ? "true" : "false"))"
+                                        class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" 
+                                        title="Editar Usuario">
                                     <span class="material-symbols-outlined text-[20px]">edit</span>
                                 </button>
-                                <button class="p-2 text-on-surface-variant hover:text-error rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Eliminar">
-                                    <span class="material-symbols-outlined text-[20px]">delete</span>
-                                </button>
+
+                                @if (!isCurrent && !isSuperAdminAcc)
+                                {
+                                    <button type="button" 
+                                            onclick="openDeleteUserModal('@user.Id', '@Html.Raw(Html.Encode(user.FirstName + " " + user.LastName))', '@Html.Raw(Html.Encode(user.UserName))', '@Html.Raw(Html.Encode(user.Email))', '@role')"
+                                            class="p-2 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer" 
+                                            title="Eliminar Usuario">
+                                        <span class="material-symbols-outlined text-[20px]">delete</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="p-2 text-outline/40 cursor-not-allowed inline-block" title="@(isCurrent ? "Tu propia cuenta (En sesión)" : "Cuenta SuperAdmin protegida")">
+                                        <span class="material-symbols-outlined text-[20px]">lock</span>
+                                    </span>
+                                }
                             </td>
                         </tr>
                     }
@@ -104,7 +220,7 @@
                 else
                 {
                     <tr id="noUsersServerRow">
-                        <td colspan="4" class="p-8 text-center text-on-surface-variant">
+                        <td colspan="5" class="p-8 text-center text-on-surface-variant">
                             <span class="material-symbols-outlined text-outline text-4xl block mb-2">person_off</span>
                             No se encontraron usuarios con los criterios de búsqueda.
                             @if (hasFilters)
@@ -117,7 +233,7 @@
                     </tr>
                 }
                 <tr id="noUsersClientRow" class="hidden">
-                    <td colspan="4" class="p-8 text-center text-on-surface-variant">
+                    <td colspan="5" class="p-8 text-center text-on-surface-variant">
                         <span class="material-symbols-outlined text-outline text-4xl block mb-2">search_off</span>
                         No hay usuarios que coincidan con la búsqueda en tiempo real.
                     </td>
@@ -129,33 +245,315 @@
     <partial name="_AdminPagination" model="ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel" />
 </div>
 
+<!-- ======================================================== -->
+<!-- MODAL: REGISTRAR NUEVO USUARIO                           -->
+<!-- ======================================================== -->
+<div id="createUserModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-outline-variant max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">person_add</span>
+                Registrar Nuevo Usuario del Sistema
+            </h3>
+            <button type="button" onclick="closeCreateUserModal()" class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <form asp-action="CreateUser" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Nombres <span class="text-red-500">*</span></label>
+                    <input type="text" name="FirstName" required placeholder="Ej. Carlos" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Apellidos <span class="text-red-500">*</span></label>
+                    <input type="text" name="LastName" required placeholder="Ej. Mendoza Sánchez" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Nombre de Usuario <span class="text-red-500">*</span></label>
+                    <input type="text" name="UserName" required placeholder="Ej. cmendoza" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Correo Electrónico <span class="text-red-500">*</span></label>
+                    <input type="email" name="Email" required placeholder="usuario@sigetour.com" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Teléfono / WhatsApp</label>
+                    <input type="tel" name="PhoneNumber" placeholder="+51 987 654 321" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
+                    <select name="Role" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
+                        @foreach (var r in availableRoles)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Contraseña Inicial <span class="text-red-500">*</span></label>
+                <div class="flex gap-2">
+                    <input type="text" name="Password" id="createPasswordInput" required value="Chilon2026!" class="flex-1 py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                    <button type="button" onclick="generateRandomPassword('createPasswordInput')" class="px-3 py-2 bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs rounded-lg border border-outline-variant transition-colors cursor-pointer shrink-0">
+                        Generar
+                    </button>
+                </div>
+                <p class="text-[11px] text-outline mt-1">Mínimo 6 caracteres. Puedes usar la generada o escribir una propia.</p>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Estado de la Cuenta</label>
+                <select name="IsActive" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
+                    <option value="true" selected>Activo (Permite inicio de sesión)</option>
+                    <option value="false">Inactivo (Acceso suspendido)</option>
+                </select>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeCreateUserModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">how_to_reg</span>
+                    <span>Crear Usuario</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: EDITAR USUARIO EXISTENTE                          -->
+<!-- ======================================================== -->
+<div id="editUserModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-outline-variant max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+            <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">manage_accounts</span>
+                Modificar Datos de Usuario
+            </h3>
+            <button type="button" onclick="closeEditUserModal()" class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <form asp-action="EditUser" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="Id" id="editUserId" />
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Nombres <span class="text-red-500">*</span></label>
+                    <input type="text" name="FirstName" id="editUserFirstName" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Apellidos <span class="text-red-500">*</span></label>
+                    <input type="text" name="LastName" id="editUserLastName" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Nombre de Usuario <span class="text-red-500">*</span></label>
+                    <input type="text" name="UserName" id="editUserUserName" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Correo Electrónico <span class="text-red-500">*</span></label>
+                    <input type="email" name="Email" id="editUserEmail" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Teléfono / WhatsApp</label>
+                    <input type="tel" name="PhoneNumber" id="editUserPhone" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
+                    <select name="Role" id="editUserRole" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
+                        @foreach (var r in availableRoles)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Restablecer Contraseña (Opcional)</label>
+                <div class="flex gap-2">
+                    <input type="text" name="NewPassword" id="editUserNewPassword" placeholder="Dejar en blanco para mantener la contraseña actual" class="flex-1 py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                    <button type="button" onclick="generateRandomPassword('editUserNewPassword')" class="px-3 py-2 bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs rounded-lg border border-outline-variant transition-colors cursor-pointer shrink-0">
+                        Generar
+                    </button>
+                </div>
+                <p class="text-[11px] text-outline mt-1">Escribe una nueva contraseña solo si el usuario necesita cambiarla.</p>
+            </div>
+
+            <div>
+                <label class="block text-label-sm font-bold text-on-surface mb-1">Estado de la Cuenta</label>
+                <select name="IsActive" id="editUserIsActive" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
+                    <option value="true">Activo (Permite inicio de sesión)</option>
+                    <option value="false">Inactivo (Acceso suspendido)</option>
+                </select>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                <button type="button" onclick="closeEditUserModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">save</span>
+                    <span>Guardar Cambios</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: ELIMINAR / DAR DE BAJA USUARIO                     -->
+<!-- ======================================================== -->
+<div id="deleteUserModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="flex items-start gap-3.5 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-2xl">person_remove</span>
+            </div>
+            <div>
+                <h3 class="text-title-md font-bold text-on-surface leading-tight">¿Eliminar Usuario?</h3>
+                <p class="text-body-xs text-outline mt-0.5">Esta acción revocará de inmediato los accesos del usuario.</p>
+            </div>
+        </div>
+
+        <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/60 space-y-2 mb-5">
+            <div class="text-body-sm">
+                <span class="text-outline text-xs block mb-0.5">Nombre Completo:</span>
+                <span id="deleteUserName" class="font-bold text-on-surface"></span>
+            </div>
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-on-surface-variant font-medium">Usuario:</span>
+                <span id="deleteUserUserName" class="font-mono text-xs font-bold text-primary"></span>
+            </div>
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-on-surface-variant font-medium">Email:</span>
+                <span id="deleteUserEmail" class="font-mono text-xs text-on-surface"></span>
+            </div>
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-on-surface-variant font-medium">Rol:</span>
+                <span id="deleteUserRole" class="font-bold text-xs bg-surface-container px-2 py-0.5 rounded"></span>
+            </div>
+        </div>
+
+        <form asp-action="DeleteUser" method="post" class="flex items-center justify-end gap-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="deleteUserId" />
+            <button type="button" onclick="closeDeleteUserModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-body-sm transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">delete</span>
+                <span>Sí, Eliminar Usuario</span>
+            </button>
+        </form>
+    </div>
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput = document.getElementById('userSearchInput');
-    const rows = document.querySelectorAll('.user-row');
-    const noUsersClientRow = document.getElementById('noUsersClientRow');
-    const countLabel = document.getElementById('userResultsCount');
-
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const query = this.value.trim().toLowerCase();
-            let visibleCount = 0;
-
-            rows.forEach(row => {
-                const text = row.getAttribute('data-search') || '';
-                const match = !query || text.includes(query);
-                row.style.display = match ? '' : 'none';
-                if (match) visibleCount++;
-            });
-
-            if (noUsersClientRow) {
-                noUsersClientRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
-            }
-
-            if (countLabel && rows.length > 0) {
-                countLabel.innerText = `Mostrando ${visibleCount} de ${rows.length} usuarios`;
-            }
-        });
+    // Control de modales de usuarios
+    function openCreateUserModal() {
+        document.getElementById('createUserModal')?.classList.remove('hidden');
     }
-});
+    function closeCreateUserModal() {
+        document.getElementById('createUserModal')?.classList.add('hidden');
+    }
+
+    function openEditUserModal(id, firstName, lastName, userName, email, phone, role, isActive) {
+        document.getElementById('editUserId').value = id;
+        document.getElementById('editUserFirstName').value = firstName;
+        document.getElementById('editUserLastName').value = lastName;
+        document.getElementById('editUserUserName').value = userName;
+        document.getElementById('editUserEmail').value = email;
+        document.getElementById('editUserPhone').value = phone;
+        document.getElementById('editUserRole').value = role;
+        document.getElementById('editUserIsActive').value = isActive ? 'true' : 'false';
+        document.getElementById('editUserNewPassword').value = '';
+        document.getElementById('editUserModal')?.classList.remove('hidden');
+    }
+    function closeEditUserModal() {
+        document.getElementById('editUserModal')?.classList.add('hidden');
+    }
+
+    function openDeleteUserModal(id, fullName, userName, email, role) {
+        document.getElementById('deleteUserId').value = id;
+        document.getElementById('deleteUserName').innerText = fullName;
+        document.getElementById('deleteUserUserName').innerText = '@@' + userName;
+        document.getElementById('deleteUserEmail').innerText = email;
+        document.getElementById('deleteUserRole').innerText = role;
+        document.getElementById('deleteUserModal')?.classList.remove('hidden');
+    }
+    function closeDeleteUserModal() {
+        document.getElementById('deleteUserModal')?.classList.add('hidden');
+    }
+
+    function generateRandomPassword(targetInputId) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!#%*';
+        let pass = 'TC';
+        for (let i = 0; i < 6; i++) {
+            pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        pass += '!';
+        const input = document.getElementById(targetInputId);
+        if (input) input.value = pass;
+    }
+
+    // Filtro instantáneo del lado del cliente
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('userSearchInput');
+        const rows = document.querySelectorAll('.user-row');
+        const noUsersClientRow = document.getElementById('noUsersClientRow');
+        const countLabel = document.getElementById('userResultsCount');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim().toLowerCase();
+                let visibleCount = 0;
+
+                rows.forEach(row => {
+                    const text = row.getAttribute('data-search') || '';
+                    const match = !query || text.includes(query);
+                    row.style.display = match ? '' : 'none';
+                    if (match) visibleCount++;
+                });
+
+                if (noUsersClientRow) {
+                    noUsersClientRow.classList.toggle('hidden', visibleCount > 0 || rows.length === 0);
+                }
+
+                if (countLabel && rows.length > 0) {
+                    countLabel.innerText = `Mostrando ${visibleCount} de ${rows.length} usuarios`;
+                }
+            });
+        }
+    });
+
+    // Cerrar con tecla Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeCreateUserModal();
+            closeEditUserModal();
+            closeDeleteUserModal();
+        }
+    });
 </script>
