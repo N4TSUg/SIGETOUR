@@ -23,13 +23,20 @@ namespace SIGETOUR.API.Controllers.UI
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IWebHostEnvironment _env;
         private readonly IManifestExportService _manifestService;
+        private readonly ICashReportExportService _cashReportService;
 
-        public AdminController(AppDbContext context, UserManager<ApplicationUser> userManager, IWebHostEnvironment env, IManifestExportService manifestService)
+        public AdminController(
+            AppDbContext context, 
+            UserManager<ApplicationUser> userManager, 
+            IWebHostEnvironment env, 
+            IManifestExportService manifestService,
+            ICashReportExportService cashReportService)
         {
             _context = context;
             _userManager = userManager;
             _env = env;
             _manifestService = manifestService;
+            _cashReportService = cashReportService;
         }
 
         public async Task<IActionResult> Dashboard()
@@ -1888,6 +1895,63 @@ namespace SIGETOUR.API.Controllers.UI
 
             TempData["SuccessMessage"] = $"Límite del fondo fijo actualizado a S/ {newFundAmount:N2}.";
             return RedirectToAction(nameof(Cash), new { tab = "petty" });
+        }
+
+        // --- EXPORTACIÓN DE REPORTES EN HOJAS DE CÁLCULO (EXCEL .XLSX) --- //
+
+        [HttpGet]
+        public async Task<IActionResult> ExportDailyCashReport(DateTime? date)
+        {
+            var targetDate = date ?? DateTime.Today;
+            try
+            {
+                var fileBytes = await _cashReportService.GenerateDailyCashReportExcelAsync(targetDate);
+                var fileName = $"Reporte_Caja_Diario_{targetDate:yyyyMMdd}.xlsx";
+                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error al generar el reporte diario de caja: {ex.Message}";
+                return RedirectToAction(nameof(Cash));
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportMonthlyCashReport(int? year, int? month)
+        {
+            int y = year ?? DateTime.Today.Year;
+            int m = month ?? DateTime.Today.Month;
+            try
+            {
+                var fileBytes = await _cashReportService.GenerateMonthlyCashReportExcelAsync(y, m);
+                var fileName = $"Reporte_Caja_Mensual_{y}_{m:D2}.xlsx";
+                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error al generar el reporte mensual de caja: {ex.Message}";
+                return RedirectToAction(nameof(Cash));
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ExportShiftReport(Guid shiftId)
+        {
+            try
+            {
+                var shift = await _context.CashRegisterShifts.FindAsync(shiftId);
+                if (shift == null) return NotFound("Turno no encontrado.");
+
+                var fileBytes = await _cashReportService.GenerateShiftReportExcelAsync(shiftId);
+                var cleanNumber = shift.ShiftNumber.Replace(" ", "_").Replace("-", "_");
+                var fileName = $"Acta_Turno_{cleanNumber}_{shift.OpenedAt:yyyyMMdd}.xlsx";
+                return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                TempData["ErrorMessage"] = $"Error al generar el acta de turno: {ex.Message}";
+                return RedirectToAction(nameof(Cash));
+            }
         }
     }
 }
