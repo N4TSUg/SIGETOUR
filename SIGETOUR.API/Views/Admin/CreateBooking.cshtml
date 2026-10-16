@@ -1,39 +1,46 @@
-﻿@model SIGETOUR.API.Models.EditBookingViewModel
+@model SIGETOUR.API.Models.EditBookingViewModel
+@using SIGETOUR.API.Core.Entities
 @{
-    ViewData["Title"] = "Editar Reserva " + Model.ReferenceCode;
+    ViewData["Title"] = "Registrar Nueva Reserva Manual";
     Layout = "_AdminLayout";
+    var tours = ViewBag.Tours as IEnumerable<TourPackage> ?? Enumerable.Empty<TourPackage>();
+    var toursJson = tours.Select(t => new {
+        id = t.Id.ToString(),
+        title = t.Title,
+        price = t.BasePrice,
+        duration = t.Duration ?? "Día completo",
+        shifts = t.Shifts != null ? t.Shifts.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() : new List<string>()
+    });
 }
 
 <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
-<form asp-action="CreateBooking" method="post" id="editBookingForm">
-    <input type="hidden" asp-for="Id" />
-    <input type="hidden" asp-for="ReferenceCode" />
-    <input type="hidden" asp-for="TourName" />
+
+<form asp-action="CreateBooking" method="post" id="createBookingForm">
     <input type="hidden" asp-for="AdditionalPassengersJson" id="AdditionalPassengersJson" />
 
     <!-- Page Header -->
     <div class="sm:flex sm:justify-between sm:items-center mb-8">
       <div class="mb-4 sm:mb-0 flex items-center gap-3">
-        <a href="@Url.Action("Dashboard", "Admin")" class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant">
+        <a href="@Url.Action("Bookings", "Admin")" class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant cursor-pointer" title="Volver al listado de reservas">
           <span class="material-symbols-outlined text-[24px]">arrow_back</span>
         </a>
         <div>
           <h1 class="text-headline-md font-headline-md font-bold text-on-surface flex items-center gap-3">
-            Editar Reserva <span class="text-primary font-mono bg-surface-container-low px-2 rounded">@Model.ReferenceCode</span>
+            Registrar Nueva Reserva
           </h1>
           <p class="text-body-md text-on-surface-variant flex items-center gap-2">
-            <span class="material-symbols-outlined text-[18px]">tour</span> @Model.TourName
+            <span class="material-symbols-outlined text-[18px] text-primary">point_of_sale</span>
+            Venta y registro directo de pasajeros en caja o mostrador.
           </p>
         </div>
       </div>
-      <div class="flex gap-2">
-        <button type="button" class="btn bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high transition-colors font-label-md px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-sm">
-          <span class="material-symbols-outlined text-[18px]" data-icon="cancel">cancel</span>
-          Anular Reserva
-        </button>
-        <button type="submit" class="btn bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md px-6 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold">
-          <span class="material-symbols-outlined text-[18px]" data-icon="save">save</span>
-          Guardar Cambios
+      <div class="flex gap-2 items-center">
+        <a href="@Url.Action("Bookings", "Admin")" class="px-4 py-2.5 rounded-lg border border-outline text-on-surface-variant hover:bg-surface-container transition-colors font-label-md cursor-pointer">
+          Cancelar
+        </a>
+        <button type="submit" class="bg-primary text-on-primary hover:bg-[#0e5a52] transition-colors font-label-md px-6 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold cursor-pointer">
+          <span class="material-symbols-outlined text-[18px]">save</span>
+          Registrar Reserva
         </button>
       </div>
     </div>
@@ -46,39 +53,83 @@
 
         <!-- 1. Operational Details -->
         <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-xs overflow-hidden">
-          <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
+          <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex flex-wrap justify-between items-center gap-2">
             <h2 class="text-title-md font-title-md font-bold text-on-surface flex items-center gap-2">
               <span class="material-symbols-outlined text-primary">calendar_clock</span>
               Detalles Operativos de la Salida
             </h2>
-            <span class="px-2.5 py-0.5 rounded-full bg-[#ecfdf5] text-primary border border-primary/20 text-label-sm font-bold">Estado: @Model.Status</span>
+            <div class="flex items-center gap-2">
+              <label class="text-label-sm font-bold text-on-surface-variant">Estado Inicial:</label>
+              <select asp-for="Status" class="py-1 px-3 rounded-lg border border-outline-variant font-bold text-label-sm bg-green-50 text-green-800 border-green-300 focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="Confirmed">Confirmada</option>
+                <option value="Pending">Pendiente</option>
+              </select>
+            </div>
           </div>
           <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+              <!-- SELECTOR DE TOUR / CIRCUITO -->
+              <div class="col-span-1 md:col-span-3 pb-4 border-b border-outline-variant/60">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1.5">
+                  <label class="block text-label-md font-label-md text-on-surface font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-[20px]">tour</span>
+                    Seleccionar Tour / Circuito Turístico <span class="text-tertiary">*</span>
+                  </label>
+                  <span class="text-xs text-outline" id="tourPriceBadge">Tarifa individual base: S/ @Model.TourBasePrice.ToString("F2")</span>
+                </div>
+                <div class="relative">
+                  <select asp-for="TourPackageId" id="tourPackageSelect" onchange="onTourChanged(this)" class="w-full py-2.5 pl-3 pr-10 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    @foreach (var t in tours)
+                    {
+                      <option value="@t.Id" data-price="@t.BasePrice" data-title="@t.Title" selected="@(t.Id == Model.TourPackageId)">
+                        @t.Title — S/ @t.BasePrice.ToString("F2") (@(t.Duration ?? "Día completo"))
+                      </option>
+                    }
+                  </select>
+                  <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-outline">expand_more</span>
+                </div>
+                <p class="text-xs text-outline mt-1.5">El tour seleccionado determina los turnos disponibles y calcula automáticamente la tarifa total según los pasajeros.</p>
+              </div>
+
+              <!-- FECHA DE RECORRIDO -->
               <div>
-                <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Fecha de Recorrido</label>
-                <input asp-for="TravelDate" type="date" class="w-full pl-3 pr-3 py-2 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" />
+                <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Fecha de Recorrido <span class="text-tertiary">*</span></label>
+                <input asp-for="TravelDate" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" class="w-full pl-3 pr-3 py-2 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" required />
               </div>
               
+              <!-- TURNO OPERATIVO -->
               <div>
                 <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Turno Operativo</label>
-                <div class="grid grid-cols-2 gap-3">
-                  <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-outline-variant">
-                            <input type="radio" asp-for="ShiftName" value="Turno Mañana" class="sr-only" />
-                            <span class="text-label-md font-label-md font-bold">Mañana</span>
+                <div class="grid grid-cols-2 gap-3" id="shiftsContainer">
+                  @if (Model.AvailableShifts.Any())
+                  {
+                      foreach (var shift in Model.AvailableShifts)
+                      {
+                          <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == shift ? "border-primary bg-primary/5" : "border-outline-variant")">
+                            <input type="radio" asp-for="ShiftName" value="@shift" class="sr-only" onchange="onShiftRadioChanged(this)" />
+                            <span class="text-label-md font-label-md font-bold text-center">@shift</span>
                           </label>
-                          <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-outline-variant">
-                            <input type="radio" asp-for="ShiftName" value="Turno Tarde" class="sr-only" />
-                            <span class="text-label-md font-label-md font-bold">Tarde</span>
-                          </label>
+                      }
+                  }
+                  else
+                  {
+                      <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-primary bg-primary/5">
+                        <input type="radio" asp-for="ShiftName" value="Turno Único" class="sr-only" checked onchange="onShiftRadioChanged(this)" />
+                        <span class="text-label-md font-label-md font-bold text-center">Turno Único</span>
+                      </label>
+                  }
                 </div>
               </div>
 
+              <!-- PUNTO DE EMBARQUE -->
               <div>
                 <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Punto de Embarque</label>
                 <select asp-for="BoardingPoint" class="w-full py-2 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                  <option value="Agencia Central">Agencia Central</option>
+                  <option value="Agencia Central">Agencia Central (Jr. 2 de Mayo 569)</option>
                   <option value="Hotel Centro Histórico">Hotel (Recojo coordinado)</option>
+                  <option value="Plaza de Armas">Plaza de Armas</option>
+                  <option value="Aeropuerto Mayor General FAP Armando Revoredo">Aeropuerto</option>
                 </select>
               </div>
             </div>
@@ -94,7 +145,7 @@
             </h2>
             <div class="flex items-center gap-3">
               <span class="text-label-sm font-label-sm text-secondary bg-surface-container py-1 px-2 rounded-lg" id="passenger-count-badge">@Model.TotalPassengers Pasajeros</span>
-              <button type="button" onclick="addPassengerRow()" class="text-primary hover:text-primary-container text-label-sm font-bold flex items-center gap-1 transition-colors">
+              <button type="button" onclick="addPassengerRow()" class="text-primary hover:text-primary-container text-label-sm font-bold flex items-center gap-1 transition-colors cursor-pointer">
                 <span class="material-symbols-outlined text-[18px]">person_add</span> Agregar
               </button>
             </div>
@@ -112,16 +163,16 @@
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-2">
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
-                  <input asp-for="CustomerName" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo <span class="text-tertiary">*</span></label>
+                  <input asp-for="CustomerName" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. Juan Pérez" required />
                 </div>
                 <div>
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
-                  <input asp-for="CustomerDni" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte <span class="text-tertiary">*</span></label>
+                  <input asp-for="CustomerDni" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 dígitos" required />
                 </div>
                 <div class="md:col-span-1">
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
-                  <input asp-for="CustomerPhone" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono <span class="text-tertiary">*</span></label>
+                  <input asp-for="CustomerPhone" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. 987654321" required />
                 </div>
               </div>
             </div>
@@ -152,13 +203,13 @@
                   <input type="number" step="0.50" asp-for="TotalAmount" id="TotalAmountHidden" class="w-32 py-1 px-2 text-headline-sm font-headline-sm font-extrabold text-on-surface bg-transparent border-b-2 border-outline-variant focus:border-primary focus:outline-none" oninput="updateDisplayTotal(this.value)" />
                 </div>
                 <span class="hidden" id="display-total-tariff"></span>
-                <input type="hidden" asp-for="TotalPassengers" id="TotalPassengersHidden" />
+                <input type="hidden" asp-for="TotalPassengers" id="TotalPassengersHidden" value="1" />
               </div>
             </div>
 
             <div class="space-y-4">
               <div class="flex justify-between items-center">
-                <span class="text-body-md font-body-md text-on-surface-variant font-medium">Abono Registrado</span>
+                <span class="text-body-md font-body-md text-on-surface-variant font-medium">Abono Inicial</span>
                 <div class="flex items-center gap-2">
                   <span class="text-body-md text-outline">S/</span>
                   <input asp-for="PaidAmount" id="input-paid-amount" type="number" step="0.50" oninput="recalcBalance()" class="w-24 text-right py-1 px-2 rounded border border-outline-variant bg-surface-container-lowest font-bold text-title-sm text-primary focus:ring-1 focus:ring-primary" />
@@ -174,17 +225,17 @@
             </div>
 
             <div class="mt-6 pt-5 border-t border-outline-variant">
-              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Método de Pago (Abono)</label>
+              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Método de Pago</label>
               <select asp-for="PaymentMethod" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary mb-3">
+                <option value="efectivo">Efectivo (Caja Agencia)</option>
                 <option value="yape">Yape / Plin Interbancario</option>
                 <option value="transferencia">Transferencia BCP / BBVA</option>
-                <option value="efectivo">Efectivo (Caja Agencia)</option>
                 <option value="tarjeta">POS Tarjeta (Niubiz/IziPay)</option>
               </select>
 
               <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">N° de Operación (Voucher)</label>
               <div class="relative">
-                <input asp-for="OperationNumber" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono" />
+                <input asp-for="OperationNumber" placeholder="Opcional para efectivo" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono" />
               </div>
             </div>
           </div>
@@ -211,7 +262,7 @@
             <div>
               <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Serie y Correlativo</label>
               <div class="flex gap-2">
-                <input asp-for="InvoiceNumber" class="flex-1 py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono font-bold" />
+                <input asp-for="InvoiceNumber" placeholder="Ej. B001-000428" class="flex-1 py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono font-bold" />
               </div>
             </div>
           </div>
@@ -223,27 +274,68 @@
 </div>
 
 <script>
+    const allTours = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(toursJson));
+
+    function onTourChanged(select) {
+        const tourId = select.value;
+        const selectedTour = allTours.find(t => t.id === tourId);
+        if (!selectedTour) return;
+
+        // Actualizar etiqueta de precio individual
+        const priceBadge = document.getElementById('tourPriceBadge');
+        if (priceBadge) priceBadge.innerText = `Tarifa individual base: S/ ${parseFloat(selectedTour.price).toFixed(2)}`;
+
+        // Recalcular Total según cantidad de pasajeros
+        const totalPax = parseInt(document.getElementById('TotalPassengersHidden')?.value || '1', 10);
+        const newTotal = (selectedTour.price * totalPax);
+        const totalInput = document.getElementById('TotalAmountHidden');
+        if (totalInput) {
+            totalInput.value = newTotal.toFixed(2);
+            updateDisplayTotal(newTotal);
+        }
+
+        // Actualizar turnos dinámicamente
+        const shiftsContainer = document.getElementById('shiftsContainer');
+        if (shiftsContainer) {
+            shiftsContainer.innerHTML = '';
+            if (selectedTour.shifts && selectedTour.shifts.length > 0) {
+                selectedTour.shifts.forEach((shift, idx) => {
+                    const label = document.createElement('label');
+                    label.className = `relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low ${idx === 0 ? 'border-primary bg-primary/5' : 'border-outline-variant'}`;
+                    label.innerHTML = `
+                        <input type="radio" name="ShiftName" value="${shift}" class="sr-only" ${idx === 0 ? 'checked' : ''} onchange="onShiftRadioChanged(this)" />
+                        <span class="text-label-md font-label-md font-bold text-center">${shift}</span>
+                    `;
+                    shiftsContainer.appendChild(label);
+                });
+            } else {
+                shiftsContainer.innerHTML = `
+                    <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-primary bg-primary/5">
+                        <input type="radio" name="ShiftName" value="Turno Único" class="sr-only" checked onchange="onShiftRadioChanged(this)" />
+                        <span class="text-label-md font-label-md font-bold text-center">Turno Único</span>
+                    </label>
+                `;
+            }
+        }
+    }
+
+    function onShiftRadioChanged(radio) {
+        document.querySelectorAll('#shiftsContainer label').forEach(lbl => {
+            lbl.classList.remove('border-primary', 'bg-primary/5');
+            lbl.classList.add('border-outline-variant');
+        });
+        radio.closest('label').classList.remove('border-outline-variant');
+        radio.closest('label').classList.add('border-primary', 'bg-primary/5');
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
-        loadExtraPassengers();
         recalcBalance();
 
         // Hook into form submit to save extra passengers
-        document.getElementById('editBookingForm').addEventListener('submit', function() {
+        document.getElementById('createBookingForm').addEventListener('submit', function() {
             saveExtraPassengersToJson();
         });
     });
-
-    function loadExtraPassengers() {
-        const jsonField = document.getElementById('AdditionalPassengersJson');
-        if (!jsonField || !jsonField.value) return;
-        
-        try {
-            const passengers = JSON.parse(jsonField.value);
-            passengers.forEach(p => addPassengerRow(p.Name, p.Dni, p.Phone));
-        } catch (e) {
-            console.error('Error parsing extra passengers:', e);
-        }
-    }
 
     function addPassengerRow(name = '', dni = '', phone = '') {
         const container = document.getElementById('passengers-container');
@@ -251,13 +343,13 @@
         
         const div = document.createElement('div');
         div.className = 'extra-passenger-row passenger-card p-4 rounded-xl border border-outline-variant bg-surface-bright relative mt-4';
-        div.innerHTML = 
+        div.innerHTML = `
             <div class="flex items-center justify-between mb-3 border-b border-outline-variant/40 pb-2">
                 <div class="flex items-center gap-2">
-                  <span class="w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-label-sm font-bold">+count+</span>
-                  <span class="text-title-sm font-title-sm text-on-surface font-bold">Acompañante +count+</span>
+                  <span class="w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-label-sm font-bold">\${count}</span>
+                  <span class="text-title-sm font-title-sm text-on-surface font-bold">Acompañante \${count}</span>
                 </div>
-                <button type="button" onclick="this.closest('.extra-passenger-row').remove(); updatePassengerCount();" class="p-1 text-tertiary hover:bg-error-container rounded-md transition-colors flex items-center gap-1 text-label-sm font-label-sm">
+                <button type="button" onclick="this.closest('.extra-passenger-row').remove(); updatePassengerCount();" class="p-1 text-tertiary hover:bg-error-container rounded-md transition-colors flex items-center gap-1 text-label-sm font-label-sm cursor-pointer">
                   <span class="material-symbols-outlined text-[16px]">delete</span>
                   <span>Retirar</span>
                 </button>
@@ -265,26 +357,49 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-2">
                   <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
-                  <input type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="+name+" />
+                  <input type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nombre del acompañante" value="\${escapeQuotes(name)}" />
                 </div>
                 <div>
                   <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
-                  <input type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="+dni+" />
+                  <input type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 dígitos" value="\${escapeQuotes(dni)}" />
                 </div>
                 <div class="md:col-span-1">
                   <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
-                  <input type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" value="+phone+" />
+                  <input type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Opcional" value="\${escapeQuotes(phone)}" />
                 </div>
             </div>
-        ;
+        `;
         container.appendChild(div);
         updatePassengerCount();
+    }
+
+    function escapeQuotes(str) {
+        if (!str) return '';
+        return str.replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
     function updatePassengerCount() {
         const total = document.querySelectorAll('.extra-passenger-row').length + 1;
         document.getElementById('passenger-count-badge').innerText = total + ' Pasajeros';
         document.getElementById('TotalPassengersHidden').value = total;
+
+        // Auto-recalculate total price based on selected tour
+        const tourSelect = document.getElementById('tourPackageSelect');
+        if (tourSelect) {
+            const selectedOpt = tourSelect.options[tourSelect.selectedIndex];
+            const price = parseFloat(selectedOpt?.getAttribute('data-price') || '0');
+            if (price > 0) {
+                const totalInput = document.getElementById('TotalAmountHidden');
+                if (totalInput) {
+                    totalInput.value = (price * totalPaxCount(total)).toFixed(2);
+                    updateDisplayTotal(totalInput.value);
+                }
+            }
+        }
+    }
+
+    function totalPaxCount(num) {
+        return num || 1;
     }
 
     function saveExtraPassengersToJson() {
@@ -322,10 +437,3 @@
         }
     }
 </script>
-
-
-
-
-
-
-

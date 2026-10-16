@@ -4,6 +4,14 @@
     ViewData["Title"] = "Editar Reserva " + Model.ReferenceCode;
     Layout = "_AdminLayout";
     bool isCancelled = Model.Status == BookingStatus.Cancelled;
+    var tours = ViewBag.Tours as IEnumerable<TourPackage> ?? Enumerable.Empty<TourPackage>();
+    var toursJson = tours.Select(t => new {
+        id = t.Id.ToString(),
+        title = t.Title,
+        price = t.BasePrice,
+        duration = t.Duration ?? "Día completo",
+        shifts = t.Shifts != null ? t.Shifts.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() : new List<string>()
+    });
 }
 
 <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
@@ -36,7 +44,6 @@
 <form asp-action="EditBooking" method="post" id="editBookingForm">
     <input type="hidden" asp-for="Id" />
     <input type="hidden" asp-for="ReferenceCode" />
-    <input type="hidden" asp-for="TourName" />
     <input type="hidden" asp-for="AdditionalPassengersJson" id="AdditionalPassengersJson" />
 
     <!-- Page Header -->
@@ -50,7 +57,8 @@
             Editar Reserva <span class="text-primary font-mono bg-surface-container-low px-2 rounded">@Model.ReferenceCode</span>
           </h1>
           <p class="text-body-md text-on-surface-variant flex items-center gap-2">
-            <span class="material-symbols-outlined text-[18px]">tour</span> @Model.TourName
+            <span class="material-symbols-outlined text-[18px] text-primary">tour</span>
+            Tour actual: <span class="font-bold text-on-surface" id="headerTourTitle">@Model.TourName</span>
           </p>
         </div>
       </div>
@@ -100,32 +108,68 @@
           </div>
           <div class="p-6">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+              <!-- SELECTOR DE TOUR / CIRCUITO -->
+              <div class="col-span-1 md:col-span-3 pb-4 border-b border-outline-variant/60">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1.5">
+                  <label class="block text-label-md font-label-md text-on-surface font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-[20px]">tour</span>
+                    Circuito / Paquete Turístico Asignado <span class="text-tertiary">*</span>
+                  </label>
+                  <span class="text-xs text-outline" id="tourPriceBadge">Tarifa individual base: S/ @Model.TourBasePrice.ToString("F2")</span>
+                </div>
+                <div class="relative">
+                  <select asp-for="TourPackageId" id="tourPackageSelect" onchange="onTourChanged(this)" class="w-full py-2.5 pl-3 pr-10 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                    @foreach (var t in tours)
+                    {
+                      <option value="@t.Id" data-price="@t.BasePrice" data-title="@t.Title" selected="@(t.Id == Model.TourPackageId)">
+                        @t.Title — S/ @t.BasePrice.ToString("F2") (@(t.Duration ?? "Día completo"))
+                      </option>
+                    }
+                  </select>
+                  <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-outline">expand_more</span>
+                </div>
+                <p class="text-xs text-outline mt-1.5">Si el cliente desea cambiar de tour, selecciona la nueva ruta aquí. Se actualizarán los turnos y la tarifa correspondiente.</p>
+              </div>
+
+              <!-- FECHA DE RECORRIDO -->
               <div>
                 <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Fecha de Recorrido</label>
                 <input asp-for="TravelDate" type="date" class="w-full pl-3 pr-3 py-2 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" />
               </div>
               
+              <!-- TURNO OPERATIVO -->
               <div>
                 <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Turno Operativo</label>
-                <div class="grid grid-cols-2 gap-3">
-                  @if(Model.AvailableShifts.Any()) {
-                      foreach (var shift in Model.AvailableShifts) {
+                <div class="grid grid-cols-2 gap-3" id="shiftsContainer">
+                  @if (Model.AvailableShifts.Any())
+                  {
+                      foreach (var shift in Model.AvailableShifts)
+                      {
                           <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == shift ? "border-primary bg-primary/5" : "border-outline-variant")">
-                            <input type="radio" asp-for="ShiftName" value="@shift" class="sr-only" />
-                            <span class="text-label-md font-label-md font-bold">@shift</span>
+                            <input type="radio" asp-for="ShiftName" value="@shift" class="sr-only" onchange="onShiftRadioChanged(this)" />
+                            <span class="text-label-md font-label-md font-bold text-center">@shift</span>
                           </label>
                       }
-                  } else {
-                      <span class="text-body-sm text-outline">Sin turnos configurados</span>
+                  }
+                  else
+                  {
+                      <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-primary bg-primary/5">
+                        <input type="radio" asp-for="ShiftName" value="Turno Único" class="sr-only" checked onchange="onShiftRadioChanged(this)" />
+                        <span class="text-label-md font-label-md font-bold text-center">Turno Único</span>
+                      </label>
                   }
                 </div>
               </div>
 
+              <!-- PUNTO DE EMBARQUE -->
               <div>
                 <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Punto de Embarque</label>
                 <select asp-for="BoardingPoint" class="w-full py-2 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                   <option value="Agencia Central">Agencia Central</option>
                   <option value="Hotel Centro Histórico">Hotel (Recojo coordinado)</option>
+                  <option value="Plaza de Armas">Plaza de Armas</option>
+                  <option value="Aeropuerto Mayor General FAP Armando Revoredo">Aeropuerto</option>
                 </select>
               </div>
             </div>
@@ -159,16 +203,16 @@
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-2">
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
-                  <input asp-for="CustomerName" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo <span class="text-tertiary">*</span></label>
+                  <input asp-for="CustomerName" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
                 </div>
                 <div>
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
-                  <input asp-for="CustomerDni" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte <span class="text-tertiary">*</span></label>
+                  <input asp-for="CustomerDni" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
                 </div>
                 <div class="md:col-span-1">
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
-                  <input asp-for="CustomerPhone" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" />
+                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono <span class="text-tertiary">*</span></label>
+                  <input asp-for="CustomerPhone" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" required />
                 </div>
               </div>
             </div>
@@ -289,7 +333,7 @@
         </div>
         <div class="px-6 py-4 space-y-4">
             <p class="text-body-md text-on-surface leading-relaxed">
-                Estás a punto de anular la reserva a nombre de <strong class="font-bold text-primary">@Model.CustomerName</strong> para el tour <strong class="font-bold">@Model.TourName</strong>.
+                Estás a punto de anular la reserva a nombre de <strong class="font-bold text-primary">@Model.CustomerName</strong> para el tour <strong class="font-bold" id="modalTourName">@Model.TourName</strong>.
             </p>
             <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-body-sm text-red-800 space-y-1">
                 <div class="flex items-center gap-1.5 font-bold">
@@ -324,6 +368,66 @@
 </form>
 
 <script>
+    const allTours = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(toursJson));
+
+    function onTourChanged(select) {
+        const tourId = select.value;
+        const selectedTour = allTours.find(t => t.id === tourId);
+        if (!selectedTour) return;
+
+        // Actualizar título del header y modal
+        const headerEl = document.getElementById('headerTourTitle');
+        if (headerEl) headerEl.innerText = selectedTour.title;
+        const modalEl = document.getElementById('modalTourName');
+        if (modalEl) modalEl.innerText = selectedTour.title;
+
+        // Actualizar etiqueta de precio individual
+        const priceBadge = document.getElementById('tourPriceBadge');
+        if (priceBadge) priceBadge.innerText = `Tarifa individual base: S/ ${parseFloat(selectedTour.price).toFixed(2)}`;
+
+        // Recalcular Total según cantidad de pasajeros
+        const totalPax = parseInt(document.getElementById('TotalPassengersHidden')?.value || '1', 10);
+        const newTotal = (selectedTour.price * totalPax);
+        const totalInput = document.getElementById('TotalAmountHidden');
+        if (totalInput) {
+            totalInput.value = newTotal.toFixed(2);
+            updateDisplayTotal(newTotal);
+        }
+
+        // Actualizar turnos dinámicamente
+        const shiftsContainer = document.getElementById('shiftsContainer');
+        if (shiftsContainer) {
+            shiftsContainer.innerHTML = '';
+            if (selectedTour.shifts && selectedTour.shifts.length > 0) {
+                selectedTour.shifts.forEach((shift, idx) => {
+                    const label = document.createElement('label');
+                    label.className = `relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low ${idx === 0 ? 'border-primary bg-primary/5' : 'border-outline-variant'}`;
+                    label.innerHTML = `
+                        <input type="radio" name="ShiftName" value="${shift}" class="sr-only" ${idx === 0 ? 'checked' : ''} onchange="onShiftRadioChanged(this)" />
+                        <span class="text-label-md font-label-md font-bold text-center">${shift}</span>
+                    `;
+                    shiftsContainer.appendChild(label);
+                });
+            } else {
+                shiftsContainer.innerHTML = `
+                    <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-primary bg-primary/5">
+                        <input type="radio" name="ShiftName" value="Turno Único" class="sr-only" checked onchange="onShiftRadioChanged(this)" />
+                        <span class="text-label-md font-label-md font-bold text-center">Turno Único</span>
+                    </label>
+                `;
+            }
+        }
+    }
+
+    function onShiftRadioChanged(radio) {
+        document.querySelectorAll('#shiftsContainer label').forEach(lbl => {
+            lbl.classList.remove('border-primary', 'bg-primary/5');
+            lbl.classList.add('border-outline-variant');
+        });
+        radio.closest('label').classList.remove('border-outline-variant');
+        radio.closest('label').classList.add('border-primary', 'bg-primary/5');
+    }
+
     function openCancelModal() {
         document.getElementById('cancelBookingModal')?.classList.remove('hidden');
     }
@@ -398,6 +502,24 @@
         const total = document.querySelectorAll('.extra-passenger-row').length + 1;
         document.getElementById('passenger-count-badge').innerText = total + ' Pasajeros';
         document.getElementById('TotalPassengersHidden').value = total;
+
+        // Auto-recalculate total price based on selected tour
+        const tourSelect = document.getElementById('tourPackageSelect');
+        if (tourSelect) {
+            const selectedOpt = tourSelect.options[tourSelect.selectedIndex];
+            const price = parseFloat(selectedOpt?.getAttribute('data-price') || '0');
+            if (price > 0) {
+                const totalInput = document.getElementById('TotalAmountHidden');
+                if (totalInput) {
+                    totalInput.value = (price * totalPaxCount(total)).toFixed(2);
+                    updateDisplayTotal(totalInput.value);
+                }
+            }
+        }
+    }
+
+    function totalPaxCount(num) {
+        return num || 1;
     }
 
     function saveExtraPassengersToJson() {

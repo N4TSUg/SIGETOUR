@@ -641,40 +641,53 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpGet]
         public async Task<IActionResult> CreateBooking()
         {
-            var tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
+            var tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
             ViewBag.Tours = tours;
             
+            var firstTour = tours.FirstOrDefault();
+            var shifts = firstTour?.Shifts?.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() ?? new List<string>();
+
             var vm = new SIGETOUR.API.Models.EditBookingViewModel
             {
                 ReferenceCode = "NUEVA",
+                TourPackageId = firstTour?.Id ?? Guid.Empty,
+                TourName = firstTour?.Title ?? string.Empty,
+                TourBasePrice = firstTour?.BasePrice ?? 0,
                 TravelDate = DateTime.Today,
+                ShiftName = shifts.FirstOrDefault() ?? "Turno Mañana",
                 TotalPassengers = 1,
-                TotalAmount = 0,
-                PaidAmount = 0
+                TotalAmount = firstTour?.BasePrice ?? 0,
+                PaidAmount = 0,
+                AvailableShifts = shifts
             };
             return View(vm);
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateBooking(SIGETOUR.API.Models.EditBookingViewModel model, Guid TourId)
+        public async Task<IActionResult> CreateBooking(SIGETOUR.API.Models.EditBookingViewModel model)
         {
+            if (model.TourPackageId == Guid.Empty)
+            {
+                ModelState.AddModelError("TourPackageId", "Debe seleccionar un tour.");
+            }
+
             if (!ModelState.IsValid)
             {
-                ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
+                ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
                 return View(model);
             }
-            var tour = await _context.TourPackages.FindAsync(TourId);
+
+            var tour = await _context.TourPackages.Include(t => t.Shifts).FirstOrDefaultAsync(t => t.Id == model.TourPackageId);
             if (tour == null) {
-                ModelState.AddModelError("", "Tour no seleccionado.");
-                ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
+                ModelState.AddModelError("TourPackageId", "El tour seleccionado no existe.");
+                ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
                 return View(model);
             }
             if (string.IsNullOrWhiteSpace(model.CustomerName)) {
-                ModelState.AddModelError("", "El nombre del cliente es obligatorio.");
-                ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).ToListAsync();
+                ModelState.AddModelError(nameof(model.CustomerName), "El nombre del cliente es obligatorio.");
+                ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
                 return View(model);
             }
-            if (tour == null) return NotFound();
 
             var booking = new SIGETOUR.API.Core.Entities.Booking
             {
@@ -709,7 +722,8 @@ namespace SIGETOUR.API.Controllers.UI
             _context.Bookings.Add(booking);
             await _context.SaveChangesAsync();
 
-            return RedirectToAction("Dashboard");
+            TempData["SuccessMessage"] = $"Reserva {booking.ReferenceCode} creada exitosamente.";
+            return RedirectToAction(nameof(Bookings));
         }
 
         [HttpGet]
@@ -723,7 +737,11 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound();
 
+            var tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+            ViewBag.Tours = tours;
+
             var tour = booking.Items.FirstOrDefault()?.TourPackage;
+            var currentTourShifts = tour?.Shifts?.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() ?? new List<string>();
 
             var vm = new SIGETOUR.API.Models.EditBookingViewModel
             {
@@ -744,8 +762,10 @@ namespace SIGETOUR.API.Controllers.UI
                 InvoiceNumber = booking.InvoiceNumber,
                 Status = booking.Status,
                 AdditionalPassengersJson = booking.AdditionalPassengersJson,
+                TourPackageId = tour?.Id ?? Guid.Empty,
                 TourName = tour?.Title ?? "Tour Desconocido",
-                AvailableShifts = tour?.Shifts?.Select(s => s.ShiftName).ToList() ?? new List<string>()
+                TourBasePrice = tour?.BasePrice ?? 0,
+                AvailableShifts = currentTourShifts
             };
 
             return View(vm);
@@ -756,19 +776,23 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (!ModelState.IsValid)
             {
-                // Repopulate dropdowns if necessary (like AvailableShifts)
-                // In EditBooking GET, AvailableShifts was populated from the Booking.Items
-                var existingBooking = await _context.Bookings.Include(b => b.Items).ThenInclude(i => i.TourPackage).ThenInclude(tp => tp.Shifts).FirstOrDefaultAsync(b => b.Id == model.Id);
-                if (existingBooking != null)
+                ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+                var selectedTourObj = await _context.TourPackages.Include(t => t.Shifts).FirstOrDefaultAsync(t => t.Id == model.TourPackageId);
+                if (selectedTourObj != null)
                 {
-                    var shifts = existingBooking.Items.FirstOrDefault()?.TourPackage?.Shifts.Select(s => s.ShiftName).ToList() ?? new List<string>();
-                    model.AvailableShifts = shifts;
+                    model.AvailableShifts = selectedTourObj.Shifts.Where(s => s.IsActive).Select(s => s.ShiftName).ToList();
+                    model.TourName = selectedTourObj.Title;
                 }
                 return View(model);
             }
 
-            var booking = await _context.Bookings.FindAsync(model.Id);
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                .FirstOrDefaultAsync(b => b.Id == model.Id);
+
             if (booking == null) return NotFound();
+
+            var selectedTour = await _context.TourPackages.FindAsync(model.TourPackageId);
 
             booking.CustomerName = model.CustomerName ?? string.Empty;
             booking.CustomerDni = model.CustomerDni ?? string.Empty;
@@ -785,6 +809,32 @@ namespace SIGETOUR.API.Controllers.UI
             booking.InvoiceNumber = model.InvoiceNumber ?? string.Empty;
             booking.Status = model.Status;
             booking.AdditionalPassengersJson = string.IsNullOrWhiteSpace(model.AdditionalPassengersJson) ? "[]" : model.AdditionalPassengersJson;
+
+            // Actualizar o reasignar el tour en BookingItem si cambió de tour
+            if (selectedTour != null)
+            {
+                var item = booking.Items.FirstOrDefault();
+                if (item != null)
+                {
+                    item.TourPackageId = selectedTour.Id;
+                    item.UnitPrice = selectedTour.BasePrice;
+                    item.Passengers = model.TotalPassengers;
+                    item.SubTotal = model.TotalAmount;
+                    _context.Entry(item).State = EntityState.Modified;
+                }
+                else
+                {
+                    booking.Items.Add(new BookingItem
+                    {
+                        Id = Guid.NewGuid(),
+                        BookingId = booking.Id,
+                        TourPackageId = selectedTour.Id,
+                        Passengers = model.TotalPassengers,
+                        UnitPrice = selectedTour.BasePrice,
+                        SubTotal = model.TotalAmount
+                    });
+                }
+            }
 
             _context.Bookings.Update(booking);
             await _context.SaveChangesAsync();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 using SIGETOUR.API.Core.Entities;
 
@@ -38,6 +38,9 @@ namespace SIGETOUR.API.Models
         
         public string? ReferenceCode { get; set; } = string.Empty;
         public string? TourName { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Debe seleccionar un tour")]
+        public Guid TourPackageId { get; set; }
+        public decimal TourBasePrice { get; set; }
         public System.Collections.Generic.List<string> AvailableShifts { get; set; } = new();
     }
 }
