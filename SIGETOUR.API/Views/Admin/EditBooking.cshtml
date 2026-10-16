@@ -434,15 +434,21 @@
         document.getElementById('cancelBookingModal')?.classList.add('hidden');
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    function initEditBooking() {
         loadExtraPassengers();
         recalcBalance();
 
         // Hook into form submit to save extra passengers
-        document.getElementById('editBookingForm').addEventListener('submit', function() {
+        document.getElementById('editBookingForm')?.addEventListener('submit', function() {
             saveExtraPassengersToJson();
         });
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEditBooking);
+    } else {
+        initEditBooking();
+    }
 
     function loadExtraPassengers() {
         const jsonField = document.getElementById('AdditionalPassengersJson');

@@ -327,15 +327,21 @@
         radio.closest('label').classList.add('border-primary', 'bg-primary/5');
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    function initCreateBooking() {
         loadExtraPassengers();
         recalcBalance();
 
         // Hook into form submit to save extra passengers
-        document.getElementById('createBookingForm').addEventListener('submit', function() {
+        document.getElementById('createBookingForm')?.addEventListener('submit', function() {
             saveExtraPassengersToJson();
         });
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCreateBooking);
+    } else {
+        initCreateBooking();
+    }
 
     function loadExtraPassengers() {
         const jsonField = document.getElementById('AdditionalPassengersJson');
