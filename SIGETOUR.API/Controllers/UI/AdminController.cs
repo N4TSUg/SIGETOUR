@@ -98,11 +98,15 @@ namespace SIGETOUR.API.Controllers.UI
             return View(tours);
         }
 
-        public async Task<IActionResult> Bookings(string? search, string? status, DateTime? date)
+        public async Task<IActionResult> Bookings(string? search, string? status, DateTime? date, Guid? tourId)
         {
             var query = _context.Bookings
                 .Include(b => b.Items)
-                .ThenInclude(i => i.TourPackage)
+                    .ThenInclude(i => i.TourPackage)
+                        .ThenInclude(t => t.Category)
+                .Include(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                        .ThenInclude(t => t.DefaultVehicle)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -116,6 +120,8 @@ namespace SIGETOUR.API.Controllers.UI
                     b.CustomerPhone.ToLower().Contains(term) ||
                     b.OperationNumber.ToLower().Contains(term) ||
                     b.InvoiceNumber.ToLower().Contains(term) ||
+                    b.PickupLocation.ToLower().Contains(term) ||
+                    b.ShiftName.ToLower().Contains(term) ||
                     b.AdditionalPassengersJson.ToLower().Contains(term) ||
                     b.Items.Any(i => i.TourPackage.Title.ToLower().Contains(term)));
             }
@@ -134,6 +140,11 @@ namespace SIGETOUR.API.Controllers.UI
                 query = query.Where(b => b.TravelDate.Date == dUtc);
             }
 
+            if (tourId.HasValue && tourId != Guid.Empty)
+            {
+                query = query.Where(b => b.Items.Any(i => i.TourPackageId == tourId.Value));
+            }
+
             var bookings = await query
                 .OrderByDescending(b => b.BookingDate)
                 .ToListAsync();
@@ -141,6 +152,11 @@ namespace SIGETOUR.API.Controllers.UI
             ViewBag.CurrentSearch = search;
             ViewBag.CurrentStatus = status;
             ViewBag.CurrentDate = date?.ToString("yyyy-MM-dd");
+            ViewBag.CurrentTourId = tourId;
+            ViewBag.AvailableTours = await _context.TourPackages
+                .Where(t => t.IsActive)
+                .OrderBy(t => t.Title)
+                .ToListAsync();
 
             return View(bookings);
         }
