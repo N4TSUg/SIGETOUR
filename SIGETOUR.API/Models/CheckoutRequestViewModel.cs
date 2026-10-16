@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
@@ -42,6 +42,8 @@ namespace SIGETOUR.API.Models
         // Pasajeros adicionales (desde Pasajero 2 en adelante)
         public List<string> PassengerNames { get; set; } = new();
         public List<string> PassengerDnis { get; set; } = new();
+        public List<string> PassengerPhones { get; set; } = new();
+        public List<string> PassengerEmails { get; set; } = new();
     }
 }
 

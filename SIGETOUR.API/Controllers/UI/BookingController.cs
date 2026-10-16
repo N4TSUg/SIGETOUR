@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -66,6 +66,21 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
 
+            var extraPassengers = new List<object>();
+            if (model.PassengerNames != null && model.PassengerNames.Any())
+            {
+                for (int i = 0; i < model.PassengerNames.Count; i++)
+                {
+                    var pName = model.PassengerNames[i]?.Trim() ?? "";
+                    var pDni = (model.PassengerDnis != null && i < model.PassengerDnis.Count) ? model.PassengerDnis[i]?.Trim() ?? "" : "";
+                    var pPhone = (model.PassengerPhones != null && i < model.PassengerPhones.Count) ? model.PassengerPhones[i]?.Trim() ?? "" : "";
+                    if (!string.IsNullOrWhiteSpace(pName) || !string.IsNullOrWhiteSpace(pDni))
+                    {
+                        extraPassengers.Add(new { Name = pName, Dni = pDni, Phone = pPhone });
+                    }
+                }
+            }
+
             var booking = new Booking
             {
                 ReferenceCode = "RES-" + new Random().Next(1000, 9999),
@@ -79,7 +94,8 @@ namespace SIGETOUR.API.Controllers.UI
                 TotalAmount = (tour.BasePrice * model.Passengers) + pickupCost,
                 PickupLocation = pickupLocation,
                 PickupCost = pickupCost,
-                Status = BookingStatus.Pending
+                Status = BookingStatus.Pending,
+                AdditionalPassengersJson = JsonSerializer.Serialize(extraPassengers)
             };
 
             booking.Items.Add(new BookingItem
