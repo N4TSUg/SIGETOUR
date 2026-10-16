@@ -79,7 +79,7 @@
                   <span class="text-xs text-outline" id="tourPriceBadge">Tarifa individual base: S/ @Model.TourBasePrice.ToString("F2")</span>
                 </div>
                 <div class="relative">
-                  <select asp-for="TourPackageId" id="tourPackageSelect" onchange="onTourChanged(this)" class="w-full py-2.5 pl-3 pr-10 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <select asp-for="TourPackageId" id="tourPackageSelect" onchange="onTourChanged(this)" class="w-full py-2.5 pl-3 pr-10 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent appearance-none cursor-pointer" style="-webkit-appearance: none; -moz-appearance: none; appearance: none;">
                     @foreach (var t in tours)
                     {
                       <option value="@t.Id" data-price="@t.BasePrice" data-title="@t.Title" selected="@(t.Id == Model.TourPackageId)">
