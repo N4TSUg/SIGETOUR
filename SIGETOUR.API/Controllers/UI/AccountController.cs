@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.ViewModels;
@@ -54,7 +54,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpGet]
         public async Task<IActionResult> Logout()
         {
             await _signInManager.SignOutAsync();

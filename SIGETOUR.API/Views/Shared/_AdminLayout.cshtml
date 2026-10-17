@@ -192,11 +192,11 @@
 <div class="h-6 w-px bg-outline-variant/60 mx-1"></div>
 <div class="flex items-center gap-space-xs pl-1">
 <div class="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-label-md">
-          TC
-        </div>
+    @(User.Identity?.Name?.Length >= 2 ? User.Identity.Name.Substring(0, 2).ToUpper() : "TC")
+</div>
 <div class="hidden md:flex flex-col text-left">
-<span class="text-label-md font-label-md font-bold text-on-surface">Admin Central</span>
-<span class="text-label-sm font-label-sm text-outline">Cajamarca Sede</span>
+<span class="text-label-md font-label-md font-bold text-on-surface">@(User.Identity?.Name ?? "Admin Central")</span>
+<span class="text-label-sm font-label-sm text-outline">@(User.IsInRole("Administrator") ? "Administrador General" : "Operaciones Cajamarca")</span>
 </div>
 </div>
 </div>
@@ -287,14 +287,17 @@
 </div>
 <!-- Footer Navigation Items -->
 <div class="border-t border-outline-variant/50 pt-2 space-y-1">
-<a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg text-on-surface-variant font-label-md hover:bg-surface-container-high transition-colors" asp-controller="Admin" asp-action="Tours">
+<a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg text-on-surface-variant font-label-md hover:bg-surface-container-high transition-colors" asp-controller="Admin" asp-action="Users">
 <span class="material-symbols-outlined text-[20px]">settings</span>
 <span class="">Ajustes</span>
 </a>
-<a class="flex items-center gap-space-sm px-space-md py-2 rounded-lg text-tertiary font-label-md hover:bg-error-container/30 transition-colors" asp-controller="Admin" asp-action="Tours">
+<form asp-controller="Account" asp-action="Logout" method="post" class="w-full m-0 p-0">
+@Html.AntiForgeryToken()
+<button type="submit" class="w-full flex items-center gap-space-sm px-space-md py-2 rounded-lg text-tertiary font-label-md hover:bg-error-container/30 transition-colors text-left border-0 bg-transparent cursor-pointer">
 <span class="material-symbols-outlined text-[20px]">logout</span>
 <span class="">Cerrar Sesión</span>
-</a>
+</button>
+</form>
 </div>
 </div>
 </aside>

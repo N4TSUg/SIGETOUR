@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using SIGETOUR.API.Application.DTOs;
 using SIGETOUR.API.Application.Interfaces;
@@ -35,6 +37,7 @@ namespace SIGETOUR.API.Controllers
         }
 
         [HttpPost]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult<TourPackageReadDto>> Create(TourPackageCreateDto dto)
         {
             var createdPackage = await _tourPackageService.CreateAsync(dto);
@@ -42,6 +45,7 @@ namespace SIGETOUR.API.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult> Update(Guid id, TourPackageUpdateDto dto)
         {
             var success = await _tourPackageService.UpdateAsync(id, dto);
@@ -51,6 +55,7 @@ namespace SIGETOUR.API.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<ActionResult> Delete(Guid id)
         {
             var success = await _tourPackageService.DeleteAsync(id);

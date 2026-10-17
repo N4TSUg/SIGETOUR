@@ -1,78 +1,428 @@
 @model SIGETOUR.API.Core.Entities.Booking
+@using System.Text.Json
 @{
-    ViewData["Title"] = "Voucher de Reserva";
+    ViewData["Title"] = "Voucher Oficial de Reserva – " + Model.ReferenceCode;
     var tour = Model.Items.FirstOrDefault()?.TourPackage;
+    var tourPrice = tour?.BasePrice ?? (Model.TotalAmount / Math.Max(1, Model.TotalPassengers));
+    
+    // Parse extra passengers safely
+    var extraPassengers = new List<(string Name, string Dni, string Phone)>();
+    if (!string.IsNullOrWhiteSpace(Model.AdditionalPassengersJson) && Model.AdditionalPassengersJson != "[]")
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(Model.AdditionalPassengersJson);
+            foreach (var elem in doc.RootElement.EnumerateArray())
+            {
+                var name = elem.TryGetProperty("Name", out var n) ? n.GetString() ?? "" : "";
+                var dni = elem.TryGetProperty("Dni", out var d) ? d.GetString() ?? "" : "";
+                var phone = elem.TryGetProperty("Phone", out var p) ? p.GetString() ?? "" : "";
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    extraPassengers.Add((name, dni, phone));
+                }
+            }
+        }
+        catch { }
+    }
 }
 
-<!-- STEPPER BAR -->
-<nav aria-label="Progreso de la Reserva" class="bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs py-4">
+<style>
+  @@media print {
+    body * {
+      visibility: hidden;
+    }
+    #print-voucher-area, #print-voucher-area * {
+      visibility: visible;
+    }
+    #print-voucher-area {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      margin: 0;
+      padding: 1.5rem;
+      box-shadow: none !important;
+      border: 1px solid #999 !important;
+      background: white !important;
+      color: black !important;
+    }
+    .no-print {
+      display: none !important;
+    }
+  }
+</style>
+
+<!-- STEPPER BAR (NO-PRINT) -->
+<nav aria-label="Progreso de la Reserva" class="no-print bg-surface-container-lowest border-b border-outline-variant/30 shadow-xs py-4">
   <div class="max-w-7xl mx-auto px-4 md:px-8">
     <div class="flex items-center justify-between max-w-4xl mx-auto relative">
-      <!-- Steps 1-4: Completed -->
       @foreach (var (label, num) in new[] { ("1. Datos del Tour", 1), ("2. Recojo & Pasajeros", 2), ("3. Datos de Contacto", 3), ("4. Pago Seguro", 4) })
       {
         <div class="flex flex-col items-center group relative z-10">
-          <div class="w-9 h-9 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-sm shadow-sm">
+          <div class="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shadow-sm">
             <span class="material-symbols-outlined text-base font-bold">check</span>
           </div>
           <span class="mt-2 text-label-sm font-label-sm text-secondary font-medium hidden md:inline-block">@label</span>
         </div>
-        <div class="flex-1 h-0.5 bg-primary-container mx-2 -mt-5 md:-mt-6"></div>
+        <div class="flex-1 h-0.5 bg-primary mx-2 -mt-5 md:-mt-6"></div>
       }
       <!-- Step 5: Completed & Active Voucher -->
       <div class="flex flex-col items-center group relative z-10">
         <div class="w-9 h-9 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-sm shadow-md">
           <span class="material-symbols-outlined text-base font-bold">check</span>
         </div>
-        <span class="mt-2 text-label-sm font-label-sm text-primary font-bold">5. Voucher Oficial</span>
+        <span class="mt-2 text-label-sm font-label-sm text-primary font-bold">5. Boleto Oficial</span>
       </div>
     </div>
   </div>
 </nav>
 
-<div class="bg-surface-container py-12 px-4 md:px-8 min-h-screen">
-    <div class="max-w-3xl mx-auto bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant p-8 text-center">
-        <span class="material-symbols-outlined text-[64px] text-primary mb-4" data-icon="check_circle">check_circle</span>
-        <h1 class="font-title-lg text-title-lg text-on-surface font-bold mb-2">¡Reserva Confirmada!</h1>
-        <p class="font-body-md text-body-md text-secondary mb-8">Tu solicitud ha sido procesada con éxito. Por favor presenta este código el día de tu viaje.</p>
+<div class="bg-surface font-body-md text-on-surface antialiased min-h-screen py-8 md:py-12">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
 
-        <div class="bg-primary/10 border border-primary/20 rounded-lg p-6 mb-8 inline-block mx-auto min-w-[200px]">
-            <span class="block font-label-sm text-label-sm uppercase tracking-wider text-primary mb-1">Código de Reserva</span>
-            <span class="font-headline-md text-headline-md font-bold text-primary">@Model.ReferenceCode</span>
+    <!-- MENSAJE DE ÉXITO & FELICITACIÓN (NO-PRINT) -->
+    <div class="no-print bg-surface-container-lowest rounded-2xl p-6 md:p-8 shadow-sm border border-outline-variant text-center relative overflow-hidden mb-8">
+      <div class="relative z-10 flex flex-col items-center">
+        <div class="w-16 h-16 rounded-full bg-primary-container text-primary flex items-center justify-center shadow-md mb-4 ring-8 ring-surface-container-low">
+          <span class="material-symbols-outlined text-4xl">check_circle</span>
         </div>
+        <h1 class="text-headline-md sm:text-headline-lg font-bold text-on-surface mb-2 tracking-tight">
+          ¡Tu Reserva ha sido Confirmada Exitosamente!
+        </h1>
+        <p class="text-body-md text-secondary max-w-2xl mx-auto mb-6">
+          Hemos generado tu comprobante y voucher oficial de viaje. Por favor conserva este documento para presentarlo en el counter de embarque o durante el recojo de tu tour.
+        </p>
 
-        <div class="text-left bg-surface-container-low p-6 rounded-lg border border-outline-variant grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <span class="block font-label-sm text-label-sm text-secondary uppercase">Tour Seleccionado</span>
-                <span class="font-title-sm font-bold text-on-surface">@(tour?.Title ?? "N/A")</span>
-            </div>
-            <div>
-                <span class="block font-label-sm text-label-sm text-secondary uppercase">Fecha de Viaje</span>
-                <span class="font-title-sm font-bold text-on-surface">@Model.TravelDate.ToString("dd/MM/yyyy")</span>
-            </div>
-            <div>
-                <span class="block font-label-sm text-label-sm text-secondary uppercase">Pasajeros</span>
-                <span class="font-title-sm font-bold text-on-surface">@Model.TotalPassengers</span>
-            </div>
-            <div>
-                <span class="block font-label-sm text-label-sm text-secondary uppercase">Punto de Recojo</span>
-                <span class="font-title-sm font-bold text-on-surface">@Model.PickupLocation</span>
-            </div>
-            <div>
-                <span class="block font-label-sm text-label-sm text-secondary uppercase">Titular</span>
-                <span class="font-title-sm font-bold text-on-surface">@Model.CustomerName</span>
-            </div>
-            <div>
-                <span class="block font-label-sm text-label-sm text-secondary uppercase">Total Pagado / A Pagar</span>
-                <span class="font-headline-sm font-bold text-primary">S/ @Model.TotalAmount.ToString("0.00")</span>
-            </div>
+        <!-- BADGE CON CÓDIGO DE RESERVA -->
+        <div class="inline-flex items-center gap-3 bg-surface-container-low border border-primary/20 px-6 py-3 rounded-2xl shadow-xs">
+          <div class="flex flex-col text-left">
+            <span class="text-label-sm text-secondary uppercase tracking-wider font-bold">Código Oficial de Reserva</span>
+            <span class="text-headline-sm text-primary font-mono tracking-wider font-extrabold">@Model.ReferenceCode</span>
+          </div>
+          <span class="material-symbols-outlined text-primary text-3xl">confirmation_number</span>
         </div>
-
-        <div class="mt-8 pt-6 border-t border-outline-variant flex justify-center gap-4">
-            <a href="/Tour/Catalog" class="px-6 py-3 border border-outline text-secondary font-label-md rounded-lg hover:bg-surface-container-low transition-all">Volver al Catálogo</a>
-            <a href="https://wa.me/51901195392?text=Hola,%20tengo%20la%20reserva%20@Model.ReferenceCode" target="_blank" class="px-6 py-3 bg-primary text-on-primary font-label-md rounded-lg hover:bg-primary-container transition-all flex items-center gap-2">
-                <span class="material-symbols-outlined text-sm">chat</span> WhatsApp
-            </a>
-        </div>
+      </div>
     </div>
+
+    <!-- BOTONES DE ACCIÓN RÁPIDA (NO-PRINT) -->
+    <div class="no-print flex flex-wrap gap-3 justify-center mb-8">
+      <button type="button" class="inline-flex items-center justify-center gap-2 bg-primary text-on-primary hover:bg-primary/90 px-6 py-3 rounded-xl text-label-lg font-bold shadow-md transition-all active:scale-95 cursor-pointer" onclick="window.print()">
+        <span class="material-symbols-outlined text-[20px]">print</span>
+        <span>Imprimir Boleto Oficial / Guardar en PDF</span>
+      </button>
+
+      <a class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl text-label-lg font-bold transition-all shadow-sm active:scale-95" href="https://wa.me/51901195392?text=Hola,%20adjunto%20mi%20código%20de%20reserva%20@Model.ReferenceCode%20para%20el%20Tour%20@(Uri.EscapeDataString(tour?.Title ?? "Cajamarca"))" target="_blank" rel="noopener noreferrer">
+        <span class="material-symbols-outlined text-[20px]">chat</span>
+        <span>Enviar a WhatsApp de Soporte</span>
+      </a>
+
+      <a asp-controller="Tour" asp-action="Catalog" class="inline-flex items-center justify-center gap-2 bg-surface-container-lowest text-secondary border border-outline-variant hover:bg-surface-container-low px-5 py-3 rounded-xl text-label-lg font-semibold transition-all shadow-sm active:scale-95">
+        <span class="material-symbols-outlined text-[20px]">explore</span>
+        <span>Ver Más Tours</span>
+      </a>
+    </div>
+
+    <!-- VOUCHER DIGITAL OFICIAL (ESTILO BOLETO TURÍSTICO IMPRIMIBLE) -->
+    <div class="bg-surface-container-lowest rounded-2xl shadow-lg border border-outline-variant overflow-hidden mb-10 transition-all" id="print-voucher-area">
+      <!-- ENCABEZADO DEL BOLETO -->
+      <div class="bg-surface-container-low border-b border-outline-variant p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-md shrink-0">
+            <span class="material-symbols-outlined text-3xl">directions_bus</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-headline-sm font-extrabold text-primary">TURISMO CHILÓN</span>
+              <span class="bg-primary/10 text-primary text-label-sm px-2.5 py-0.5 rounded-full font-bold border border-primary/20">BOLETO ELECTRÓNICO</span>
+            </div>
+            <p class="text-body-sm text-secondary font-medium mt-0.5">Transporte &amp; Turismo Cajamarca S.A.C.</p>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-label-sm text-outline">
+              <span><strong>RUC:</strong> 20601234567</span>
+              <span>•</span>
+              <span class="text-primary font-semibold">Acreditación DIRCETUR Cajamarca Cert. N° 4412</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-surface-container-lowest px-5 py-3 rounded-xl border border-outline-variant text-left md:text-right">
+          <span class="text-label-sm text-secondary block font-bold uppercase tracking-wider">CÓDIGO DE EMISIÓN</span>
+          <span class="text-title-lg font-mono font-black text-primary tracking-wider">@Model.ReferenceCode</span>
+          <span class="text-body-sm text-outline block mt-0.5">Emisión: @Model.BookingDate.ToString("dd/MM/yyyy HH:mm") hrs</span>
+        </div>
+      </div>
+
+      <!-- CUERPO PRINCIPAL DEL VOUCHER -->
+      <div class="p-6 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <!-- LADO IZQUIERDO: DETALLE DEL SERVICIO Y PASAJEROS (8 COLUMNAS) -->
+        <div class="lg:col-span-8 space-y-6">
+          
+          <!-- DETALLES DEL TOUR -->
+          <div class="bg-surface-container/20 rounded-2xl p-5 border border-primary/20">
+            <div class="flex items-start justify-between mb-3">
+              <div>
+                <span class="text-label-sm uppercase font-bold text-tertiary tracking-wider block">Circuito Turístico Autorizado</span>
+                <h2 class="text-title-lg sm:text-headline-sm font-extrabold text-on-surface">@(tour?.Title ?? "Tour Turístico Cajamarca")</h2>
+              </div>
+              <span class="bg-surface-container-high text-primary px-3 py-1 rounded-full text-label-sm font-bold flex items-center gap-1 shrink-0">
+                <span class="material-symbols-outlined text-sm">verified</span>
+                Servicio Confort VIP
+              </span>
+            </div>
+            
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-3 border-t border-outline-variant/60">
+              <div>
+                <span class="text-label-sm text-secondary block font-bold">Fecha del Viaje</span>
+                <div class="flex items-center gap-1.5 text-on-surface font-semibold text-body-md mt-0.5">
+                  <span class="material-symbols-outlined text-primary text-base">calendar_today</span>
+                  <span>@Model.TravelDate.ToString("dd/MM/yyyy")</span>
+                </div>
+              </div>
+              <div>
+                <span class="text-label-sm text-secondary block font-bold">Turno / Horario</span>
+                <div class="flex items-center gap-1.5 text-on-surface font-semibold text-body-md mt-0.5">
+                  <span class="material-symbols-outlined text-primary text-base">schedule</span>
+                  <span>@(string.IsNullOrWhiteSpace(Model.ShiftName) ? "Mañana (09:00 AM)" : Model.ShiftName)</span>
+                </div>
+              </div>
+              <div>
+                <span class="text-label-sm text-secondary block font-bold">Duración Estimada</span>
+                <div class="flex items-center gap-1.5 text-on-surface font-semibold text-body-md mt-0.5">
+                  <span class="material-symbols-outlined text-primary text-base">timelapse</span>
+                  <span>@(tour?.Duration ?? "4 Horas aprox.")</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- UNIDAD Y PUNTO DE EMBARQUE -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="border border-outline-variant rounded-2xl p-4 bg-surface-container-lowest">
+              <div class="flex items-center gap-2 text-primary mb-2">
+                <span class="material-symbols-outlined text-[20px]">directions_bus</span>
+                <span class="text-label-md font-bold">Unidad &amp; Flota Asignada</span>
+              </div>
+              <p class="text-body-md font-bold text-on-surface">Mercedes-Benz Sprinter / HiAce VIP</p>
+              <ul class="text-body-sm text-secondary mt-1.5 space-y-1">
+                <li class="flex items-center gap-1.5"><span class="material-symbols-outlined text-sm text-primary">check</span> Asientos ergonómicos reclinables</li>
+                <li class="flex items-center gap-1.5"><span class="material-symbols-outlined text-sm text-primary">check</span> Climatización A/C & botiquín</li>
+                <li class="flex items-center gap-1.5"><span class="material-symbols-outlined text-sm text-primary">check</span> Póliza SOAT Turístico y MTC vigente</li>
+              </ul>
+            </div>
+
+            <div class="border border-outline-variant rounded-2xl p-4 bg-surface-container-lowest">
+              <div class="flex items-center gap-2 text-tertiary mb-2">
+                <span class="material-symbols-outlined text-[20px]">location_on</span>
+                <span class="text-label-md font-bold">Punto de Embarque Oficial</span>
+              </div>
+              @if (!string.IsNullOrWhiteSpace(Model.PickupLocation) && Model.PickupLocation != "agencia")
+              {
+                <p class="text-body-md font-bold text-on-surface">Recojo: @Model.PickupLocation</p>
+                <p class="text-body-sm text-secondary font-medium">Servicio coordinado con la unidad móvil.</p>
+                <div class="mt-2 bg-amber-50 text-amber-900 border border-amber-200 px-2.5 py-1 rounded-lg text-label-sm font-semibold inline-block">
+                  Estar listo en recepción 15 min antes
+                </div>
+              }
+              else
+              {
+                <p class="text-body-md font-bold text-on-surface">Agencia Central Turismo Chilón</p>
+                <p class="text-body-sm text-secondary font-medium">Jr. 2 de Mayo 569, Cajamarca, Perú</p>
+                <div class="mt-2 bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-lg text-label-sm font-semibold inline-block">
+                  Presentarse 15 min antes con DNI físico
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- LISTA DE PASAJEROS REGISTRADOS -->
+          <div class="border border-outline-variant rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-title-sm text-on-surface font-bold flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary">group</span>
+                Pasajeros Registrados en el Boleto (@Model.TotalPassengers)
+              </h3>
+              <span class="text-label-sm text-secondary font-semibold">@Model.TotalPassengers Asiento(s) Reservado(s)</span>
+            </div>
+
+            <div class="space-y-2.5">
+              <!-- Titular -->
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/80">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-label-md shrink-0">
+                    1
+                  </div>
+                  <div>
+                    <span class="text-body-md font-bold text-on-surface">@Model.CustomerName</span>
+                    <span class="ml-2 bg-primary/10 text-primary font-bold text-label-sm px-2 py-0.5 rounded">Titular de Compra</span>
+                  </div>
+                </div>
+                <div class="mt-2 sm:mt-0 flex items-center gap-4 text-body-sm text-secondary pl-11 sm:pl-0">
+                  <span><strong>DNI:</strong> @(string.IsNullOrWhiteSpace(Model.CustomerDni) ? "Pendiente" : Model.CustomerDni)</span>
+                  <span><strong>Cel:</strong> @(string.IsNullOrWhiteSpace(Model.CustomerPhone) ? "–" : Model.CustomerPhone)</span>
+                </div>
+              </div>
+
+              <!-- Pasajeros adicionales -->
+              @{
+                int seatNum = 2;
+                foreach (var extra in extraPassengers)
+                {
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-surface-container-lowest border border-outline-variant/80">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-full bg-surface-container-high text-primary flex items-center justify-center font-bold text-label-md shrink-0">
+                        @seatNum
+                      </div>
+                      <div>
+                        <span class="text-body-md font-bold text-on-surface">@extra.Name</span>
+                        <span class="ml-2 text-label-sm text-outline">Acompañante</span>
+                      </div>
+                    </div>
+                    <div class="mt-2 sm:mt-0 flex items-center gap-4 text-body-sm text-secondary pl-11 sm:pl-0">
+                      <span><strong>DNI:</strong> @(string.IsNullOrWhiteSpace(extra.Dni) ? "Verificar al embarque" : extra.Dni)</span>
+                      @if (!string.IsNullOrWhiteSpace(extra.Phone))
+                      {
+                        <span><strong>Cel:</strong> @extra.Phone</span>
+                      }
+                    </div>
+                  </div>
+                  seatNum++;
+                }
+              }
+            </div>
+          </div>
+        </div>
+
+        <!-- LADO DERECHO: VALIDACIÓN DE ACCESO & RESUMEN FINANCIERO (4 COLUMNAS) -->
+        <div class="lg:col-span-4 bg-surface-container-low rounded-2xl p-6 border border-outline-variant flex flex-col justify-between h-full space-y-6">
+          
+          <!-- SECCIÓN DE IDENTIFICACIÓN Y VERIFICACIÓN (SIN CÓDIGO QR SEGÚN ESPECIFICACIÓN) -->
+          <div class="w-full text-center">
+            <span class="text-label-sm uppercase font-bold text-secondary tracking-widest block mb-3">Verificación de Abordaje</span>
+            
+            <div class="bg-surface-container-lowest p-6 rounded-2xl border-2 border-dashed border-primary/40 shadow-sm flex flex-col items-center">
+              <div class="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3">
+                <span class="material-symbols-outlined text-3xl">verified_user</span>
+              </div>
+              <span class="text-label-sm text-outline font-semibold uppercase">Localizador Digital</span>
+              <span class="text-headline-md font-mono font-black text-primary tracking-widest mt-1">@Model.ReferenceCode</span>
+              <div class="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-label-sm font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                Acceso Verificado
+              </div>
+            </div>
+
+            <p class="text-label-sm text-secondary mt-3 leading-relaxed">
+              Presentar este código y su documento de identidad (DNI o Pasaporte) en el counter de salida o al abordar la unidad.
+            </p>
+          </div>
+
+          <!-- RESUMEN FINANCIERO -->
+          <div class="w-full pt-4 border-t border-outline-variant/60 space-y-2">
+            <div class="flex justify-between items-center text-body-sm text-secondary">
+              <span>Tarifa Tour (@Model.TotalPassengers Pax):</span>
+              <span class="font-semibold text-on-surface">S/ @((tourPrice * Model.TotalPassengers).ToString("N2"))</span>
+            </div>
+            @if (Model.PickupCost > 0)
+            {
+              <div class="flex justify-between items-center text-body-sm text-secondary">
+                <span>Servicio Recojo Hotel:</span>
+                <span class="font-semibold text-on-surface">S/ @Model.PickupCost.ToString("N2")</span>
+              </div>
+            }
+            <div class="flex justify-between items-center text-body-sm text-secondary">
+              <span>Método de Pago:</span>
+              <span class="font-semibold text-on-surface">@(string.IsNullOrWhiteSpace(Model.PaymentMethod) ? "Yape / Transferencia" : Model.PaymentMethod)</span>
+            </div>
+
+            <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant flex justify-between items-center mt-3">
+              <div>
+                <span class="text-label-sm text-secondary block font-bold text-left">TOTAL ABONADO</span>
+                <span class="text-title-lg font-extrabold text-primary">S/ @Model.TotalAmount.ToString("N2")</span>
+              </div>
+              <span class="bg-emerald-100 text-emerald-800 border border-emerald-200 text-label-sm px-3 py-1 rounded-full font-extrabold flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">check_circle</span>
+                PAGADO
+              </span>
+            </div>
+
+            <div class="pt-2 text-center text-label-sm text-outline flex items-center justify-center gap-1">
+              <span class="material-symbols-outlined text-sm">receipt_long</span>
+              <span>Boleta de Venta Electrónica Generada</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- FRANJA INFORMATIVA INFERIOR DEL VOUCHER -->
+      <div class="bg-surface-container-high/40 px-6 py-4 border-t border-outline-variant text-center md:text-left flex flex-col md:flex-row items-center justify-between text-label-sm text-secondary gap-2">
+        <span>Boleto electrónico válido para la fecha y turno señalados. Sujeto a términos y condiciones del servicio turístico regional.</span>
+        <span class="font-bold text-on-surface shrink-0">Central Telefónica: +51 901 195 392 / +51 944 746 364</span>
+      </div>
+    </div>
+
+    <!-- BLOQUE DE INSTRUCCIONES Y RECOMENDACIONES IMPORTANTES (NO-PRINT) -->
+    <div class="no-print bg-surface-container-lowest rounded-2xl p-6 md:p-8 shadow-sm border border-outline-variant mb-12">
+      <div class="flex items-center gap-3 mb-6 border-b border-outline-variant/60 pb-4">
+        <div class="p-2.5 bg-secondary-container text-secondary rounded-xl">
+          <span class="material-symbols-outlined text-2xl">info</span>
+        </div>
+        <div>
+          <h3 class="text-title-md font-bold text-on-surface">Instrucciones y Recomendaciones Importantes</h3>
+          <p class="text-body-sm text-secondary">Pautas esenciales para una experiencia segura y confortable en los circuitos de Cajamarca.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="flex items-start gap-3.5">
+          <div class="p-2 rounded-xl bg-surface-container text-primary shrink-0">
+            <span class="material-symbols-outlined">alarm</span>
+          </div>
+          <div>
+            <h4 class="font-bold text-on-surface text-body-md">Puntualidad de Embarque</h4>
+            <p class="text-body-sm text-secondary mt-0.5 leading-relaxed">
+              Presentarse con 15 minutos de anticipación en el punto asignado. El transporte inicia su recorrido en estricta hora programada.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-3.5">
+          <div class="p-2 rounded-xl bg-surface-container text-primary shrink-0">
+            <span class="material-symbols-outlined">badge</span>
+          </div>
+          <div>
+            <h4 class="font-bold text-on-surface text-body-md">Documento de Identidad Obligatorio</h4>
+            <p class="text-body-sm text-secondary mt-0.5 leading-relaxed">
+              Todos los pasajeros deben portar DNI físico original (o Pasaporte/Carné de Extranjería para turistas extranjeros) para los controles en ruta.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-3.5">
+          <div class="p-2 rounded-xl bg-surface-container text-primary shrink-0">
+            <span class="material-symbols-outlined">wb_sunny</span>
+          </div>
+          <div>
+            <h4 class="font-bold text-on-surface text-body-md">Clima y Equipamiento Recomendado</h4>
+            <p class="text-body-sm text-secondary mt-0.5 leading-relaxed">
+              Cajamarca se ubica a 2,750 m.s.n.m. Se recomienda llevar ropa abrigadora cortaviento, calzado cómodo antideslizante, bloqueador solar y lentes de sol.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-3.5">
+          <div class="p-2 rounded-xl bg-surface-container text-primary shrink-0">
+            <span class="material-symbols-outlined">support_agent</span>
+          </div>
+          <div>
+            <h4 class="font-bold text-on-surface text-body-md">Reprogramaciones y Atención</h4>
+            <p class="text-body-sm text-secondary mt-0.5 leading-relaxed">
+              Cualquier modificación debe solicitarse con al menos 24 horas de antelación comunicándose a nuestra Central Telefónica o vía WhatsApp.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>

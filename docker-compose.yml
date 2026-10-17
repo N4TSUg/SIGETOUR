@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sigetour-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sigetour_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 3nriqueA1402#
+    ports:
+      - "5432:5432"
+    volumes:
+      - sigetour_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sigetour_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: sigetour-app:latest
+    container_name: sigetour-web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=sigetour_db;Username=postgres;Password=3nriqueA1402#"
+    ports:
+      - "5000:8080"
+    volumes:
+      - sigetour_uploads:/app/wwwroot/images
+
+volumes:
+  sigetour_pgdata:
+  sigetour_uploads:
