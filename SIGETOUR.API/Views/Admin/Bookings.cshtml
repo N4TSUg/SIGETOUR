@@ -9,6 +9,7 @@
     var currentTourId = ViewBag.CurrentTourId as Guid?;
     var availableTours = ViewBag.AvailableTours as IEnumerable<TourPackage> ?? Enumerable.Empty<TourPackage>();
     var availableVehicles = ViewBag.AvailableVehicles as IEnumerable<Vehicle> ?? Enumerable.Empty<Vehicle>();
+    var driversList = ViewBag.Drivers as IEnumerable<Driver> ?? Enumerable.Empty<Driver>();
     bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch) || (!string.IsNullOrWhiteSpace(currentStatus) && currentStatus != "Todos") || !string.IsNullOrWhiteSpace(currentDate) || (currentTourId.HasValue && currentTourId.Value != Guid.Empty);
 }
 
@@ -200,11 +201,18 @@
                                             <span class="truncate max-w-[200px]">@booking.PickupLocation</span>
                                         </div>
                                     }
-                                    @if (tour.DefaultVehicle != null)
+                                    @if (booking.AssignedVehicle != null)
                                     {
-                                        <div class="text-[11px] text-outline mt-0.5 flex items-center gap-1">
-                                            <span class="material-symbols-outlined text-[13px] shrink-0">directions_bus</span>
-                                            <span class="truncate max-w-[200px]">Unidad: @tour.DefaultVehicle.Model (@tour.DefaultVehicle.LicensePlate)</span>
+                                        <div class="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-1 inline-flex items-center gap-1" title="Vehículo y Conductor asignados en Manifiesto">
+                                            <span class="material-symbols-outlined text-[13px] shrink-0 text-emerald-600">directions_bus</span>
+                                            <span class="truncate max-w-[200px]">Despacho: @booking.AssignedVehicle.LicensePlate • @(booking.AssignedDriver?.FullName ?? "Chofer asignado")</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded mt-1 inline-flex items-center gap-1" title="El vehículo se asigna al exportar el Manifiesto de la salida">
+                                            <span class="material-symbols-outlined text-[13px] shrink-0 text-amber-600">schedule</span>
+                                            <span>Por asignar en Manifiesto</span>
                                         </div>
                                     }
                                 }
@@ -423,8 +431,17 @@
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-body-sm">
                     <div>
-                        <label class="block text-[11px] font-semibold text-outline mb-1">Conductor Asignado</label>
-                        <input type="text" name="DriverName" id="manifestDriver" value="Conductor Oficial Chilón" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
+                        <label class="block text-[11px] font-semibold text-outline mb-1">Conductor Habilitado MTC <span class="text-tertiary">*</span></label>
+                        <select name="DriverId" id="manifestDriverSelect" onchange="onDriverSelected(this)" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm font-semibold focus:border-primary outline-none">
+                            <option value="" data-name="Conductor Oficial Chilón" data-license="Q-42910834" data-vehicle="">-- Seleccionar Conductor Oficial --</option>
+                            @foreach (var d in driversList)
+                            {
+                                <option value="@d.Id" data-name="@d.FullName" data-license="@d.LicenseNumber" data-vehicle="@(d.AssignedVehicleId?.ToString() ?? "")">
+                                    @d.FullName &bull; Lic: @d.LicenseNumber (@d.LicenseCategory.Split(' ')[0])
+                                </option>
+                            }
+                        </select>
+                        <input type="hidden" name="DriverName" id="manifestDriver" value="Conductor Oficial Chilón" />
                     </div>
                     <div>
                         <label class="block text-[11px] font-semibold text-outline mb-1">N° Licencia de Conducir / DNI</label>
@@ -432,7 +449,7 @@
                     </div>
                     <div>
                         <label class="block text-[11px] font-semibold text-outline mb-1">Guía Oficial de Turismo</label>
-                        <input type="text" name="GuideName" id="manifestGuide" value="Guía Oficial Turismo Chilón" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
+                        <input type="text" name="GuideName" id="manifestGuide" value="Rosa Paredes (Guía Oficial)" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
                     </div>
                     <div>
                         <label class="block text-[11px] font-semibold text-outline mb-1">Carnet DIRCETUR / DNI Guía</label>
@@ -462,6 +479,18 @@
                 <!-- Barra de Progreso de Ocupación -->
                 <div class="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
                     <div id="previewProgressBar" class="bg-primary h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+
+                <!-- BANNER DE RECOMENDACIÓN DE OPTIMIZACIÓN DE FLOTA (EVITAR PÉRDIDAS) -->
+                <div id="optimizationAdviceContainer" class="hidden p-3.5 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5">
+                    <span class="material-symbols-outlined text-[20px] shrink-0" id="optimizationIcon">tips_and_updates</span>
+                    <div class="flex-1">
+                        <strong class="block font-bold mb-0.5" id="optimizationTitle">Recomendación de Flota</strong>
+                        <p id="optimizationText" class="text-body-sm"></p>
+                        <button type="button" id="applySuggestedVehicleBtn" class="mt-2 text-xs font-bold underline cursor-pointer hidden">
+                            Cambiar a unidad sugerida
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Mensaje Explicativo de la Tabla del Excel -->
@@ -665,9 +694,82 @@ async function fetchManifestPreview() {
 
             const bar = document.getElementById('previewProgressBar');
             if (bar) bar.style.width = `${Math.min(100, data.occupancyPercentage)}%`;
+
+            // Gestión de Alertas y Recomendación de Flota (Evitar pérdidas operativas)
+            const adviceContainer = document.getElementById('optimizationAdviceContainer');
+            const adviceTitle = document.getElementById('optimizationTitle');
+            const adviceText = document.getElementById('optimizationText');
+            const adviceIcon = document.getElementById('optimizationIcon');
+            const applyBtn = document.getElementById('applySuggestedVehicleBtn');
+
+            if (adviceContainer && data.isOverCapacity) {
+                adviceContainer.className = 'p-3.5 rounded-xl border border-red-300 bg-red-50 text-red-900 flex items-start gap-2.5';
+                if (adviceIcon) {
+                    adviceIcon.className = 'material-symbols-outlined text-[20px] shrink-0 text-red-600';
+                    adviceIcon.innerText = 'warning';
+                }
+                if (adviceTitle) adviceTitle.innerText = '⚠️ Alerta de Capacidad Insuficiente';
+                if (adviceText) adviceText.innerText = data.optimizationAdvice;
+                adviceContainer.classList.remove('hidden');
+                if (applyBtn && data.suggestedVehicleId) {
+                    applyBtn.classList.remove('hidden');
+                    applyBtn.innerText = `Asignar unidad mayor: ${data.suggestedVehicleName}`;
+                    applyBtn.onclick = () => selectVehicleById(data.suggestedVehicleId);
+                } else if (applyBtn) {
+                    applyBtn.classList.add('hidden');
+                }
+            } else if (adviceContainer && data.isUnderUtilized) {
+                adviceContainer.className = 'p-3.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 flex items-start gap-2.5';
+                if (adviceIcon) {
+                    adviceIcon.className = 'material-symbols-outlined text-[20px] shrink-0 text-amber-600';
+                    adviceIcon.innerText = 'tips_and_updates';
+                }
+                if (adviceTitle) adviceTitle.innerText = '💡 Sugerencia de Eficiencia (Evitar pérdidas operativas)';
+                if (adviceText) adviceText.innerText = data.optimizationAdvice;
+                adviceContainer.classList.remove('hidden');
+                if (applyBtn && data.suggestedVehicleId) {
+                    applyBtn.classList.remove('hidden');
+                    applyBtn.innerText = `Asignar unidad sugerida: ${data.suggestedVehicleName}`;
+                    applyBtn.onclick = () => selectVehicleById(data.suggestedVehicleId);
+                } else if (applyBtn) {
+                    applyBtn.classList.add('hidden');
+                }
+            } else if (adviceContainer) {
+                adviceContainer.classList.add('hidden');
+            }
         }
     } catch (err) {
         console.error('Error fetching manifest preview:', err);
+    }
+}
+
+function onDriverSelected(select) {
+    if (!select) return;
+    const opt = select.options[select.selectedIndex];
+    const name = opt?.getAttribute('data-name') || '';
+    const license = opt?.getAttribute('data-license') || '';
+    const assignedVehicle = opt?.getAttribute('data-vehicle') || '';
+
+    const driverNameInput = document.getElementById('manifestDriver');
+    const driverLicenseInput = document.getElementById('manifestDriverLicense');
+
+    if (driverNameInput) driverNameInput.value = name;
+    if (driverLicenseInput) driverLicenseInput.value = license;
+
+    if (assignedVehicle && assignedVehicle !== '') {
+        const vSelect = document.getElementById('manifestVehicle');
+        if (vSelect && (!vSelect.value || vSelect.value === '')) {
+            vSelect.value = assignedVehicle;
+            fetchManifestPreview();
+        }
+    }
+}
+
+function selectVehicleById(vehId) {
+    const vSelect = document.getElementById('manifestVehicle');
+    if (vSelect && vehId) {
+        vSelect.value = vehId;
+        fetchManifestPreview();
     }
 }
 

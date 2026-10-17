@@ -9,6 +9,7 @@ namespace SIGETOUR.API.Models
         public Guid TourPackageId { get; set; }
         public string? ShiftName { get; set; }
         public Guid VehicleId { get; set; }
+        public Guid? DriverId { get; set; }
         public string? DriverName { get; set; } = "Conductor Asignado";
         public string? DriverLicense { get; set; } = "Q-42910834";
         public string? GuideName { get; set; } = "Guía Oficial de Turismo";
@@ -40,6 +41,11 @@ namespace SIGETOUR.API.Models
         public int OccupiedSeats { get; set; }
         public int AvailableSeats { get; set; }
         public double OccupancyPercentage { get; set; }
+        public bool IsOverCapacity { get; set; }
+        public bool IsUnderUtilized { get; set; }
+        public string OptimizationAdvice { get; set; } = string.Empty;
+        public Guid? SuggestedVehicleId { get; set; }
+        public string SuggestedVehicleName { get; set; } = string.Empty;
         public List<ManifestPassengerItem> Passengers { get; set; } = new();
     }
 }

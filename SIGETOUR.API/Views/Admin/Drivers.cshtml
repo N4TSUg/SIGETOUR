@@ -1,0 +1,244 @@
+@using SIGETOUR.API.Core.Entities
+@model IEnumerable<Driver>
+@{
+    ViewData["Title"] = "Conductores Habilitados MTC";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var drivers = Model ?? Enumerable.Empty<Driver>();
+    var currentSearch = ViewBag.CurrentSearch as string;
+    bool hasFilters = !string.IsNullOrWhiteSpace(currentSearch);
+}
+
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+        <h1 class="text-display-sm font-bold text-on-surface">Gestión de Flota y Transporte</h1>
+        <p class="text-body-lg text-on-surface-variant">Registro y control de conductores habilitados para el Manifiesto Oficial MTC y salidas de campo.</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="@Url.Action("EditDriver", "Admin")" class="bg-primary text-on-primary px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-colors inline-flex shadow-sm shrink-0">
+            <span class="material-symbols-outlined">add</span>
+            Registrar Conductor
+        </a>
+    </div>
+</div>
+
+<!-- Pestañas Operativas de Transporte -->
+<div class="flex items-center gap-2 border-b border-outline-variant/60 mb-6">
+    <a asp-action="Fleet" class="px-4 py-2.5 font-semibold text-sm text-outline hover:text-on-surface border-b-2 border-transparent transition-colors flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">directions_bus</span>
+        <span>Unidades de Flota</span>
+    </a>
+    <a asp-action="Drivers" class="px-4 py-2.5 font-bold text-sm border-b-2 border-primary text-primary flex items-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">badge</span>
+        <span>Conductores Habilitados MTC (@drivers.Count())</span>
+    </a>
+</div>
+
+<!-- Barra de Búsqueda de Conductores -->
+<div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm mb-6">
+    <form method="get" asp-action="Drivers" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <div class="md:col-span-10 relative">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+            <input type="text" name="search" value="@currentSearch" placeholder="Buscar conductor por nombre, DNI, brevete MTC o placa de vehículo..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+            @if (!string.IsNullOrWhiteSpace(currentSearch))
+            {
+                <a href="@Url.Action("Drivers", "Admin")" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface material-symbols-outlined text-[16px]">close</a>
+            }
+        </div>
+        <div class="md:col-span-2 flex items-center gap-2">
+            <button type="submit" class="w-full py-2 px-3 bg-primary hover:bg-[#0e5a52] text-on-primary font-bold text-body-sm rounded-lg flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                <span>Buscar</span>
+            </button>
+            @if (hasFilters)
+            {
+                <a href="@Url.Action("Drivers", "Admin")" class="py-2 px-2.5 bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded-lg border border-outline-variant flex items-center justify-center transition-colors cursor-pointer" title="Limpiar filtro">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
+<!-- Tabla de Conductores -->
+<div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="border-b border-outline-variant bg-surface-container-low/50 text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">
+                    <th class="py-3 px-4">Conductor</th>
+                    <th class="py-3 px-4">DNI</th>
+                    <th class="py-3 px-4">N° Brevete / Categoría MTC</th>
+                    <th class="py-3 px-4">Teléfono / WhatsApp</th>
+                    <th class="py-3 px-4">Unidad Habitual</th>
+                    <th class="py-3 px-4">Revalidación Brevete</th>
+                    <th class="py-3 px-4 text-center">Estado</th>
+                    <th class="py-3 px-4 text-right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-outline-variant/40 text-body-sm">
+                @if (drivers.Any())
+                {
+                    foreach (var d in drivers)
+                    {
+                        var initials = !string.IsNullOrWhiteSpace(d.FullName) 
+                            ? string.Concat(d.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => s[0])) 
+                            : "CH";
+
+                        bool isNearExpiry = d.LicenseExpiryDate.HasValue && d.LicenseExpiryDate.Value <= DateTime.UtcNow.AddMonths(2);
+                        bool isExpired = d.LicenseExpiryDate.HasValue && d.LicenseExpiryDate.Value < DateTime.UtcNow;
+
+                        <tr class="hover:bg-surface-container-low/50 transition-colors">
+                            <td class="py-3 px-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-label-sm uppercase">
+                                        @initials
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-on-surface">@d.FullName</div>
+                                        <div class="text-[11px] text-outline">Transporte Turístico Terrestre</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 font-mono font-medium text-on-surface">
+                                @(string.IsNullOrWhiteSpace(d.Dni) ? "-" : d.Dni)
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-mono font-bold text-primary">@d.LicenseNumber</div>
+                                <div class="text-xs text-outline">@d.LicenseCategory</div>
+                            </td>
+                            <td class="py-3 px-4">
+                                @if (!string.IsNullOrWhiteSpace(d.Phone))
+                                {
+                                    <a href="https://wa.me/51@(d.Phone.Replace(" ", "").Replace("-", ""))" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline font-medium">
+                                        <span class="material-symbols-outlined text-[15px] text-[#25D366]">chat</span>
+                                        <span>@d.Phone</span>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span class="text-outline">-</span>
+                                }
+                            </td>
+                            <td class="py-3 px-4">
+                                @if (d.AssignedVehicle != null)
+                                {
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="material-symbols-outlined text-[16px] text-primary">directions_bus</span>
+                                        <span class="font-bold text-on-surface font-mono">@d.AssignedVehicle.LicensePlate</span>
+                                    </div>
+                                    <div class="text-[11px] text-outline">@d.AssignedVehicle.Model</div>
+                                }
+                                else
+                                {
+                                    <span class="text-xs text-outline italic">Rotativo / Por despacho</span>
+                                }
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap">
+                                @if (d.LicenseExpiryDate.HasValue)
+                                {
+                                    <span class="font-medium @(isExpired ? "text-error font-bold" : (isNearExpiry ? "text-amber-600 font-bold" : "text-on-surface"))">
+                                        @d.LicenseExpiryDate.Value.ToString("dd/MM/yyyy")
+                                    </span>
+                                    @if (isExpired)
+                                    {
+                                        <span class="block text-[10px] text-error font-bold">VENCIDO</span>
+                                    }
+                                    else if (isNearExpiry)
+                                    {
+                                        <span class="block text-[10px] text-amber-600 font-bold">Por vencer</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-outline">Vigente MTC</span>
+                                }
+                            </td>
+                            <td class="py-3 px-4 text-center whitespace-nowrap">
+                                @if (d.IsActive)
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Habilitado
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Inactivo
+                                    </span>
+                                }
+                            </td>
+                            <td class="py-3 px-4 text-right whitespace-nowrap">
+                                <div class="flex items-center justify-end gap-1">
+                                    <a href="@Url.Action("EditDriver", "Admin", new { id = d.Id })" class="p-1.5 rounded-lg hover:bg-surface-container text-primary transition-colors" title="Editar Conductor">
+                                        <span class="material-symbols-outlined text-[19px]">edit</span>
+                                    </a>
+                                    <button type="button" onclick="confirmDeleteDriver('@d.Id', '@d.FullName')" class="p-1.5 rounded-lg hover:bg-surface-container text-tertiary transition-colors cursor-pointer" title="Dar de baja">
+                                        <span class="material-symbols-outlined text-[19px]">delete</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="8" class="py-12 text-center text-outline">
+                            <span class="material-symbols-outlined text-4xl mb-2 text-outline block">badge</span>
+                            <p class="font-semibold text-on-surface">No se encontraron conductores registrados.</p>
+                            <p class="text-xs text-outline mt-1">Registra los choferes oficiales para asignarlos automáticamente en los manifiestos de viaje.</p>
+                            <a href="@Url.Action("EditDriver", "Admin")" class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-on-primary rounded-lg font-bold text-xs shadow-sm">
+                                <span class="material-symbols-outlined text-[16px]">add</span>
+                                Registrar Primer Conductor
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (ViewBag.Pagination != null)
+{
+    @await Html.PartialAsync("_AdminPagination", (object)ViewBag.Pagination)
+}
+
+<!-- Modal de Eliminación de Conductor -->
+<div id="deleteDriverModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm transition-all duration-200 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant relative">
+        <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-red-100 border border-red-200 text-red-600 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[28px]">badge</span>
+            </div>
+            <div>
+                <h3 class="text-headline-sm font-bold text-on-surface leading-snug">¿Dar de baja al conductor?</h3>
+                <p id="deleteDriverNameSpan" class="text-body-sm text-outline mt-1 font-semibold"></p>
+            </div>
+        </div>
+
+        <p class="text-body-sm text-on-surface-variant mt-4 leading-relaxed">
+            Esta acción deshabilitará al conductor del despacho activo y ya no aparecerá sugerido en los nuevos Manifiestos de Pasajeros MTC.
+        </p>
+
+        <form asp-action="DeleteDriver" method="post" class="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="deleteDriverIdInput" name="id" value="" />
+            <button type="button" onclick="document.getElementById('deleteDriverModal').classList.add('hidden')" class="px-5 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md font-bold hover:bg-surface-container transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-label-md font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">delete</span>
+                Confirmar Baja
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function confirmDeleteDriver(id, name) {
+        document.getElementById('deleteDriverIdInput').value = id;
+        document.getElementById('deleteDriverNameSpan').innerText = name;
+        document.getElementById('deleteDriverModal').classList.remove('hidden');
+    }
+</script>

@@ -26,11 +26,37 @@ namespace SIGETOUR.API.Infrastructure.Data
         public DbSet<CashTransaction> CashTransactions { get; set; }
         public DbSet<PettyCashAccount> PettyCashAccounts { get; set; }
         public DbSet<PettyCashMovement> PettyCashMovements { get; set; }
+        public DbSet<Driver> Drivers { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
             
+            // Relaciones para Driver y Booking
+            modelBuilder.Entity<Booking>()
+                .HasOne(b => b.AssignedVehicle)
+                .WithMany()
+                .HasForeignKey(b => b.AssignedVehicleId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Booking>()
+                .HasOne(b => b.AssignedDriver)
+                .WithMany()
+                .HasForeignKey(b => b.AssignedDriverId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Driver>()
+                .HasOne(d => d.AssignedVehicle)
+                .WithMany()
+                .HasForeignKey(d => d.AssignedVehicleId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Booking>()
+                .HasMany(b => b.Items)
+                .WithOne(i => i.Booking)
+                .HasForeignKey(i => i.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // Aplicar configuraciones de entidades
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
         }

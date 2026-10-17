@@ -99,6 +99,80 @@ using (var scope = app.Services.CreateScope())
     try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Categories"" (""Id"" uuid NOT NULL PRIMARY KEY, ""Name"" text NOT NULL, ""Description"" text, ""Icon"" text, ""IsActive"" boolean NOT NULL DEFAULT true, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP);"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" DROP COLUMN IF EXISTS ""Category"";"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" ADD COLUMN IF NOT EXISTS ""CategoryId"" uuid REFERENCES ""Categories""(""Id"") ON DELETE SET NULL;"); } catch { }
+    try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Drivers"" (
+        ""Id"" uuid NOT NULL PRIMARY KEY,
+        ""FullName"" text NOT NULL DEFAULT '',
+        ""Dni"" text NOT NULL DEFAULT '',
+        ""LicenseNumber"" text NOT NULL DEFAULT '',
+        ""LicenseCategory"" text NOT NULL DEFAULT 'A-IIIa (Especial Transporte Turístico)',
+        ""LicenseExpiryDate"" timestamp with time zone NULL,
+        ""Phone"" text NOT NULL DEFAULT '',
+        ""IsActive"" boolean NOT NULL DEFAULT true,
+        ""AssignedVehicleId"" uuid REFERENCES ""Vehicles""(""Id"") ON DELETE SET NULL,
+        ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );"); } catch { }
+    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""AssignedVehicleId"" uuid REFERENCES ""Vehicles""(""Id"") ON DELETE SET NULL;"); } catch { }
+    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""AssignedDriverId"" uuid REFERENCES ""Drivers""(""Id"") ON DELETE SET NULL;"); } catch { }
+    try
+    {
+        if (!db.Drivers.Any())
+        {
+            var v1 = db.Vehicles.FirstOrDefault(v => v.LicensePlate == "T7C-841") ?? db.Vehicles.FirstOrDefault();
+            var v2 = db.Vehicles.Skip(1).FirstOrDefault();
+            var v3 = db.Vehicles.Skip(2).FirstOrDefault();
+
+            var d1 = new SIGETOUR.API.Core.Entities.Driver
+            {
+                Id = Guid.NewGuid(),
+                FullName = "Carlos Mendoza Silva",
+                Dni = "42910834",
+                LicenseNumber = "Q-42910834",
+                LicenseCategory = "A-IIIa (Especial Transporte Turístico)",
+                LicenseExpiryDate = DateTime.UtcNow.AddYears(2),
+                Phone = "976 123 456",
+                IsActive = true,
+                AssignedVehicleId = v1?.Id
+            };
+            var d2 = new SIGETOUR.API.Core.Entities.Driver
+            {
+                Id = Guid.NewGuid(),
+                FullName = "Jorge Llanos Bazán",
+                Dni = "41829301",
+                LicenseNumber = "Q-41829301",
+                LicenseCategory = "A-IIIa (Especial Transporte Turístico)",
+                LicenseExpiryDate = DateTime.UtcNow.AddYears(1).AddMonths(6),
+                Phone = "976 234 567",
+                IsActive = true,
+                AssignedVehicleId = v2?.Id
+            };
+            var d3 = new SIGETOUR.API.Core.Entities.Driver
+            {
+                Id = Guid.NewGuid(),
+                FullName = "Manuel Tejada Quispe",
+                Dni = "45019283",
+                LicenseNumber = "Q-45019283",
+                LicenseCategory = "A-IIIc (Profesional Superior)",
+                LicenseExpiryDate = DateTime.UtcNow.AddYears(3),
+                Phone = "976 345 678",
+                IsActive = true,
+                AssignedVehicleId = v3?.Id
+            };
+            var d4 = new SIGETOUR.API.Core.Entities.Driver
+            {
+                Id = Guid.NewGuid(),
+                FullName = "Hernán Villanueva Cabrera",
+                Dni = "40918273",
+                LicenseNumber = "Q-40918273",
+                LicenseCategory = "A-IIIa (Especial Transporte Turístico)",
+                LicenseExpiryDate = DateTime.UtcNow.AddMonths(9),
+                Phone = "976 456 789",
+                IsActive = true
+            };
+            db.Drivers.AddRange(d1, d2, d3, d4);
+            db.SaveChanges();
+        }
+    }
+    catch { }
     try
     {
         if (!db.Categories.Any())

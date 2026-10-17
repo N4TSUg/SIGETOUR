@@ -171,32 +171,40 @@ namespace SIGETOUR.API.Controllers.UI
                 }).ToList();
             }
 
-            // Tablero de Salidas y Despacho en Vivo de Hoy
+            // Tablero de Salidas y Despacho en Vivo de Hoy con Conductores Reales
             var departures = new List<DashboardDepartureItem>();
             var sampleTimes = new[] { "09:00 AM", "09:30 AM", "10:00 AM", "02:30 PM", "03:00 PM" };
-            var sampleStaff = new[] { 
-                ("Carlos Mendoza", "Rosa Paredes (Coordinadora)"), 
-                ("Jorge Llanos", "Operaciones de Campo"), 
-                ("Manuel Tejada", "Equipo de Despacho"), 
-                ("Hernán Villanueva", "David Soto (Guía Oficial)") 
-            };
+            var activeDrivers = await _context.Drivers
+                .Include(d => d.AssignedVehicle)
+                .Where(d => d.IsActive)
+                .OrderBy(d => d.FullName)
+                .ToListAsync();
 
             int depIdx = 0;
             foreach (var tour in activeToursList.Take(5))
             {
-                var veh = vehicles.Count > depIdx ? vehicles[depIdx] : vehicles.FirstOrDefault();
-                var staff = sampleStaff[depIdx % sampleStaff.Length];
-                var time = sampleTimes[depIdx % sampleTimes.Length];
-
                 var tourBookings = todayBookings.Where(b => b.Items.Any(i => i.TourPackageId == tour.Id)).ToList();
                 var bookedPax = tourBookings.Sum(b => b.Items.Where(i => i.TourPackageId == tour.Id).Sum(i => i.Passengers));
+
+                var assignedBooking = tourBookings.FirstOrDefault(b => b.AssignedVehicle != null);
+                var veh = assignedBooking?.AssignedVehicle 
+                          ?? (activeDrivers.Count > depIdx && activeDrivers[depIdx].AssignedVehicle != null 
+                              ? activeDrivers[depIdx].AssignedVehicle 
+                              : (vehicles.Count > depIdx ? vehicles[depIdx] : vehicles.FirstOrDefault()));
+
+                var assignedDriver = assignedBooking?.AssignedDriver 
+                                     ?? (activeDrivers.Count > depIdx ? activeDrivers[depIdx] : activeDrivers.FirstOrDefault());
+
+                var driverName = assignedDriver != null ? assignedDriver.FullName : "Conductor Oficial Habilitado MTC";
+                var guideName = "Rosa Paredes (Guía Oficial DIRCETUR)";
+                var time = sampleTimes[depIdx % sampleTimes.Length];
                 var capacity = veh != null && veh.SeatCapacity > 0 ? veh.SeatCapacity : 19;
 
                 string status;
                 string statusColor;
                 if (depIdx == 0) { status = "En Ruta (Los Frailones)"; statusColor = "emerald"; }
                 else if (depIdx == 1) { status = "Abordando en Jr. 2 de Mayo 569"; statusColor = "amber"; }
-                else if (depIdx == 2) { status = "Recojo: Hotel Costa del Sol"; statusColor = "sky"; }
+                else if (depIdx == 2) { status = "Recojo: Centro Histórico"; statusColor = "sky"; }
                 else { status = "Programado / Venta Abierta"; statusColor = "slate"; }
 
                 departures.Add(new DashboardDepartureItem
@@ -206,9 +214,9 @@ namespace SIGETOUR.API.Controllers.UI
                     Subtitle = tour.Duration + (tour.Category != null ? " • " + tour.Category.Name : ""),
                     VehicleModel = veh != null ? veh.Model : "Mercedes-Benz Sprinter 515",
                     LicensePlate = veh != null ? veh.LicensePlate : "T7C-841",
-                    DriverName = staff.Item1,
-                    GuideName = staff.Item2,
-                    BookedSeats = bookedPax > 0 ? bookedPax : (capacity - ((depIdx + 1) * 2)),
+                    DriverName = driverName,
+                    GuideName = guideName,
+                    BookedSeats = bookedPax > 0 ? bookedPax : Math.Max(2, capacity - ((depIdx + 1) * 3)),
                     TotalCapacity = capacity,
                     Status = status,
                     StatusColor = statusColor,
@@ -327,6 +335,8 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(b => b.Items)
                     .ThenInclude(i => i.TourPackage)
                         .ThenInclude(t => t.DefaultVehicle)
+                .Include(b => b.AssignedVehicle)
+                .Include(b => b.AssignedDriver)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -400,7 +410,12 @@ namespace SIGETOUR.API.Controllers.UI
                 .ToListAsync();
             ViewBag.AvailableVehicles = await _context.Vehicles
                 .Where(v => v.IsActive)
-                .OrderBy(v => v.Model)
+                .OrderBy(v => v.SeatCapacity)
+                .ToListAsync();
+            ViewBag.Drivers = await _context.Drivers
+                .Include(d => d.AssignedVehicle)
+                .Where(d => d.IsActive)
+                .OrderBy(d => d.FullName)
                 .ToListAsync();
 
             var routeParams = new Dictionary<string, string>();
@@ -454,6 +469,7 @@ namespace SIGETOUR.API.Controllers.UI
                         Date = DateTime.TryParse(Request.Query["date"].ToString(), out var d) ? d : DateTime.Today,
                         ShiftName = Request.Query["shiftName"].ToString(),
                         VehicleId = Guid.TryParse(Request.Query["vehicleId"].ToString(), out var vid) ? vid : Guid.Empty,
+                        DriverId = Guid.TryParse(Request.Query["driverId"].ToString(), out var did) ? did : (Guid?)null,
                         DriverName = Request.Query["driverName"].ToString(),
                         DriverLicense = Request.Query["driverLicense"].ToString(),
                         GuideName = Request.Query["guideName"].ToString(),
@@ -473,6 +489,45 @@ namespace SIGETOUR.API.Controllers.UI
                 var fileBytes = await _manifestService.GenerateManifestExcelAsync(req);
                 var tour = await _context.TourPackages.FindAsync(req.TourPackageId);
                 var vehicle = await _context.Vehicles.FindAsync(req.VehicleId);
+
+                // Enlazar vehículo y conductor a las reservas correspondientes para esta salida oficial
+                var matchingBookings = await _context.Bookings
+                    .Include(b => b.Items)
+                    .Where(b => b.Status != BookingStatus.Cancelled &&
+                                b.Items.Any(i => i.TourPackageId == req.TourPackageId))
+                    .ToListAsync();
+
+                matchingBookings = matchingBookings.Where(b =>
+                    b.TravelDate.Date == req.Date.Date ||
+                    b.TravelDate.ToUniversalTime().Date == req.Date.Date ||
+                    b.TravelDate.ToString("yyyy-MM-dd") == req.Date.ToString("yyyy-MM-dd")
+                ).ToList();
+
+                if (!string.IsNullOrWhiteSpace(req.ShiftName) &&
+                    !req.ShiftName.Equals("Todos", StringComparison.OrdinalIgnoreCase) &&
+                    !req.ShiftName.StartsWith("Todos", StringComparison.OrdinalIgnoreCase))
+                {
+                    var cleanShift = req.ShiftName.ToLower().Replace("turno", "").Trim();
+                    var keyword = cleanShift.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? cleanShift;
+                    matchingBookings = matchingBookings.Where(b =>
+                        string.IsNullOrWhiteSpace(b.ShiftName) ||
+                        b.ShiftName.ToLower().Contains(keyword) ||
+                        keyword.Contains(b.ShiftName.ToLower())
+                    ).ToList();
+                }
+
+                foreach (var b in matchingBookings)
+                {
+                    if (req.VehicleId != Guid.Empty)
+                    {
+                        b.AssignedVehicleId = req.VehicleId;
+                    }
+                    if (req.DriverId.HasValue && req.DriverId.Value != Guid.Empty)
+                    {
+                        b.AssignedDriverId = req.DriverId;
+                    }
+                }
+                await _context.SaveChangesAsync();
 
                 var cleanTour = tour != null ? string.Concat(tour.Title.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_") : "Tour";
                 var cleanPlate = vehicle != null ? vehicle.LicensePlate.Replace(" ", "-") : "Unidad";
@@ -748,6 +803,141 @@ namespace SIGETOUR.API.Controllers.UI
             };
 
             return View(vehicles);
+        }
+
+        // ==========================================
+        // GESTIÓN DE CONDUCTORES (MTC TURISMO)
+        // ==========================================
+        [HttpGet]
+        public async Task<IActionResult> Drivers(string? search, int page = 1)
+        {
+            var query = _context.Drivers
+                .Include(d => d.AssignedVehicle)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(d =>
+                    d.FullName.ToLower().Contains(term) ||
+                    d.Dni.ToLower().Contains(term) ||
+                    d.LicenseNumber.ToLower().Contains(term) ||
+                    d.Phone.ToLower().Contains(term) ||
+                    (d.AssignedVehicle != null && (d.AssignedVehicle.LicensePlate.ToLower().Contains(term) || d.AssignedVehicle.Model.ToLower().Contains(term))));
+            }
+
+            int totalItems = await query.CountAsync();
+            int pageSize = 12;
+            int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            var drivers = await query
+                .OrderBy(d => d.FullName)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            ViewBag.CurrentSearch = search;
+            ViewBag.AvailableVehicles = await _context.Vehicles.Where(v => v.IsActive).OrderBy(v => v.LicensePlate).ToListAsync();
+
+            var routeParams = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(search)) routeParams["search"] = search;
+
+            ViewBag.Pagination = new PaginationViewModel
+            {
+                Action = "Drivers",
+                Controller = "Admin",
+                CurrentPage = page,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                PageSize = pageSize,
+                RouteParams = routeParams
+            };
+
+            return View(drivers);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> EditDriver(Guid? id)
+        {
+            ViewBag.Vehicles = await _context.Vehicles.Where(v => v.IsActive).OrderBy(v => v.LicensePlate).ToListAsync();
+            if (id == null || id == Guid.Empty)
+            {
+                return View(new Driver());
+            }
+
+            var driver = await _context.Drivers
+                .Include(d => d.AssignedVehicle)
+                .FirstOrDefaultAsync(d => d.Id == id.Value);
+
+            if (driver == null) return NotFound();
+            return View(driver);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditDriver(Driver model)
+        {
+            if (string.IsNullOrWhiteSpace(model.FullName) || string.IsNullOrWhiteSpace(model.LicenseNumber))
+            {
+                ModelState.AddModelError("", "El nombre y el número de licencia son obligatorios.");
+                ViewBag.Vehicles = await _context.Vehicles.Where(v => v.IsActive).OrderBy(v => v.LicensePlate).ToListAsync();
+                return View(model);
+            }
+
+            if (model.LicenseExpiryDate.HasValue)
+            {
+                model.LicenseExpiryDate = DateTime.SpecifyKind(model.LicenseExpiryDate.Value, DateTimeKind.Utc);
+            }
+
+            if (model.Id == Guid.Empty)
+            {
+                model.Id = Guid.NewGuid();
+                model.CreatedAt = DateTime.UtcNow;
+                if (model.AssignedVehicleId == Guid.Empty) model.AssignedVehicleId = null;
+                _context.Drivers.Add(model);
+            }
+            else
+            {
+                var existing = await _context.Drivers.FindAsync(model.Id);
+                if (existing == null) return NotFound();
+
+                existing.FullName = model.FullName;
+                existing.Dni = model.Dni ?? string.Empty;
+                existing.LicenseNumber = model.LicenseNumber;
+                existing.LicenseCategory = model.LicenseCategory ?? "A-IIIa (Especial Transporte Turístico)";
+                existing.LicenseExpiryDate = model.LicenseExpiryDate;
+                existing.Phone = model.Phone ?? string.Empty;
+                existing.IsActive = model.IsActive;
+                existing.AssignedVehicleId = model.AssignedVehicleId != Guid.Empty ? model.AssignedVehicleId : null;
+                _context.Drivers.Update(existing);
+            }
+
+            await _context.SaveChangesAsync();
+            return RedirectToAction("Drivers");
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteDriver(Guid id)
+        {
+            var driver = await _context.Drivers.FindAsync(id);
+            if (driver != null)
+            {
+                var hasBookings = await _context.Bookings.AnyAsync(b => b.AssignedDriverId == id);
+                if (hasBookings)
+                {
+                    driver.IsActive = false;
+                    _context.Drivers.Update(driver);
+                }
+                else
+                {
+                    _context.Drivers.Remove(driver);
+                }
+                await _context.SaveChangesAsync();
+            }
+            return RedirectToAction("Drivers");
         }
 
         public async Task<IActionResult> Users(string? search, int page = 1)

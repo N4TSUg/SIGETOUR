@@ -87,6 +87,45 @@ namespace SIGETOUR.API.Application.Services
             int available = Math.Max(0, totalSeats - occupied);
             double occupancyPct = totalSeats > 0 ? Math.Round((double)occupied / totalSeats * 100.0, 1) : 0;
 
+            // Lógica de Optimización de Flota para evitar pérdidas operativas
+            var allActiveVehicles = await _context.Vehicles.Where(v => v.IsActive).OrderBy(v => v.SeatCapacity).ToListAsync();
+            int passengerCount = passengerList.Count;
+            bool isOverCapacity = passengerCount > totalSeats;
+            bool isUnderUtilized = false;
+            string advice = string.Empty;
+            Guid? suggestedId = null;
+            string suggestedName = string.Empty;
+
+            if (isOverCapacity)
+            {
+                var largerVehicle = allActiveVehicles.FirstOrDefault(v => v.SeatCapacity >= passengerCount);
+                if (largerVehicle != null && largerVehicle.Id != vehicle?.Id)
+                {
+                    advice = $"Capacidad insuficiente: Hay {passengerCount} pasajeros y la unidad '{vehicle?.Model}' tiene solo {totalSeats} asientos. Se recomienda asignar '{largerVehicle.Model} ({largerVehicle.LicensePlate})' con {largerVehicle.SeatCapacity} asientos.";
+                    suggestedId = largerVehicle.Id;
+                    suggestedName = $"{largerVehicle.Model} ({largerVehicle.LicensePlate})";
+                }
+                else
+                {
+                    advice = $"Capacidad insuficiente: Hay {passengerCount} pasajeros para {totalSeats} asientos. Considera programar un segundo vehículo o turno adicional.";
+                }
+            }
+            else if (passengerCount > 0 && totalSeats >= 18 && passengerCount <= 14)
+            {
+                var optimalSmallerVehicle = allActiveVehicles
+                    .Where(v => v.SeatCapacity >= passengerCount && v.SeatCapacity < totalSeats)
+                    .OrderBy(v => v.SeatCapacity)
+                    .FirstOrDefault();
+
+                if (optimalSmallerVehicle != null && optimalSmallerVehicle.Id != vehicle?.Id)
+                {
+                    isUnderUtilized = true;
+                    advice = $"Optimización de costos: Tienes {passengerCount} pasajeros confirmados. En lugar de enviar una unidad de {totalSeats} plazas, se sugiere asignar '{optimalSmallerVehicle.Model} ({optimalSmallerVehicle.LicensePlate})' de {optimalSmallerVehicle.SeatCapacity} plazas para ahorrar combustible y evitar pérdidas.";
+                    suggestedId = optimalSmallerVehicle.Id;
+                    suggestedName = $"{optimalSmallerVehicle.Model} ({optimalSmallerVehicle.LicensePlate})";
+                }
+            }
+
             return new ManifestPreviewDto
             {
                 TourTitle = tour?.Title ?? "Circuito Turístico",
@@ -98,6 +137,11 @@ namespace SIGETOUR.API.Application.Services
                 OccupiedSeats = occupied,
                 AvailableSeats = available,
                 OccupancyPercentage = occupancyPct,
+                IsOverCapacity = isOverCapacity,
+                IsUnderUtilized = isUnderUtilized,
+                OptimizationAdvice = advice,
+                SuggestedVehicleId = suggestedId,
+                SuggestedVehicleName = suggestedName,
                 Passengers = previewSeats
             };
         }
@@ -109,6 +153,17 @@ namespace SIGETOUR.API.Application.Services
                 .Include(t => t.DefaultVehicle)
                 .FirstOrDefaultAsync(t => t.Id == request.TourPackageId)
                 ?? throw new Exception("Tour no encontrado.");
+
+            // Si se seleccionó un DriverId de la base de datos, extraer sus datos oficiales
+            if (request.DriverId.HasValue && request.DriverId.Value != Guid.Empty)
+            {
+                var driverDb = await _context.Drivers.FindAsync(request.DriverId.Value);
+                if (driverDb != null)
+                {
+                    request.DriverName = driverDb.FullName;
+                    request.DriverLicense = driverDb.LicenseNumber;
+                }
+            }
 
             Vehicle? vehicle = null;
             if (request.VehicleId != Guid.Empty)

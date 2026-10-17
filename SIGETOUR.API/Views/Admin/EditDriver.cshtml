@@ -1,0 +1,153 @@
+@model SIGETOUR.API.Core.Entities.Driver
+@{
+    bool isCreate = Model.Id == Guid.Empty;
+    ViewData["Title"] = isCreate ? "Registrar Conductor" : "Editar Conductor – " + Model.FullName;
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var vehicles = ViewBag.Vehicles as IEnumerable<SIGETOUR.API.Core.Entities.Vehicle> ?? Enumerable.Empty<SIGETOUR.API.Core.Entities.Vehicle>();
+}
+
+<div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-5xl mx-auto">
+    <form asp-action="EditDriver" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="CreatedAt" />
+
+        <!-- Header -->
+        <div class="sm:flex sm:justify-between sm:items-center mb-8">
+            <div class="flex items-center gap-3">
+                <a href="@Url.Action("Drivers", "Admin")" class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">arrow_back</span>
+                </a>
+                <div>
+                    <h1 class="text-headline-md font-headline-md font-bold text-on-surface">
+                        @(isCreate ? "Registrar Nuevo Conductor Oficial" : "Editar Conductor – " + Model.FullName)
+                    </h1>
+                    <p class="text-body-md text-on-surface-variant mt-0.5">Ficha de habilitación MTC para asignación de flota y emisión de Manifiestos de Pasajeros.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-4 sm:mt-0">
+                <a href="@Url.Action("Drivers", "Admin")" class="px-4 py-2.5 rounded-lg border border-outline text-on-surface-variant hover:bg-surface-container transition-colors font-label-md">Cancelar</a>
+                <button type="submit" class="px-6 py-2.5 rounded-lg bg-primary text-on-primary font-label-lg hover:bg-primary/90 transition-all flex items-center gap-2 shadow-md cursor-pointer">
+                    <span class="material-symbols-outlined text-xl">save</span>
+                    Guardar Conductor
+                </button>
+            </div>
+        </div>
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="p-4 mb-6 rounded-xl bg-error-container text-error text-body-sm border border-error/20 flex items-center gap-3">
+                <span class="material-symbols-outlined text-xl">error</span>
+                <div asp-validation-summary="All"></div>
+            </div>
+        }
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Left 2 cols: Información del Conductor -->
+            <div class="md:col-span-2 space-y-6">
+                <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">person</span>
+                        <h2 class="text-title-md font-bold text-on-surface">Datos Personales y de Contacto</h2>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div class="sm:col-span-2">
+                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Nombre Completo y Apellidos <span class="text-tertiary">*</span></label>
+                            <input asp-for="FullName" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. Carlos Mendoza Silva" required />
+                        </div>
+                        <div>
+                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">N° de DNI <span class="text-tertiary">*</span></label>
+                            <input asp-for="Dni" maxlength="8" class="w-full bg-surface-container-low text-on-surface font-mono py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. 42910834" required />
+                        </div>
+                        <div>
+                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Teléfono Móvil / WhatsApp</label>
+                            <div class="relative">
+                                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">phone</span>
+                                <input asp-for="Phone" class="w-full bg-surface-container-low text-on-surface pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. 976 123 456" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Licencia MTC -->
+                <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">badge</span>
+                        <h2 class="text-title-md font-bold text-on-surface">Habilitación y Licencia de Conducir MTC</h2>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">N° Brevete / Licencia MTC <span class="text-tertiary">*</span></label>
+                            <div class="relative">
+                                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">pin</span>
+                                <input asp-for="LicenseNumber" class="w-full bg-surface-container-low text-on-surface font-mono font-bold tracking-widest pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 uppercase outline-none text-body-md" placeholder="Ej. Q-42910834" required />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Categoría Oficial MTC</label>
+                            <select asp-for="LicenseCategory" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md font-medium">
+                                <option value="A-IIIa (Especial Transporte Turístico)">A-IIIa (Especial Transporte Turístico)</option>
+                                <option value="A-IIIc (Profesional Superior Interprovincial)">A-IIIc (Profesional Superior Interprovincial)</option>
+                                <option value="A-IIIb (Vehículos de Carga / Pesados)">A-IIIb (Vehículos de Carga / Pesados)</option>
+                                <option value="A-IIb (Minibús / Microbús Pasajeros)">A-IIb (Minibús / Microbús Pasajeros)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Fecha de Revalidación / Vencimiento</label>
+                            <input asp-for="LicenseExpiryDate" type="date" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md" />
+                        </div>
+                        <div>
+                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Estado Operativo</label>
+                            <div class="flex items-center gap-4 mt-2">
+                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" asp-for="IsActive" value="true" class="text-primary focus:ring-primary" />
+                                    <span class="text-body-sm font-bold text-emerald-800">Habilitado</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" asp-for="IsActive" value="false" class="text-primary focus:ring-primary" />
+                                    <span class="text-body-sm text-outline">Inactivo</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right 1 col: Asignación Vehicular Habitual -->
+            <div class="space-y-6">
+                <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+                    <div class="px-5 py-4 border-b border-outline-variant bg-surface-bright flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">directions_bus</span>
+                        <h2 class="text-title-md font-bold text-on-surface">Unidad Asignada Habitual</h2>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <p class="text-body-sm text-on-surface-variant leading-relaxed">
+                            Puedes vincular la unidad vehicular que este conductor conduce habitualmente. Al generar el Manifiesto de viaje se preseleccionará automáticamente.
+                        </p>
+                        <div>
+                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Vehículo de la Flota</label>
+                            <select asp-for="AssignedVehicleId" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md font-medium">
+                                <option value="">-- Sin unidad fija (Rotativo) --</option>
+                                @foreach (var v in vehicles)
+                                {
+                                    <option value="@v.Id" selected="@(Model.AssignedVehicleId == v.Id)">
+                                        @v.Model (@v.LicensePlate) &bull; @v.SeatCapacity plazas
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="p-3 bg-surface-container-low rounded-xl text-xs text-outline leading-relaxed border border-outline-variant/40">
+                            <span class="material-symbols-outlined text-sm text-primary align-middle">info</span>
+                            Recuerda: En cada salida puedes optimizar y cambiar la unidad asignada al momento de emitir el manifiesto para evitar pérdidas según la cantidad de pasajeros.
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3 px-4 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer">
+                    <span class="material-symbols-outlined">save</span>
+                    Guardar Datos del Conductor
+                </button>
+            </div>
+        </div>
+    </form>
+</div>

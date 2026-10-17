@@ -82,15 +82,19 @@ namespace SIGETOUR.Tests.Helpers
                 PaidAmount = 100,
                 Status = BookingStatus.Confirmed
             };
-            booking.Items.Add(new BookingItem
+            var item = new BookingItem
             {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
                 TourPackageId = tour.Id,
                 Passengers = 2,
                 UnitPrice = 50,
                 SubTotal = 100,
                 Booking = booking
-            });
+            };
+            booking.Items.Add(item);
             context.Bookings.Add(booking);
+            context.BookingItems.Add(item);
 
             var cashShift = new CashRegisterShift
             {

@@ -34,6 +34,18 @@ namespace SIGETOUR.API.Core.Entities
         /// <summary>Pasajeros adicionales almacenados en JSON</summary>
         public string AdditionalPassengersJson { get; set; } = "[]";
 
+        /// <summary>
+        /// Vehículo enlazado en el momento del despacho / manifiesto (no en la creación)
+        /// </summary>
+        public Guid? AssignedVehicleId { get; set; }
+        public Vehicle? AssignedVehicle { get; set; }
+
+        /// <summary>
+        /// Conductor enlazado en el momento del despacho / manifiesto (no en la creación)
+        /// </summary>
+        public Guid? AssignedDriverId { get; set; }
+        public Driver? AssignedDriver { get; set; }
+
         public ICollection<BookingItem> Items { get; set; } = new List<BookingItem>();
     }
 

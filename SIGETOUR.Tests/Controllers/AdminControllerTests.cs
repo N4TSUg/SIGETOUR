@@ -4,7 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Moq;
+using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Models;
 using SIGETOUR.Tests.Helpers;
@@ -450,6 +452,115 @@ namespace SIGETOUR.Tests.Controllers
             // Assert
             var jsonResult = Assert.IsType<JsonResult>(result);
             Assert.NotNull(jsonResult.Value);
+        }
+
+        [Fact]
+        public async Task Drivers_ReturnsView_WithDriversList()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var driver = new Driver
+            {
+                Id = Guid.NewGuid(),
+                FullName = "Carlos Mendoza Silva",
+                LicenseNumber = "Q-42910834",
+                IsActive = true
+            };
+            context.Drivers.Add(driver);
+            context.SaveChanges();
+
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.Drivers(null);
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsAssignableFrom<IEnumerable<Driver>>(viewResult.Model);
+            Assert.Contains(model, d => d.FullName == "Carlos Mendoza Silva");
+        }
+
+        [Fact]
+        public async Task EditDriver_ValidModel_SavesDriver()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = TestHelpers.CreateAdminController(context);
+
+            var driver = new Driver
+            {
+                Id = Guid.Empty,
+                FullName = "Nuevo Conductor Test",
+                Dni = "70809010",
+                LicenseNumber = "Q-70809010",
+                LicenseCategory = "A-IIIa",
+                Phone = "999111222",
+                IsActive = true
+            };
+
+            // Act
+            var result = await controller.EditDriver(driver);
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Drivers", redirectResult.ActionName);
+            Assert.True(context.Drivers.Any(d => d.FullName == "Nuevo Conductor Test"));
+        }
+
+        [Fact]
+        public async Task ExportManifestExcel_LinksAssignedVehicleAndDriver_ToMatchingBookings()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+
+            var booking = context.Bookings.Include(b => b.Items).First();
+            var tourId = booking.Items.First().TourPackageId;
+            var tour = context.TourPackages.First(t => t.Id == tourId);
+            var vehicle = context.Vehicles.First();
+
+            // Verificamos estado inicial: Sin vehículo ni conductor asignados
+            Assert.Null(booking.AssignedVehicleId);
+            Assert.Null(booking.AssignedDriverId);
+
+            var driver = new Driver
+            {
+                Id = Guid.NewGuid(),
+                FullName = "Conductor Despacho Oficial",
+                Dni = "40102030",
+                LicenseNumber = "Q-40102030",
+                IsActive = true
+            };
+            context.Drivers.Add(driver);
+            context.SaveChanges();
+
+            var mockManifest = new Mock<IManifestExportService>();
+            mockManifest.Setup(m => m.GenerateManifestExcelAsync(It.IsAny<ManifestExportRequest>()))
+                .ReturnsAsync(new byte[] { 1, 2, 3 });
+
+            var controller = TestHelpers.CreateAdminController(context, manifestService: mockManifest);
+
+            var request = new ManifestExportRequest
+            {
+                Date = booking.TravelDate.Date,
+                TourPackageId = tour.Id,
+                VehicleId = vehicle.Id,
+                DriverId = driver.Id,
+                ShiftName = booking.ShiftName
+            };
+
+            // Act: El despachador genera el manifiesto oficial para esa salida
+            var result = await controller.ExportManifestExcel(request, null);
+
+            // Assert: Se devuelve el archivo Excel y la reserva queda enlazada con el vehículo y chofer
+            Assert.IsType<FileContentResult>(result);
+
+            var updatedBooking = context.Bookings.Find(booking.Id);
+            Assert.NotNull(updatedBooking);
+            Assert.Equal(vehicle.Id, updatedBooking.AssignedVehicleId);
+            Assert.Equal(driver.Id, updatedBooking.AssignedDriverId);
         }
     }
 }
