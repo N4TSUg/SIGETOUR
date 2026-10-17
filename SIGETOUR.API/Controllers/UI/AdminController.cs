@@ -2582,7 +2582,7 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(Cash), new { tab = "petty" });
             }
 
-            m.MovementType = movementType == "Reposicion" ? "Reposicion" : "Egreso";
+            m.MovementType = (movementType == "Reposicion" || movementType == "Ingreso") ? movementType : "Egreso";
             m.ExpenseCategory = string.IsNullOrWhiteSpace(expenseCategory) ? m.ExpenseCategory : expenseCategory;
             m.VoucherType = voucherType;
             m.VoucherNumber = voucherNumber;

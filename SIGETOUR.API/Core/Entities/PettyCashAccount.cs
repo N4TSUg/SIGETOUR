@@ -15,19 +15,30 @@ namespace SIGETOUR.API.Core.Entities
 
         public ICollection<PettyCashMovement> Movements { get; set; } = new List<PettyCashMovement>();
 
-        // Propiedades calculadas
-        public decimal TotalSpent => Movements
+        // Total histórico de egresos
+        public decimal TotalSpentAllTime => Movements
             .Where(m => m.MovementType == "Egreso")
             .Sum(m => m.Amount);
 
-        public decimal TotalReplenished => Movements
-            .Where(m => m.MovementType == "Reposicion")
+        // Total histórico de reposiciones e ingresos
+        public decimal TotalReplenishedAllTime => Movements
+            .Where(m => m.MovementType == "Reposicion" || m.MovementType == "Ingreso")
             .Sum(m => m.Amount);
 
-        public decimal CurrentBalance => Math.Max(0m, TotalFundAmount - TotalSpent + TotalReplenished);
+        // Gasto pendiente de reposición en el fondo actual (neto no reembolsado)
+        public decimal PendingSpent => Math.Max(0m, TotalSpentAllTime - TotalReplenishedAllTime);
 
+        // Lo que se muestra como "Gastado" en rojo en la interfaz es el gasto pendiente de reposición
+        public decimal TotalSpent => PendingSpent;
+
+        public decimal TotalReplenished => TotalReplenishedAllTime;
+
+        // Saldo real en efectivo disponible en caja chica
+        public decimal CurrentBalance => Math.Max(0m, TotalFundAmount - TotalSpentAllTime + TotalReplenishedAllTime);
+
+        // Consumo del fondo asignado (% del fondo que está gastado y pendiente de reposición)
         public decimal ConsumptionPercentage => TotalFundAmount > 0 
-            ? Math.Min(100m, Math.Round((TotalSpent / TotalFundAmount) * 100m, 1)) 
+            ? Math.Min(100m, Math.Round((PendingSpent / TotalFundAmount) * 100m, 1)) 
             : 0m;
     }
 }

@@ -354,6 +354,42 @@ namespace SIGETOUR.Tests.Controllers
             var updatedAccount = context.PettyCashAccounts.Find(account.Id);
             Assert.NotNull(updatedAccount);
             Assert.Equal(initialBalance - 45.00m, updatedAccount.CurrentBalance);
+            Assert.Equal(45.00m, updatedAccount.TotalSpent);
+        }
+
+        [Fact]
+        public async Task ReplenishPettyCash_ReducesPendingSpent_AndRestoresBalance()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = TestHelpers.CreateAdminController(context);
+
+            var account = context.PettyCashAccounts.First();
+            var fundAmount = account.TotalFundAmount;
+
+            // 1. Registrar gasto de S/ 100
+            await controller.RegisterPettyCashExpense(
+                account.Id, "Combustible", "Factura", "F001-999", "Grifo Primax", 100.00m, "Chofer", "Combustible Sprinter");
+
+            var accAfterExpense = context.PettyCashAccounts.Find(account.Id)!;
+            Assert.Equal(100.00m, accAfterExpense.TotalSpent);
+            Assert.Equal(fundAmount - 100.00m, accAfterExpense.CurrentBalance);
+
+            // 2. Reponer S/ 100
+            var replenishResult = await controller.ReplenishPettyCash(
+                account.Id, 100.00m, "Reembolso total de combustible");
+
+            var redirectResult = Assert.IsType<RedirectToActionResult>(replenishResult);
+            Assert.Equal("Cash", redirectResult.ActionName);
+
+            var accAfterReplenish = context.PettyCashAccounts.Find(account.Id)!;
+            // Gastado pendiente en rojo vuelve a 0
+            Assert.Equal(0.00m, accAfterReplenish.TotalSpent);
+            // Saldo disponible vuelve al 100% del fondo asignado
+            Assert.Equal(fundAmount, accAfterReplenish.CurrentBalance);
+            // Consumo vuelve a 0%
+            Assert.Equal(0.0m, accAfterReplenish.ConsumptionPercentage);
         }
 
         [Fact]
