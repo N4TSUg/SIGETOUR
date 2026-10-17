@@ -349,16 +349,23 @@ namespace SIGETOUR.API.Controllers.UI
         public async Task<IActionResult> EditVehicle(SIGETOUR.API.Models.VehicleDto dto, List<IFormFile> VehicleImages)
         {
             ModelState.Remove("ExistingImages");
+            if (string.IsNullOrWhiteSpace(dto.LicensePlate))
+            {
+                ModelState.AddModelError("LicensePlate", "La placa de rodaje es obligatoria.");
+            }
+            if (string.IsNullOrWhiteSpace(dto.Model))
+            {
+                ModelState.AddModelError("Model", "La marca y modelo son obligatorios.");
+            }
+            if (dto.SeatCapacity <= 0)
+            {
+                ModelState.AddModelError("SeatCapacity", "La capacidad debe ser mayor a 0.");
+            }
             if (!ModelState.IsValid)
             {
                 if (dto.Id != Guid.Empty) {
                     dto.ExistingImages = await _context.VehicleImages.Where(vi => vi.VehicleId == dto.Id).ToListAsync();
                 }
-                return View(dto);
-            }
-            if (string.IsNullOrWhiteSpace(dto.LicensePlate) || string.IsNullOrWhiteSpace(dto.Model))
-            {
-                ModelState.AddModelError("", "Placa y Modelo son obligatorios.");
                 return View(dto);
             }
 

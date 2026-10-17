@@ -55,10 +55,12 @@
                             <input asp-for="LicensePlate" class="w-full bg-surface-container-low text-on-surface font-bold tracking-widest pl-10 pr-16 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 uppercase outline-none text-body-md" maxlength="8" placeholder="Ej. T7C-841" required />
                             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-label-sm bg-primary-container text-on-primary-container font-bold px-1.5 py-0.5 rounded">PERÚ</span>
                         </div>
+                        <span asp-validation-for="LicensePlate" class="text-error text-xs font-semibold mt-1 block"></span>
                     </div>
                     <div>
                         <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Marca y Modelo <span class="text-tertiary">*</span></label>
                         <input asp-for="Model" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. Mercedes-Benz Sprinter 515" required />
+                        <span asp-validation-for="Model" class="text-error text-xs font-semibold mt-1 block"></span>
                     </div>
                     <div>
                         <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Categoría</label>
@@ -68,10 +70,12 @@
                             <option value="Bus Panorámico de 2 pisos">Bus Panorámico de 2 pisos</option>
                             <option value="SUV 4x4 (Servicio Privado)">SUV 4x4 (Servicio Privado)</option>
                         </select>
+                        <span asp-validation-for="Category" class="text-error text-xs font-semibold mt-1 block"></span>
                     </div>
                     <div>
                         <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Año de Fabricación</label>
-                        <input asp-for="ManufactureYear" type="number" min="2010" max="2026" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md" />
+                        <input asp-for="ManufactureYear" type="number" min="1990" max="2030" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md" />
+                        <span asp-validation-for="ManufactureYear" class="text-error text-xs font-semibold mt-1 block"></span>
                     </div>
                 </div>
             </div>
@@ -98,6 +102,7 @@
                             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">airline_seat_recline_normal</span>
                             <input asp-for="SeatCapacity" type="number" min="1" max="80" class="w-full bg-surface-container-low text-on-surface font-bold pl-10 py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-title-sm" required />
                         </div>
+                        <span asp-validation-for="SeatCapacity" class="text-error text-xs font-semibold mt-1 block"></span>
                     </div>
                     <div>
                         <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Color</label>

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
@@ -10,10 +10,10 @@ namespace SIGETOUR.API.Models
     {
         public Guid Id { get; set; }
 
-        [Required(ErrorMessage = "La placa es obligatoria")]
+        [Required(ErrorMessage = "Por favor, ingresa la placa de rodaje.")]
         public string LicensePlate { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "El modelo es obligatorio")]
+        [Required(ErrorMessage = "Por favor, ingresa la marca y modelo del vehículo.")]
         public string Model { get; set; } = string.Empty;
         
         public string? Category { get; set; } = string.Empty;
@@ -21,8 +21,8 @@ namespace SIGETOUR.API.Models
         public string? ChassisNumber { get; set; } = string.Empty;
         public string? EngineNumber { get; set; } = string.Empty;
         
-        [Required]
-        [Range(1, 100, ErrorMessage = "La capacidad debe ser mayor a 0")]
+        [Required(ErrorMessage = "Por favor, especifica la capacidad de asientos.")]
+        [Range(1, 120, ErrorMessage = "La capacidad debe ser de al menos 1 pasajero.")]
         public int SeatCapacity { get; set; }
         
         public string? Color { get; set; } = string.Empty;
