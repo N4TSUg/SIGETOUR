@@ -26,10 +26,12 @@ namespace SIGETOUR.API.Application.Mappings
             CreateMap<TourPackage, TourPackageReadDto>();
             
             CreateMap<TourPackageCreateDto, TourPackage>()
-                .ForMember(d => d.Images, opt => opt.Ignore()); // Images should be handled separately
+                .ForMember(d => d.Images, opt => opt.Ignore())
+                .ForMember(d => d.Category, opt => opt.Ignore());
 
             CreateMap<TourPackageUpdateDto, TourPackage>()
-                .ForMember(d => d.Images, opt => opt.Ignore());
+                .ForMember(d => d.Images, opt => opt.Ignore())
+                .ForMember(d => d.Category, opt => opt.Ignore());
         }
     }
 }
