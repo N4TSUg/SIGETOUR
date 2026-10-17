@@ -300,6 +300,30 @@
 </aside>
 <!-- MAIN DASHBOARD CONTENT AREA -->
 <main class="flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden custom-scrollbar p-4 sm:p-6 lg:p-8 pb-24">
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="mb-4 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 flex items-center justify-between shadow-sm animate-fade-in">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-green-600">check_circle</span>
+                <span class="text-body-sm font-semibold">@TempData["SuccessMessage"]</span>
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="text-green-600 hover:text-green-800 p-1">
+                <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="mb-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex items-center justify-between shadow-sm animate-fade-in">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-red-600">error</span>
+                <span class="text-body-sm font-semibold">@TempData["ErrorMessage"]</span>
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="text-red-600 hover:text-red-800 p-1">
+                <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+        </div>
+    }
     @RenderBody()
 </main>
 </div>

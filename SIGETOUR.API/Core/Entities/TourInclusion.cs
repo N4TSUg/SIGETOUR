@@ -4,7 +4,7 @@ namespace SIGETOUR.API.Core.Entities
 {
     public class TourInclusion
     {
-        public Guid Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
         public Guid TourPackageId { get; set; }
         public string Description { get; set; } = string.Empty;
 

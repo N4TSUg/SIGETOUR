@@ -884,34 +884,74 @@ namespace SIGETOUR.API.Controllers.UI
                 ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
                 return View("CreateTour", dto);
             }
+
+            // Validar Categoría para evitar violación de Foreign Key si el ID no existe en la BD
+            Guid? validCategoryId = null;
+            if (dto.CategoryId.HasValue && dto.CategoryId.Value != Guid.Empty)
+            {
+                var categoryExists = await _context.Categories.AnyAsync(c => c.Id == dto.CategoryId.Value);
+                if (categoryExists)
+                {
+                    validCategoryId = dto.CategoryId.Value;
+                }
+                else
+                {
+                    var fallbackCat = await _context.Categories.FirstOrDefaultAsync(c => c.IsActive);
+                    validCategoryId = fallbackCat?.Id;
+                }
+            }
+
+            // Validar Vehículo por defecto si se especificó
+            Guid? validVehicleId = null;
+            if (dto.DefaultVehicleId.HasValue && dto.DefaultVehicleId.Value != Guid.Empty)
+            {
+                var vehicleExists = await _context.Vehicles.AnyAsync(v => v.Id == dto.DefaultVehicleId.Value);
+                if (vehicleExists) validVehicleId = dto.DefaultVehicleId.Value;
+            }
+
             var model = new SIGETOUR.API.Core.Entities.TourPackage
             {
                 Id = Guid.NewGuid(),
-                Title = dto.Title ?? string.Empty,
-                Subtitle = dto.Subtitle ?? string.Empty,
-                CategoryId = dto.CategoryId,
+                Title = dto.Title?.Trim() ?? string.Empty,
+                Subtitle = dto.Subtitle?.Trim() ?? string.Empty,
+                CategoryId = validCategoryId,
                 Modality = dto.Modality,
                 Difficulty = dto.Difficulty,
-                Description = dto.Description ?? string.Empty,
+                Description = dto.Description?.Trim() ?? string.Empty,
                 BasePrice = dto.BasePrice,
                 ChildPrice = dto.ChildPrice,
                 MaxCapacity = dto.MaxCapacity,
                 RequiredAdvancePercentage = dto.RequiredAdvancePercentage,
-                Duration = dto.Duration ?? string.Empty,
+                Duration = dto.Duration?.Trim() ?? string.Empty,
+                DefaultVehicleId = validVehicleId,
                 IsActive = true
             };
-            model.Slug = string.IsNullOrEmpty(dto.Slug) ? model.Title.ToLower().Replace(" ", "-") : dto.Slug;
+
+            var baseSlug = !string.IsNullOrWhiteSpace(dto.Slug) ? dto.Slug.Trim() : model.Title;
+            var cleanSlug = System.Text.RegularExpressions.Regex.Replace(baseSlug.ToLower(), @"[^a-z0-9\-]", "-").Trim('-');
+            model.Slug = string.IsNullOrWhiteSpace(cleanSlug) ? Guid.NewGuid().ToString("N").Substring(0, 8) : cleanSlug;
             
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
-                        model.ItineraryStops.Add(new ItineraryStop { Id = Guid.NewGuid(), Name = Stops[i], OrderIndex = i, EstimatedTime = StopTimes?.ElementAtOrDefault(i) });
+                        model.ItineraryStops.Add(new ItineraryStop { 
+                            Id = Guid.NewGuid(), 
+                            TourPackageId = model.Id,
+                            Name = Stops[i].Trim(), 
+                            OrderIndex = i, 
+                            EstimatedTime = StopTimes?.ElementAtOrDefault(i)?.Trim() 
+                        });
                 }
             }
             
             if (Inclusions != null) {
                 foreach (var inc in Inclusions) {
-                    model.Inclusions.Add(new TourInclusion { Id = Guid.NewGuid(), Description = inc });
+                    if (!string.IsNullOrWhiteSpace(inc))
+                        model.Inclusions.Add(new TourInclusion { 
+                            Id = Guid.NewGuid(), 
+                            TourPackageId = model.Id,
+                            Description = inc.Trim() 
+                        });
                 }
             }
             
@@ -920,7 +960,8 @@ namespace SIGETOUR.API.Controllers.UI
                     if (!string.IsNullOrWhiteSpace(ShiftNames[i])) {
                         model.Shifts.Add(new TourShift {
                             Id = Guid.NewGuid(),
-                            ShiftName = ShiftNames[i],
+                            TourPackageId = model.Id,
+                            ShiftName = ShiftNames[i].Trim(),
                             StartTime = TimeSpan.TryParse(ShiftStarts?.ElementAtOrDefault(i), out var st) ? st : TimeSpan.Zero,
                             EndTime = TimeSpan.TryParse(ShiftEnds?.ElementAtOrDefault(i), out var et) ? et : TimeSpan.Zero,
                             IsActive = true
@@ -931,9 +972,21 @@ namespace SIGETOUR.API.Controllers.UI
 
             await ProcessImages(model, ImageFiles);
             
-            _context.TourPackages.Add(model);
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Tours));
+            try
+            {
+                _context.TourPackages.Add(model);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Circuito '{model.Title}' registrado y publicado exitosamente.";
+                return RedirectToAction(nameof(Tours));
+            }
+            catch (Exception ex)
+            {
+                var detailedError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                ModelState.AddModelError("", $"No se pudo guardar el circuito en la base de datos: {detailedError}");
+                TempData["ErrorMessage"] = $"Error al registrar circuito: {detailedError}";
+                ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
+                return View("CreateTour", dto);
+            }
         }
 
         [HttpGet]
@@ -1011,29 +1064,60 @@ namespace SIGETOUR.API.Controllers.UI
                 
             if (tour == null) return NotFound();
 
-            tour.Title = dto.Title ?? string.Empty;
-            tour.Subtitle = dto.Subtitle ?? string.Empty;
-            tour.Description = dto.Description ?? string.Empty;
+            // Validar Categoría para evitar violación de Foreign Key si el ID no existe en la BD
+            Guid? validCategoryId = null;
+            if (dto.CategoryId.HasValue && dto.CategoryId.Value != Guid.Empty)
+            {
+                var categoryExists = await _context.Categories.AnyAsync(c => c.Id == dto.CategoryId.Value);
+                if (categoryExists)
+                {
+                    validCategoryId = dto.CategoryId.Value;
+                }
+                else
+                {
+                    var fallbackCat = await _context.Categories.FirstOrDefaultAsync(c => c.IsActive);
+                    validCategoryId = fallbackCat?.Id;
+                }
+            }
+
+            // Validar Vehículo por defecto si se especificó
+            Guid? validVehicleId = null;
+            if (dto.DefaultVehicleId.HasValue && dto.DefaultVehicleId.Value != Guid.Empty)
+            {
+                var vehicleExists = await _context.Vehicles.AnyAsync(v => v.Id == dto.DefaultVehicleId.Value);
+                if (vehicleExists) validVehicleId = dto.DefaultVehicleId.Value;
+            }
+
+            tour.Title = dto.Title?.Trim() ?? string.Empty;
+            tour.Subtitle = dto.Subtitle?.Trim() ?? string.Empty;
+            tour.Description = dto.Description?.Trim() ?? string.Empty;
             tour.BasePrice = dto.BasePrice;
             tour.ChildPrice = dto.ChildPrice;
             tour.MaxCapacity = dto.MaxCapacity;
-            tour.Duration = dto.Duration ?? string.Empty;
-            tour.CategoryId = dto.CategoryId;
+            tour.Duration = dto.Duration?.Trim() ?? string.Empty;
+            tour.CategoryId = validCategoryId;
+            tour.DefaultVehicleId = validVehicleId;
             tour.Modality = dto.Modality;
             tour.Difficulty = dto.Difficulty;
             tour.IsActive = dto.IsActive;
             tour.RequiredAdvancePercentage = dto.RequiredAdvancePercentage;
             if (!string.IsNullOrEmpty(dto.Slug)) {
-                tour.Slug = dto.Slug;
+                var cleanSlug = System.Text.RegularExpressions.Regex.Replace(dto.Slug.Trim().ToLower(), @"[^a-z0-9\-]", "-").Trim('-');
+                tour.Slug = string.IsNullOrWhiteSpace(cleanSlug) ? tour.Slug : cleanSlug;
             }
 
             // Actualizar Paradas del Itinerario
-            // Eliminar directamente desde la base de datos sin tocar la coleccion en memoria
             await _context.Set<ItineraryStop>().Where(s => s.TourPackageId == tour.Id).ExecuteDeleteAsync();
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
-                        _context.Set<ItineraryStop>().Add(new ItineraryStop { Id = Guid.NewGuid(), TourPackageId = tour.Id, Name = Stops[i], OrderIndex = i, EstimatedTime = StopTimes?.ElementAtOrDefault(i) });
+                        _context.Set<ItineraryStop>().Add(new ItineraryStop { 
+                            Id = Guid.NewGuid(), 
+                            TourPackageId = tour.Id, 
+                            Name = Stops[i].Trim(), 
+                            OrderIndex = i, 
+                            EstimatedTime = StopTimes?.ElementAtOrDefault(i)?.Trim() 
+                        });
                 }
             }
 
@@ -1041,7 +1125,12 @@ namespace SIGETOUR.API.Controllers.UI
             await _context.Set<TourInclusion>().Where(i => i.TourPackageId == tour.Id).ExecuteDeleteAsync();
             if (Inclusions != null) {
                 foreach (var inc in Inclusions) {
-                    _context.Set<TourInclusion>().Add(new TourInclusion { Id = Guid.NewGuid(), TourPackageId = tour.Id, Description = inc });
+                    if (!string.IsNullOrWhiteSpace(inc))
+                        _context.Set<TourInclusion>().Add(new TourInclusion { 
+                            Id = Guid.NewGuid(), 
+                            TourPackageId = tour.Id, 
+                            Description = inc.Trim() 
+                        });
                 }
             }
 
@@ -1053,7 +1142,7 @@ namespace SIGETOUR.API.Controllers.UI
                         _context.Set<TourShift>().Add(new TourShift {
                             Id = Guid.NewGuid(),
                             TourPackageId = tour.Id,
-                            ShiftName = ShiftNames[i],
+                            ShiftName = ShiftNames[i].Trim(),
                             StartTime = TimeSpan.TryParse(ShiftStarts?.ElementAtOrDefault(i), out var st) ? st : TimeSpan.Zero,
                             EndTime = TimeSpan.TryParse(ShiftEnds?.ElementAtOrDefault(i), out var et) ? et : TimeSpan.Zero,
                             IsActive = true
@@ -1064,9 +1153,20 @@ namespace SIGETOUR.API.Controllers.UI
 
             await ProcessImages(tour, ImageFiles);
 
-            // _context.TourPackages.Update(tour); // Removed to prevent state overriding
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Tours));
+            try
+            {
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Circuito '{tour.Title}' actualizado exitosamente.";
+                return RedirectToAction(nameof(Tours));
+            }
+            catch (Exception ex)
+            {
+                var detailedError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                ModelState.AddModelError("", $"No se pudo actualizar el circuito en la base de datos: {detailedError}");
+                TempData["ErrorMessage"] = $"Error al actualizar circuito: {detailedError}";
+                ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
+                return View("CreateTour", dto);
+            }
         }
 
         [HttpPost]
@@ -1123,6 +1223,8 @@ namespace SIGETOUR.API.Controllers.UI
                         
                         tour.Images.Add(new TourImage 
                         { 
+                            Id = Guid.NewGuid(),
+                            TourPackageId = tour.Id,
                             ImageUrl = "/images/tours/" + uniqueFileName,
                             IsMain = tour.Images.Count == 0 
                         });
