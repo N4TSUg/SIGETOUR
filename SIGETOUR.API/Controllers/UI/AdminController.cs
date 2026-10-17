@@ -1060,6 +1060,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(t => t.Images)
                 .Include(t => t.ItineraryStops)
                 .Include(t => t.Inclusions)
+                .Include(t => t.Shifts)
                 .FirstOrDefaultAsync(t => t.Id == dto.Id);
                 
             if (tour == null) return NotFound();
@@ -1106,47 +1107,60 @@ namespace SIGETOUR.API.Controllers.UI
                 tour.Slug = string.IsNullOrWhiteSpace(cleanSlug) ? tour.Slug : cleanSlug;
             }
 
-            // Actualizar Paradas del Itinerario
-            await _context.Set<ItineraryStop>().Where(s => s.TourPackageId == tour.Id).ExecuteDeleteAsync();
+            // Actualizar Paradas del Itinerario sincronizando ChangeTracker
+            _context.ItineraryStops.RemoveRange(tour.ItineraryStops);
+            tour.ItineraryStops.Clear();
             if (Stops != null) {
                 for (int i = 0; i < Stops.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(Stops[i]))
-                        _context.Set<ItineraryStop>().Add(new ItineraryStop { 
+                    {
+                        var newStop = new ItineraryStop { 
                             Id = Guid.NewGuid(), 
                             TourPackageId = tour.Id, 
                             Name = Stops[i].Trim(), 
                             OrderIndex = i, 
                             EstimatedTime = StopTimes?.ElementAtOrDefault(i)?.Trim() 
-                        });
+                        };
+                        _context.ItineraryStops.Add(newStop);
+                        tour.ItineraryStops.Add(newStop);
+                    }
                 }
             }
 
-            // Actualizar Inclusiones del Tour
-            await _context.Set<TourInclusion>().Where(i => i.TourPackageId == tour.Id).ExecuteDeleteAsync();
+            // Actualizar Inclusiones del Tour sincronizando ChangeTracker
+            _context.TourInclusions.RemoveRange(tour.Inclusions);
+            tour.Inclusions.Clear();
             if (Inclusions != null) {
                 foreach (var inc in Inclusions) {
                     if (!string.IsNullOrWhiteSpace(inc))
-                        _context.Set<TourInclusion>().Add(new TourInclusion { 
+                    {
+                        var newInc = new TourInclusion { 
                             Id = Guid.NewGuid(), 
                             TourPackageId = tour.Id, 
                             Description = inc.Trim() 
-                        });
+                        };
+                        _context.TourInclusions.Add(newInc);
+                        tour.Inclusions.Add(newInc);
+                    }
                 }
             }
 
-            // Actualizar Turnos del Tour
-            await _context.Set<TourShift>().Where(s => s.TourPackageId == tour.Id).ExecuteDeleteAsync();
+            // Actualizar Turnos del Tour sincronizando ChangeTracker
+            _context.TourShifts.RemoveRange(tour.Shifts);
+            tour.Shifts.Clear();
             if (ShiftNames != null) {
                 for (int i = 0; i < ShiftNames.Length; i++) {
                     if (!string.IsNullOrWhiteSpace(ShiftNames[i])) {
-                        _context.Set<TourShift>().Add(new TourShift {
+                        var newShift = new TourShift {
                             Id = Guid.NewGuid(),
                             TourPackageId = tour.Id,
                             ShiftName = ShiftNames[i].Trim(),
                             StartTime = TimeSpan.TryParse(ShiftStarts?.ElementAtOrDefault(i), out var st) ? st : TimeSpan.Zero,
                             EndTime = TimeSpan.TryParse(ShiftEnds?.ElementAtOrDefault(i), out var et) ? et : TimeSpan.Zero,
                             IsActive = true
-                        });
+                        };
+                        _context.TourShifts.Add(newShift);
+                        tour.Shifts.Add(newShift);
                     }
                 }
             }
@@ -1221,13 +1235,15 @@ namespace SIGETOUR.API.Controllers.UI
                             await file.CopyToAsync(fileStream);
                         }
                         
-                        tour.Images.Add(new TourImage 
+                        var newImg = new TourImage 
                         { 
                             Id = Guid.NewGuid(),
                             TourPackageId = tour.Id,
                             ImageUrl = "/images/tours/" + uniqueFileName,
                             IsMain = tour.Images.Count == 0 
-                        });
+                        };
+                        _context.TourImages.Add(newImg);
+                        tour.Images.Add(newImg);
                     }
                 }
             }
