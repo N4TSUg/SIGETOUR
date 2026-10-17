@@ -60,7 +60,15 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SIGETOUR.API.Infrastructure.Data.AppDbContext>();
-    db.Database.EnsureCreated();
+    try
+    {
+        db.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[DB Migration Notice] {ex.Message}");
+        try { db.Database.EnsureCreated(); } catch { }
+    }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"ItineraryStops\" ADD COLUMN IF NOT EXISTS \"EstimatedTime\" text;"); } catch { }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"ShiftName\" text NOT NULL DEFAULT '';"); } catch { }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"PaidAmount\" numeric NOT NULL DEFAULT 0;"); } catch { }
