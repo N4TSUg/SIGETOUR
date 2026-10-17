@@ -368,58 +368,73 @@ namespace SIGETOUR.API.Controllers.UI
                 vehicle = new SIGETOUR.API.Core.Entities.Vehicle
                 {
                     Id = Guid.NewGuid(),
-                    LicensePlate = dto.LicensePlate,
-                    Model = dto.Model,
-                    Category = dto.Category,
-                    ManufactureYear = dto.ManufactureYear,
-                    ChassisNumber = dto.ChassisNumber,
-                    EngineNumber = dto.EngineNumber,
-                    SeatCapacity = dto.SeatCapacity,
-                    Color = dto.Color,
-                    FuelType = dto.FuelType,
-                    SoatNumber = dto.SoatNumber,
-                    SoatProvider = dto.SoatProvider,
+                    LicensePlate = dto.LicensePlate?.Trim().ToUpper() ?? string.Empty,
+                    Model = dto.Model?.Trim() ?? string.Empty,
+                    Category = dto.Category?.Trim() ?? string.Empty,
+                    ManufactureYear = dto.ManufactureYear > 1900 ? dto.ManufactureYear : 2020,
+                    ChassisNumber = dto.ChassisNumber?.Trim() ?? string.Empty,
+                    EngineNumber = dto.EngineNumber?.Trim() ?? string.Empty,
+                    SeatCapacity = dto.SeatCapacity > 0 ? dto.SeatCapacity : 1,
+                    Color = dto.Color?.Trim() ?? string.Empty,
+                    FuelType = dto.FuelType?.Trim() ?? string.Empty,
+                    SoatNumber = dto.SoatNumber?.Trim() ?? string.Empty,
+                    SoatProvider = dto.SoatProvider?.Trim() ?? string.Empty,
                     SoatIssueDate = dto.SoatIssueDate.HasValue ? DateTime.SpecifyKind(dto.SoatIssueDate.Value, DateTimeKind.Utc) : (DateTime?)null,
                     SoatExpiryDate = dto.SoatExpiryDate.HasValue ? DateTime.SpecifyKind(dto.SoatExpiryDate.Value, DateTimeKind.Utc) : (DateTime?)null,
-                    CitvNumber = dto.CitvNumber,
-                    CitvProvider = dto.CitvProvider,
+                    CitvNumber = dto.CitvNumber?.Trim() ?? string.Empty,
+                    CitvProvider = dto.CitvProvider?.Trim() ?? string.Empty,
                     CitvExpiryDate = dto.CitvExpiryDate.HasValue ? DateTime.SpecifyKind(dto.CitvExpiryDate.Value, DateTimeKind.Utc) : (DateTime?)null,
-                    TucNumber = dto.TucNumber,
-                    ResolutionNumber = dto.ResolutionNumber,
-                    Status = dto.Status,
+                    TucNumber = dto.TucNumber?.Trim() ?? string.Empty,
+                    ResolutionNumber = dto.ResolutionNumber?.Trim() ?? string.Empty,
+                    Status = dto.Status ?? "Operativo en Ruta (En Servicio)",
                     IsActive = dto.Status != "Baja Operativa",
-                    EquipmentJson = dto.EquipmentJson ?? "[]"
+                    EquipmentJson = string.IsNullOrWhiteSpace(dto.EquipmentJson) ? "[]" : dto.EquipmentJson
                 };
                 _context.Vehicles.Add(vehicle);
             }
             else
             {
-                vehicle = await _context.Vehicles.FindAsync(dto.Id) ?? throw new Exception("Vehicle not found");
-                vehicle.LicensePlate = dto.LicensePlate;
-                vehicle.Model = dto.Model;
-                vehicle.Category = dto.Category;
-                vehicle.ManufactureYear = dto.ManufactureYear;
-                vehicle.ChassisNumber = dto.ChassisNumber;
-                vehicle.EngineNumber = dto.EngineNumber;
-                vehicle.SeatCapacity = dto.SeatCapacity;
-                vehicle.Color = dto.Color;
-                vehicle.FuelType = dto.FuelType;
-                vehicle.SoatNumber = dto.SoatNumber;
-                vehicle.SoatProvider = dto.SoatProvider;
+                var found = await _context.Vehicles.FindAsync(dto.Id);
+                if (found == null) return NotFound();
+                vehicle = found;
+
+                vehicle.LicensePlate = dto.LicensePlate?.Trim().ToUpper() ?? string.Empty;
+                vehicle.Model = dto.Model?.Trim() ?? string.Empty;
+                vehicle.Category = dto.Category?.Trim() ?? string.Empty;
+                vehicle.ManufactureYear = dto.ManufactureYear > 1900 ? dto.ManufactureYear : 2020;
+                vehicle.ChassisNumber = dto.ChassisNumber?.Trim() ?? string.Empty;
+                vehicle.EngineNumber = dto.EngineNumber?.Trim() ?? string.Empty;
+                vehicle.SeatCapacity = dto.SeatCapacity > 0 ? dto.SeatCapacity : 1;
+                vehicle.Color = dto.Color?.Trim() ?? string.Empty;
+                vehicle.FuelType = dto.FuelType?.Trim() ?? string.Empty;
+                vehicle.SoatNumber = dto.SoatNumber?.Trim() ?? string.Empty;
+                vehicle.SoatProvider = dto.SoatProvider?.Trim() ?? string.Empty;
                 vehicle.SoatIssueDate = dto.SoatIssueDate.HasValue ? DateTime.SpecifyKind(dto.SoatIssueDate.Value, DateTimeKind.Utc) : (DateTime?)null;
                 vehicle.SoatExpiryDate = dto.SoatExpiryDate.HasValue ? DateTime.SpecifyKind(dto.SoatExpiryDate.Value, DateTimeKind.Utc) : (DateTime?)null;
-                vehicle.CitvNumber = dto.CitvNumber;
-                vehicle.CitvProvider = dto.CitvProvider;
+                vehicle.CitvNumber = dto.CitvNumber?.Trim() ?? string.Empty;
+                vehicle.CitvProvider = dto.CitvProvider?.Trim() ?? string.Empty;
                 vehicle.CitvExpiryDate = dto.CitvExpiryDate.HasValue ? DateTime.SpecifyKind(dto.CitvExpiryDate.Value, DateTimeKind.Utc) : (DateTime?)null;
-                vehicle.TucNumber = dto.TucNumber;
-                vehicle.ResolutionNumber = dto.ResolutionNumber;
-                vehicle.Status = dto.Status;
+                vehicle.TucNumber = dto.TucNumber?.Trim() ?? string.Empty;
+                vehicle.ResolutionNumber = dto.ResolutionNumber?.Trim() ?? string.Empty;
+                vehicle.Status = dto.Status ?? "Operativo en Ruta (En Servicio)";
                 vehicle.IsActive = dto.Status != "Baja Operativa";
-                vehicle.EquipmentJson = dto.EquipmentJson ?? "[]";
-                _context.Vehicles.Update(vehicle);
+                vehicle.EquipmentJson = string.IsNullOrWhiteSpace(dto.EquipmentJson) ? "[]" : dto.EquipmentJson;
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                var detailedError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                ModelState.AddModelError("", $"No se pudo guardar la unidad vehicular en la base de datos: {detailedError}");
+                TempData["ErrorMessage"] = $"Error al guardar vehículo: {detailedError}";
+                if (dto.Id != Guid.Empty) {
+                    dto.ExistingImages = await _context.VehicleImages.Where(vi => vi.VehicleId == dto.Id).ToListAsync();
+                }
+                return View(dto);
+            }
 
             // Handle image uploads
             if (VehicleImages != null && VehicleImages.Any())
@@ -447,9 +462,18 @@ namespace SIGETOUR.API.Controllers.UI
                         isFirst = false;
                     }
                 }
-                await _context.SaveChangesAsync();
+                try
+                {
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    var detailedError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                    TempData["ErrorMessage"] = $"Vehículo guardado pero falló la carga de fotos: {detailedError}";
+                }
             }
 
+            TempData["SuccessMessage"] = $"Unidad vehicular '{vehicle.LicensePlate}' guardada exitosamente.";
             return RedirectToAction("Fleet");
         }
 
