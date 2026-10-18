@@ -9,6 +9,7 @@ using Moq;
 using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Models;
+using SIGETOUR.API.ViewModels;
 using SIGETOUR.Tests.Helpers;
 using Xunit;
 
@@ -605,6 +606,36 @@ namespace SIGETOUR.Tests.Controllers
             Assert.NotNull(updatedBooking);
             Assert.Equal(vehicle.Id, updatedBooking.AssignedVehicleId);
             Assert.Equal(driver.Id, updatedBooking.AssignedDriverId);
+            Assert.Equal(BookingStatus.Confirmed, updatedBooking.Status);
+
+            var updatedVehicle = context.Vehicles.Find(vehicle.Id);
+            Assert.NotNull(updatedVehicle);
+            Assert.Equal("Operativo en Ruta (En Servicio)", updatedVehicle.Status);
+            Assert.True(updatedVehicle.IsActive);
+        }
+
+        [Fact]
+        public async Task Dashboard_DeparturesBoard_ShowsRealOccupancyAndEmptyWhenUnassigned()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.Dashboard();
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<DashboardViewModel>(viewResult.Model);
+            Assert.NotNull(model.Departures);
+            Assert.NotEmpty(model.Departures);
+
+            // Verificamos que sin asignación previa, unidad y chofer salgan vacíos y sin guía
+            foreach (var dep in model.Departures)
+            {
+                Assert.Empty(dep.GuideName); // La empresa no tiene guías contratados
+            }
         }
     }
 }

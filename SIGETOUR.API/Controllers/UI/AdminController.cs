@@ -52,40 +52,55 @@ namespace SIGETOUR.API.Controllers.UI
             var activeVehicles = vehicles.Count(v => v.IsActive);
             var bookingsCount = await _context.Bookings.CountAsync();
 
-            var todayUtc = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
-            var tomorrowUtc = todayUtc.AddDays(1);
+            // Fecha local de Cajamarca / Perú (UTC-5)
+            var peruNow = DateTime.UtcNow.AddHours(-5);
+            var todayPeru = peruNow.Date;
+            var todayPeruStr = todayPeru.ToString("yyyy-MM-dd");
 
-            // Reservas de hoy o recientes
-            var todayBookings = await _context.Bookings
+            // Todas las reservas activas (no canceladas) con detalles de vehículo y conductor
+            var allActiveBookings = await _context.Bookings
                 .Include(b => b.Items)
                 .ThenInclude(i => i.TourPackage)
-                .Where(b => (b.TravelDate >= todayUtc && b.TravelDate < tomorrowUtc) || (b.BookingDate >= todayUtc && b.BookingDate < tomorrowUtc))
+                .Include(b => b.AssignedVehicle)
+                .Include(b => b.AssignedDriver)
+                .Where(b => b.Status != BookingStatus.Cancelled)
                 .ToListAsync();
+
+            // Reservas del día de viaje
+            var todayBookings = allActiveBookings.Where(b =>
+                b.TravelDate.ToString("yyyy-MM-dd") == todayPeruStr ||
+                b.TravelDate.AddHours(-5).ToString("yyyy-MM-dd") == todayPeruStr ||
+                b.TravelDate.Date == todayPeru
+            ).ToList();
 
             var todayPax = todayBookings.Sum(b => b.TotalPassengers);
             var totalDailyCapacity = vehicles.Where(v => v.IsActive).Sum(v => v.SeatCapacity);
             if (totalDailyCapacity <= 0) totalDailyCapacity = Math.Max(20, vehiclesCount * 18);
-            if (todayPax == 0 && bookingsCount > 0)
+            if (todayPax == 0 && allActiveBookings.Any())
             {
-                // Para demostración operativa si no hay salidas para hoy exacto
-                todayPax = Math.Min(totalDailyCapacity, (int)Math.Round(totalDailyCapacity * 0.75));
+                // Si para hoy exacto no hay reservas programadas, reflejar el total de pasajeros de las reservas activas
+                todayPax = allActiveBookings.Sum(b => b.TotalPassengers);
             }
             var occupancyRate = totalDailyCapacity > 0 ? (int)Math.Min(100, Math.Round((double)todayPax / totalDailyCapacity * 100)) : 0;
 
             // Recaudación del día (Caja / Reservas)
             var todayTransactions = await _context.CashTransactions
-                .Where(t => t.TransactionType == "Ingreso" && t.CreatedAt >= todayUtc && t.CreatedAt < tomorrowUtc)
+                .Where(t => t.TransactionType == "Ingreso" && t.CreatedAt >= todayPeru && t.CreatedAt < todayPeru.AddDays(1))
                 .ToListAsync();
             var todayIncome = todayTransactions.Sum(t => t.Amount);
             if (todayIncome == 0 && todayBookings.Any())
             {
                 todayIncome = todayBookings.Sum(b => b.PaidAmount);
             }
-            if (todayIncome == 0 && bookingsCount > 0)
+            if (todayIncome == 0 && allActiveBookings.Any())
             {
-                todayIncome = 4220.00m; // Monto referencial inicial
+                todayIncome = allActiveBookings.Sum(b => b.PaidAmount);
             }
             var todayPending = todayBookings.Sum(b => Math.Max(0, b.TotalAmount - b.PaidAmount));
+            if (todayPending == 0 && allActiveBookings.Any())
+            {
+                todayPending = allActiveBookings.Sum(b => Math.Max(0, b.TotalAmount - b.PaidAmount));
+            }
 
             // Alertas Regulatorias y de Flota (SOAT y CITV a 30 días)
             var fleetAlerts = new List<FleetAlertItem>();
@@ -159,64 +174,71 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (!circuitDemands.Any() && activeToursList.Any())
             {
-                int[] demoPercentages = { 38, 25, 20, 17 };
-                int[] demoPax = { 54, 36, 28, 24 };
                 circuitDemands = activeToursList.Take(4).Select((t, idx) => new DashboardCircuitDemandItem
                 {
                     TourTitle = t.Title,
                     CategoryName = t.Category?.Name ?? "Circuito Tradicional",
-                    PassengerCount = demoPax[idx % demoPax.Length],
-                    Percentage = demoPercentages[idx % demoPercentages.Length],
+                    PassengerCount = 0,
+                    Percentage = 0,
                     ColorClass = colorClasses[idx % colorClasses.Length]
                 }).ToList();
             }
 
-            // Tablero de Salidas y Despacho en Vivo de Hoy con Conductores Reales
+            // Tablero de Salidas y Despacho en Vivo con Datos Reales
             var departures = new List<DashboardDepartureItem>();
             var sampleTimes = new[] { "09:00 AM", "09:30 AM", "10:00 AM", "02:30 PM", "03:00 PM" };
-            var activeDrivers = await _context.Drivers
-                .Include(d => d.AssignedVehicle)
-                .Where(d => d.IsActive)
-                .OrderBy(d => d.FullName)
-                .ToListAsync();
 
             int depIdx = 0;
             foreach (var tour in activeToursList.Take(5))
             {
+                // Buscar reservas para este tour: primero de hoy; si no hay hoy, buscar en reservas activas registradas
                 var tourBookings = todayBookings.Where(b => b.Items.Any(i => i.TourPackageId == tour.Id)).ToList();
+                if (!tourBookings.Any())
+                {
+                    tourBookings = allActiveBookings.Where(b => b.Items.Any(i => i.TourPackageId == tour.Id)).ToList();
+                }
+
+                // Cantidad real de pasajeros reservados (sin fórmulas ficticias)
                 var bookedPax = tourBookings.Sum(b => b.Items.Where(i => i.TourPackageId == tour.Id).Sum(i => i.Passengers));
 
-                var assignedBooking = tourBookings.FirstOrDefault(b => b.AssignedVehicle != null);
-                var veh = assignedBooking?.AssignedVehicle 
-                          ?? (activeDrivers.Count > depIdx && activeDrivers[depIdx].AssignedVehicle != null 
-                              ? activeDrivers[depIdx].AssignedVehicle 
-                              : (vehicles.Count > depIdx ? vehicles[depIdx] : vehicles.FirstOrDefault()));
+                // Unidad y conductor: SOLAMENTE si fueron asignados en alguna reserva del circuito
+                var assignedBooking = tourBookings.FirstOrDefault(b => b.AssignedVehicleId != null || b.AssignedDriverId != null);
+                var veh = assignedBooking?.AssignedVehicle;
+                var assignedDriver = assignedBooking?.AssignedDriver;
 
-                var assignedDriver = assignedBooking?.AssignedDriver 
-                                     ?? (activeDrivers.Count > depIdx ? activeDrivers[depIdx] : activeDrivers.FirstOrDefault());
-
-                var driverName = assignedDriver != null ? assignedDriver.FullName : "Conductor Oficial Habilitado MTC";
-                var guideName = "Rosa Paredes (Guía Oficial DIRCETUR)";
                 var time = sampleTimes[depIdx % sampleTimes.Length];
-                var capacity = veh != null && veh.SeatCapacity > 0 ? veh.SeatCapacity : 19;
+                var capacity = veh != null && veh.SeatCapacity > 0 
+                    ? veh.SeatCapacity 
+                    : (tour.MaxCapacity > 0 ? tour.MaxCapacity : 15);
 
                 string status;
                 string statusColor;
-                if (depIdx == 0) { status = "En Ruta (Los Frailones)"; statusColor = "emerald"; }
-                else if (depIdx == 1) { status = "Abordando en Jr. 2 de Mayo 569"; statusColor = "amber"; }
-                else if (depIdx == 2) { status = "Recojo: Centro Histórico"; statusColor = "sky"; }
-                else { status = "Programado / Venta Abierta"; statusColor = "slate"; }
+                if (veh != null || assignedDriver != null)
+                {
+                    status = "Despachado / En Ruta";
+                    statusColor = "emerald";
+                }
+                else if (bookedPax > 0)
+                {
+                    status = "Pendiente de Asignación";
+                    statusColor = "amber";
+                }
+                else
+                {
+                    status = "Programado / Venta Abierta";
+                    statusColor = "slate";
+                }
 
                 departures.Add(new DashboardDepartureItem
                 {
                     Time = time,
                     TourTitle = tour.Title,
                     Subtitle = tour.Duration + (tour.Category != null ? " • " + tour.Category.Name : ""),
-                    VehicleModel = veh != null ? veh.Model : "Mercedes-Benz Sprinter 515",
-                    LicensePlate = veh != null ? veh.LicensePlate : "T7C-841",
-                    DriverName = driverName,
-                    GuideName = guideName,
-                    BookedSeats = bookedPax > 0 ? bookedPax : Math.Max(2, capacity - ((depIdx + 1) * 3)),
+                    VehicleModel = veh != null ? veh.Model : string.Empty,
+                    LicensePlate = veh != null ? veh.LicensePlate : string.Empty,
+                    DriverName = assignedDriver != null ? assignedDriver.FullName : string.Empty,
+                    GuideName = string.Empty, // La empresa no cuenta con guías contratados
+                    BookedSeats = bookedPax, // DATO REAL
                     TotalCapacity = capacity,
                     Status = status,
                     StatusColor = statusColor,
@@ -526,7 +548,16 @@ namespace SIGETOUR.API.Controllers.UI
                     {
                         b.AssignedDriverId = req.DriverId;
                     }
+                    b.Status = BookingStatus.Confirmed;
                 }
+
+                if (vehicle != null)
+                {
+                    vehicle.Status = "Operativo en Ruta (En Servicio)";
+                    vehicle.IsActive = true;
+                    _context.Vehicles.Update(vehicle);
+                }
+
                 await _context.SaveChangesAsync();
 
                 var cleanTour = tour != null ? string.Concat(tour.Title.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_") : "Tour";

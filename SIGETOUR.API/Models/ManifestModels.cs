@@ -10,10 +10,10 @@ namespace SIGETOUR.API.Models
         public string? ShiftName { get; set; }
         public Guid VehicleId { get; set; }
         public Guid? DriverId { get; set; }
-        public string? DriverName { get; set; } = "Conductor Asignado";
-        public string? DriverLicense { get; set; } = "Q-42910834";
-        public string? GuideName { get; set; } = "Guía Oficial de Turismo";
-        public string? GuideCarnet { get; set; } = "DIRCETUR-CAJ";
+        public string? DriverName { get; set; } = string.Empty;
+        public string? DriverLicense { get; set; } = string.Empty;
+        public string? GuideName { get; set; } = string.Empty;
+        public string? GuideCarnet { get; set; } = string.Empty;
         public string? DeparturePoint { get; set; } = "Agencia Principal - Jr. Dos de Mayo 534, Cajamarca";
     }
 

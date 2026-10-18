@@ -300,7 +300,7 @@ namespace SIGETOUR.API.Application.Services
             ws.Range("G10:I10").Merge();
             var guideInfo = !string.IsNullOrWhiteSpace(request.GuideName) 
                 ? $"{request.GuideName} (Carnet: {request.GuideCarnet ?? "DIRCETUR"})"
-                : "Guía Oficial de Turismo Habilitado";
+                : "Sin guía contratado (Chofer a cargo / No requerido)";
             SetMetaCell(10, "A", "C", "Guía de Turismo:", guideInfo);
             var tucInfo = !string.IsNullOrWhiteSpace(vehicle.TucNumber)
                 ? $"TUC N° {vehicle.TucNumber} - Resol: {vehicle.ResolutionNumber ?? "MTC"}"
@@ -549,10 +549,18 @@ namespace SIGETOUR.API.Application.Services
             ws.Range(sigTitleRow, 4, sigTitleRow, 6).Merge().Value = "DESPACHADOR DE TURNO / SELLO";
             ws.Range(sigDetailRow, 4, sigDetailRow, 6).Merge().Value = "Turismo Chilón S.A.C. - Terminal";
 
-            // 3. Guía Oficial
+            // 3. Guía Oficial / Control Operativo
             ws.Range(sigLineRow, 7, sigLineRow, 9).Merge().Value = "________________________________________";
-            ws.Range(sigTitleRow, 7, sigTitleRow, 9).Merge().Value = "GUÍA OFICIAL DE TURISMO";
-            ws.Range(sigDetailRow, 7, sigDetailRow, 9).Merge().Value = $"Carnet: {request.GuideCarnet ?? "DIRCETUR Cajamarca"}";
+            if (!string.IsNullOrWhiteSpace(request.GuideName))
+            {
+                ws.Range(sigTitleRow, 7, sigTitleRow, 9).Merge().Value = "GUÍA OFICIAL DE TURISMO";
+                ws.Range(sigDetailRow, 7, sigDetailRow, 9).Merge().Value = $"Carnet: {request.GuideCarnet ?? "DIRCETUR Cajamarca"}";
+            }
+            else
+            {
+                ws.Range(sigTitleRow, 7, sigTitleRow, 9).Merge().Value = "CONTROL Y REVISIÓN OPERATIVA";
+                ws.Range(sigDetailRow, 7, sigDetailRow, 9).Merge().Value = "Turismo Chilón S.A.C.";
+            }
 
             for (int r = sigLineRow; r <= sigDetailRow; r++)
             {

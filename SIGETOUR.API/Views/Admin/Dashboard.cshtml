@@ -197,17 +197,41 @@
                                     <div class="text-label-sm text-outline">@dep.Subtitle</div>
                                 </td>
                                 <td class="py-3.5 px-4">
-                                    <div class="flex items-center gap-1.5 font-semibold text-on-surface">
-                                        <span class="material-symbols-outlined text-[18px] text-primary">directions_bus</span>
-                                        @dep.VehicleModel
-                                    </div>
-                                    <div class="text-label-sm font-mono text-outline">Placa: @dep.LicensePlate</div>
+                                    @if (!string.IsNullOrWhiteSpace(dep.VehicleModel))
+                                    {
+                                        <div class="flex items-center gap-1.5 font-semibold text-on-surface">
+                                            <span class="material-symbols-outlined text-[18px] text-primary">directions_bus</span>
+                                            @dep.VehicleModel
+                                        </div>
+                                        <div class="text-label-sm font-mono text-outline">Placa: @dep.LicensePlate</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="flex items-center gap-1.5 text-outline text-label-sm">
+                                            <span class="material-symbols-outlined text-[18px] text-outline">pending</span>
+                                            <span class="italic font-medium">Sin unidad asignada</span>
+                                        </div>
+                                        <div class="text-[11px] text-outline/80">Por asignar en manifiesto</div>
+                                    }
                                 </td>
                                 <td class="py-3.5 px-4">
-                                    <div class="font-medium text-on-surface">@dep.DriverName</div>
-                                    <div class="text-label-sm text-primary font-semibold flex items-center gap-0.5">
-                                        <span class="material-symbols-outlined text-[14px]">badge</span> @dep.GuideName
-                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(dep.DriverName))
+                                    {
+                                        <div class="font-medium text-on-surface">@dep.DriverName</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="flex items-center gap-1.5 text-outline text-label-sm">
+                                            <span class="material-symbols-outlined text-[18px] text-outline">person_off</span>
+                                            <span class="italic font-medium">Sin conductor asignado</span>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(dep.GuideName))
+                                    {
+                                        <div class="text-label-sm text-primary font-semibold flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[14px]">badge</span> @dep.GuideName
+                                        </div>
+                                    }
                                 </td>
                                 <td class="py-3.5 px-4">
                                     <div class="flex items-center gap-2">
