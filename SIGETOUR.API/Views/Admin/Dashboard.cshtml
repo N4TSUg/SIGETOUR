@@ -18,7 +18,7 @@
             <p class="text-body-sm text-on-surface-variant">Monitoreo en tiempo real de salidas turísticas, capacidad vehicular, caja y cumplimiento normativo.</p>
         </div>
         <div class="flex items-center gap-3">
-            <a asp-controller="Booking" asp-action="Wizard" class="px-4 py-2.5 bg-primary text-on-primary font-label-md font-bold rounded-xl shadow-sm hover:bg-primary/90 transition-all flex items-center gap-2">
+            <a asp-controller="Admin" asp-action="CreateBooking" class="px-4 py-2.5 bg-primary text-on-primary font-label-md font-bold rounded-xl shadow-sm hover:bg-primary/90 transition-all flex items-center gap-2">
                 <span class="material-symbols-outlined text-[20px]">add_circle</span>
                 Nueva Reserva
             </a>
@@ -71,15 +71,20 @@
                 <div class="text-display-sm font-extrabold text-on-surface">
                     @Model.Departures.Count <span class="text-label-md text-outline font-normal">circuitos</span>
                 </div>
+                @{
+                    var enRutaCount = Model.Departures.Count(d => d.StatusColor == "emerald");
+                    var abordandoCount = Model.Departures.Count(d => d.StatusColor == "amber" || d.StatusColor == "sky");
+                    var enEsperaCount = Math.Max(0, Model.Departures.Count - enRutaCount - abordandoCount);
+                }
                 <div class="flex flex-wrap gap-1.5 mt-2">
                     <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> 1 en ruta
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> @enRutaCount en ruta
                     </span>
                     <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
-                        <span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span> 1 abordando
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span> @abordandoCount abordando
                     </span>
                     <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                        @Math.Max(0, Model.Departures.Count - 2) en espera
+                        @enEsperaCount en espera
                     </span>
                 </div>
             </div>
@@ -446,7 +451,7 @@
 
                 <div class="pt-3 border-t border-outline-variant/30 mt-3 flex items-center justify-between text-body-sm">
                     <span class="text-outline font-medium">Sede Central: Jr. 2 de Mayo 569</span>
-                    <a asp-controller="Booking" asp-action="Wizard" class="text-primary font-bold hover:underline flex items-center gap-1 text-label-sm">
+                    <a asp-controller="Admin" asp-action="CreateBooking" class="text-primary font-bold hover:underline flex items-center gap-1 text-label-sm">
                         <span>Registrar Venta</span>
                         <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
                     </a>
