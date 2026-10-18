@@ -1,7 +1,7 @@
 @model SIGETOUR.API.Core.Entities.Driver
 @{
-    bool isCreate = Model.Id == Guid.Empty;
-    ViewData["Title"] = isCreate ? "Registrar Conductor" : "Editar Conductor – " + Model.FullName;
+    bool isCreate = Model == null || Model.Id == Guid.Empty;
+    ViewData["Title"] = isCreate ? "Registrar Conductor" : "Editar Conductor – " + (Model?.FullName ?? "MTC");
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
     var vehicles = ViewBag.Vehicles as IEnumerable<SIGETOUR.API.Core.Entities.Vehicle> ?? Enumerable.Empty<SIGETOUR.API.Core.Entities.Vehicle>();
 }
@@ -9,8 +9,8 @@
 <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-5xl mx-auto">
     <form asp-action="EditDriver" method="post">
         @Html.AntiForgeryToken()
-        <input type="hidden" asp-for="Id" />
-        <input type="hidden" asp-for="CreatedAt" />
+        <input type="hidden" name="Id" value="@(isCreate ? Guid.Empty.ToString() : Model!.Id.ToString())" />
+        <input type="hidden" name="CreatedAt" value="@((Model?.CreatedAt ?? DateTime.UtcNow).ToString("o"))" />
 
         <!-- Header -->
         <div class="sm:flex sm:justify-between sm:items-center mb-8">
@@ -20,7 +20,7 @@
                 </a>
                 <div>
                     <h1 class="text-headline-md font-headline-md font-bold text-on-surface">
-                        @(isCreate ? "Registrar Nuevo Conductor Oficial" : "Editar Conductor – " + Model.FullName)
+                        @(isCreate ? "Registrar Nuevo Conductor Oficial" : "Editar Conductor – " + (Model?.FullName ?? "MTC"))
                     </h1>
                     <p class="text-body-md text-on-surface-variant mt-0.5">Ficha de habilitación MTC para asignación de flota y emisión de Manifiestos de Pasajeros.</p>
                 </div>
@@ -130,7 +130,7 @@
                                 <option value="">-- Sin unidad fija (Rotativo) --</option>
                                 @foreach (var v in vehicles)
                                 {
-                                    <option value="@v.Id" selected="@(Model.AssignedVehicleId == v.Id)">
+                                    <option value="@v.Id" selected="@(Model?.AssignedVehicleId == v.Id)">
                                         @v.Model (@v.LicensePlate) &bull; @v.SeatCapacity plazas
                                     </option>
                                 }

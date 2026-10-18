@@ -864,7 +864,7 @@ namespace SIGETOUR.API.Controllers.UI
             ViewBag.Vehicles = await _context.Vehicles.Where(v => v.IsActive).OrderBy(v => v.LicensePlate).ToListAsync();
             if (id == null || id == Guid.Empty)
             {
-                return View(new Driver());
+                return View(new Driver { Id = Guid.Empty });
             }
 
             var driver = await _context.Drivers
@@ -881,7 +881,7 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (string.IsNullOrWhiteSpace(model.FullName) || string.IsNullOrWhiteSpace(model.LicenseNumber))
             {
-                ModelState.AddModelError("", "El nombre y el número de licencia son obligatorios.");
+                ModelState.AddModelError("", "El nombre completo y el número de brevete/licencia MTC son obligatorios.");
                 ViewBag.Vehicles = await _context.Vehicles.Where(v => v.IsActive).OrderBy(v => v.LicensePlate).ToListAsync();
                 return View(model);
             }
@@ -891,31 +891,74 @@ namespace SIGETOUR.API.Controllers.UI
                 model.LicenseExpiryDate = DateTime.SpecifyKind(model.LicenseExpiryDate.Value, DateTimeKind.Utc);
             }
 
+            Driver driverToSave;
             if (model.Id == Guid.Empty)
             {
-                model.Id = Guid.NewGuid();
-                model.CreatedAt = DateTime.UtcNow;
-                if (model.AssignedVehicleId == Guid.Empty) model.AssignedVehicleId = null;
-                _context.Drivers.Add(model);
+                driverToSave = new Driver
+                {
+                    Id = Guid.NewGuid(),
+                    FullName = model.FullName.Trim(),
+                    Dni = model.Dni?.Trim() ?? string.Empty,
+                    LicenseNumber = model.LicenseNumber.Trim().ToUpper(),
+                    LicenseCategory = model.LicenseCategory ?? "A-IIIa (Especial Transporte Turístico)",
+                    LicenseExpiryDate = model.LicenseExpiryDate,
+                    Phone = model.Phone?.Trim() ?? string.Empty,
+                    IsActive = model.IsActive,
+                    AssignedVehicleId = (model.AssignedVehicleId.HasValue && model.AssignedVehicleId.Value != Guid.Empty) ? model.AssignedVehicleId : null,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Drivers.Add(driverToSave);
             }
             else
             {
                 var existing = await _context.Drivers.FindAsync(model.Id);
-                if (existing == null) return NotFound();
-
-                existing.FullName = model.FullName;
-                existing.Dni = model.Dni ?? string.Empty;
-                existing.LicenseNumber = model.LicenseNumber;
-                existing.LicenseCategory = model.LicenseCategory ?? "A-IIIa (Especial Transporte Turístico)";
-                existing.LicenseExpiryDate = model.LicenseExpiryDate;
-                existing.Phone = model.Phone ?? string.Empty;
-                existing.IsActive = model.IsActive;
-                existing.AssignedVehicleId = model.AssignedVehicleId != Guid.Empty ? model.AssignedVehicleId : null;
-                _context.Drivers.Update(existing);
+                if (existing == null)
+                {
+                    // Si el ID enviado no existe en la base de datos, lo creamos como nuevo de forma segura
+                    driverToSave = new Driver
+                    {
+                        Id = model.Id != Guid.Empty ? model.Id : Guid.NewGuid(),
+                        FullName = model.FullName.Trim(),
+                        Dni = model.Dni?.Trim() ?? string.Empty,
+                        LicenseNumber = model.LicenseNumber.Trim().ToUpper(),
+                        LicenseCategory = model.LicenseCategory ?? "A-IIIa (Especial Transporte Turístico)",
+                        LicenseExpiryDate = model.LicenseExpiryDate,
+                        Phone = model.Phone?.Trim() ?? string.Empty,
+                        IsActive = model.IsActive,
+                        AssignedVehicleId = (model.AssignedVehicleId.HasValue && model.AssignedVehicleId.Value != Guid.Empty) ? model.AssignedVehicleId : null,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.Drivers.Add(driverToSave);
+                }
+                else
+                {
+                    existing.FullName = model.FullName.Trim();
+                    existing.Dni = model.Dni?.Trim() ?? string.Empty;
+                    existing.LicenseNumber = model.LicenseNumber.Trim().ToUpper();
+                    existing.LicenseCategory = model.LicenseCategory ?? "A-IIIa (Especial Transporte Turístico)";
+                    existing.LicenseExpiryDate = model.LicenseExpiryDate;
+                    existing.Phone = model.Phone?.Trim() ?? string.Empty;
+                    existing.IsActive = model.IsActive;
+                    existing.AssignedVehicleId = (model.AssignedVehicleId.HasValue && model.AssignedVehicleId.Value != Guid.Empty) ? model.AssignedVehicleId : null;
+                    _context.Drivers.Update(existing);
+                    driverToSave = existing;
+                }
             }
 
-            await _context.SaveChangesAsync();
-            return RedirectToAction("Drivers");
+            try
+            {
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Conductor '{driverToSave.FullName}' guardado exitosamente.";
+                return RedirectToAction("Drivers");
+            }
+            catch (Exception ex)
+            {
+                var detailedError = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                ModelState.AddModelError("", $"No se pudo guardar el conductor en la base de datos: {detailedError}");
+                TempData["ErrorMessage"] = $"Error al guardar conductor: {detailedError}";
+                ViewBag.Vehicles = await _context.Vehicles.Where(v => v.IsActive).OrderBy(v => v.LicensePlate).ToListAsync();
+                return View(model);
+            }
         }
 
         [HttpPost]

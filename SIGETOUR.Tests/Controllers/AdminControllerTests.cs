@@ -510,6 +510,50 @@ namespace SIGETOUR.Tests.Controllers
         }
 
         [Fact]
+        public async Task EditDriver_Get_ReturnsModelWithEmptyId()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.EditDriver((Guid?)null);
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<Driver>(viewResult.Model);
+            Assert.Equal(Guid.Empty, model.Id);
+        }
+
+        [Fact]
+        public async Task EditDriver_Post_NonExistingId_CreatesNewDriverSafely()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = TestHelpers.CreateAdminController(context);
+
+            var driver = new Driver
+            {
+                Id = Guid.NewGuid(), // Unsaved ID
+                FullName = "Conductor Fallback Test",
+                Dni = "77665544",
+                LicenseNumber = "Q-77665544",
+                LicenseCategory = "A-IIIa",
+                IsActive = true
+            };
+
+            // Act
+            var result = await controller.EditDriver(driver);
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Drivers", redirectResult.ActionName);
+            Assert.True(context.Drivers.Any(d => d.FullName == "Conductor Fallback Test"));
+        }
+
+        [Fact]
         public async Task ExportManifestExcel_LinksAssignedVehicleAndDriver_ToMatchingBookings()
         {
             // Arrange

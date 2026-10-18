@@ -4,7 +4,7 @@ namespace SIGETOUR.API.Core.Entities
 {
     public class Driver
     {
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid Id { get; set; }
         
         public string FullName { get; set; } = string.Empty;
         public string Dni { get; set; } = string.Empty;
