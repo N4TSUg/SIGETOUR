@@ -191,7 +191,7 @@
             </p>
 </div>
 <!-- Login Form -->
-<form asp-controller="Account" asp-action="Login" method="post" class="space-y-4" id="adminLoginForm">
+<form asp-controller="Account" asp-action="Login" asp-route-returnurl="@ViewData["ReturnUrl"]" method="post" class="space-y-4" id="adminLoginForm">
     <div asp-validation-summary="ModelOnly" class="text-error font-body-sm bg-error-container p-2 rounded-md"></div>
     <div>
         <label asp-for="EmailOrUsername" class="block font-label-md text-label-md text-on-surface font-semibold mb-1.5 flex items-center gap-1.5">
@@ -227,7 +227,7 @@
     </div>
 
     <div class="flex items-center pt-1">
-        <input asp-for="RememberMe" class="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary focus:ring-offset-0 transition-colors" />
+        <input asp-for="RememberMe" checked class="h-4 w-4 rounded border-outline-variant text-primary focus:ring-primary focus:ring-offset-0 transition-colors" />
         <label asp-for="RememberMe" class="ml-2.5 block font-body-sm text-body-sm text-on-surface-variant cursor-pointer select-none">
             Recordar sesión en este equipo de caja/despacho
         </label>
@@ -283,12 +283,14 @@
 </footer>
 <!-- Vanilla JS Interactions -->
 <script>
-    // Evita que el navegador muestre esta pagina desde el cache al presionar Atrás
+    // Evita que el navegador muestre esta página desde el cache al presionar Atrás
     // cuando el usuario ya tiene sesión iniciada (bfcache fix)
-    window.addEventListener('pageshow', function(event) {
-        if (event.persisted) {
-            // La página vino del back/forward cache del navegador
-            window.location.replace('/Admin/Dashboard');
+    window.addEventListener('pageshow', function (event) {
+        var perfEntries = (window.performance && window.performance.getEntriesByType) ? window.performance.getEntriesByType('navigation') : null;
+        var isBackForward = (perfEntries && perfEntries.length > 0 && perfEntries[0].type === 'back_forward') ||
+                              (window.performance && window.performance.navigation && window.performance.navigation.type === 2);
+        if (event.persisted || isBackForward) {
+            window.location.reload();
         }
     });
 

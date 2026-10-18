@@ -19,18 +19,28 @@ namespace SIGETOUR.API.Controllers.UI
 
         [HttpGet]
         [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Login()
+        public IActionResult Login(string? returnUrl = null)
         {
-            if (_signInManager.IsSignedIn(User))
+            // Prevenir cache en el navegador para que al presionar 'Atrás' no muestre el formulario si ya está logeado
+            Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+            Response.Headers["Pragma"] = "no-cache";
+            Response.Headers["Expires"] = "0";
+
+            if (_signInManager.IsSignedIn(User) || User.Identity?.IsAuthenticated == true)
             {
+                if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                {
+                    return Redirect(returnUrl);
+                }
                 return RedirectToAction("Dashboard", "Admin");
             }
+            ViewData["ReturnUrl"] = returnUrl;
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginViewModel model)
+        public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
         {
             if (ModelState.IsValid)
             {
@@ -43,6 +53,10 @@ namespace SIGETOUR.API.Controllers.UI
 
                     if (result.Succeeded)
                     {
+                        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                        {
+                            return Redirect(returnUrl);
+                        }
                         return RedirectToAction("Dashboard", "Admin");
                     }
                 }
@@ -50,6 +64,7 @@ namespace SIGETOUR.API.Controllers.UI
                 ModelState.AddModelError(string.Empty, "Intento de inicio de sesión no válido.");
             }
 
+            ViewData["ReturnUrl"] = returnUrl;
             return View(model);
         }
 

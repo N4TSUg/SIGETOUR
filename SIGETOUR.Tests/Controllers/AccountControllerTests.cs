@@ -60,6 +60,30 @@ namespace SIGETOUR.Tests.Controllers
         }
 
         [Fact]
+        public void Login_Get_SetsNoCacheHeaders()
+        {
+            // Arrange
+            var mockUserManager = TestHelpers.CreateMockUserManager();
+            var mockSignInManager = TestHelpers.CreateMockSignInManager(mockUserManager);
+            mockSignInManager.Setup(s => s.IsSignedIn(It.IsAny<ClaimsPrincipal>())).Returns(false);
+
+            var controller = new AccountController(mockSignInManager.Object, mockUserManager.Object);
+            var httpContext = new DefaultHttpContext();
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            };
+
+            // Act
+            controller.Login();
+
+            // Assert
+            Assert.Equal("no-cache, no-store, must-revalidate", httpContext.Response.Headers["Cache-Control"].ToString());
+            Assert.Equal("no-cache", httpContext.Response.Headers["Pragma"].ToString());
+            Assert.Equal("0", httpContext.Response.Headers["Expires"].ToString());
+        }
+
+        [Fact]
         public async Task Login_Post_ValidCredentials_SignsInAndRedirectsToDashboard()
         {
             // Arrange
