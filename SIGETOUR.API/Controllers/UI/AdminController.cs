@@ -1453,8 +1453,8 @@ namespace SIGETOUR.API.Controllers.UI
                             Id = Guid.NewGuid(),
                             TourPackageId = model.Id,
                             ShiftName = ShiftNames[i].Trim(),
-                            StartTime = TimeSpan.TryParse(ShiftStarts?.ElementAtOrDefault(i), out var st) ? st : TimeSpan.Zero,
-                            EndTime = TimeSpan.TryParse(ShiftEnds?.ElementAtOrDefault(i), out var et) ? et : TimeSpan.Zero,
+                            StartTime = ParseShiftTime(ShiftStarts?.ElementAtOrDefault(i)),
+                            EndTime = ParseShiftTime(ShiftEnds?.ElementAtOrDefault(i)),
                             IsActive = true
                         });
                     }
@@ -1658,8 +1658,8 @@ namespace SIGETOUR.API.Controllers.UI
                             Id = Guid.NewGuid(),
                             TourPackageId = tour.Id,
                             ShiftName = ShiftNames[i].Trim(),
-                            StartTime = TimeSpan.TryParse(ShiftStarts?.ElementAtOrDefault(i), out var st) ? st : TimeSpan.Zero,
-                            EndTime = TimeSpan.TryParse(ShiftEnds?.ElementAtOrDefault(i), out var et) ? et : TimeSpan.Zero,
+                            StartTime = ParseShiftTime(ShiftStarts?.ElementAtOrDefault(i)),
+                            EndTime = ParseShiftTime(ShiftEnds?.ElementAtOrDefault(i)),
                             IsActive = true
                         };
                         _context.TourShifts.Add(newShift);
@@ -3269,6 +3269,41 @@ namespace SIGETOUR.API.Controllers.UI
             {
                 return dt2.TimeOfDay;
             }
+            return TimeSpan.Zero;
+        }
+
+        private static TimeSpan ParseShiftTime(string? timeStr)
+        {
+            if (string.IsNullOrWhiteSpace(timeStr)) return TimeSpan.Zero;
+            timeStr = timeStr.Trim();
+
+            // Soportar formatos de 12 horas con AM/PM y formatos de 24 horas
+            string[] formats = new[] {
+                "hh:mm tt", "h:mm tt", "hh:mmtt", "h:mmtt",
+                "hh:mm:ss tt", "h:mm:ss tt",
+                "HH:mm", "H:mm", "HH:mm:ss", "H:mm:ss"
+            };
+
+            if (DateTime.TryParseExact(timeStr, formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dtExact))
+            {
+                return dtExact.TimeOfDay;
+            }
+
+            if (DateTime.TryParse(timeStr, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dtInv))
+            {
+                return dtInv.TimeOfDay;
+            }
+
+            if (DateTime.TryParse(timeStr, out var dtLocal))
+            {
+                return dtLocal.TimeOfDay;
+            }
+
+            if (TimeSpan.TryParse(timeStr, out var ts))
+            {
+                return ts;
+            }
+
             return TimeSpan.Zero;
         }
     }

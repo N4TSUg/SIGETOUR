@@ -239,58 +239,225 @@
 </div>
 </div>
 </section>
+<!-- Datalist para selección rápida de horas en formato 12 horas (sin formato militar) -->
+<datalist id="datalist-times-12h">
+    <option value="05:00"></option>
+    <option value="05:30"></option>
+    <option value="06:00"></option>
+    <option value="06:30"></option>
+    <option value="07:00"></option>
+    <option value="07:30"></option>
+    <option value="08:00"></option>
+    <option value="08:30"></option>
+    <option value="09:00"></option>
+    <option value="09:30"></option>
+    <option value="10:00"></option>
+    <option value="10:30"></option>
+    <option value="11:00"></option>
+    <option value="11:30"></option>
+    <option value="12:00"></option>
+    <option value="12:30"></option>
+    <option value="01:00"></option>
+    <option value="01:30"></option>
+    <option value="02:00"></option>
+    <option value="02:30"></option>
+    <option value="03:00"></option>
+    <option value="03:30"></option>
+    <option value="04:00"></option>
+    <option value="04:30"></option>
+    <option value="05:00"></option>
+    <option value="05:30"></option>
+    <option value="06:00"></option>
+    <option value="06:30"></option>
+    <option value="07:00"></option>
+    <option value="07:30"></option>
+    <option value="08:00"></option>
+    <option value="08:30"></option>
+    <option value="09:00"></option>
+</datalist>
+
+<datalist id="datalist-stops-12h">
+    <option value="07:00 AM"></option>
+    <option value="07:30 AM"></option>
+    <option value="08:00 AM"></option>
+    <option value="08:30 AM"></option>
+    <option value="09:00 AM"></option>
+    <option value="09:30 AM"></option>
+    <option value="10:00 AM"></option>
+    <option value="10:30 AM"></option>
+    <option value="11:00 AM"></option>
+    <option value="11:30 AM"></option>
+    <option value="12:00 PM"></option>
+    <option value="12:30 PM"></option>
+    <option value="01:00 PM"></option>
+    <option value="01:30 PM"></option>
+    <option value="02:00 PM"></option>
+    <option value="02:30 PM"></option>
+    <option value="03:00 PM"></option>
+    <option value="03:30 PM"></option>
+    <option value="04:00 PM"></option>
+    <option value="04:30 PM"></option>
+    <option value="05:00 PM"></option>
+    <option value="05:30 PM"></option>
+    <option value="06:00 PM"></option>
+</datalist>
+
 <script>
 let shiftCount = 0;
+
+function parseTo12h(timeStr, defaultAmpm = 'AM') {
+    if (!timeStr) return { time: '09:00', ampm: defaultAmpm };
+    timeStr = timeStr.trim();
+    const matchAmpm = timeStr.match(/^(\d{1,2})(?::(\d{1,2}))?\s*(AM|PM)?$/i);
+    if (matchAmpm) {
+        let h = parseInt(matchAmpm[1], 10);
+        let m = matchAmpm[2] ? matchAmpm[2].padStart(2, '0') : '00';
+        let ampm = matchAmpm[3] ? matchAmpm[3].toUpperCase() : null;
+        if (!ampm) {
+            if (h >= 12) {
+                ampm = 'PM';
+                h = h % 12;
+                if (h === 0) h = 12;
+            } else {
+                ampm = defaultAmpm;
+                if (h === 0) h = 12;
+            }
+        } else {
+            if (h > 12) h = h % 12;
+            if (h === 0) h = 12;
+        }
+        return { time: h.toString().padStart(2, '0') + ':' + m, ampm: ampm };
+    }
+    return { time: '09:00', ampm: defaultAmpm };
+}
+
+function syncShiftRow(element) {
+    const parent = element.closest('.shift-time-group');
+    if (!parent) return;
+    const timeInput = parent.querySelector('.shift-time-val');
+    const ampmSelect = parent.querySelector('.shift-ampm-select');
+    const hiddenInput = parent.querySelector('.shift-hidden-target');
+    if (timeInput && ampmSelect && hiddenInput) {
+        let val = timeInput.value.trim();
+        if (val) {
+            hiddenInput.value = `${val} ${ampmSelect.value}`;
+        }
+    }
+}
+
+function formatShiftInput(input) {
+    let val = input.value.trim();
+    if (!val) return;
+    const parent = input.closest('.shift-time-group');
+    const ampmSelect = parent ? parent.querySelector('.shift-ampm-select') : null;
+    const currentAmpm = ampmSelect ? ampmSelect.value : 'AM';
+    const parsed = parseTo12h(val, currentAmpm);
+    input.value = parsed.time;
+    if (ampmSelect) {
+        ampmSelect.value = parsed.ampm;
+    }
+    syncShiftRow(input);
+}
+
 function addShift(name, start, end) {
     shiftCount++;
     const container = document.getElementById('shifts-container');
     const div = document.createElement('div');
-    div.className = 'shift-row p-3 rounded-lg border border-outline-variant bg-surface-bright/30 space-y-2';
+    div.className = 'shift-row p-3.5 rounded-lg border border-outline-variant bg-surface-bright/30 space-y-3';
+
+    const startParsed = parseTo12h(start, 'AM');
+    const endParsed = parseTo12h(end, startParsed.ampm === 'PM' ? 'PM' : 'PM');
+
     div.innerHTML = `
-        <div class="flex items-center justify-between">
-            <span class="text-label-sm font-label-sm text-primary font-bold">Turno ${shiftCount}</span>
-            <button type="button" onclick="this.closest('.shift-row').remove(); reindexShifts();" class="p-1 rounded text-red-500 hover:bg-red-50">
+        <div class="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+            <span class="text-label-sm font-label-sm text-primary font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-[16px]">schedule</span>
+                Turno ${shiftCount}
+            </span>
+            <button type="button" onclick="this.closest('.shift-row').remove(); reindexShifts();" class="p-1 rounded text-red-500 hover:bg-red-50 flex items-center gap-0.5 text-xs font-semibold" title="Eliminar Turno">
                 <span class="material-symbols-outlined text-sm">delete</span>
+                <span>Quitar</span>
             </button>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-                <label class="block text-label-sm text-on-surface-variant mb-0.5">Nombre del Turno</label>
-                <input type="text" name="ShiftNames" value="${name || ''}" class="w-full px-2 py-1.5 text-body-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: Turno Mañana" required />
+                <label class="block text-label-sm text-on-surface-variant mb-1 font-semibold">Nombre del Turno</label>
+                <input type="text" name="ShiftNames" value="${name || ''}" class="w-full px-3 py-2 text-body-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: Turno Tarde" required />
             </div>
             <div>
-                <label class="block text-label-sm text-on-surface-variant mb-0.5">Hora de Salida</label>
-                <input type="time" name="ShiftStarts" value="${start || ''}" class="w-full px-2 py-1.5 text-body-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary outline-none" required />
+                <label class="block text-label-sm text-on-surface-variant mb-1 font-semibold">Hora de Salida (Formato 12h)</label>
+                <div class="shift-time-group flex items-center gap-1.5">
+                    <div class="relative flex-1">
+                        <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px] pointer-events-none">departure_board</span>
+                        <input type="text" 
+                               value="${startParsed.time}" 
+                               class="shift-time-val w-full pl-8 pr-2 py-2 text-body-sm font-bold bg-surface-container-lowest border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary focus:border-primary outline-none text-center" 
+                               placeholder="03:00" 
+                               list="datalist-times-12h" 
+                               oninput="syncShiftRow(this)" 
+                               onblur="formatShiftInput(this)" 
+                               required />
+                    </div>
+                    <select class="shift-ampm-select px-2.5 py-2 text-body-sm font-bold bg-surface-container-low border border-outline-variant rounded-lg text-primary focus:border-primary focus:ring-2 focus:ring-primary outline-none cursor-pointer shrink-0" onchange="syncShiftRow(this)">
+                        <option value="AM" ${startParsed.ampm === 'AM' ? 'selected' : ''}>AM</option>
+                        <option value="PM" ${startParsed.ampm === 'PM' ? 'selected' : ''}>PM</option>
+                    </select>
+                    <input type="hidden" name="ShiftStarts" class="shift-hidden-target" value="${startParsed.time} ${startParsed.ampm}" />
+                </div>
             </div>
             <div>
-                <label class="block text-label-sm text-on-surface-variant mb-0.5">Hora de Retorno</label>
-                <input type="time" name="ShiftEnds" value="${end || ''}" class="w-full px-2 py-1.5 text-body-sm bg-surface-container-lowest border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary outline-none" required />
+                <label class="block text-label-sm text-on-surface-variant mb-1 font-semibold">Hora de Retorno (Formato 12h)</label>
+                <div class="shift-time-group flex items-center gap-1.5">
+                    <div class="relative flex-1">
+                        <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px] pointer-events-none">alarm_on</span>
+                        <input type="text" 
+                               value="${endParsed.time}" 
+                               class="shift-time-val w-full pl-8 pr-2 py-2 text-body-sm font-bold bg-surface-container-lowest border border-outline-variant rounded-lg text-on-surface focus:ring-2 focus:ring-primary focus:border-primary outline-none text-center" 
+                               placeholder="06:00" 
+                               list="datalist-times-12h" 
+                               oninput="syncShiftRow(this)" 
+                               onblur="formatShiftInput(this)" 
+                               required />
+                    </div>
+                    <select class="shift-ampm-select px-2.5 py-2 text-body-sm font-bold bg-surface-container-low border border-outline-variant rounded-lg text-primary focus:border-primary focus:ring-2 focus:ring-primary outline-none cursor-pointer shrink-0" onchange="syncShiftRow(this)">
+                        <option value="AM" ${endParsed.ampm === 'AM' ? 'selected' : ''}>AM</option>
+                        <option value="PM" ${endParsed.ampm === 'PM' ? 'selected' : ''}>PM</option>
+                    </select>
+                    <input type="hidden" name="ShiftEnds" class="shift-hidden-target" value="${endParsed.time} ${endParsed.ampm}" />
+                </div>
             </div>
         </div>
     `;
     container.appendChild(div);
 }
+
 function reindexShifts() {
     shiftCount = 0;
     document.querySelectorAll('.shift-row').forEach(row => {
         shiftCount++;
-        row.querySelector('span.text-primary').innerText = 'Turno ' + shiftCount;
+        const titleSpan = row.querySelector('span.text-primary');
+        if (titleSpan) {
+            titleSpan.innerHTML = `<span class="material-symbols-outlined text-[16px]">schedule</span> Turno ${shiftCount}`;
+        }
     });
 }
+
 document.addEventListener('DOMContentLoaded', () => {
     @if (Model.ExistingShifts != null && Model.ExistingShifts.Any())
     {
         foreach (var s in Model.ExistingShifts)
         {
-            var startStr = s.StartTime.ToString(@"hh\:mm");
-            var endStr = s.EndTime.ToString(@"hh\:mm");
+            var startDt = DateTime.Today.Add(s.StartTime);
+            var endDt = DateTime.Today.Add(s.EndTime);
+            var startStr = startDt.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+            var endStr = endDt.ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture);
             <text>addShift('@Html.Raw(s.ShiftName.Replace("'", "\\'"))', '@startStr', '@endStr');</text>
         }
     }
     else
     {
-        <text>addShift('Turno Mañana', '09:30', '13:30');
-        addShift('Turno Tarde', '15:00', '19:00');</text>
+        <text>addShift('Turno Mañana', '09:30 AM', '01:30 PM');
+        addShift('Turno Tarde', '03:00 PM', '06:00 PM');</text>
     }
 });
 </script>
@@ -401,7 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
         div.className = 'flex items-center gap-2 p-2 rounded-lg bg-surface-container-low border border-outline-variant/60 itinerary-stop-row';
         div.innerHTML = `
             <span class="w-6 h-6 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold shrink-0 stop-number">${stopCount}</span>
-            <input type="text" name="StopTimes" value="${estimatedTime}" class="w-24 bg-transparent border-b border-outline-variant px-1 py-1 text-body-sm font-body-sm text-on-surface focus:border-primary focus:outline-none shrink-0" placeholder="09:00 AM" />
+            <input type="text" name="StopTimes" value="${estimatedTime}" class="w-28 bg-transparent border-b border-outline-variant px-1.5 py-1 text-body-sm font-bold text-on-surface focus:border-primary focus:outline-none shrink-0 text-center" placeholder="09:00 AM" list="datalist-stops-12h" />
             <input type="text" name="Stops" value="${name}" class="w-full bg-transparent border-none px-2 py-1 text-body-sm font-body-sm text-on-surface focus:outline-none focus:ring-0" placeholder="Nombre de la parada" required />
             <button type="button" onclick="this.closest('.itinerary-stop-row').remove(); reindexStops();" class="text-error hover:text-red-700 shrink-0 flex items-center">
                 <span class="material-symbols-outlined text-[18px]">close</span>
