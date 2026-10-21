@@ -57,6 +57,23 @@ Los siguientes enlaces corresponden a carpetas compartidas en Google Drive, faci
 
 ---
 
+## 📋 Fichas de Tours para Demostración en Vivo (Copiar y Pegar)
+> 💡 *Para el archivo completo con todas las casillas desglosadas listas para copiar y pegar durante la reunión con el cliente, consulta [`DEMO_TOURS_DATA.md`](DEMO_TOURS_DATA.md).*
+
+### Resumen de Circuitos Comerciales Oficiales
+
+| N° | Circuito / Tour | Subtítulo / Badge | Horario / Turno | Tarifa Sugerida | Lugares Principales Incluidos |
+| :-: | :--- | :--- | :--- | :-: | :--- |
+| **1** | **Ventanillas de Otuzco** | Cementerio pre-inca | 3:30 PM – 6:30 PM | S/ 35.00 | Ventanillas pre-incas, Jardín de las Hortensias, Artesanía, Fundo Tres Molinos (fábrica de quesos y rosquitas). |
+| **2** | **Collpa y Cascadas de Llacanora** | Llamado de vacas por su nombre | 3:30 PM – 7:00 PM | S/ 35.00 | Ex-hacienda La Collpa, laguna artificial, capilla, establo central, llamado de vacas, degustación de lácteos, cascadas de Llacanora. |
+| **3** | **Castillo de Yanamarca** | Estilo medieval en los Andes | Am o Pm (A coordinar) | S/ 40.00 | Castillo medieval, pinturas y esculturas en piedra/madera, vistas panorámicas, cafetería y áreas temáticas. |
+| **4** | **City Tour Peatonal** | Mezcla incaica, colonial y moderna | 10:00 AM o 3:30 PM | S/ 25.00 | Plaza de Armas, Cuarto del Rescate, Catedral, San Francisco, Belén, Museos, Santa Apolonia y Sillas del Inca. |
+| **5** | **Namora y Laguna San Nicolás** | Guitarras, totora y gastronomía | 9:30 AM – 3:00 PM | S/ 45.00 | Alameda de los 14 Incas, Bosque de sapitos, talleres de guitarras en Namora, Laguna San Nicolás con botes de totora y gastronomía. |
+| **6** | **Cumbe Mayo** | 3ra. Maravilla del Perú | 9:30 AM – 2:00 PM | S/ 40.00 | Mirador Bellavista, bosque de rocas Los Frailones, santuario, abrigos rocosos, piedra del sacrificio y acueducto milenario (3,000 años). |
+| **7** | **Granja de Porcón** | La Suiza peruana | 9:30 AM – 2:00 PM | S/ 40.00 | Huambocancha (picapedreros), bosque de pinos más grande del Perú, zoológico andino (otorongos, pumas, osos de anteojos) y textilería. |
+
+---
+
 ## 🛠️ Stack Tecnológico
 
 - **Plataforma:** .NET 10.0 (C#)
