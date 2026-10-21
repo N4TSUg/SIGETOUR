@@ -5,7 +5,7 @@
 ---
 
 ## 🎯 Instrucciones para la Demostración
-1. Inicia sesión en el sistema: `http://localhost:5000/Account/Login` con usuario `admin` y contraseña `Admin123!`.
+1. Inicia sesión en el sistema: `https://localhost:7103/Account/Login` con usuario `admin` y contraseña `Admin123!`.
 2. Dirígete a **Catálogo Tours** (`/Admin/Tours`) y pulsa en **"Nuevo Tour"** (`/Admin/CreateTour`).
 3. Copia y pega los valores de cada casilla desde este documento con el botón de copiar de GitHub/Markdown.
 4. Para las imágenes del tour, puedes descargar una o dos fotos de la carpeta oficial de Google Drive asociada y cargarlas en el campo de subida de fotos.

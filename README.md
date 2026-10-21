@@ -18,9 +18,11 @@ El sistema resuelve la gestión comercial de cara al turista (catálogo interact
 ## 🔐 Acceso al Panel Administrativo
 
 ### Endpoints Oficiales
-- **Formulario de Inicio de Sesión:** `https://localhost:5001/Account/Login` (o `http://localhost:5000/Account/Login`)
-- **Panel Central / Dashboard Operativo:** `https://localhost:5001/Admin/Dashboard`  
+- **Formulario de Inicio de Sesión:** `https://localhost:7103/Account/Login` (o `http://localhost:5047/Account/Login`)
+- **Panel Central / Dashboard Operativo:** `https://localhost:7103/Admin/Dashboard`  
   *(Si se intenta acceder a `/Admin` sin sesión activa, el sistema redirige automáticamente al login con parámetro `ReturnUrl`)*.
+- **Catálogo de Tours:** `https://localhost:7103/Admin/Tours`
+- **Registro de Nueva Reserva:** `https://localhost:7103/Admin/CreateBooking`
 
 ### Credenciales de Acceso Sembradas por Defecto
 

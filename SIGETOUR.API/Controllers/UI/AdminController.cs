@@ -167,9 +167,9 @@ namespace SIGETOUR.API.Controllers.UI
             var activeToursList = await _context.TourPackages
                 .Include(t => t.Images)
                 .Include(t => t.Category)
+                .Include(t => t.Shifts)
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.Title)
-                .Take(6)
                 .ToListAsync();
 
             if (!circuitDemands.Any() && activeToursList.Any())
@@ -185,67 +185,81 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             // Tablero de Salidas y Despacho en Vivo con Datos Reales
+            // REGLA OPERATIVA: Solo deben figurar las salidas que cuentan con pasajeros reservados
             var departures = new List<DashboardDepartureItem>();
-            var sampleTimes = new[] { "09:00 AM", "09:30 AM", "10:00 AM", "02:30 PM", "03:00 PM" };
+            var relevantBookings = todayBookings.Any() ? todayBookings : allActiveBookings;
 
-            int depIdx = 0;
-            foreach (var tour in activeToursList.Take(5))
+            var tourIdsWithBookings = relevantBookings
+                .SelectMany(b => b.Items)
+                .Where(i => i.Passengers > 0)
+                .Select(i => i.TourPackageId)
+                .Distinct()
+                .ToList();
+
+            var toursWithBookings = activeToursList
+                .Where(t => tourIdsWithBookings.Contains(t.Id))
+                .ToList();
+
+            foreach (var tour in toursWithBookings)
             {
-                // Buscar reservas para este tour: primero de hoy; si no hay hoy, buscar en reservas activas registradas
-                var tourBookings = todayBookings.Where(b => b.Items.Any(i => i.TourPackageId == tour.Id)).ToList();
-                if (!tourBookings.Any())
+                var tourBookings = relevantBookings
+                    .Where(b => b.Items.Any(i => i.TourPackageId == tour.Id))
+                    .ToList();
+
+                var shiftGroups = tourBookings
+                    .GroupBy(b => string.IsNullOrWhiteSpace(b.ShiftName) ? "General" : b.ShiftName.Trim());
+
+                foreach (var sGroup in shiftGroups)
                 {
-                    tourBookings = allActiveBookings.Where(b => b.Items.Any(i => i.TourPackageId == tour.Id)).ToList();
+                    var shiftKey = sGroup.Key;
+                    var shiftBookings = sGroup.ToList();
+                    var bookedPax = shiftBookings.Sum(b => b.Items.Where(i => i.TourPackageId == tour.Id).Sum(i => i.Passengers));
+
+                    if (bookedPax <= 0) continue;
+
+                    var assignedBooking = shiftBookings.FirstOrDefault(b => b.AssignedVehicleId != null || b.AssignedDriverId != null);
+                    var veh = assignedBooking?.AssignedVehicle;
+                    var assignedDriver = assignedBooking?.AssignedDriver;
+
+                    string formattedTime = ResolveDepartureTime(tour, shiftKey);
+
+                    var capacity = veh != null && veh.SeatCapacity > 0 
+                        ? veh.SeatCapacity 
+                        : (tour.MaxCapacity > 0 ? tour.MaxCapacity : 15);
+
+                    string status;
+                    string statusColor;
+                    if (veh != null || assignedDriver != null)
+                    {
+                        status = "Despachado / En Ruta";
+                        statusColor = "emerald";
+                    }
+                    else
+                    {
+                        status = "Pendiente de Asignación";
+                        statusColor = "amber";
+                    }
+
+                    departures.Add(new DashboardDepartureItem
+                    {
+                        Time = formattedTime,
+                        TourTitle = tour.Title,
+                        Subtitle = tour.Duration + (tour.Category != null ? " • " + tour.Category.Name : ""),
+                        VehicleModel = veh != null ? veh.Model : string.Empty,
+                        LicensePlate = veh != null ? veh.LicensePlate : string.Empty,
+                        DriverName = assignedDriver != null ? assignedDriver.FullName : string.Empty,
+                        GuideName = string.Empty, // La empresa no cuenta con guías contratados
+                        BookedSeats = bookedPax,
+                        TotalCapacity = capacity,
+                        Status = status,
+                        StatusColor = statusColor,
+                        TourId = tour.Id
+                    });
                 }
-
-                // Cantidad real de pasajeros reservados (sin fórmulas ficticias)
-                var bookedPax = tourBookings.Sum(b => b.Items.Where(i => i.TourPackageId == tour.Id).Sum(i => i.Passengers));
-
-                // Unidad y conductor: SOLAMENTE si fueron asignados en alguna reserva del circuito
-                var assignedBooking = tourBookings.FirstOrDefault(b => b.AssignedVehicleId != null || b.AssignedDriverId != null);
-                var veh = assignedBooking?.AssignedVehicle;
-                var assignedDriver = assignedBooking?.AssignedDriver;
-
-                var time = sampleTimes[depIdx % sampleTimes.Length];
-                var capacity = veh != null && veh.SeatCapacity > 0 
-                    ? veh.SeatCapacity 
-                    : (tour.MaxCapacity > 0 ? tour.MaxCapacity : 15);
-
-                string status;
-                string statusColor;
-                if (veh != null || assignedDriver != null)
-                {
-                    status = "Despachado / En Ruta";
-                    statusColor = "emerald";
-                }
-                else if (bookedPax > 0)
-                {
-                    status = "Pendiente de Asignación";
-                    statusColor = "amber";
-                }
-                else
-                {
-                    status = "Programado / Venta Abierta";
-                    statusColor = "slate";
-                }
-
-                departures.Add(new DashboardDepartureItem
-                {
-                    Time = time,
-                    TourTitle = tour.Title,
-                    Subtitle = tour.Duration + (tour.Category != null ? " • " + tour.Category.Name : ""),
-                    VehicleModel = veh != null ? veh.Model : string.Empty,
-                    LicensePlate = veh != null ? veh.LicensePlate : string.Empty,
-                    DriverName = assignedDriver != null ? assignedDriver.FullName : string.Empty,
-                    GuideName = string.Empty, // La empresa no cuenta con guías contratados
-                    BookedSeats = bookedPax, // DATO REAL
-                    TotalCapacity = capacity,
-                    Status = status,
-                    StatusColor = statusColor,
-                    TourId = tour.Id
-                });
-                depIdx++;
             }
+
+            // Ordenar las salidas de manera cronológica
+            departures = departures.OrderBy(d => ParseTimeForSorting(d.Time)).ToList();
 
             var recentBookings = await _context.Bookings
                 .Include(b => b.Items)
@@ -2957,6 +2971,119 @@ namespace SIGETOUR.API.Controllers.UI
                 TempData["ErrorMessage"] = $"Error al generar el acta de turno: {ex.Message}";
                 return RedirectToAction(nameof(Cash));
             }
+        }
+
+        private static string ResolveDepartureTime(SIGETOUR.API.Core.Entities.TourPackage tour, string shiftKey)
+        {
+            // 1. Si el shiftKey contiene una hora explícita (ej. "09:30 AM", "3:30 PM", "03:30 PM")
+            if (!string.IsNullOrWhiteSpace(shiftKey) && shiftKey != "General" && shiftKey != "Turno Único")
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    shiftKey,
+                    @"\b(0?[1-9]|1[0-2]):[0-5][0-9]\s*(?:AM|PM|am|pm)\b",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    return match.Value.ToUpper();
+                }
+            }
+
+            // 2. Buscar en tour.Shifts si coincide con el nombre del turno
+            if (tour.Shifts != null && tour.Shifts.Any())
+            {
+                SIGETOUR.API.Core.Entities.TourShift? matchingShift = null;
+                if (!string.IsNullOrWhiteSpace(shiftKey) && shiftKey != "General")
+                {
+                    matchingShift = tour.Shifts.FirstOrDefault(s =>
+                        s.IsActive && (
+                            s.ShiftName.Equals(shiftKey, StringComparison.OrdinalIgnoreCase) ||
+                            s.ShiftName.Contains(shiftKey, StringComparison.OrdinalIgnoreCase) ||
+                            shiftKey.Contains(s.ShiftName, StringComparison.OrdinalIgnoreCase)
+                        ));
+                }
+
+                var isAfternoonKey = !string.IsNullOrWhiteSpace(shiftKey) &&
+                    (shiftKey.ToLower().Contains("tarde") || shiftKey.ToLower().Contains("pm"));
+                var isMorningKey = !string.IsNullOrWhiteSpace(shiftKey) &&
+                    (shiftKey.ToLower().Contains("mañana") || shiftKey.ToLower().Contains("am"));
+
+                if (matchingShift == null && isAfternoonKey)
+                {
+                    matchingShift = tour.Shifts.FirstOrDefault(s => s.IsActive && s.StartTime.Hours >= 12);
+                }
+                else if (matchingShift == null && isMorningKey)
+                {
+                    matchingShift = tour.Shifts.FirstOrDefault(s => s.IsActive && s.StartTime.Hours < 12 && s.StartTime != TimeSpan.Zero);
+                }
+
+                matchingShift ??= tour.Shifts.FirstOrDefault(s => s.IsActive && s.StartTime != TimeSpan.Zero);
+
+                if (matchingShift != null && matchingShift.StartTime != TimeSpan.Zero)
+                {
+                    return DateTime.Today.Add(matchingShift.StartTime).ToString("hh:mm tt", System.Globalization.CultureInfo.InvariantCulture);
+                }
+            }
+
+            // 3. Fallback oficial basado en los folletos y ficha técnica de Turismo Chilón S.A.C.
+            var titleLower = (tour.Title ?? "").ToLower();
+            var isAfternoon = !string.IsNullOrWhiteSpace(shiftKey) &&
+                (shiftKey.ToLower().Contains("tarde") || shiftKey.ToLower().Contains("pm"));
+
+            if (titleLower.Contains("otuzco"))
+            {
+                return "03:30 PM";
+            }
+            if (titleLower.Contains("collpa") || titleLower.Contains("llacanora"))
+            {
+                return "03:30 PM";
+            }
+            if (titleLower.Contains("yanamarca") || titleLower.Contains("castillo"))
+            {
+                return isAfternoon ? "02:30 PM" : "09:30 AM";
+            }
+            if (titleLower.Contains("namora") || titleLower.Contains("nicolás") || titleLower.Contains("nicolas"))
+            {
+                return "09:30 AM";
+            }
+            if (titleLower.Contains("city") || titleLower.Contains("peatonal"))
+            {
+                return isAfternoon ? "03:30 PM" : "10:00 AM";
+            }
+            if (titleLower.Contains("cumbe") || titleLower.Contains("frailones"))
+            {
+                return isAfternoon ? "02:30 PM" : "09:30 AM";
+            }
+            if (titleLower.Contains("porcon") || titleLower.Contains("porcón"))
+            {
+                return "09:30 AM";
+            }
+            if (titleLower.Contains("polloc"))
+            {
+                return isAfternoon ? "02:30 PM" : "09:30 AM";
+            }
+            if (titleLower.Contains("baños") || titleLower.Contains("inca"))
+            {
+                return isAfternoon ? "03:00 PM" : "09:30 AM";
+            }
+            if (titleLower.Contains("yumagual"))
+            {
+                return "09:00 AM";
+            }
+
+            return isAfternoon ? "03:30 PM" : "09:30 AM";
+        }
+
+        private static TimeSpan ParseTimeForSorting(string timeStr)
+        {
+            if (DateTime.TryParseExact(timeStr, "hh:mm tt", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var dt))
+            {
+                return dt.TimeOfDay;
+            }
+            if (DateTime.TryParse(timeStr, out var dt2))
+            {
+                return dt2.TimeOfDay;
+            }
+            return TimeSpan.Zero;
         }
     }
 }

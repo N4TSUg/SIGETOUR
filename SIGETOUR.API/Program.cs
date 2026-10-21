@@ -223,6 +223,133 @@ using (var scope = app.Services.CreateScope())
     catch { }
     try
     {
+        if (!db.TourShifts.Any())
+        {
+            var allTours = db.TourPackages.ToList();
+            foreach (var t in allTours)
+            {
+                var lower = (t.Title ?? "").ToLower();
+                if (lower.Contains("otuzco"))
+                {
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Tarde",
+                        StartTime = new TimeSpan(15, 30, 0),
+                        EndTime = new TimeSpan(18, 30, 0),
+                        IsActive = true
+                    });
+                }
+                else if (lower.Contains("collpa") || lower.Contains("llacanora"))
+                {
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Tarde",
+                        StartTime = new TimeSpan(15, 30, 0),
+                        EndTime = new TimeSpan(19, 0, 0),
+                        IsActive = true
+                    });
+                }
+                else if (lower.Contains("yanamarca") || lower.Contains("castillo"))
+                {
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Mañana",
+                        StartTime = new TimeSpan(9, 30, 0),
+                        EndTime = new TimeSpan(13, 30, 0),
+                        IsActive = true
+                    });
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Tarde",
+                        StartTime = new TimeSpan(14, 30, 0),
+                        EndTime = new TimeSpan(18, 30, 0),
+                        IsActive = true
+                    });
+                }
+                else if (lower.Contains("namora"))
+                {
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Mañana",
+                        StartTime = new TimeSpan(9, 30, 0),
+                        EndTime = new TimeSpan(15, 0, 0),
+                        IsActive = true
+                    });
+                }
+                else if (lower.Contains("city tour") || lower.Contains("peatonal"))
+                {
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Mañana",
+                        StartTime = new TimeSpan(10, 0, 0),
+                        EndTime = new TimeSpan(13, 0, 0),
+                        IsActive = true
+                    });
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Tarde",
+                        StartTime = new TimeSpan(15, 30, 0),
+                        EndTime = new TimeSpan(18, 30, 0),
+                        IsActive = true
+                    });
+                }
+                else if (lower.Contains("cumbe") || lower.Contains("cumbemayo"))
+                {
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Mañana",
+                        StartTime = new TimeSpan(9, 30, 0),
+                        EndTime = new TimeSpan(14, 0, 0),
+                        IsActive = true
+                    });
+                }
+                else if (lower.Contains("porcon") || lower.Contains("porcón"))
+                {
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Mañana",
+                        StartTime = new TimeSpan(9, 30, 0),
+                        EndTime = new TimeSpan(14, 0, 0),
+                        IsActive = true
+                    });
+                }
+                else
+                {
+                    db.TourShifts.Add(new SIGETOUR.API.Core.Entities.TourShift
+                    {
+                        Id = Guid.NewGuid(),
+                        TourPackageId = t.Id,
+                        ShiftName = "Turno Mañana",
+                        StartTime = new TimeSpan(9, 30, 0),
+                        EndTime = new TimeSpan(13, 30, 0),
+                        IsActive = true
+                    });
+                }
+            }
+            db.SaveChanges();
+        }
+    }
+    catch { }
+    try
+    {
         if (!db.Vehicles.Any())
         {
             var v1 = new SIGETOUR.API.Core.Entities.Vehicle
