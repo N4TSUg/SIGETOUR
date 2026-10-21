@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SIGETOUR.API.Core.Enums;
@@ -141,15 +142,16 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [AllowAnonymous]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitReview(Guid tourId, string authorName, string? authorCity, string comment)
+        public async Task<IActionResult> SubmitReview(Guid tourId, string authorName, string comment, string? authorCity = null)
         {
             var tour = await _context.TourPackages.FindAsync(tourId);
             if (tour == null) return NotFound();
 
             if (string.IsNullOrWhiteSpace(authorName) || string.IsNullOrWhiteSpace(comment))
             {
-                TempData["ErrorMessage"] = "Por favor ingresa tu nombre y tu comentario.";
+                TempData["ErrorMessage"] = "Por favor ingresa tu nombre y la descripción de tu experiencia.";
                 return RedirectToAction(nameof(Details), new { slug = tour.Slug });
             }
 
@@ -158,7 +160,7 @@ namespace SIGETOUR.API.Controllers.UI
                 Id = Guid.NewGuid(),
                 TourPackageId = tour.Id,
                 AuthorName = authorName.Trim(),
-                AuthorCity = string.IsNullOrWhiteSpace(authorCity) ? "Viajero Verificado" : authorCity.Trim(),
+                AuthorCity = string.IsNullOrWhiteSpace(authorCity) ? "Viajero" : authorCity.Trim(),
                 Comment = comment.Trim(),
                 CreatedAt = DateTime.UtcNow,
                 IsApproved = false,
@@ -168,7 +170,7 @@ namespace SIGETOUR.API.Controllers.UI
             _context.TourReviews.Add(review);
             await _context.SaveChangesAsync();
 
-            TempData["SuccessMessage"] = "¡Muchas gracias por compartir tu experiencia! Tu comentario será revisado por nuestro equipo antes de ser publicado.";
+            TempData["SuccessMessage"] = "¡Muchas gracias por compartir tu experiencia! Tu reseña ha sido registrada y será publicada tras su breve moderación.";
             return RedirectToAction(nameof(Details), new { slug = tour.Slug });
         }
     }

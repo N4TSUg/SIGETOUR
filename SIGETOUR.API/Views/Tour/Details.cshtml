@@ -203,33 +203,37 @@
           <p class="text-body-sm text-outline italic">Aún no hay comentarios publicados para este tour. ¡Sé el primero en compartir tu experiencia!</p>
         }
 
-        <!-- Formulario para dejar comentario -->
+        <!-- Formulario para dejar comentario (Público, sin autenticación) -->
         <div class="mt-6 pt-6 border-t border-outline-variant space-y-4">
-          <h3 class="text-title-sm font-bold text-secondary flex items-center gap-1.5">
-            <span class="material-symbols-outlined text-primary text-[20px]">rate_review</span>
-            ¿Viajaste en este tour? Comparte tu experiencia
-          </h3>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <h3 class="text-title-sm font-bold text-secondary flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-primary text-[20px]">rate_review</span>
+              ¿Viajaste en este tour? Comparte tu experiencia
+            </h3>
+            <span class="text-xs text-on-surface-variant flex items-center gap-1 bg-surface-container-low px-2.5 py-1 rounded-full border border-outline-variant/60">
+              <span class="material-symbols-outlined text-[15px] text-primary">public</span>
+              Público y libre (no requiere registro ni inicio de sesión)
+            </span>
+          </div>
+
           <form asp-controller="Tour" asp-action="SubmitReview" method="post" class="space-y-3">
             @Html.AntiForgeryToken()
             <input type="hidden" name="tourId" value="@Model.Id" />
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Tu Nombre Completo <span class="text-red-500">*</span></label>
-                <input type="text" name="authorName" required placeholder="Ej. Juan Pérez" class="w-full px-3 py-2 text-body-sm bg-surface border border-outline-variant rounded-lg text-on-surface focus:border-primary outline-none" />
-              </div>
-              <div>
-                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Ciudad o Tipo de Viaje (Opcional)</label>
-                <input type="text" name="authorCity" placeholder="Ej. Turista de Lima • Con amigos" class="w-full px-3 py-2 text-body-sm bg-surface border border-outline-variant rounded-lg text-on-surface focus:border-primary outline-none" />
-              </div>
+            <div>
+              <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Tu Nombre <span class="text-red-500">*</span></label>
+              <input type="text" name="authorName" required placeholder="Ingresa tu nombre o cómo te gustaría figurar" class="w-full px-3.5 py-2.5 text-body-sm bg-surface border border-outline-variant rounded-lg text-on-surface focus:border-primary outline-none transition-colors" />
             </div>
             <div>
-              <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Tu Opinión / Comentario de la Experiencia <span class="text-red-500">*</span></label>
-              <textarea name="comment" required rows="3" placeholder="Cuéntanos cómo fue el transporte, la puntualidad y tu visita a este atractivo..." class="w-full px-3 py-2 text-body-sm bg-surface border border-outline-variant rounded-lg text-on-surface focus:border-primary outline-none"></textarea>
+              <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Descripción de tu experiencia <span class="text-red-500">*</span></label>
+              <textarea name="comment" required rows="3" placeholder="Describe cómo estuvo el recorrido, los paisajes, el transporte, la puntualidad o la atención del guía..." class="w-full px-3.5 py-2.5 text-body-sm bg-surface border border-outline-variant rounded-lg text-on-surface focus:border-primary outline-none transition-colors"></textarea>
             </div>
-            <button type="submit" class="px-5 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold text-label-md flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
-              <span class="material-symbols-outlined text-sm">send</span>
-              <span>Enviar Comentario</span>
-            </button>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+              <span class="text-[11px] text-outline">Tu testimonio será visible en este circuito tras una breve validación de nuestro equipo.</span>
+              <button type="submit" class="px-5 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold text-label-md flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer shrink-0">
+                <span class="material-symbols-outlined text-sm">send</span>
+                <span>Publicar Reseña</span>
+              </button>
+            </div>
           </form>
         </div>
       </section>
