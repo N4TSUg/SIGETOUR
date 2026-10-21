@@ -121,6 +121,22 @@ using (var scope = app.Services.CreateScope())
     try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Categories"" (""Id"" uuid NOT NULL PRIMARY KEY, ""Name"" text NOT NULL, ""Description"" text, ""Icon"" text, ""IsActive"" boolean NOT NULL DEFAULT true, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP);"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" DROP COLUMN IF EXISTS ""Category"";"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" ADD COLUMN IF NOT EXISTS ""CategoryId"" uuid REFERENCES ""Categories""(""Id"") ON DELETE SET NULL;"); } catch { }
+    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" ADD COLUMN IF NOT EXISTS ""IsFlagship"" boolean NOT NULL DEFAULT false;"); } catch { }
+    try {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""TourReviews"" (
+                ""Id"" uuid NOT NULL PRIMARY KEY,
+                ""TourPackageId"" uuid NOT NULL REFERENCES ""TourPackages""(""Id"") ON DELETE CASCADE,
+                ""AuthorName"" text NOT NULL DEFAULT '',
+                ""AuthorCity"" text NOT NULL DEFAULT '',
+                ""Comment"" text NOT NULL DEFAULT '',
+                ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ""IsApproved"" boolean NOT NULL DEFAULT false,
+                ""IsVisibleOnHome"" boolean NOT NULL DEFAULT false
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_TourReviews_TourPackageId"" ON ""TourReviews"" (""TourPackageId"");
+        ");
+    } catch { }
     try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Drivers"" (
         ""Id"" uuid NOT NULL PRIMARY KEY,
         ""FullName"" text NOT NULL DEFAULT '',
@@ -501,6 +517,68 @@ using (var scope = app.Services.CreateScope())
 
             db.CashRegisterShifts.Add(shift);
             db.SaveChanges();
+        }
+    }
+    catch { }
+
+    try
+    {
+        if (!db.TourPackages.Any(t => t.IsFlagship))
+        {
+            var flag = db.TourPackages.FirstOrDefault(t => (t.Title ?? "").ToLower().Contains("cumbe"))
+                    ?? db.TourPackages.FirstOrDefault(t => (t.Title ?? "").ToLower().Contains("yanamarca"))
+                    ?? db.TourPackages.FirstOrDefault();
+            if (flag != null)
+            {
+                flag.IsFlagship = true;
+                db.SaveChanges();
+            }
+        }
+
+        if (!db.TourReviews.Any())
+        {
+            var sampleTour = db.TourPackages.FirstOrDefault();
+            if (sampleTour != null)
+            {
+                var r1 = new SIGETOUR.API.Core.Entities.TourReview
+                {
+                    Id = Guid.NewGuid(),
+                    TourPackageId = sampleTour.Id,
+                    AuthorName = "Mariana Gutiérrez",
+                    AuthorCity = "Turista desde Lima • Viaje Familiar",
+                    Comment = "Excelente servicio en Cumbemayo y Porcón. La van Mercedes estaba súper limpia, muy puntual la salida desde su local en Jr. 2 de Mayo y el viaje fue sumamente cómodo y puntual.",
+                    CreatedAt = DateTime.UtcNow.AddDays(-12),
+                    IsApproved = true,
+                    IsVisibleOnHome = true
+                };
+
+                var r2 = new SIGETOUR.API.Core.Entities.TourReview
+                {
+                    Id = Guid.NewGuid(),
+                    TourPackageId = sampleTour.Id,
+                    AuthorName = "Carlos Rodríguez",
+                    AuthorCity = "Turista de Trujillo • Servicio Privado",
+                    Comment = "Coordinamos por WhatsApp al 901 195 392 para un grupo de 8 amigos con la Toyota HiAce. Nos recogieron puntualmente, chofer sumamente prudente en las curvas de montaña.",
+                    CreatedAt = DateTime.UtcNow.AddDays(-7),
+                    IsApproved = true,
+                    IsVisibleOnHome = true
+                };
+
+                var r3 = new SIGETOUR.API.Core.Entities.TourReview
+                {
+                    Id = Guid.NewGuid(),
+                    TourPackageId = sampleTour.Id,
+                    AuthorName = "Sarah Miller",
+                    AuthorCity = "Traveler from USA • Cumbemayo Tour",
+                    Comment = "Outstanding transport service! Quick communication via WhatsApp and their official office is right in downtown Cajamarca. Very comfortable trip.",
+                    CreatedAt = DateTime.UtcNow.AddDays(-3),
+                    IsApproved = true,
+                    IsVisibleOnHome = true
+                };
+
+                db.TourReviews.AddRange(r1, r2, r3);
+                db.SaveChanges();
+            }
         }
     }
     catch { }

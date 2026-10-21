@@ -140,6 +140,100 @@
           </ul>
         </div>
       </section>
+
+      <!-- SECCIÓN: Opiniones y Comentarios de Viajeros (Sin estrellas) -->
+      <section class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm space-y-6">
+        <div class="flex items-center justify-between border-b border-outline-variant pb-3">
+          <div class="flex items-center gap-2 text-secondary">
+            <span class="material-symbols-outlined text-[24px] text-primary">chat</span>
+            <h2 class="text-title-md font-title-md font-bold">Experiencias y Comentarios de Viajeros</h2>
+          </div>
+          <span class="text-xs text-on-surface-variant font-medium">Turismo Chilón S.A.C.</span>
+        </div>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+          <div class="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-body-sm flex items-center gap-2">
+            <span class="material-symbols-outlined text-emerald-600">check_circle</span>
+            <span>@TempData["SuccessMessage"]</span>
+          </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+          <div class="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-body-sm flex items-center gap-2">
+            <span class="material-symbols-outlined text-red-600">error</span>
+            <span>@TempData["ErrorMessage"]</span>
+          </div>
+        }
+
+        @{
+          var reviews = ViewBag.Reviews as IEnumerable<SIGETOUR.API.Core.Entities.TourReview>;
+        }
+
+        @if (reviews != null && reviews.Any())
+        {
+          <div class="space-y-4">
+            @foreach (var rev in reviews)
+            {
+              var initials = string.Join("", rev.AuthorName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => w[0])).ToUpper();
+              if (string.IsNullOrEmpty(initials)) initials = "TC";
+              <div class="p-4 rounded-xl bg-surface-container-low border border-outline-variant/60 flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-sm shrink-0">
+                  @initials
+                </div>
+                <div class="flex-grow space-y-1">
+                  <div class="flex items-center justify-between flex-wrap gap-1">
+                    <h4 class="text-label-lg font-bold text-secondary">@rev.AuthorName</h4>
+                    <span class="text-[11px] text-outline font-medium">@rev.CreatedAt.ToString("dd MMM yyyy")</span>
+                  </div>
+                  @if (!string.IsNullOrWhiteSpace(rev.AuthorCity))
+                  {
+                    <p class="text-[11px] text-primary font-semibold">@rev.AuthorCity</p>
+                  }
+                  <p class="text-body-sm text-on-surface-variant pt-1 leading-relaxed">
+                    "@rev.Comment"
+                  </p>
+                </div>
+              </div>
+            }
+          </div>
+        }
+        else
+        {
+          <p class="text-body-sm text-outline italic">Aún no hay comentarios publicados para este tour. ¡Sé el primero en compartir tu experiencia!</p>
+        }
+
+        <!-- Formulario para dejar comentario -->
+        <div class="mt-6 pt-6 border-t border-outline-variant space-y-4">
+          <h3 class="text-title-sm font-bold text-secondary flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary text-[20px]">rate_review</span>
+            ¿Viajaste en este tour? Comparte tu experiencia
+          </h3>
+          <form asp-controller="Tour" asp-action="SubmitReview" method="post" class="space-y-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="tourId" value="@Model.Id" />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Tu Nombre Completo <span class="text-red-500">*</span></label>
+                <input type="text" name="authorName" required placeholder="Ej. Juan Pérez" class="w-full px-3 py-2 text-body-sm bg-surface border border-outline-variant rounded-lg text-on-surface focus:border-primary outline-none" />
+              </div>
+              <div>
+                <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Ciudad o Tipo de Viaje (Opcional)</label>
+                <input type="text" name="authorCity" placeholder="Ej. Turista de Lima • Con amigos" class="w-full px-3 py-2 text-body-sm bg-surface border border-outline-variant rounded-lg text-on-surface focus:border-primary outline-none" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Tu Opinión / Comentario de la Experiencia <span class="text-red-500">*</span></label>
+              <textarea name="comment" required rows="3" placeholder="Cuéntanos cómo fue el transporte, la puntualidad y tu visita a este atractivo..." class="w-full px-3 py-2 text-body-sm bg-surface border border-outline-variant rounded-lg text-on-surface focus:border-primary outline-none"></textarea>
+            </div>
+            <button type="submit" class="px-5 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-white font-bold text-label-md flex items-center gap-2 shadow-xs transition-colors cursor-pointer">
+              <span class="material-symbols-outlined text-sm">send</span>
+              <span>Enviar Comentario</span>
+            </button>
+          </form>
+        </div>
+      </section>
+    </div> <!-- END LEFT COLUMN -->
     <!-- RIGHT COLUMN: STICKY BOOKING PANEL (4 Cols) -->
     <aside class="lg:col-span-4 sticky top-24">
       <div class="bg-surface-container-lowest rounded-2xl p-6 border border-primary/20 shadow-lg relative overflow-hidden">

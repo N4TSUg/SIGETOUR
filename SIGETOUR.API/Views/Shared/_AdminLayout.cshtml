@@ -224,6 +224,7 @@
     var toursClass = action == "Tours" || action == "CreateTour" || action == "EditTour" ? activeClass : inactiveClass;
     var categoriesClass = action == "Categories" || action == "EditCategory" || action == "CreateCategory" ? activeClass : inactiveClass;
     var featuredClass = action == "Featured" || action == "EditFeatured" ? activeClass : inactiveClass;
+    var reviewsClass = action == "Reviews" ? activeClass : inactiveClass;
     var fleetClass = action == "Fleet" || action == "EditVehicle" ? activeClass : inactiveClass;
     var bookingsClass = action == "Bookings" || action == "EditBooking" ? activeClass : inactiveClass;
     var cashClass = action == "Cash" ? activeClass : inactiveClass;
@@ -250,6 +251,11 @@
     <a class="@featuredClass" asp-controller="Admin" asp-action="Featured">
       <span class="material-symbols-outlined text-[20px]">star</span>
       <span class="">Tours Destacados</span>
+    </a>
+    <!-- Item 2.6: Testimonios & Reseñas -->
+    <a class="@reviewsClass" asp-controller="Admin" asp-action="Reviews">
+      <span class="material-symbols-outlined text-[20px]">rate_review</span>
+      <span class="">Testimonios & Reseñas</span>
     </a>
 <!-- Item 3: Salidas y Flota -->
   <a class="@fleetClass" asp-controller="Admin" asp-action="Fleet">

@@ -35,6 +35,7 @@ namespace SIGETOUR.API.Models
         public Guid? DefaultVehicleId { get; set; }
 
         public bool IsActive { get; set; } = true;
+        public bool IsFlagship { get; set; } = false;
         
         // For the views
         public ICollection<TourImage> ExistingImages { get; set; } = new List<TourImage>();

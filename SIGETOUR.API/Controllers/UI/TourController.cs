@@ -131,7 +131,45 @@ namespace SIGETOUR.API.Controllers.UI
                 tour.BasePrice = featured.PromoPrice.Value;
             }
 
+            var reviews = await _context.TourReviews
+                .Where(r => r.TourPackageId == tour.Id && r.IsApproved)
+                .OrderByDescending(r => r.CreatedAt)
+                .ToListAsync();
+            ViewBag.Reviews = reviews;
+
             return View(tour);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SubmitReview(Guid tourId, string authorName, string? authorCity, string comment)
+        {
+            var tour = await _context.TourPackages.FindAsync(tourId);
+            if (tour == null) return NotFound();
+
+            if (string.IsNullOrWhiteSpace(authorName) || string.IsNullOrWhiteSpace(comment))
+            {
+                TempData["ErrorMessage"] = "Por favor ingresa tu nombre y tu comentario.";
+                return RedirectToAction(nameof(Details), new { slug = tour.Slug });
+            }
+
+            var review = new SIGETOUR.API.Core.Entities.TourReview
+            {
+                Id = Guid.NewGuid(),
+                TourPackageId = tour.Id,
+                AuthorName = authorName.Trim(),
+                AuthorCity = string.IsNullOrWhiteSpace(authorCity) ? "Viajero Verificado" : authorCity.Trim(),
+                Comment = comment.Trim(),
+                CreatedAt = DateTime.UtcNow,
+                IsApproved = false,
+                IsVisibleOnHome = false
+            };
+
+            _context.TourReviews.Add(review);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "¡Muchas gracias por compartir tu experiencia! Tu comentario será revisado por nuestro equipo antes de ser publicado.";
+            return RedirectToAction(nameof(Details), new { slug = tour.Slug });
         }
     }
 }

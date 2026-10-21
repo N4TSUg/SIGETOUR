@@ -1,0 +1,434 @@
+@model IEnumerable<SIGETOUR.API.Core.Entities.TourReview>
+@using SIGETOUR.API.Core.Entities
+@{
+    ViewData["Title"] = "Gestión de Testimonios y Reseñas";
+    Layout = "_AdminLayout";
+    var tours = ViewBag.Tours as IEnumerable<TourPackage> ?? Enumerable.Empty<TourPackage>();
+    var currentStatus = ViewBag.CurrentStatus as string ?? "all";
+    var currentTourId = ViewBag.CurrentTourId as Guid?;
+    var currentSearch = ViewBag.CurrentSearch as string;
+    int totalCount = ViewBag.TotalCount ?? 0;
+    int pendingCount = ViewBag.PendingCount ?? 0;
+    int approvedCount = ViewBag.ApprovedCount ?? 0;
+    int homeCount = ViewBag.HomeCount ?? 0;
+}
+
+<div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-7xl mx-auto space-y-6">
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center gap-3">
+            <span class="material-symbols-outlined text-[22px]">check_circle</span>
+            <span class="font-semibold text-body-md">@TempData["SuccessMessage"]</span>
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="p-4 rounded-xl bg-red-100 border border-red-200 text-red-700 flex items-center gap-3">
+            <span class="material-symbols-outlined text-[22px]">error</span>
+            <span class="font-semibold text-body-md">@TempData["ErrorMessage"]</span>
+        </div>
+    }
+
+    <!-- Header Section -->
+    <section class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2 text-label-sm font-label-sm text-secondary mb-1">
+                <span>Catálogo de Rutas</span>
+                <span class="material-symbols-outlined text-xs">chevron_right</span>
+                <span class="text-primary font-bold">Moderación de Experiencias</span>
+            </div>
+            <h1 class="text-headline-md font-headline-md font-extrabold text-on-surface flex items-center gap-2.5">
+                <span class="material-symbols-outlined text-primary text-[32px]">rate_review</span>
+                Testimonios y Reseñas de Viajeros
+            </h1>
+            <p class="text-body-md font-body-md text-on-surface-variant mt-1 max-w-3xl">
+                Modera y administra las experiencias compartidas por los pasajeros de Turismo Chilón. Puedes aprobar testimonios recibidos en la web o registrar comentarios de clientes y seleccionar cuáles se exhibirán en la portada principal.
+            </p>
+        </div>
+        <div class="flex items-center gap-3 shrink-0">
+            <button type="button" onclick="openCreateReviewModal()" class="px-5 py-2.5 rounded-lg bg-primary hover:bg-[#0e5a52] text-on-primary font-label-lg font-bold shadow-sm transition-all flex items-center gap-2 active:scale-95 cursor-pointer">
+                <span class="material-symbols-outlined text-[20px]">add_comment</span>
+                <span>Registrar Testimonio Manual</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Metrics Ribbon -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-label-sm font-label-sm text-secondary block font-medium">Total Testimonios</span>
+                <span class="text-headline-md font-headline-md font-extrabold text-primary">@totalCount</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">comment</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-label-sm font-label-sm text-amber-700 block font-medium">Pendientes de Moderación</span>
+                <span class="text-headline-md font-headline-md font-extrabold text-amber-600">@pendingCount</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">hourglass_empty</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-label-sm font-label-sm text-green-700 block font-medium">Aprobados / Validados</span>
+                <span class="text-headline-md font-headline-md font-extrabold text-green-700">@approvedCount</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-green-100 text-green-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">verified</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant shadow-sm flex items-center justify-between">
+            <div>
+                <span class="text-label-sm font-label-sm text-secondary block font-medium">En Portada Principal</span>
+                <span class="text-headline-md font-headline-md font-extrabold text-primary">@homeCount</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">storefront</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter and Search Bar -->
+    <div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm space-y-4">
+        <!-- Status Tabs -->
+        <div class="flex items-center gap-2 border-b border-outline-variant/50 pb-3 overflow-x-auto">
+            <a href="@Url.Action("Reviews", "Admin", new { status = "all", tourId = currentTourId, search = currentSearch })"
+               class="px-3.5 py-1.5 rounded-lg text-label-md font-semibold transition-all whitespace-nowrap @(currentStatus == "all" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:bg-surface-container")">
+                Todos (@totalCount)
+            </a>
+            <a href="@Url.Action("Reviews", "Admin", new { status = "pending", tourId = currentTourId, search = currentSearch })"
+               class="px-3.5 py-1.5 rounded-lg text-label-md font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 @(currentStatus == "pending" ? "bg-amber-600 text-white shadow-sm" : "text-on-surface-variant hover:bg-surface-container")">
+                <span>Pendientes</span>
+                @if (pendingCount > 0)
+                {
+                    <span class="px-1.5 py-0.2 rounded-full text-xs font-bold @(currentStatus == "pending" ? "bg-white text-amber-700" : "bg-amber-100 text-amber-800")">@pendingCount</span>
+                }
+            </a>
+            <a href="@Url.Action("Reviews", "Admin", new { status = "approved", tourId = currentTourId, search = currentSearch })"
+               class="px-3.5 py-1.5 rounded-lg text-label-md font-semibold transition-all whitespace-nowrap @(currentStatus == "approved" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:bg-surface-container")">
+                Aprobados (@approvedCount)
+            </a>
+            <a href="@Url.Action("Reviews", "Admin", new { status = "home", tourId = currentTourId, search = currentSearch })"
+               class="px-3.5 py-1.5 rounded-lg text-label-md font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 @(currentStatus == "home" ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:bg-surface-container")">
+                <span class="material-symbols-outlined text-[16px]">storefront</span>
+                <span>En Portada (@homeCount)</span>
+            </a>
+        </div>
+
+        <!-- Filter Form -->
+        <form method="get" asp-action="Reviews" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            <input type="hidden" name="status" value="@currentStatus" />
+
+            <div class="md:col-span-6 relative">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+                <input type="text" name="search" value="@currentSearch" placeholder="Buscar por autor, ciudad o texto del testimonio..."
+                       class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+                @if (!string.IsNullOrWhiteSpace(currentSearch))
+                {
+                    <a href="@Url.Action("Reviews", "Admin", new { status = currentStatus, tourId = currentTourId })" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface material-symbols-outlined text-[16px]">close</a>
+                }
+            </div>
+
+            <div class="md:col-span-4">
+                <select name="tourId" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                    <option value="" selected="@(!currentTourId.HasValue || currentTourId.Value == Guid.Empty)">Todos los Circuitos</option>
+                    @foreach (var t in tours)
+                    {
+                        <option value="@t.Id" selected="@(currentTourId.HasValue && currentTourId.Value == t.Id)">@t.Title</option>
+                    }
+                </select>
+            </div>
+
+            <div class="md:col-span-2 flex items-center gap-2">
+                <button type="submit" class="w-full py-2 px-3 bg-primary text-on-primary rounded-lg text-label-md font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-1">
+                    <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                    <span>Filtrar</span>
+                </button>
+                @if (!string.IsNullOrWhiteSpace(currentSearch) || (currentTourId.HasValue && currentTourId.Value != Guid.Empty) || currentStatus != "all")
+                {
+                    <a href="@Url.Action("Reviews", "Admin")" class="p-2 border border-outline-variant text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors" title="Limpiar todos los filtros">
+                        <span class="material-symbols-outlined text-[20px]">refresh</span>
+                    </a>
+                }
+            </div>
+        </form>
+    </div>
+
+    <!-- Reviews Table -->
+    <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-surface-container-low text-on-surface-variant font-label-lg border-b border-outline-variant">
+                        <th class="p-4 font-semibold">Viajero / Autor</th>
+                        <th class="p-4 font-semibold">Circuito Turístico</th>
+                        <th class="p-4 font-semibold">Testimonio</th>
+                        <th class="p-4 font-semibold text-center">Estado</th>
+                        <th class="p-4 font-semibold text-center">En Portada</th>
+                        <th class="p-4 font-semibold text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="text-body-md text-on-surface divide-y divide-outline-variant/50">
+                    @if (Model != null && Model.Any())
+                    {
+                        foreach (var review in Model)
+                        {
+                            var initials = string.Join("", (review.AuthorName ?? "V").Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => s[0])).ToUpper();
+                            <tr class="hover:bg-surface-container-low/50 transition-colors">
+                                <td class="p-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0 border border-primary/20">
+                                            @initials
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-on-surface">@review.AuthorName</div>
+                                            <div class="text-xs text-on-surface-variant flex items-center gap-1">
+                                                <span class="material-symbols-outlined text-[13px] text-outline">location_on</span>
+                                                <span>@(string.IsNullOrWhiteSpace(review.AuthorCity) ? "Cajamarca, Perú" : review.AuthorCity)</span>
+                                            </div>
+                                            <div class="text-[11px] text-outline mt-0.5">@review.CreatedAt.ToString("dd MMM yyyy, hh:mm tt")</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-4">
+                                    @if (review.TourPackage != null)
+                                    {
+                                        <div class="flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-primary text-[18px]">tour</span>
+                                            <span class="font-semibold text-on-surface text-sm">@review.TourPackage.Title</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-on-surface-variant text-sm italic">Experiencia General</span>
+                                    }
+                                </td>
+                                <td class="p-4 max-w-md">
+                                    <p class="text-body-sm text-on-surface-variant line-clamp-3 italic">
+                                        &ldquo;@review.Comment&rdquo;
+                                    </p>
+                                </td>
+                                <td class="p-4 text-center whitespace-nowrap">
+                                    @if (review.IsApproved)
+                                    {
+                                        <span class="inline-flex items-center gap-1 text-green-800 bg-green-100 border border-green-200 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                            <span class="material-symbols-outlined text-[14px]">check_circle</span> Aprobado
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex items-center gap-1 text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-full text-xs font-semibold">
+                                            <span class="material-symbols-outlined text-[14px]">hourglass_empty</span> Pendiente
+                                        </span>
+                                    }
+                                </td>
+                                <td class="p-4 text-center whitespace-nowrap">
+                                    @if (review.IsVisibleOnHome)
+                                    {
+                                        <span class="inline-flex items-center gap-1 text-primary bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-full text-xs font-bold">
+                                            <span class="material-symbols-outlined text-[14px]">storefront</span> Visible en Inicio
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="inline-flex items-center gap-1 text-outline bg-surface-container px-2 py-0.5 rounded-full text-xs">
+                                            No Visible
+                                        </span>
+                                    }
+                                </td>
+                                <td class="p-4 text-right space-x-1 whitespace-nowrap">
+                                    <!-- Toggle Aprobación -->
+                                    <form asp-action="ToggleReviewApproval" method="post" class="inline">
+                                        <input type="hidden" name="id" value="@review.Id" />
+                                        <button type="submit" class="p-2 @(review.IsApproved ? "text-amber-700 hover:bg-amber-50" : "text-green-700 hover:bg-green-50") rounded-lg transition-colors inline-block" title="@(review.IsApproved ? "Marcar como pendiente" : "Aprobar testimonio")">
+                                            <span class="material-symbols-outlined text-[20px]">@(review.IsApproved ? "unpublished" : "check_circle")</span>
+                                        </button>
+                                    </form>
+
+                                    <!-- Toggle Portada -->
+                                    <form asp-action="ToggleReviewHomeVisibility" method="post" class="inline">
+                                        <input type="hidden" name="id" value="@review.Id" />
+                                        <button type="submit" class="p-2 @(review.IsVisibleOnHome ? "text-primary bg-primary/10" : "text-on-surface-variant hover:text-primary") rounded-lg hover:bg-surface-container transition-colors inline-block" title="@(review.IsVisibleOnHome ? "Quitar de portada de inicio" : "Exhibir en portada de inicio")">
+                                            <span class="material-symbols-outlined text-[20px]" style="@(review.IsVisibleOnHome ? "font-variation-settings: 'FILL' 1;" : "")">storefront</span>
+                                        </button>
+                                    </form>
+
+                                    <!-- Eliminar -->
+                                    <button type="button" class="p-2 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-surface-container transition-colors cursor-pointer inline-block" title="Eliminar testimonio" onclick="openDeleteReviewModal('@review.Id', '@(review.AuthorName?.Replace("'", "\\'") ?? "")')">
+                                        <span class="material-symbols-outlined text-[20px]">delete</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="p-12 text-center text-on-surface-variant">
+                                <span class="material-symbols-outlined text-outline text-5xl block mb-3">rate_review</span>
+                                <h3 class="text-title-md font-bold text-on-surface mb-1">No se encontraron testimonios</h3>
+                                <p class="text-body-sm text-outline max-w-md mx-auto">
+                                    No hay reseñas registradas bajo los filtros seleccionados. Los comentarios dejados por visitantes en las fichas de los tours aparecerán aquí automáticamente.
+                                </p>
+                                <div class="mt-4 flex justify-center gap-3">
+                                    <button type="button" onclick="openCreateReviewModal()" class="px-4 py-2 bg-primary text-on-primary rounded-lg font-bold text-label-md flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-[18px]">add</span>
+                                        Registrar Nuevo Testimonio
+                                    </button>
+                                    @if (!string.IsNullOrWhiteSpace(currentSearch) || currentTourId.HasValue || currentStatus != "all")
+                                    {
+                                        <a href="@Url.Action("Reviews", "Admin")" class="px-4 py-2 border border-outline-variant text-on-surface-variant hover:bg-surface-container rounded-lg font-bold text-label-md">
+                                            Limpiar Filtros
+                                        </a>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <partial name="_AdminPagination" model="ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel" />
+    </div>
+</div>
+
+<!-- MODAL: REGISTRAR TESTIMONIO MANUAL -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="createReviewModal">
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-xl border border-outline-variant overflow-hidden shadow-2xl transform transition-all">
+        <div class="h-1.5 w-full bg-primary"></div>
+        <form asp-action="CreateReview" method="post">
+            <div class="p-6 pb-4 flex items-start justify-between gap-4 border-b border-outline-variant/50">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined text-[26px]">rate_review</span>
+                    </div>
+                    <div>
+                        <h3 class="text-headline-sm font-bold text-on-surface">Registrar Testimonio</h3>
+                        <p class="text-body-sm text-on-surface-variant">Ingresa la reseña brindada por un pasajero.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeCreateReviewModal()" class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-label-md font-bold text-on-surface mb-1.5">Circuito Turístico Relacionado *</label>
+                    <select name="tourId" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" required>
+                        <option value="">-- Seleccionar Tour --</option>
+                        @foreach (var t in tours)
+                        {
+                            <option value="@t.Id">@t.Title</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-label-md font-bold text-on-surface mb-1.5">Nombre del Pasajero / Autor *</label>
+                        <input type="text" name="authorName" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Ej: Mariana Gutiérrez" required />
+                    </div>
+                    <div>
+                        <label class="block text-label-md font-bold text-on-surface mb-1.5">Ciudad o Procedencia</label>
+                        <input type="text" name="authorCity" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Ej: Turista de Lima – Viaje Familiar" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-label-md font-bold text-on-surface mb-1.5">Comentario / Testimonio del Viajero *</label>
+                    <textarea name="comment" rows="4" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Escribe aquí la experiencia y opinión del viajero respecto al servicio brindado..." required></textarea>
+                </div>
+
+                <div class="pt-2">
+                    <label class="flex items-center gap-3 p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors">
+                        <input type="checkbox" name="isVisibleOnHome" value="true" class="rounded text-primary focus:ring-primary h-5 w-5" checked />
+                        <div>
+                            <span class="block text-label-md font-bold text-primary">Exhibir en la Portada Principal</span>
+                            <span class="block text-label-sm text-on-surface-variant">Aparecerá en el carrusel de 'Viajeros que recomiendan Turismo Chilón' del Home.</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="p-6 pt-3 flex justify-end gap-3 border-t border-outline-variant/50">
+                <button type="button" onclick="closeCreateReviewModal()" class="px-5 py-2.5 rounded-lg border border-outline-variant text-on-surface font-label-md font-bold hover:bg-surface-container transition-all">Cancelar</button>
+                <button type="submit" class="px-6 py-2.5 rounded-lg bg-primary hover:bg-[#0e5a52] text-on-primary font-label-md font-bold shadow-sm transition-all flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">save</span>
+                    <span>Guardar y Aprobar</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: ELIMINAR TESTIMONIO -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="deleteReviewModal">
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-md border border-red-200 overflow-hidden shadow-2xl transform transition-all">
+        <div class="h-1.5 w-full bg-red-600"></div>
+        <form asp-action="DeleteReview" method="post">
+            <input type="hidden" name="id" id="deleteReviewId" />
+            <div class="p-6 pb-4 flex items-start justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined text-[26px]">delete</span>
+                    </div>
+                    <div>
+                        <h3 class="text-headline-sm font-bold text-on-surface">¿Eliminar Testimonio?</h3>
+                        <p class="text-body-sm text-outline">Esta acción no se puede deshacer.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeDeleteReviewModal()" class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="p-6 py-2">
+                <p class="text-body-md text-on-surface-variant">
+                    ¿Estás seguro de que deseas eliminar permanentemente el testimonio de <span id="deleteReviewAuthor" class="font-bold text-on-surface"></span>?
+                </p>
+            </div>
+
+            <div class="p-6 pt-4 flex justify-end gap-3">
+                <button type="button" onclick="closeDeleteReviewModal()" class="px-5 py-2.5 rounded-lg border border-outline-variant text-on-surface font-label-md font-bold hover:bg-surface-container transition-all">Cancelar</button>
+                <button type="submit" class="px-6 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-label-md font-bold shadow-sm transition-all flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">delete_forever</span>
+                    <span>Sí, Eliminar</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openCreateReviewModal() {
+        document.getElementById('createReviewModal').classList.remove('hidden');
+    }
+    function closeCreateReviewModal() {
+        document.getElementById('createReviewModal').classList.add('hidden');
+    }
+
+    function openDeleteReviewModal(id, author) {
+        document.getElementById('deleteReviewId').value = id;
+        document.getElementById('deleteReviewAuthor').textContent = `"${author}"`;
+        document.getElementById('deleteReviewModal').classList.remove('hidden');
+    }
+    function closeDeleteReviewModal() {
+        document.getElementById('deleteReviewModal').classList.add('hidden');
+    }
+
+    // Cerrar modales con Escape
+    window.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeCreateReviewModal();
+            closeDeleteReviewModal();
+        }
+    });
+</script>

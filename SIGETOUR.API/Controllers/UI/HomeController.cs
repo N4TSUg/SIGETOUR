@@ -57,6 +57,28 @@ namespace SIGETOUR.API.Controllers.UI
                 .ToListAsync();
             ViewBag.Categories = categories;
 
+            // Destino Insignia de Portada (configurable desde Admin)
+            var flagshipTour = await _context.TourPackages
+                .Include(t => t.Images)
+                .Include(t => t.Category)
+                .Include(t => t.Shifts)
+                .FirstOrDefaultAsync(t => t.IsFlagship && t.IsActive)
+                ?? await _context.TourPackages
+                    .Include(t => t.Images)
+                    .Include(t => t.Category)
+                    .Include(t => t.Shifts)
+                    .FirstOrDefaultAsync(t => t.IsActive);
+            ViewBag.FlagshipTour = flagshipTour;
+
+            // Testimonios y Comentarios de Experiencia (aprobados y seleccionados para portada)
+            var homeReviews = await _context.TourReviews
+                .Include(r => r.TourPackage)
+                .Where(r => r.IsApproved && r.IsVisibleOnHome)
+                .OrderByDescending(r => r.CreatedAt)
+                .Take(6)
+                .ToListAsync();
+            ViewBag.HomeReviews = homeReviews;
+
             return View(tours);
         }
     }

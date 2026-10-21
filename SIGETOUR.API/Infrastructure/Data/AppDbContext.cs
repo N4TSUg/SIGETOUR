@@ -27,6 +27,7 @@ namespace SIGETOUR.API.Infrastructure.Data
         public DbSet<PettyCashAccount> PettyCashAccounts { get; set; }
         public DbSet<PettyCashMovement> PettyCashMovements { get; set; }
         public DbSet<Driver> Drivers { get; set; }
+        public DbSet<TourReview> TourReviews { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

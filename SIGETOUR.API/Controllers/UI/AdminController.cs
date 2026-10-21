@@ -1414,7 +1414,8 @@ namespace SIGETOUR.API.Controllers.UI
                 RequiredAdvancePercentage = dto.RequiredAdvancePercentage,
                 Duration = dto.Duration?.Trim() ?? string.Empty,
                 DefaultVehicleId = validVehicleId,
-                IsActive = true
+                IsActive = true,
+                IsFlagship = dto.IsFlagship
             };
 
             var baseSlug = !string.IsNullOrWhiteSpace(dto.Slug) ? dto.Slug.Trim() : model.Title;
@@ -1464,6 +1465,11 @@ namespace SIGETOUR.API.Controllers.UI
             
             try
             {
+                if (model.IsFlagship)
+                {
+                    var existingFlagships = await _context.TourPackages.Where(t => t.IsFlagship).ToListAsync();
+                    foreach (var ef in existingFlagships) ef.IsFlagship = false;
+                }
                 _context.TourPackages.Add(model);
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"Circuito '{model.Title}' registrado y publicado exitosamente.";
@@ -1512,6 +1518,7 @@ namespace SIGETOUR.API.Controllers.UI
                 Duration = tour.Duration,
                 DefaultVehicleId = tour.DefaultVehicleId,
                 IsActive = tour.IsActive,
+                IsFlagship = tour.IsFlagship,
                 ExistingImages = tour.Images,
                 ExistingInclusions = tour.Inclusions,
                 ExistingShifts = tour.Shifts,
@@ -1591,6 +1598,12 @@ namespace SIGETOUR.API.Controllers.UI
             tour.Modality = dto.Modality;
             tour.Difficulty = dto.Difficulty;
             tour.IsActive = dto.IsActive;
+            tour.IsFlagship = dto.IsFlagship;
+            if (dto.IsFlagship)
+            {
+                var existingFlagships = await _context.TourPackages.Where(t => t.Id != tour.Id && t.IsFlagship).ToListAsync();
+                foreach (var ef in existingFlagships) ef.IsFlagship = false;
+            }
             tour.RequiredAdvancePercentage = dto.RequiredAdvancePercentage;
             if (!string.IsNullOrEmpty(dto.Slug)) {
                 var cleanSlug = System.Text.RegularExpressions.Regex.Replace(dto.Slug.Trim().ToLower(), @"[^a-z0-9\-]", "-").Trim('-');
@@ -1701,6 +1714,179 @@ namespace SIGETOUR.API.Controllers.UI
                 } catch { } // ignore file delete errors
             }
             return Ok();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SetFlagshipTour(Guid id)
+        {
+            var tour = await _context.TourPackages.FindAsync(id);
+            if (tour == null) return NotFound();
+
+            var currentFlagships = await _context.TourPackages.Where(t => t.IsFlagship).ToListAsync();
+            foreach (var f in currentFlagships)
+            {
+                f.IsFlagship = false;
+            }
+
+            tour.IsFlagship = true;
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"El circuito \"{tour.Title}\" ha sido seleccionado como Destino Insignia en la portada.";
+            return RedirectToAction(nameof(Tours));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Reviews(string? status, Guid? tourId, string? search, int page = 1)
+        {
+            var query = _context.TourReviews
+                .Include(r => r.TourPackage)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(r =>
+                    r.AuthorName.ToLower().Contains(term) ||
+                    r.AuthorCity.ToLower().Contains(term) ||
+                    r.Comment.ToLower().Contains(term) ||
+                    (r.TourPackage != null && r.TourPackage.Title.ToLower().Contains(term)));
+            }
+
+            if (tourId.HasValue && tourId.Value != Guid.Empty)
+            {
+                query = query.Where(r => r.TourPackageId == tourId.Value);
+            }
+
+            if (status == "pending")
+            {
+                query = query.Where(r => !r.IsApproved);
+            }
+            else if (status == "approved")
+            {
+                query = query.Where(r => r.IsApproved);
+            }
+            else if (status == "home")
+            {
+                query = query.Where(r => r.IsVisibleOnHome);
+            }
+
+            ViewBag.TotalCount = await _context.TourReviews.CountAsync();
+            ViewBag.PendingCount = await _context.TourReviews.CountAsync(r => !r.IsApproved);
+            ViewBag.ApprovedCount = await _context.TourReviews.CountAsync(r => r.IsApproved);
+            ViewBag.HomeCount = await _context.TourReviews.CountAsync(r => r.IsVisibleOnHome);
+
+            int totalItems = await query.CountAsync();
+            int pageSize = 12;
+            int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
+            var reviews = await query.OrderByDescending(r => r.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+            ViewBag.CurrentStatus = status ?? "all";
+            ViewBag.CurrentTourId = tourId;
+            ViewBag.CurrentSearch = search;
+
+            var routeParams = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(status)) routeParams["status"] = status;
+            if (tourId.HasValue && tourId.Value != Guid.Empty) routeParams["tourId"] = tourId.Value.ToString();
+            if (!string.IsNullOrWhiteSpace(search)) routeParams["search"] = search;
+
+            ViewBag.Pagination = new PaginationViewModel
+            {
+                Action = "Reviews",
+                Controller = "Admin",
+                CurrentPage = page,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                PageSize = pageSize,
+                RouteParams = routeParams
+            };
+
+            return View(reviews);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ToggleReviewApproval(Guid id)
+        {
+            var review = await _context.TourReviews.FindAsync(id);
+            if (review == null) return NotFound();
+
+            review.IsApproved = !review.IsApproved;
+            if (!review.IsApproved)
+            {
+                review.IsVisibleOnHome = false;
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = review.IsApproved
+                ? $"Testimonio de \"{review.AuthorName}\" aprobado exitosamente."
+                : $"Testimonio de \"{review.AuthorName}\" marcado como pendiente.";
+            return RedirectToAction(nameof(Reviews));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ToggleReviewHomeVisibility(Guid id)
+        {
+            var review = await _context.TourReviews.FindAsync(id);
+            if (review == null) return NotFound();
+
+            review.IsVisibleOnHome = !review.IsVisibleOnHome;
+            if (review.IsVisibleOnHome)
+            {
+                review.IsApproved = true;
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = review.IsVisibleOnHome
+                ? $"Testimonio fijado para mostrarse en la portada oficial."
+                : $"Testimonio retirado de la portada.";
+            return RedirectToAction(nameof(Reviews));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteReview(Guid id)
+        {
+            var review = await _context.TourReviews.FindAsync(id);
+            if (review != null)
+            {
+                _context.TourReviews.Remove(review);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = "Testimonio eliminado permanentemente.";
+            }
+            return RedirectToAction(nameof(Reviews));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateReview(Guid tourId, string authorName, string? authorCity, string comment, bool isVisibleOnHome)
+        {
+            if (string.IsNullOrWhiteSpace(authorName) || string.IsNullOrWhiteSpace(comment))
+            {
+                TempData["ErrorMessage"] = "El nombre y el comentario son obligatorios.";
+                return RedirectToAction(nameof(Reviews));
+            }
+
+            var review = new TourReview
+            {
+                Id = Guid.NewGuid(),
+                TourPackageId = tourId,
+                AuthorName = authorName.Trim(),
+                AuthorCity = authorCity?.Trim() ?? string.Empty,
+                Comment = comment.Trim(),
+                CreatedAt = DateTime.UtcNow,
+                IsApproved = true,
+                IsVisibleOnHome = isVisibleOnHome
+            };
+
+            _context.TourReviews.Add(review);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = "Nuevo testimonio registrado y aprobado con éxito.";
+            return RedirectToAction(nameof(Reviews));
         }
 
         private async Task ProcessImages(TourPackage tour, IFormFileCollection files)

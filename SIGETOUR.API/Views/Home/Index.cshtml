@@ -30,8 +30,8 @@
 <p class="text-xs text-on-surface-variant font-medium mt-0.5">Viajeros Felices</p>
 </div>
 <div>
-<p class="text-2xl sm:text-3xl font-extrabold text-primary">4.9 / 5</p>
-<p class="text-xs text-on-surface-variant font-medium mt-0.5">Calificación Oficial</p>
+<p class="text-2xl sm:text-3xl font-extrabold text-primary">100%</p>
+<p class="text-xs text-on-surface-variant font-medium mt-0.5">Empresa Formal MTC</p>
 </div>
 <div>
 <p class="text-2xl sm:text-3xl font-extrabold text-secondary">100%</p>
@@ -39,21 +39,46 @@
 </div>
 </div>
 </div>
-<!-- Hero Graphic / Media Preview -->
+@{
+    var flagship = ViewBag.FlagshipTour as SIGETOUR.API.Core.Entities.TourPackage;
+}
+<!-- Hero Graphic / Media Preview: Destino Insignia Dinámico -->
 <div class="lg:col-span-5">
 <div class="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white group">
-<img class="w-full h-[410px] object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A breathtaking vista of Cumbemayo in Cajamarca Perú, featuring towering natural rock formations called Los Frailones standing under a crisp bright Andean morning sky." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5UbZyU3SVvD2tu1aa_CHtteeQYkcL95cOvzvOcpIvu2wSDQFk8OL5-zpj4BP6Uc-Y1r1upOagIGL6XDZpRir4poouS_nNhq2AifsBuQaEozOwlBGaWtnIQEQ9hvuSPBJtvX6363rCI9x3MuzlbenUMZ7Vj1a43rtQrRu2GIM7MwqP97sw5n7gLF40B_reiszc5H8G7C5LPdPKUwK_HQmvoq71Fuo9LebjDlQT-LCe2SCAXdmtiNCurQ">
-<div class="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md p-4 rounded-xl shadow-lg border border-outline-variant flex items-center justify-between">
+@if (flagship != null && flagship.Images != null && flagship.Images.Any())
+{
+    <img class="w-full h-[410px] object-cover group-hover:scale-105 transition-transform duration-500" alt="@flagship.Title" src="@flagship.Images.First().ImageUrl">
+}
+else
+{
+    <img class="w-full h-[410px] object-cover group-hover:scale-105 transition-transform duration-500" alt="Cajamarca Turismo Chilón" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB5UbZyU3SVvD2tu1aa_CHtteeQYkcL95cOvzvOcpIvu2wSDQFk8OL5-zpj4BP6Uc-Y1r1upOagIGL6XDZpRir4poouS_nNhq2AifsBuQaEozOwlBGaWtnIQEQ9hvuSPBJtvX6363rCI9x3MuzlbenUMZ7Vj1a43rtQrRu2GIM7MwqP97sw5n7gLF40B_reiszc5H8G7C5LPdPKUwK_HQmvoq71Fuo9LebjDlQT-LCe2SCAXdmtiNCurQ">
+}
+<div class="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md p-4 rounded-xl shadow-lg border border-outline-variant flex items-center justify-between z-20">
 <div>
-<span class="text-[11px] font-bold text-accent-red uppercase tracking-wider block">Destino Insignia</span>
-<h4 class="text-lg font-bold text-secondary">Cumbemayo &amp; Acueducto</h4>
-<p class="text-xs text-on-surface-variant">Salidas 9:30 AM y 2:30 PM • 3,500 msnm</p>
+<span class="text-[11px] font-bold text-accent-red uppercase tracking-wider block flex items-center gap-1">
+    <span class="material-symbols-outlined text-[14px]">verified</span> Destino Insignia
+</span>
+<h4 class="text-lg font-bold text-secondary">@(flagship?.Title ?? "Cumbemayo & Acueducto")</h4>
+<p class="text-xs text-on-surface-variant">
+    @if (flagship?.Shifts != null && flagship.Shifts.Any())
+    {
+        @:Salidas: @string.Join(", ", flagship.Shifts.Where(s => s.IsActive).Select(s => s.ShiftName)) • @flagship.Duration
+    }
+    else
+    {
+        @:Salidas 9:30 AM y 2:30 PM • 3,500 msnm
+    }
+</p>
 </div>
 <div class="text-right">
 <span class="text-xs text-on-surface-variant block">Desde</span>
-<span class="text-2xl font-extrabold text-primary">S/ 35</span>
+<span class="text-2xl font-extrabold text-primary">S/ @(flagship?.BasePrice.ToString("N0") ?? "35")</span>
 </div>
 </div>
+@if (flagship != null)
+{
+    <a asp-controller="Tour" asp-action="Details" asp-route-slug="@flagship.Slug" class="absolute inset-0 z-10" title="Ver detalles de @flagship.Title"></a>
+}
 </div>
 </div>
 </div>
@@ -155,7 +180,7 @@
                             @tour.Duration
                         </span>
                         <span class="absolute top-3 left-3 bg-secondary text-white text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-xs">
-                            <span class="material-symbols-outlined text-[14px] text-amber-400" data-icon="star">star</span> 4.9
+                            <span class="material-symbols-outlined text-[14px] text-primary-light" data-icon="verified">verified</span> Oficial
                         </span>
                     </div>
                     <div class="p-5 flex flex-col flex-grow">
@@ -362,74 +387,51 @@
 <div class="text-center max-w-2xl mx-auto mb-12">
 <span class="text-xs font-bold text-primary uppercase tracking-wider">Testimonios Reales</span>
 <h2 class="text-2xl sm:text-3xl font-extrabold text-secondary mt-1">Viajeros que recomiendan Turismo Chilón</h2>
+<p class="text-xs sm:text-sm text-on-surface-variant mt-2">Experiencias y opiniones compartidas por turistas que viajaron con nosotros.</p>
 </div>
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-<div class="bg-[#f7fefc] p-6 rounded-2xl border border-outline-variant shadow-sm flex flex-col justify-between">
-<div>
-<div class="flex text-amber-400 mb-3">
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-</div>
-<p class="text-xs sm:text-sm text-on-surface-variant italic leading-relaxed">"Excelente servicio en Cumbemayo y Porcón. La van Mercedes estaba súper limpia, muy puntual la salida desde su local en Jr. 2 de Mayo y el viaje fue sumamente cómodo y puntual."</p>
-</div>
-<div class="mt-6 pt-4 border-t border-outline-variant flex items-center gap-3">
-<div class="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-sm">
-            MG
-          </div>
-<div>
-<h4 class="text-xs font-bold text-secondary">Mariana Gutiérrez</h4>
-<p class="text-[11px] text-on-surface-variant">Turista desde Lima • Viaje Familiar</p>
-</div>
-</div>
-</div>
-<div class="bg-[#f7fefc] p-6 rounded-2xl border border-outline-variant shadow-sm flex flex-col justify-between">
-<div>
-<div class="flex text-amber-400 mb-3">
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-</div>
-<p class="text-xs sm:text-sm text-on-surface-variant italic leading-relaxed">
-            "Coordinamos por WhatsApp al 901 195 392 para un grupo de 8 amigos con la Toyota HiAce. Nos recogieron puntualmente, chofer sumamente prudente en las curvas de montaña."
-          </p>
-</div>
-<div class="mt-6 pt-4 border-t border-outline-variant flex items-center gap-3">
-<div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
-            CR
-          </div>
-<div>
-<h4 class="text-xs font-bold text-secondary">Carlos Rodríguez</h4>
-<p class="text-[11px] text-on-surface-variant">Turista de Trujillo • Servicio Privado</p>
-</div>
-</div>
-</div>
-<div class="bg-[#f7fefc] p-6 rounded-2xl border border-outline-variant shadow-sm flex flex-col justify-between">
-<div>
-<div class="flex text-amber-400 mb-3">
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-<span class="material-symbols-outlined text-[18px]">star</span>
-</div>
-<p class="text-xs sm:text-sm text-on-surface-variant italic leading-relaxed">"Outstanding transport service! Quick communication via WhatsApp and their official office is right in downtown Cajamarca. Very comfortable trip."</p>
-</div>
-<div class="mt-6 pt-4 border-t border-outline-variant flex items-center gap-3">
-<div class="w-10 h-10 rounded-full bg-accent-red text-white flex items-center justify-center font-bold text-sm">
-            SM
-          </div>
-<div>
-<h4 class="text-xs font-bold text-secondary">Sarah Miller</h4>
-<p class="text-[11px] text-on-surface-variant">Traveler from USA • Cumbemayo Tour</p>
-</div>
-</div>
-</div>
-</div>
+@{
+    var dynamicReviews = ViewBag.HomeReviews as IEnumerable<SIGETOUR.API.Core.Entities.TourReview>;
+}
+@if (dynamicReviews != null && dynamicReviews.Any())
+{
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        @foreach (var rev in dynamicReviews)
+        {
+            var initials = string.Join("", rev.AuthorName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(w => w[0])).ToUpper();
+            if (string.IsNullOrEmpty(initials)) initials = "TC";
+            <div class="bg-[#f7fefc] p-6 rounded-2xl border border-outline-variant shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                <div>
+                    @if (rev.TourPackage != null)
+                    {
+                        <div class="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full mb-3">
+                            <span class="material-symbols-outlined text-xs">tour</span>
+                            <span>@rev.TourPackage.Title</span>
+                        </div>
+                    }
+                    <p class="text-xs sm:text-sm text-on-surface-variant italic leading-relaxed">
+                        "@rev.Comment"
+                    </p>
+                </div>
+                <div class="mt-6 pt-4 border-t border-outline-variant flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-sm shrink-0">
+                        @initials
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-secondary">@rev.AuthorName</h4>
+                        <p class="text-[11px] text-on-surface-variant">@(string.IsNullOrWhiteSpace(rev.AuthorCity) ? "Turista Verificado" : rev.AuthorCity)</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="bg-surface-container-low/50 rounded-2xl p-8 text-center max-w-xl mx-auto border border-outline-variant">
+        <span class="material-symbols-outlined text-4xl text-outline mb-2">reviews</span>
+        <p class="text-body-sm text-on-surface-variant">Pronto compartiremos más testimonios de nuestros viajeros en ruta.</p>
+    </div>
+}
 </div>
 </section>
 <!-- Direct Booking / Group CTA -->

@@ -27,6 +27,21 @@
     </div>
 </div>
 
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="mb-6 p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px]">check_circle</span>
+        <span class="font-semibold text-body-md">@TempData["SuccessMessage"]</span>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="mb-6 p-4 rounded-xl bg-red-100 border border-red-200 text-red-700 flex items-center gap-3">
+        <span class="material-symbols-outlined text-[22px]">error</span>
+        <span class="font-semibold text-body-md">@TempData["ErrorMessage"]</span>
+    </div>
+}
+
 <!-- Barra de Búsqueda y Filtros de Tours -->
 <div class="bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant shadow-sm mb-6">
     <form method="get" asp-action="Tours" id="tourFilterForm" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
@@ -134,7 +149,15 @@
                                         }
                                     </div>
                                     <div>
-                                        <div class="font-bold text-on-surface">@tour.Title</div>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="font-bold text-on-surface">@tour.Title</span>
+                                            @if (tour.IsFlagship)
+                                            {
+                                                <span class="inline-flex items-center gap-1 text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] font-bold" title="Destino Insignia de la portada principal">
+                                                    <span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">verified</span> Insignia
+                                                </span>
+                                            }
+                                        </div>
                                         @if (!string.IsNullOrWhiteSpace(tour.Subtitle))
                                         {
                                             <div class="text-xs text-on-surface-variant line-clamp-1">@tour.Subtitle</div>
@@ -164,7 +187,13 @@
                                     </span>
                                 }
                             </td>
-                            <td class="p-4 text-right space-x-1">
+                            <td class="p-4 text-right space-x-1 whitespace-nowrap">
+                                <form asp-action="SetFlagshipTour" asp-controller="Admin" method="post" class="inline">
+                                    <input type="hidden" name="id" value="@tour.Id" />
+                                    <button type="submit" class="p-2 @(tour.IsFlagship ? "text-amber-600 bg-amber-50" : "text-on-surface-variant hover:text-amber-600") rounded-lg hover:bg-surface-container transition-colors inline-block" title="@(tour.IsFlagship ? "Destino Insignia actual en la portada" : "Fijar como Destino Insignia en portada")">
+                                        <span class="material-symbols-outlined text-[20px]" style="@(tour.IsFlagship ? "font-variation-settings: 'FILL' 1;" : "")">verified</span>
+                                    </button>
+                                </form>
                                 <a asp-action="EditTour" asp-route-id="@tour.Id" class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors inline-block" title="Editar"><span class="material-symbols-outlined text-[20px]">edit</span></a>
                                 <button type="button" class="p-2 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Eliminar" onclick="openDeleteModal('@tour.Id', '@tour.Title')"><span class="material-symbols-outlined text-[20px]">delete</span></button>
                             </td>

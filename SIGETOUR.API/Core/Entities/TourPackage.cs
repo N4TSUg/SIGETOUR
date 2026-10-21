@@ -31,6 +31,7 @@ namespace SIGETOUR.API.Core.Entities
         public Vehicle? DefaultVehicle { get; set; }
 
         public bool IsActive { get; set; } = true;
+        public bool IsFlagship { get; set; } = false; // Destino Insignia de Portada
 
         // Collections
         public ICollection<TourImage> Images { get; set; } = new List<TourImage>();
@@ -38,5 +39,6 @@ namespace SIGETOUR.API.Core.Entities
         public ICollection<TourShift> Shifts { get; set; } = new List<TourShift>();
         public ICollection<BoardingPoint> BoardingPoints { get; set; } = new List<BoardingPoint>();
         public ICollection<ItineraryStop> ItineraryStops { get; set; } = new List<ItineraryStop>();
+        public ICollection<TourReview> Reviews { get; set; } = new List<TourReview>();
     }
 }
