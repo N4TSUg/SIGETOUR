@@ -206,13 +206,18 @@ namespace SIGETOUR.API.Controllers.UI
                     .Where(b => b.Items.Any(i => i.TourPackageId == tour.Id))
                     .ToList();
 
-                var shiftGroups = tourBookings
-                    .GroupBy(b => string.IsNullOrWhiteSpace(b.ShiftName) ? "General" : b.ShiftName.Trim());
+                // Agrupar por FECHA DE VIAJE y TURNO para que cada salida operativa sea única por día y horario
+                var departureGroups = tourBookings
+                    .GroupBy(b => new {
+                        Date = b.TravelDate.Date,
+                        Shift = string.IsNullOrWhiteSpace(b.ShiftName) ? "General" : b.ShiftName.Trim()
+                    });
 
-                foreach (var sGroup in shiftGroups)
+                foreach (var group in departureGroups)
                 {
-                    var shiftKey = sGroup.Key;
-                    var shiftBookings = sGroup.ToList();
+                    var depDate = group.Key.Date;
+                    var shiftKey = group.Key.Shift;
+                    var shiftBookings = group.ToList();
                     var bookedPax = shiftBookings.Sum(b => b.Items.Where(i => i.TourPackageId == tour.Id).Sum(i => i.Passengers));
 
                     if (bookedPax <= 0) continue;
@@ -240,8 +245,25 @@ namespace SIGETOUR.API.Controllers.UI
                         statusColor = "amber";
                     }
 
+                    string formattedDateStr;
+                    var ci = new System.Globalization.CultureInfo("es-PE");
+                    if (depDate == todayPeru)
+                    {
+                        formattedDateStr = $"Hoy, {depDate.ToString("dd MMM", ci)}";
+                    }
+                    else if (depDate == todayPeru.AddDays(1))
+                    {
+                        formattedDateStr = $"Mañana, {depDate.ToString("dd MMM", ci)}";
+                    }
+                    else
+                    {
+                        formattedDateStr = depDate.ToString("dd MMM yyyy", ci);
+                    }
+
                     departures.Add(new DashboardDepartureItem
                     {
+                        DepartureDate = depDate,
+                        FormattedDate = formattedDateStr,
                         Time = formattedTime,
                         TourTitle = tour.Title,
                         Subtitle = tour.Duration + (tour.Category != null ? " • " + tour.Category.Name : ""),
@@ -258,8 +280,11 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
 
-            // Ordenar las salidas de manera cronológica
-            departures = departures.OrderBy(d => ParseTimeForSorting(d.Time)).ToList();
+            // Ordenar las salidas de manera cronológica por fecha y hora
+            departures = departures
+                .OrderBy(d => d.DepartureDate)
+                .ThenBy(d => ParseTimeForSorting(d.Time))
+                .ToList();
 
             var recentBookings = await _context.Bookings
                 .Include(b => b.Items)

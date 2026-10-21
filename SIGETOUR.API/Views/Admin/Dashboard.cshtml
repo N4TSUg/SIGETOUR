@@ -177,6 +177,7 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="border-b border-outline-variant/30 bg-surface/50 text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">
+                        <th class="py-3 px-4">Fecha de Salida</th>
                         <th class="py-3 px-4">Hora</th>
                         <th class="py-3 px-4">Circuito / Destino Turístico</th>
                         <th class="py-3 px-4">Unidad &amp; Placa</th>
@@ -194,7 +195,18 @@
                             var pct = dep.TotalCapacity > 0 ? (int)Math.Min(100, Math.Round((double)dep.BookedSeats / dep.TotalCapacity * 100)) : 0;
                             var isFull = dep.BookedSeats >= dep.TotalCapacity;
                             <tr class="hover:bg-surface-container-low/40 transition-colors">
-                                <td class="py-3.5 px-4 font-bold text-primary font-mono text-title-sm">
+                                <td class="py-3.5 px-4 whitespace-nowrap">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                            <span class="material-symbols-outlined text-[18px]">calendar_month</span>
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-on-surface text-body-sm">@dep.FormattedDate</div>
+                                            <div class="text-[11px] text-outline capitalize">@dep.DepartureDate.ToString("dddd", new System.Globalization.CultureInfo("es-PE"))</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-3.5 px-4 font-bold text-primary font-mono text-title-sm whitespace-nowrap">
                                     @dep.Time
                                 </td>
                                 <td class="py-3.5 px-4">
@@ -302,8 +314,8 @@
                     else
                     {
                         <tr>
-                            <td colspan="7" class="py-8 text-center text-outline">
-                                No hay salidas registradas para hoy. <a asp-controller="Admin" asp-action="Tours" class="text-primary font-bold hover:underline">Revisar catálogo de tours</a>.
+                            <td colspan="8" class="py-8 text-center text-outline">
+                                No hay salidas registradas. <a asp-controller="Admin" asp-action="Tours" class="text-primary font-bold hover:underline">Revisar catálogo de tours</a>.
                             </td>
                         </tr>
                     }

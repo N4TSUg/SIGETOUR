@@ -37,6 +37,8 @@ namespace SIGETOUR.API.ViewModels
 
     public class DashboardDepartureItem
     {
+        public DateTime DepartureDate { get; set; } = DateTime.Today;
+        public string FormattedDate { get; set; } = string.Empty;
         public string Time { get; set; } = "09:00 AM";
         public string TourTitle { get; set; } = string.Empty;
         public string Subtitle { get; set; } = string.Empty;
