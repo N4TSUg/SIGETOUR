@@ -106,8 +106,8 @@ namespace SIGETOUR.API.Application.Invoicing
             var isFactura = string.Equals(booking.InvoiceType, "factura", StringComparison.OrdinalIgnoreCase);
             var receiptType = isFactura ? "Factura" : "Boleta";
             var defaultSeries = isFactura
-                ? (_config["Nubefact:FacturaSeries"] ?? "FFF1")
-                : (_config["Nubefact:BoletaSeries"] ?? "BBB1");
+                ? (_config["Nubefact:FacturaSeries"] ?? "F001")
+                : (_config["Nubefact:BoletaSeries"] ?? "B001");
 
             var dni = (booking.CustomerDni ?? "").Trim();
             string docType;
