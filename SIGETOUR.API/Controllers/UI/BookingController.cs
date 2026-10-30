@@ -171,37 +171,22 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> ConfirmPayment(Guid bookingId)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmPayment(Guid bookingId, string? manualPaymentMethod = null)
         {
             var booking = await _context.Bookings.FindAsync(bookingId);
-            if (booking != null)
+            if (booking == null) return NotFound();
+
+            // Medida de seguridad: los pagos manuales (Counter / Transferencia bancaria)
+            // NO confirman el pago ni inflan la caja automáticamente.
+            // La reserva queda en estado Pendiente y con PaidAmount = 0 (o el monto real previamente acreditado).
+            // La conciliación e ingreso a caja se realizan exclusivamente cuando el cajero/administrador
+            // valida el comprobante o recibe el dinero físico en AdminController.
+            if (booking.Status == BookingStatus.Pending && booking.PaidAmount == 0)
             {
-                booking.Status = BookingStatus.Confirmed;
-                booking.PaidAmount = booking.TotalAmount;
-                if (string.IsNullOrWhiteSpace(booking.PaymentMethod))
-                {
-                    booking.PaymentMethod = "Tarjeta / Pasarela Online";
-                }
-
-                var activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
-                if (activeShift != null && !_context.CashTransactions.Any(t => t.BookingId == booking.Id))
-                {
-                    _context.CashTransactions.Add(new CashTransaction
-                    {
-                        Id = Guid.NewGuid(),
-                        ShiftId = activeShift.Id,
-                        TransactionType = "Ingreso",
-                        Category = "Cobro de Reserva",
-                        Amount = booking.TotalAmount,
-                        PaymentMethod = booking.PaymentMethod,
-                        ReferenceCode = booking.ReferenceCode,
-                        BookingId = booking.Id,
-                        Description = $"Pago en línea confirmado para reserva {booking.ReferenceCode} - {booking.CustomerName}",
-                        RegisteredBy = "Pasarela Online / Checkout",
-                        CreatedAt = DateTime.UtcNow
-                    });
-                }
-
+                booking.PaymentMethod = string.IsNullOrWhiteSpace(manualPaymentMethod)
+                    ? "Pago en Counter / Agencia"
+                    : manualPaymentMethod;
                 await _context.SaveChangesAsync();
             }
 

@@ -151,16 +151,19 @@ namespace SIGETOUR.Tests.Controllers
         }
 
         [Fact]
-        public async Task ConfirmPayment_Post_ConfirmsBookingAndCreatesCashTransactionIfShiftOpen()
+        public async Task ConfirmPayment_Post_RegistersManualProvisionalBooking_LeavesStatusPending_NoCashTransaction()
         {
             // Arrange
             using var context = TestDbContextFactory.Create();
             TestDbContextFactory.SeedSampleData(context);
             var controller = new BookingController(context);
             var booking = context.Bookings.First();
+            booking.Status = BookingStatus.Pending;
+            booking.PaidAmount = 0m;
+            await context.SaveChangesAsync();
 
             // Act
-            var result = await controller.ConfirmPayment(booking.Id);
+            var result = await controller.ConfirmPayment(booking.Id, "Efectivo en Counter");
 
             // Assert
             var redirectResult = Assert.IsType<RedirectToActionResult>(result);
@@ -169,14 +172,14 @@ namespace SIGETOUR.Tests.Controllers
 
             var updatedBooking = context.Bookings.Find(booking.Id);
             Assert.NotNull(updatedBooking);
-            Assert.Equal(BookingStatus.Confirmed, updatedBooking.Status);
-            Assert.Equal(updatedBooking.TotalAmount, updatedBooking.PaidAmount);
+            // Regla de seguridad: debe permanecer en Pending y PaidAmount en 0 para pagos manuales
+            Assert.Equal(BookingStatus.Pending, updatedBooking.Status);
+            Assert.Equal(0m, updatedBooking.PaidAmount);
+            Assert.Equal("Efectivo en Counter", updatedBooking.PaymentMethod);
 
-            // Check if cash transaction was created for the open shift
+            // No debe inflar la caja de forma automática
             var transaction = context.CashTransactions.FirstOrDefault(t => t.BookingId == booking.Id);
-            Assert.NotNull(transaction);
-            Assert.Equal("Ingreso", transaction.TransactionType);
-            Assert.Equal(updatedBooking.TotalAmount, transaction.Amount);
+            Assert.Null(transaction);
         }
 
         [Fact]

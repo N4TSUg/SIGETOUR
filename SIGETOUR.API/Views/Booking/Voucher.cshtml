@@ -99,11 +99,11 @@
     <!-- BOTONES DE ACCIÓN RÁPIDA (NO-PRINT) -->
     <div class="no-print flex flex-wrap gap-3 justify-between items-center mb-6">
       <div class="flex items-center gap-2">
-        <div class="w-10 h-10 rounded-xl bg-primary-container text-primary flex items-center justify-center font-bold shadow-xs">
-          <span class="material-symbols-outlined text-2xl">check_circle</span>
+        <div class="w-10 h-10 rounded-xl @(Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed ? "bg-primary-container text-primary" : "bg-amber-100 text-amber-800") flex items-center justify-center font-bold shadow-xs">
+          <span class="material-symbols-outlined text-2xl">@(Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed ? "check_circle" : "pending")</span>
         </div>
         <div>
-          <h1 class="text-title-md font-bold text-on-surface">Boleto Turístico Confirmado</h1>
+          <h1 class="text-title-md font-bold text-on-surface">@(Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed ? (Model.PaidAmount < Model.TotalAmount ? "Boleto con Adelanto Registrado" : "Boleto Turístico Confirmado") : "Reserva Provisional - Pendiente de Pago")</h1>
           <p class="text-xs text-secondary">Localizador: <strong class="text-primary font-mono">@Model.ReferenceCode</strong></p>
         </div>
       </div>
@@ -298,17 +298,31 @@
 
             <div class="bg-white p-2.5 rounded-xl border border-gray-200 flex justify-between items-center mt-2">
               <div>
-                <span class="text-[10px] text-gray-500 uppercase font-bold block">TOTAL ABONADO</span>
-                <span class="text-title-sm font-extrabold text-primary">S/ @Model.TotalAmount.ToString("N2")</span>
+                <span class="text-[10px] text-gray-500 uppercase font-bold block">@(Model.PaidAmount > 0 ? (Model.PaidAmount < Model.TotalAmount ? "ADELANTO REGISTRADO" : "TOTAL ABONADO") : "MONTO A LIQUIDAR")</span>
+                <span class="text-title-sm font-extrabold text-primary">S/ @((Model.PaidAmount > 0 ? Model.PaidAmount : Model.TotalAmount).ToString("N2"))</span>
+                @if (Model.PaidAmount > 0 && Model.PaidAmount < Model.TotalAmount)
+                {
+                  <span class="text-[10px] text-amber-700 block font-semibold">Saldo en Counter: S/ @((Model.TotalAmount - Model.PaidAmount).ToString("N2"))</span>
+                }
               </div>
-              <span class="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] px-2.5 py-0.5 rounded-full font-extrabold flex items-center gap-1">
-                <span class="material-symbols-outlined text-xs">check_circle</span>
-                PAGADO
-              </span>
+              @if (Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed)
+              {
+                <span class="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] px-2.5 py-0.5 rounded-full font-extrabold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-xs">check_circle</span>
+                  @(Model.PaidAmount < Model.TotalAmount ? "SEÑA REGISTRADA" : "PAGADO 100%")
+                </span>
+              }
+              else
+              {
+                <span class="bg-amber-100 text-amber-800 border border-amber-300 text-[11px] px-2.5 py-0.5 rounded-full font-extrabold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-xs">schedule</span>
+                  PENDIENTE PAGO
+                </span>
+              }
             </div>
 
             <p class="text-[10px] text-gray-500 text-center pt-1">
-              Comprobante: Boleta Electrónica Generada
+              @(Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed ? "Comprobante: Boleta Electrónica Generada" : "Presentar este código en Counter para efectuar tu pago")
             </p>
           </div>
 

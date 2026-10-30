@@ -76,6 +76,7 @@ builder.Services.AddScoped<IManifestExportService, ManifestExportService>();
 builder.Services.AddScoped<ICashReportExportService, CashReportExportService>();
 builder.Services.AddSingleton<CheckoutAccess>();
 builder.Services.AddHttpClient<CulqiApiClient>();
+builder.Services.AddHttpClient<SIGETOUR.API.Application.Invoicing.IElectronicReceiptService, SIGETOUR.API.Application.Invoicing.NubefactInvoiceService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
