@@ -215,8 +215,16 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div class="rounded-xl p-3 border border-gray-200 bg-white">
               <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Unidad &amp; Flota Asignada</span>
-              <p class="font-bold text-gray-900">Mercedes-Benz Sprinter / HiAce VIP</p>
-              <p class="text-[11px] text-gray-600 mt-0.5">Climatizada A/C • Asientos reclinables • SOAT MTC</p>
+              @if (Model.AssignedVehicle != null)
+              {
+                <p class="font-bold text-gray-900">@Model.AssignedVehicle.Model</p>
+                <p class="text-[11px] text-gray-600 mt-0.5">Placa: @Model.AssignedVehicle.LicensePlate • Capacidad: @Model.AssignedVehicle.SeatCapacity Pax</p>
+              }
+              else
+              {
+                <p class="font-semibold text-gray-400 italic">Por asignar en Manifiesto</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Se determina al generar el manifiesto de salida</p>
+              }
             </div>
 
             <div class="rounded-xl p-3 border border-gray-200 bg-white">

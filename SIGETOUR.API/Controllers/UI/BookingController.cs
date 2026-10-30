@@ -199,6 +199,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(b => b.Items)
                 .ThenInclude(i => i.TourPackage)
                 .ThenInclude(t => t.Category)
+                .Include(b => b.AssignedVehicle)
                 .FirstOrDefaultAsync(b => b.Id == id);
                 
             if (booking == null) return RedirectToAction("Catalog", "Tour");
