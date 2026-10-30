@@ -1243,5 +1243,322 @@ namespace SIGETOUR.Tests.Payments
             Assert.Equal("https://demo.nubefact.com/pdf/B001-55.pdf", updated.PdfUrl);
             Assert.Equal("queryhash123", updated.DigitalHash);
         }
+
+        [Fact]
+        public async Task Prepare_WalletQr_CreatesOrderWithConfirmFalseAndExpiration()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-QR-PREP-1",
+                CustomerName = "Prueba QR",
+                CustomerDni = "77889900",
+                TotalAmount = 80m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            string? capturedBody = null;
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.RequestUri!.AbsolutePath.Contains("orders"))
+                {
+                    capturedBody = req.Content!.ReadAsStringAsync().Result;
+                    return new HttpResponseMessage(HttpStatusCode.Created)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_qr_123\",\"state\":\"pending\",\"amount\":8000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Prepare(new PreparePayment(
+                booking.Id, token, "full", "wallet_qr"
+            ), CancellationToken.None);
+
+            var obj = Assert.IsAssignableFrom<ObjectResult>(result);
+            using var docVal = JsonDocument.Parse(JsonSerializer.Serialize(obj.Value));
+            Assert.Equal("ord_test_qr_123", docVal.RootElement.GetProperty("orderId").GetString());
+            Assert.Equal(8000, docVal.RootElement.GetProperty("amountCents").GetInt64());
+
+            Assert.NotNull(capturedBody);
+            using var doc = JsonDocument.Parse(capturedBody!);
+            Assert.False(doc.RootElement.GetProperty("confirm").GetBoolean());
+            Assert.True(doc.RootElement.GetProperty("expiration_date").GetInt64() > DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        }
+
+        [Fact]
+        public async Task Prepare_WalletQr_ReusesActivePendingOrderWithin20Min()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-QR-REUSE",
+                CustomerName = "Reuso QR",
+                CustomerDni = "77889901",
+                TotalAmount = 50m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            context.Bookings.Add(booking);
+
+            var existingPayment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 5000,
+                Channel = "wallet_qr",
+                Status = "pending",
+                ProviderId = "ord_test_reusable_99",
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5)
+            };
+            context.Set<CulqiPayment>().Add(existingPayment);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            int ordersApiCalls = 0;
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.RequestUri!.AbsolutePath.Contains("orders/ord_test_reusable_99"))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_reusable_99\",\"state\":\"pending\",\"amount\":5000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                if (req.RequestUri!.AbsolutePath.EndsWith("orders") && req.Method == HttpMethod.Post)
+                {
+                    Interlocked.Increment(ref ordersApiCalls);
+                    return new HttpResponseMessage(HttpStatusCode.Created)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_new_order\",\"state\":\"pending\",\"amount\":5000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Prepare(new PreparePayment(
+                booking.Id, token, "full", "wallet_qr"
+            ), CancellationToken.None);
+
+            var obj = Assert.IsAssignableFrom<ObjectResult>(result);
+            using var docVal = JsonDocument.Parse(JsonSerializer.Serialize(obj.Value));
+            Assert.Equal("ord_test_reusable_99", docVal.RootElement.GetProperty("orderId").GetString());
+            Assert.True(docVal.RootElement.GetProperty("reused").GetBoolean());
+            Assert.Equal(0, ordersApiCalls); // Reutilizó la orden sin llamar a Culqi para crear una nueva
+        }
+
+        [Fact]
+        public async Task Check_WalletQr_WhenCulqiOrderPaid_ConfirmsBookingAndCreditsCash()
+        {
+            using var context = TestDbContextFactory.Create();
+            var shift = new CashRegisterShift { Id = Guid.NewGuid(), IsOpen = true, OpenedAt = DateTime.UtcNow };
+            context.CashRegisterShifts.Add(shift);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-CHECK-PAID",
+                CustomerName = "Pago Exitoso",
+                CustomerDni = "77889902",
+                TotalAmount = 40m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            context.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 4000,
+                Channel = "wallet_qr",
+                Status = "pending",
+                ProviderId = "ord_test_paid_44",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.Set<CulqiPayment>().Add(payment);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.RequestUri!.AbsolutePath.Contains("orders/ord_test_paid_44"))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_paid_44\",\"state\":\"paid\",\"currency_code\":\"PEN\",\"amount\":4000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Check(new CheckPayment(
+                payment.Id, token, booking.Id
+            ), CancellationToken.None);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            using var docVal = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+            Assert.Equal("paid", docVal.RootElement.GetProperty("status").GetString());
+            Assert.Equal(40m, docVal.RootElement.GetProperty("paidAmount").GetDecimal());
+            Assert.Equal(0m, docVal.RootElement.GetProperty("pendingBalance").GetDecimal());
+
+            var updatedBooking = await context.Bookings.FindAsync(booking.Id);
+            Assert.Equal(BookingStatus.Confirmed, updatedBooking!.Status);
+            Assert.Equal(40m, updatedBooking.PaidAmount);
+
+            var cashTx = await context.CashTransactions.FirstOrDefaultAsync(c => c.CulqiPaymentId == payment.Id);
+            Assert.NotNull(cashTx);
+            Assert.Equal(40m, cashTx.Amount);
+        }
+
+        [Fact]
+        public async Task Check_WalletQr_WhenCulqiOrderExpired_SetsExpiredWithoutCrediting()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-CHECK-EXP",
+                CustomerName = "Orden Expirada",
+                CustomerDni = "77889903",
+                TotalAmount = 40m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            context.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 4000,
+                Channel = "wallet_qr",
+                Status = "pending",
+                ProviderId = "ord_test_exp_55",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.Set<CulqiPayment>().Add(payment);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.RequestUri!.AbsolutePath.Contains("orders/ord_test_exp_55"))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_exp_55\",\"state\":\"expired\",\"currency_code\":\"PEN\",\"amount\":4000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Check(new CheckPayment(
+                payment.Id, token, booking.Id
+            ), CancellationToken.None);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            using var docVal = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+            Assert.Equal("expired", docVal.RootElement.GetProperty("status").GetString());
+
+            var updatedPayment = await context.Set<CulqiPayment>().FindAsync(payment.Id);
+            Assert.Equal("expired", updatedPayment!.Status);
+
+            var updatedBooking = await context.Bookings.FindAsync(booking.Id);
+            Assert.Equal(BookingStatus.Pending, updatedBooking!.Status);
+            Assert.Equal(0m, updatedBooking.PaidAmount);
+
+            var cashTxCount = await context.CashTransactions.CountAsync(c => c.CulqiPaymentId == payment.Id);
+            Assert.Equal(0, cashTxCount);
+        }
+
+        [Fact]
+        public async Task Webhook_OrderStatusChanged_WithBasicAuth_IdempotentVerification()
+        {
+            using var context = TestDbContextFactory.Create();
+            var shift = new CashRegisterShift { Id = Guid.NewGuid(), IsOpen = true, OpenedAt = DateTime.UtcNow };
+            context.CashRegisterShifts.Add(shift);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-WH-IDEMP",
+                CustomerName = "Webhook Idempotencia",
+                CustomerDni = "77889904",
+                TotalAmount = 60m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            context.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 6000,
+                Channel = "wallet_qr",
+                Status = "pending",
+                ProviderId = "ord_test_wh_77",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.Set<CulqiPayment>().Add(payment);
+            await context.SaveChangesAsync();
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.RequestUri!.AbsolutePath.Contains("orders/ord_test_wh_77"))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_wh_77\",\"state\":\"paid\",\"currency_code\":\"PEN\",\"amount\":6000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+
+            // Mock HttpContext con Basic Auth
+            var authHeader = "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("webhook_user_sigetour:webhook_pass_secret_test"));
+            var httpContext = new DefaultHttpContext();
+            httpContext.Request.Headers["Authorization"] = authHeader;
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+            var webhookPayload = "{\"object\":\"event\",\"id\":\"evt_test_1\",\"type\":\"order.status.changed\",\"data\":{\"object\":\"order\",\"id\":\"ord_test_wh_77\",\"state\":\"paid\"}}";
+            httpContext.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(webhookPayload));
+
+            // Primera llamada del Webhook
+            var res1 = await controller.Webhook(CancellationToken.None);
+            Assert.IsAssignableFrom<IActionResult>(res1);
+
+            var updatedBooking1 = await context.Bookings.FindAsync(booking.Id);
+            Assert.Equal(BookingStatus.Confirmed, updatedBooking1!.Status);
+            Assert.Equal(60m, updatedBooking1.PaidAmount);
+
+            var cashTxCount1 = await context.CashTransactions.CountAsync(c => c.CulqiPaymentId == payment.Id);
+            Assert.Equal(1, cashTxCount1);
+
+            // Segunda llamada del Webhook (mismo evento / reintento)
+            httpContext.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(webhookPayload));
+            var res2 = await controller.Webhook(CancellationToken.None);
+            Assert.IsAssignableFrom<IActionResult>(res2);
+
+            var cashTxCount2 = await context.CashTransactions.CountAsync(c => c.CulqiPaymentId == payment.Id);
+            Assert.Equal(1, cashTxCount2); // Idempotente: NO se duplica el dinero en caja
+        }
     }
 }

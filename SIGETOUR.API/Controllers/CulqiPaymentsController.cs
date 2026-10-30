@@ -70,7 +70,7 @@ public sealed class CulqiPaymentsController : ControllerBase
 
         // Gestión inteligente y consulta de intentos previos antes de permitir nuevos cargos
         var existingAttempts = await _db.Set<CulqiPayment>()
-            .Where(p => p.BookingId == booking.Id && (p.Status == "created" || p.Status == "processing" || p.Status == "verification"))
+            .Where(p => p.BookingId == booking.Id && (p.Status == "created" || p.Status == "processing" || p.Status == "verification" || p.Status == "pending"))
             .OrderByDescending(p => p.CreatedAtUtc)
             .ToListAsync(ct);
 
@@ -113,6 +113,24 @@ public sealed class CulqiPaymentsController : ControllerBase
                                 return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
                                     publicKey = _config["Culqi:PublicKey"], status = "paid", message = "Pago verificado exitosamente" });
                             }
+                        }
+
+                        // Si es una orden QR activa (< 20 min) con el mismo monto y canal, reutilizarla
+                        if (existingAttempt.Channel == "wallet_qr" && request.Channel == "wallet_qr"
+                            && existingAttempt.AmountCents == cents && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-20))
+                        {
+                            await _db.SaveChangesAsync(ct);
+                            return Ok(new
+                            {
+                                attemptId = existingAttempt.Id,
+                                amountCents = cents,
+                                currency = "PEN",
+                                orderId = existingAttempt.ProviderId,
+                                publicKey = _config["Culqi:PublicKey"],
+                                status = existingAttempt.Status,
+                                reused = true,
+                                message = "Orden QR activa recuperada exitosamente"
+                            });
                         }
                     }
                     else if (queryResult.HttpStatus == 404)
@@ -180,7 +198,7 @@ public sealed class CulqiPaymentsController : ControllerBase
                     phone_number = phone.StartsWith("+") ? phone : "+51" + phone
                 },
                 expiration_date = DateTimeOffset.UtcNow.AddMinutes(25).ToUnixTimeSeconds(),
-                confirm = true,
+                confirm = false,
                 metadata = new { booking_id = booking.Id.ToString() }
             }, ct);
 
@@ -329,12 +347,12 @@ public sealed class CulqiPaymentsController : ControllerBase
         CulqiPayment? payment = null;
         if (request.AttemptId != Guid.Empty)
         {
-            payment = await _db.Set<CulqiPayment>().AsNoTracking()
+            payment = await _db.Set<CulqiPayment>()
                 .FirstOrDefaultAsync(p => p.Id == request.AttemptId, ct);
         }
         else if (request.BookingId.HasValue && request.BookingId.Value != Guid.Empty)
         {
-            payment = await _db.Set<CulqiPayment>().AsNoTracking()
+            payment = await _db.Set<CulqiPayment>()
                 .Where(p => p.BookingId == request.BookingId.Value)
                 .OrderByDescending(p => p.CreatedAtUtc)
                 .FirstOrDefaultAsync(ct);
@@ -342,47 +360,163 @@ public sealed class CulqiPaymentsController : ControllerBase
 
         if (payment == null) return NotFound();
         if (!_access.Verify(payment.BookingId, request.CheckoutToken)) return Unauthorized();
-        if (payment.ProviderId != null && payment.Status != "paid") await VerifyAndApply(payment.Id, ct);
-        var status = await _db.Set<CulqiPayment>().AsNoTracking()
-            .Where(p => p.Id == payment.Id).Select(p => p.Status).SingleAsync(ct);
-        return Ok(new { attemptId = payment.Id, status, bookingId = payment.BookingId });
+
+        if (payment.ProviderId != null && payment.Status != "paid")
+        {
+            var route = payment.Channel == "wallet_qr"
+                ? $"orders/{Uri.EscapeDataString(payment.ProviderId)}"
+                : $"charges/{Uri.EscapeDataString(payment.ProviderId)}";
+
+            try
+            {
+                using var queryResult = await _culqi.GetAsync(route, ct);
+                if (queryResult.Success)
+                {
+                    var culqiState = queryResult.Text("state") ?? queryResult.Text("status");
+                    if (culqiState is "expired" or "failed" or "canceled" or "deleted")
+                    {
+                        payment.Status = "expired";
+                        await _db.SaveChangesAsync(ct);
+                    }
+                    else if (culqiState is "paid")
+                    {
+                        await VerifyAndApply(payment.Id, ct);
+                    }
+                }
+            }
+            catch
+            {
+                // Timeout o error de red: se mantiene en su estado previo para siguiente sondeo
+            }
+        }
+
+        var refreshed = await _db.Set<CulqiPayment>().AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == payment.Id, ct);
+        var status = refreshed?.Status ?? payment.Status;
+
+        var booking = await _db.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == payment.BookingId, ct);
+
+        return Ok(new
+        {
+            attemptId = payment.Id,
+            status,
+            bookingId = payment.BookingId,
+            orderId = payment.ProviderId,
+            channel = payment.Channel,
+            amountCents = payment.AmountCents,
+            paidAmount = booking?.PaidAmount ?? 0m,
+            pendingBalance = booking != null ? Math.Max(0m, booking.TotalAmount - booking.PaidAmount) : 0m
+        });
     }
 
     [HttpPost("webhook")]
     [AllowAnonymous]
     public async Task<IActionResult> Webhook(CancellationToken ct)
     {
-        // Activar autenticación BASIC en CulqiPanel y configurar usuario/clave fuera de Git.
+        // 1. Autenticación HTTP Basic Auth conforme a CulqiPanel
         var auth = Request.Headers.Authorization.ToString();
         var user = _config["Culqi:WebhookUser"];
         var pass = _config["Culqi:WebhookPassword"];
         if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass)
-            || !auth.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase)) return Unauthorized();
+            || !auth.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized();
+        }
 
         string supplied;
-        try { supplied = Encoding.UTF8.GetString(Convert.FromBase64String(auth[6..].Trim())); }
-        catch (FormatException) { return Unauthorized(); }
+        try
+        {
+            supplied = Encoding.UTF8.GetString(Convert.FromBase64String(auth[6..].Trim()));
+        }
+        catch (FormatException)
+        {
+            return Unauthorized();
+        }
 
         var expected = Encoding.UTF8.GetBytes(user + ":" + pass);
         var actual = Encoding.UTF8.GetBytes(supplied);
         if (actual.Length != expected.Length || !CryptographicOperations.FixedTimeEquals(actual, expected))
-            return Unauthorized();
-
-        using var body = await JsonDocument.ParseAsync(Request.Body, cancellationToken: ct);
-        var root = body.RootElement;
-        if (!root.TryGetProperty("data", out var data)) return Ok();
-
-        string? providerId = null;
-        if (data.ValueKind == JsonValueKind.Object)
         {
-            if (data.TryGetProperty("object", out var obj) && obj.ValueKind == JsonValueKind.Object &&
-                obj.TryGetProperty("id", out var embedded)) providerId = embedded.GetString();
-            else if (data.TryGetProperty("id", out var direct)) providerId = direct.GetString();
+            return Unauthorized();
         }
 
-        if (providerId == null) return Ok();
-        var attempt = await _db.Set<CulqiPayment>().AsNoTracking().FirstOrDefaultAsync(p => p.ProviderId == providerId, ct);
-        if (attempt != null) await VerifyAndApply(attempt.Id, ct);
+        // 2. Parseo del JSON del evento
+        using var body = await JsonDocument.ParseAsync(Request.Body, cancellationToken: ct);
+        var root = body.RootElement;
+        var eventType = root.TryGetProperty("type", out var typeProp) ? typeProp.GetString() : null;
+
+        if (!root.TryGetProperty("data", out var dataProp))
+        {
+            return Ok();
+        }
+
+        JsonDocument? innerDoc = null;
+        JsonElement data;
+        if (dataProp.ValueKind == JsonValueKind.String)
+        {
+            try
+            {
+                innerDoc = JsonDocument.Parse(dataProp.GetString()!);
+                data = innerDoc.RootElement;
+            }
+            catch
+            {
+                data = dataProp;
+            }
+        }
+        else
+        {
+            data = dataProp;
+        }
+
+        string? providerId = null;
+        string? orderState = null;
+        if (data.ValueKind == JsonValueKind.Object)
+        {
+            if (data.TryGetProperty("id", out var directId))
+            {
+                providerId = directId.GetString();
+            }
+            else if (data.TryGetProperty("object", out var obj) && obj.ValueKind == JsonValueKind.Object &&
+                     obj.TryGetProperty("id", out var embeddedId))
+            {
+                providerId = embeddedId.GetString();
+            }
+
+            if (data.TryGetProperty("state", out var stateProp))
+            {
+                orderState = stateProp.GetString();
+            }
+        }
+
+        innerDoc?.Dispose();
+
+        if (string.IsNullOrWhiteSpace(providerId))
+        {
+            return Ok();
+        }
+
+        var attempt = await _db.Set<CulqiPayment>().FirstOrDefaultAsync(p => p.ProviderId == providerId, ct);
+        if (attempt == null)
+        {
+            // Evento para orden no registrada en esta base de datos: responder 200 para no forzar reintentos de Culqi
+            return Ok();
+        }
+
+        // 3. Manejo de orden expirada o cancelada
+        if (orderState is "expired" or "canceled" or "deleted")
+        {
+            if (attempt.Status != "paid")
+            {
+                attempt.Status = "expired";
+                await _db.SaveChangesAsync(ct);
+            }
+            return Ok();
+        }
+
+        // 4. Verificación oficial en la API de Culqi (no confiar únicamente en el cuerpo del webhook)
+        await VerifyAndApply(attempt.Id, ct);
+
         return Ok();
     }
 
@@ -402,7 +536,22 @@ public sealed class CulqiPaymentsController : ControllerBase
         var isPaid = false;
         if (payment.Channel == "wallet_qr")
         {
-            isPaid = result.Text("object") == "order" && result.Text("state") == "paid";
+            var currency = result.Text("currency_code") ?? result.Text("currency");
+            if (currency != null && currency != "PEN") return false;
+
+            var orderState = result.Text("state");
+            if (orderState is "expired" or "canceled")
+            {
+                var curExp = await _db.Set<CulqiPayment>().FirstAsync(p => p.Id == attemptId, ct);
+                if (curExp.Status != "paid")
+                {
+                    curExp.Status = "expired";
+                    await _db.SaveChangesAsync(ct);
+                }
+                return false;
+            }
+
+            isPaid = result.Text("object") == "order" && orderState == "paid";
         }
         else
         {
