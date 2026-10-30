@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using SIGETOUR.API.Application.Interfaces;
+using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Application.Services;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
@@ -73,6 +74,8 @@ builder.Services.AddAutoMapper(config => {
 builder.Services.AddScoped<ITourPackageService, TourPackageService>();
 builder.Services.AddScoped<IManifestExportService, ManifestExportService>();
 builder.Services.AddScoped<ICashReportExportService, CashReportExportService>();
+builder.Services.AddSingleton<CheckoutAccess>();
+builder.Services.AddHttpClient<CulqiApiClient>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -135,6 +138,24 @@ using (var scope = app.Services.CreateScope())
                 ""IsVisibleOnHome"" boolean NOT NULL DEFAULT false
             );
             CREATE INDEX IF NOT EXISTS ""IX_TourReviews_TourPackageId"" ON ""TourReviews"" (""TourPackageId"");
+        ");
+    } catch { }
+    try {
+        db.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""CulqiPayments"" (
+                ""Id"" uuid NOT NULL PRIMARY KEY,
+                ""BookingId"" uuid NOT NULL REFERENCES ""Bookings""(""Id"") ON DELETE RESTRICT,
+                ""AmountCents"" bigint NOT NULL,
+                ""Channel"" character varying(32) NOT NULL,
+                ""Status"" character varying(32) NOT NULL,
+                ""ProviderId"" character varying(100),
+                ""CreatedAtUtc"" timestamp with time zone NOT NULL,
+                ""ConfirmedAtUtc"" timestamp with time zone NULL,
+                CONSTRAINT ""CK_CulqiPayment_Positive"" CHECK (""AmountCents"" > 0)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_ProviderId"" ON ""CulqiPayments"" (""ProviderId"");
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId"" ON ""CulqiPayments"" (""BookingId"") WHERE ""Status"" IN ('created', 'processing', 'verification');
+            CREATE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId_CreatedAtUtc"" ON ""CulqiPayments"" (""BookingId"", ""CreatedAtUtc"");
         ");
     } catch { }
     try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Drivers"" (

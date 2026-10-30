@@ -1,0 +1,9 @@
+# NO guardar claves reales aquí, en appsettings.json, ni en Git.
+# Preferir dotnet user-secrets (desarrollo) o variables del entorno (servidor).
+Culqi__PublicKey=pk_test_TU_LLAVE_PUBLICA
+Culqi__SecretKey=sk_test_TU_LLAVE_PRIVADA
+Culqi__WebhookUser=webhook_usuario
+Culqi__WebhookPassword=CLAVE_ALEATORIA_DE_WEBHOOK
+Payments__CheckoutSigningKey=MINIMO_32_BYTES_ALEATORIOS_NO_COMPARTIDOS
+ConnectionStrings__DefaultConnection=Host=localhost;Database=sigetour_db;Username=postgres;Password=CLAVE_ROTADA
+Jwt__Key=OTRA_CLAVE_ALEATORIA_Y_SEGURA

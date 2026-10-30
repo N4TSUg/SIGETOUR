@@ -5,6 +5,8 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
 using SIGETOUR.API.Models;
@@ -14,10 +16,32 @@ namespace SIGETOUR.API.Controllers.UI
     public class BookingController : Controller
     {
         private readonly AppDbContext _context;
+        private readonly CheckoutAccess _checkoutAccess;
+        private readonly IConfiguration _configuration;
 
-        public BookingController(AppDbContext context)
+        public BookingController(
+            AppDbContext context,
+            CheckoutAccess? checkoutAccess = null,
+            IConfiguration? configuration = null)
         {
             _context = context;
+            _configuration = configuration ?? new ConfigurationBuilder().Build();
+            _checkoutAccess = checkoutAccess ?? CreateDefaultCheckoutAccess(_configuration);
+        }
+
+        private static CheckoutAccess CreateDefaultCheckoutAccess(IConfiguration config)
+        {
+            if (config["Payments:CheckoutSigningKey"] != null)
+            {
+                return new CheckoutAccess(config);
+            }
+            var inMemoryConfig = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Payments:CheckoutSigningKey"] = "c2lnZXRvdXJfc3VwZXJfc2VjcmV0X2NoZWNrb3V0X3NpZ25pbmdfa2V5XzIwMjZfMzJieXRlcw=="
+                })
+                .Build();
+            return new CheckoutAccess(inMemoryConfig);
         }
 
         [HttpGet]
@@ -110,17 +134,39 @@ namespace SIGETOUR.API.Controllers.UI
             _context.Bookings.Add(booking);
             await _context.SaveChangesAsync();
 
-            return RedirectToAction("Payment", new { id = booking.Id });
+            var checkoutToken = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+            return RedirectToAction("Payment", new { id = booking.Id, token = checkoutToken });
         }
 
         [HttpGet]
-        public async Task<IActionResult> Payment(Guid id)
+        public async Task<IActionResult> Payment(Guid id, string? token = null)
         {
             var booking = await _context.Bookings
                 .Include(b => b.Items)
                 .ThenInclude(i => i.TourPackage)
                 .FirstOrDefaultAsync(b => b.Id == id);
             if (booking == null) return RedirectToAction("Catalog", "Tour");
+
+            if (string.IsNullOrWhiteSpace(token) || !_checkoutAccess.Verify(booking.Id, token))
+            {
+                token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+            }
+
+            ViewBag.CheckoutToken = token;
+            ViewBag.CulqiPublicKey = _configuration["Culqi:PublicKey"] ?? "";
+
+            var advancePercentage = booking.Items.FirstOrDefault()?.TourPackage?.RequiredAdvancePercentage > 0
+                ? booking.Items.First().TourPackage!.RequiredAdvancePercentage
+                : 50;
+
+            var advanceRequired = booking.Items.Sum(i => i.SubTotal * (i.TourPackage?.RequiredAdvancePercentage > 0 ? i.TourPackage.RequiredAdvancePercentage : advancePercentage) / 100m);
+            var balance = Math.Max(0m, booking.TotalAmount - booking.PaidAmount);
+            var advanceAmount = Math.Min(balance, Math.Max(0m, advanceRequired - booking.PaidAmount));
+
+            ViewBag.AdvancePercentage = advancePercentage;
+            ViewBag.AdvanceAmount = advanceAmount > 0 ? advanceAmount : decimal.Round(booking.TotalAmount / 2m, 2);
+            ViewBag.BalanceAmount = balance;
+
             return View(booking);
         }
 

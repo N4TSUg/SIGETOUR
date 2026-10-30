@@ -3,6 +3,11 @@
     Layout = null;
     var booking = Model;
     var tourTitle = booking.Items.FirstOrDefault()?.TourPackage?.Title ?? "Tour";
+    var advancePercent = (int)(ViewBag.AdvancePercentage ?? 50);
+    var advanceAmount = (decimal)(ViewBag.AdvanceAmount ?? (Model.TotalAmount / 2m));
+    var balanceAmount = (decimal)(ViewBag.BalanceAmount ?? (Model.TotalAmount - advanceAmount));
+    var checkoutToken = (string)(ViewBag.CheckoutToken ?? "");
+    var culqiPublicKey = (string)(ViewBag.CulqiPublicKey ?? "");
 }
 <!DOCTYPE html>
 <html class="light" lang="es">
@@ -10,6 +15,8 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Checkout Seguro | Turismo Chilón Cajamarca</title>
+<!-- Culqi Checkout JS -->
+<script src="https://js.culqi.com/checkout-js"></script>
 <!-- Fonts & Material Symbols -->
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -320,8 +327,13 @@
                 <ol class="space-y-1.5 text-body-sm font-body-sm text-secondary list-decimal list-inside bg-surface-container-lowest p-3 rounded-lg border border-outline-variant/30">
                   <li>Abre tu aplicación <strong class="text-on-surface">Yape</strong> o <strong class="text-on-surface">Plin</strong>.</li>
                   <li>Escanea el QR o yapea el monto al número <strong class="text-on-surface">901 195 392</strong>.</li>
-                  <li>Ingresa el código de aprobación de la operación abajo.</li>
+                  <li>O si prefieres, genera un QR oficial Culqi con confirmación automática.</li>
                 </ol>
+                <div class="pt-2">
+                  <button type="button" onclick="ejecutarPagoCulqi('wallet_qr')" class="px-4 py-2 bg-primary hover:bg-[#005045] text-white text-label-sm font-bold rounded-lg shadow-xs flex items-center gap-2 transition-all">
+                    <span class="material-symbols-outlined text-lg">qr_code_2</span> Generar QR Dinámico Culqi Sandbox
+                  </button>
+                </div>
               </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
@@ -357,25 +369,20 @@
                 <span class="px-2 py-0.5 bg-sky-50 text-sky-800 text-[10px] font-bold rounded border border-sky-200">AMEX</span>
               </div>
             </div>
-            <div>
-              <label class="block text-label-md font-label-md text-inverse-surface mb-1">Número de Tarjeta</label>
-              <div class="relative">
-                <span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-lg">credit_card</span>
-                <input class="w-full pl-10 pr-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono" maxlength="19" placeholder="4213 5400 0000 0000" type="text"/>
+            <div class="p-4 bg-[#f0fdf9] border border-primary/20 rounded-xl space-y-3">
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-primary text-3xl">verified_user</span>
+                <div>
+                  <h4 class="font-bold text-inverse-surface text-label-lg">Pasarela Segura Culqi Sandbox</h4>
+                  <p class="text-secondary text-body-sm">Cifrado de extremo a extremo mediante el estándar PCI-DSS.</p>
+                </div>
               </div>
-            </div>
-            <div>
-              <label class="block text-label-md font-label-md text-inverse-surface mb-1">Nombre del Titular (como aparece en la tarjeta)</label>
-              <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent uppercase" type="text" placeholder="NOMBRE APELLIDO"/>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-label-md font-label-md text-inverse-surface mb-1">Vencimiento (MM/AA)</label>
-                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono" maxlength="5" placeholder="08/27" type="text"/>
-              </div>
-              <div>
-                <label class="block text-label-md font-label-md text-inverse-surface mb-1">CVV / CVC</label>
-                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono" maxlength="4" placeholder="•••" type="password"/>
+              <div class="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/30 text-body-sm text-secondary">
+                <div class="font-semibold text-inverse-surface mb-1">Tarjetas de Prueba Culqi Sandbox:</div>
+                <div class="font-mono text-xs space-y-1">
+                  <div>Visa: <span class="text-primary font-bold">4213 5400 0000 0000</span> (Cualquier fecha futura, CVV 123)</div>
+                  <div>Mastercard: <span class="text-primary font-bold">5454 5454 5454 5454</span> (Cualquier fecha futura, CVV 123)</div>
+                </div>
               </div>
             </div>
           </div>
@@ -481,14 +488,33 @@
 
         <!-- 4. SUBMIT ACTION BUTTON -->
         <div class="space-y-3 pt-2">
-          <form method="post" action="/Booking/ConfirmPayment">
+          <!-- Online Culqi Action (Active for Yape and Card) -->
+          <div id="culqi-action-container">
+            <button id="btn-pay-culqi" onclick="ejecutarPagoCulqi()" class="w-full py-4 px-6 bg-primary hover:bg-[#005045] active:scale-[0.99] text-white font-label-lg text-title-md font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3" type="button">
+              <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">lock</span>
+              <span id="btn-pay-culqi-text">Pagar con Culqi (S/ @Model.TotalAmount.ToString("N2") PEN)</span>
+            </button>
+            <div id="culqi-status-feedback" class="hidden mt-3 p-3 rounded-lg text-body-sm font-body-sm transition-all"></div>
+          </div>
+
+          <!-- Manual Offline Action (Active for Transfer and Cash) -->
+          <form id="form-confirm-manual" method="post" action="/Booking/ConfirmPayment" class="hidden">
             <input type="hidden" name="bookingId" value="@Model.Id" />
             @Html.AntiForgeryToken()
-            <button class="w-full py-4 px-6 bg-primary hover:bg-[#005045] active:scale-[0.99] text-white font-label-lg text-title-md font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3" type="submit">
-              <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">verified</span>
-              <span>Confirmar Pago y Emitir Voucher (S/ @Model.TotalAmount.ToString("N2") PEN)</span>
+            <button class="w-full py-4 px-6 bg-amber-700 hover:bg-amber-800 active:scale-[0.99] text-white font-label-lg text-title-md font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3" type="submit">
+              <span class="material-symbols-outlined text-2xl">receipt_long</span>
+              <span id="btn-manual-text">Registrar Reserva Provisional</span>
             </button>
           </form>
+
+          <!-- Check Payment Status Button -->
+          <div class="flex justify-center pt-1">
+            <button type="button" onclick="consultarEstadoPago()" class="text-label-sm font-label-sm text-primary hover:underline flex items-center gap-1.5 font-medium py-1 px-3 rounded-lg hover:bg-[#edf7f5] transition-colors">
+              <span class="material-symbols-outlined text-sm">sync</span>
+              <span>¿Ya pagaste o generaste QR? Consultar estado de pago</span>
+            </button>
+          </div>
+
           <div class="flex items-center justify-center gap-4 text-body-sm font-body-sm text-secondary">
             <span class="flex items-center gap-1">
               <span class="material-symbols-outlined text-primary text-base">shield</span>
@@ -656,8 +682,43 @@
 </footer>
 
 <!-- Inline JavaScript -->
+<script src="~/js/checkout-culqi.js"></script>
 <script>
+    const bookingId = "@Model.Id";
+    const checkoutToken = "@checkoutToken";
+    const customerEmail = "@Model.CustomerEmail";
+    const totalAmount = @Model.TotalAmount;
+    const advanceAmount = @advanceAmount;
+    const advancePercent = @advancePercent;
+    
+    let currentModality = "full"; // 'full' or 'deposit'
+    let currentTab = "yape"; // 'yape', 'card', 'transfer', 'cash'
+
+    function updateActionButtons() {
+        const isOnline = (currentTab === 'yape' || currentTab === 'card');
+        const culqiContainer = document.getElementById('culqi-action-container');
+        const manualForm = document.getElementById('form-confirm-manual');
+        const culqiText = document.getElementById('btn-pay-culqi-text');
+        
+        if (culqiContainer && manualForm) {
+            if (isOnline) {
+                culqiContainer.classList.remove('hidden');
+                manualForm.classList.add('hidden');
+            } else {
+                culqiContainer.classList.add('hidden');
+                manualForm.classList.remove('hidden');
+            }
+        }
+        
+        if (culqiText) {
+            const amount = currentModality === 'full' ? totalAmount : advanceAmount;
+            const label = currentModality === 'full' ? 'Total 100%' : `Seña ${advancePercent}%`;
+            culqiText.textContent = `Pagar con Culqi ${label} (S/ ${amount.toFixed(2)} PEN)`;
+        }
+    }
+
     function switchPaymentTab(tabId) {
+        currentTab = tabId;
         const tabs = ['yape', 'card', 'transfer', 'cash'];
         tabs.forEach(t => {
             const el = document.getElementById('tab-' + t);
@@ -676,7 +737,65 @@
                 }
             }
         });
+        updateActionButtons();
     }
+
+    function seleccionarModalidad(mode) {
+        currentModality = mode;
+        updateActionButtons();
+    }
+
+    function showStatusFeedback(message, type) {
+        const el = document.getElementById('culqi-status-feedback');
+        if (!el) return;
+        el.className = 'mt-3 p-3 rounded-lg text-body-sm font-body-sm border transition-all';
+        
+        if (type === 'error') {
+            el.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+        } else if (type === 'success') {
+            el.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
+        } else if (type === 'warning') {
+            el.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+        } else {
+            el.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+        }
+        el.textContent = message;
+    }
+
+    async function ejecutarPagoCulqi(explicitChannel = null) {
+        const channel = explicitChannel || (currentTab === 'yape' ? 'wallet_qr' : 'charge');
+        const mode = currentModality;
+        try {
+            await abrirPagoSigetour({
+                bookingId,
+                checkoutToken,
+                email: customerEmail,
+                mode,
+                channel,
+                onStatus: showStatusFeedback
+            });
+        } catch (err) {
+            console.error("Culqi payment error:", err);
+            showStatusFeedback(err.message, "error");
+        }
+    }
+
+    async function consultarEstadoPago() {
+        try {
+            await revisarPagoSigetour({
+                bookingId,
+                checkoutToken,
+                onStatus: showStatusFeedback
+            });
+        } catch (err) {
+            console.error("Culqi check error:", err);
+            showStatusFeedback(err.message, "error");
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        updateActionButtons();
+    });
 </script>
 </body>
 </html>
