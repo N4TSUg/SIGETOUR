@@ -1,0 +1,313 @@
+@model SIGETOUR.API.Core.Entities.ElectronicReceipt?
+@{
+    Layout = null;
+    var booking = ViewBag.Booking as SIGETOUR.API.Core.Entities.Booking;
+    var ticketSize = ViewBag.TicketSize as string ?? "80"; // "80" o "58"
+    var is58 = ticketSize == "58";
+    var receipt = Model;
+    var hasReceipt = receipt != null;
+    var title = (receipt?.ReceiptType == "Factura" ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA");
+    var fullNumber = receipt?.FullNumber ?? (booking != null ? $"PROV-{booking.ReferenceCode}" : "---");
+    var totalAmount = receipt?.TotalAmount ?? (booking?.PaidAmount > 0 ? booking.PaidAmount : booking?.TotalAmount ?? 0m);
+    var subtotalAmount = receipt?.SubtotalAmount ?? Math.Round(totalAmount / 1.18m, 2);
+    var igvAmount = receipt?.IgvAmount ?? (totalAmount - subtotalAmount);
+    var issuedDate = receipt?.IssuedAtUtc ?? booking?.BookingDate ?? DateTime.UtcNow;
+    var qrString = receipt?.QrData ?? $"20601234567|03|{receipt?.Series ?? "B001"}|{receipt?.Number ?? "00000001"}|{igvAmount:F2}|{totalAmount:F2}|{issuedDate:yyyy-MM-dd}|1|{booking?.CustomerDni}|{receipt?.DigitalHash}|";
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ticket POS - @fullNumber - Turismo Chilón</title>
+    <!-- Tailwind CSS para vista previa -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <!-- QRCode JS ligero -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @@page {
+            size: @(is58 ? "58mm" : "80mm") auto;
+            margin: 0mm !important;
+        }
+        @@media print {
+            body {
+                background: white !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                color: black !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .ticket-container {
+                width: @(is58 ? "54mm" : "76mm") !important;
+                max-width: @(is58 ? "54mm" : "76mm") !important;
+                margin: 0 auto !important;
+                padding: 1mm !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+        }
+        .ticket-font {
+            font-family: 'Space Mono', monospace, 'Courier New', Courier;
+        }
+    </style>
+</head>
+<body class="bg-gray-200 min-h-screen text-gray-900 font-sans antialiased flex flex-col items-center">
+
+    <!-- 1. BARRA DE CONTROL SUPERIOR (SOLO PANTALLA) -->
+    <header class="w-full bg-slate-900 text-white shadow-md py-3 px-4 sm:px-8 no-print sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <a href="/Booking/Voucher/@(booking?.Id)" class="inline-flex items-center gap-1 text-gray-300 hover:text-white text-xs font-semibold py-1.5 px-3 rounded-lg bg-slate-800 transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+                    <span>Volver al Boleto</span>
+                </a>
+                <span class="text-sm font-bold text-emerald-400 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-lg">receipt_long</span>
+                    Comprobante POS
+                </span>
+            </div>
+
+            <!-- Selector de formato térmico (80mm vs 58mm) -->
+            <div class="flex items-center gap-2 bg-slate-800 p-1 rounded-xl">
+                <span class="text-xs text-gray-400 font-semibold pl-2">Ancho:</span>
+                <a href="?size=80" class="px-3 py-1 rounded-lg text-xs font-bold transition-all @(ticketSize == "80" ? "bg-emerald-500 text-slate-950 shadow-sm" : "text-gray-300 hover:text-white")">
+                    80 mm (Estándar)
+                </a>
+                <a href="?size=58" class="px-3 py-1 rounded-lg text-xs font-bold transition-all @(ticketSize == "58" ? "bg-emerald-500 text-slate-950 shadow-sm" : "text-gray-300 hover:text-white")">
+                    58 mm (Mini)
+                </a>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="window.print()" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">print</span>
+                    <span>Imprimir Ticket</span>
+                </button>
+                @if (!string.IsNullOrWhiteSpace(receipt?.PdfUrl) && receipt.PdfUrl.StartsWith("http"))
+                {
+                    <a href="@receipt.PdfUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-xl text-xs font-bold transition-all">
+                        <span class="material-symbols-outlined text-[16px]">download</span>
+                        <span>PDF Oficial</span>
+                    </a>
+                }
+            </div>
+        </div>
+    </header>
+
+    <!-- 2. LIENZO / CONTENEDOR DEL TICKET TÉRMICO -->
+    <main class="my-6 px-2 flex justify-center w-full">
+        <div class="ticket-container bg-white text-black p-4 shadow-xl border border-gray-300 ticket-font leading-tight text-[11px] @(is58 ? "w-[58mm] text-[9.5px]" : "w-[80mm]")">
+            
+            <!-- ENCABEZADO FISCAL -->
+            <div class="text-center">
+                <div class="font-extrabold text-base tracking-tight uppercase">TURISMO CHILÓN</div>
+                <div class="font-bold text-[10px]">TRANSPORTE &amp; TURISMO CAJAMARCA S.A.C.</div>
+                <div class="font-bold">RUC: 20601234567</div>
+                <div class="text-[9.5px] mt-0.5">Jr. 2 de Mayo 569, Cajamarca - Perú</div>
+                <div class="text-[9.5px]">Tel: +51 901 195 392 / +51 944 746 364</div>
+            </div>
+
+            <!-- SEPARADOR -->
+            <div class="border-t border-dashed border-black my-2"></div>
+
+            <!-- LEYENDA DEMO / AMBIENTE -->
+            <div class="text-center font-bold text-[9px] bg-amber-100 p-1 border border-black/30 rounded mb-1.5 uppercase">
+                *** DOCUMENTO DE PRUEBA ***<br />
+                SIN VALIDEZ TRIBUTARIA (DEMO)
+            </div>
+
+            @if (receipt != null && receipt.Status != "Accepted" && receipt.Status != "Simulation")
+            {
+                <div class="text-center font-bold text-[9px] bg-red-100 text-red-900 p-1 border border-red-500 rounded mb-1.5 uppercase">
+                    *** COMPROBANTE @receipt.Status.ToUpper() ***<br />
+                    @(receipt.LastError ?? receipt.ProviderDescription ?? "No aceptado o pendiente por SUNAT / Proveedor")
+                </div>
+            }
+
+            <!-- TÍTULO DEL COMPROBANTE -->
+            <div class="text-center">
+                <div class="font-bold text-sm tracking-wide">@title</div>
+                <div class="font-extrabold text-base mt-0.5">@fullNumber</div>
+            </div>
+
+            <!-- FECHA Y EMISIÓN -->
+            <div class="mt-2 space-y-0.5">
+                <div class="flex justify-between">
+                    <span>Fecha Emisión:</span>
+                    <span class="font-bold">@issuedDate.ToString("dd/MM/yyyy")</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Hora Emisión:</span>
+                    <span class="font-bold">@issuedDate.ToString("HH:mm:ss")</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Moneda:</span>
+                    <span class="font-bold">SOLES (PEN)</span>
+                </div>
+            </div>
+
+            <!-- SEPARADOR -->
+            <div class="border-t border-dashed border-black my-2"></div>
+
+            <!-- DATOS DEL CLIENTE -->
+            <div class="space-y-0.5">
+                <div>
+                    <span class="text-gray-600">CLIENTE:</span><br />
+                    <strong class="uppercase font-bold">@(receipt?.CustomerName ?? booking?.CustomerName ?? "CLIENTE GENERAL")</strong>
+                </div>
+                <div class="flex justify-between">
+                    <span>@(receipt?.CustomerDocType == "6" ? "RUC:" : "DNI/DOC:"):</span>
+                    <strong class="font-mono">@(receipt?.CustomerDocNumber ?? booking?.CustomerDni ?? "00000000")</strong>
+                </div>
+                <div class="flex justify-between">
+                    <span>Reserva / Boleto:</span>
+                    <strong class="font-bold text-primary font-mono">@(booking?.ReferenceCode ?? "---")</strong>
+                </div>
+            </div>
+
+            <!-- SEPARADOR -->
+            <div class="border-t border-dashed border-black my-2"></div>
+
+            <!-- DETALLE DE CONCEPTOS -->
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="border-b border-black text-[9.5px]">
+                        <th class="py-0.5 w-6">CANT</th>
+                        <th class="py-0.5">DESCRIPCIÓN</th>
+                        <th class="py-0.5 text-right w-14">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-dashed divide-gray-400">
+                    @if (booking?.Items != null && booking.Items.Any())
+                    {
+                        foreach (var item in booking.Items)
+                        {
+                            var tourTitle = item.TourPackage?.Title ?? "Servicio Turístico";
+                            var isPartial = booking.PaidAmount < booking.TotalAmount;
+                            var concept = isPartial ? " (Adelanto)" : "";
+                            <tr>
+                                <td class="py-1 align-top font-bold">@item.Passengers</td>
+                                <td class="py-1 align-top">
+                                    <div class="font-bold uppercase">@tourTitle@concept</div>
+                                    <div class="text-[9px] text-gray-700">P.Unit: S/ @item.UnitPrice.ToString("N2")</div>
+                                </td>
+                                <td class="py-1 align-top text-right font-bold whitespace-nowrap">
+                                    S/ @totalAmount.ToString("N2")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td class="py-1 align-top font-bold">1</td>
+                            <td class="py-1 align-top font-bold uppercase">Servicio de Transporte Turístico</td>
+                            <td class="py-1 align-top text-right font-bold whitespace-nowrap">S/ @totalAmount.ToString("N2")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <!-- SEPARADOR -->
+            <div class="border-t border-dashed border-black my-2"></div>
+
+            <!-- TOTALES CONTABLES -->
+            <div class="space-y-0.5 text-[10px]">
+                <div class="flex justify-between">
+                    <span>OP. GRAVADA:</span>
+                    <span>S/ @subtotalAmount.ToString("N2")</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>I.G.V. (18%):</span>
+                    <span>S/ @igvAmount.ToString("N2")</span>
+                </div>
+                <div class="flex justify-between text-sm font-extrabold border-t border-b border-black py-1 my-1">
+                    <span>TOTAL A PAGAR:</span>
+                    <span>S/ @totalAmount.ToString("N2")</span>
+                </div>
+
+                @if (booking != null && booking.PaidAmount < booking.TotalAmount)
+                {
+                    <div class="text-[9.5px] bg-gray-100 p-1 border border-black/20 rounded mt-1">
+                        <div class="flex justify-between">
+                            <span>TOTAL RESERVA:</span>
+                            <span class="font-bold">S/ @booking.TotalAmount.ToString("N2")</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>ABONADO (ADELANTO):</span>
+                            <span class="font-bold">S/ @booking.PaidAmount.ToString("N2")</span>
+                        </div>
+                        <div class="flex justify-between font-bold text-red-700 border-t border-gray-300 pt-0.5 mt-0.5">
+                            <span>SALDO PENDIENTE:</span>
+                            <span>S/ @((booking.TotalAmount - booking.PaidAmount).ToString("N2"))</span>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- FORMA DE PAGO -->
+            <div class="mt-2 text-[9.5px]">
+                <div class="flex justify-between">
+                    <span>MEDIO DE PAGO:</span>
+                    <strong class="uppercase font-bold">@(booking?.PaymentMethod ?? "Tarjeta Culqi / Online")</strong>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(booking?.OperationNumber))
+                {
+                    <div class="flex justify-between">
+                        <span>N° OPERACIÓN:</span>
+                        <strong class="font-mono">@booking.OperationNumber</strong>
+                    </div>
+                }
+            </div>
+
+            <!-- SEPARADOR -->
+            <div class="border-t border-dashed border-black my-2"></div>
+
+            <!-- CÓDIGO QR TRIBUTARIO REAL SUNAT -->
+            <div class="flex flex-col items-center justify-center my-2">
+                <div id="qrcode" class="p-1 bg-white border border-black inline-block"></div>
+                @if (!string.IsNullOrWhiteSpace(receipt?.DigitalHash))
+                {
+                    <div class="text-[8.5px] font-mono mt-1 text-center break-all">
+                        Hash: @receipt.DigitalHash
+                    </div>
+                }
+            </div>
+
+            <!-- PIE DE TICKET INFORMATIVO -->
+            <div class="text-center text-[8.5px] space-y-1 mt-2">
+                <p>Representación impresa del Comprobante de Pago Electrónico.</p>
+                <p>Consulte su validez en <strong>www.nubefact.com</strong> o portal SUNAT.</p>
+                <div class="border-t border-black/30 pt-1 font-bold text-[9px]">
+                    ¡GRACIAS POR VIAJAR CON TURISMO CHILÓN!
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- INICIALIZACIÓN QR CODE -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const qrText = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(qrString));
+            const qrSize = @(is58 ? 100 : 124);
+            const container = document.getElementById("qrcode");
+            if (container && typeof QRCode !== "undefined") {
+                new QRCode(container, {
+                    text: qrText,
+                    width: qrSize,
+                    height: qrSize,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            }
+        });
+    </script>
+</body>
+</html>

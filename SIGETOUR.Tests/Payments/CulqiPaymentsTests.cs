@@ -1119,5 +1119,129 @@ namespace SIGETOUR.Tests.Payments
             Assert.Equal("Rejected", receipt.Status);
             Assert.Contains("El RUC no existe", receipt.LastError);
         }
+
+        [Fact]
+        public async Task Nubefact_ReprintReceipt_IsIdempotent_DoesNotCallExternalApi()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-REPRINT-TEST",
+                CustomerName = "Carlos Reimpresión",
+                CustomerDni = "44556677",
+                TotalAmount = 80m,
+                PaidAmount = 80m,
+                Status = BookingStatus.Confirmed
+            };
+            context.Bookings.Add(booking);
+
+            var existingReceipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "B001",
+                Number = "00000042",
+                CustomerName = booking.CustomerName,
+                CustomerDocNumber = booking.CustomerDni,
+                CustomerDocType = "1",
+                TotalAmount = 80m,
+                SubtotalAmount = 67.80m,
+                IgvAmount = 12.20m,
+                Status = "Accepted",
+                PdfUrl = "https://demo.nubefact.com/pdf/B001-42.pdf"
+            };
+            context.ElectronicReceipts.Add(existingReceipt);
+            await context.SaveChangesAsync();
+
+            var demoSettings = new Dictionary<string, string?>
+            {
+                { "Nubefact:Mode", "Demo" },
+                { "Nubefact:Ruta", "https://demo.nubefact.com/api/v1/test" },
+                { "Nubefact:Token", "demo_token_12345" }
+            };
+            var config = new ConfigurationBuilder().AddInMemoryCollection(demoSettings).Build();
+
+            int externalApiCalls = 0;
+            var mockHttp = new HttpClient(new MockCulqiHttpHandler(req =>
+            {
+                Interlocked.Increment(ref externalApiCalls);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                };
+            }));
+
+            var service = new NubefactInvoiceService(context, config, mockHttp, NullLogger<NubefactInvoiceService>.Instance);
+
+            // Act 1: GetReceiptByIdAsync
+            var retrievedReceipt = await service.GetReceiptByIdAsync(existingReceipt.Id, CancellationToken.None);
+
+            // Act 2: Attempt GenerateReceiptAsync on already emitted booking
+            var secondGenerateReceipt = await service.GenerateReceiptAsync(booking.Id, null, CancellationToken.None);
+
+            // Assert: no HTTP calls should be made to NubeFact when reprinting/fetching existing receipt
+            Assert.Equal(0, externalApiCalls);
+            Assert.NotNull(retrievedReceipt);
+            Assert.Equal("B001-00000042", retrievedReceipt.FullNumber);
+            Assert.NotNull(secondGenerateReceipt);
+            Assert.Equal(existingReceipt.Id, secondGenerateReceipt.Id);
+        }
+
+        [Fact]
+        public async Task Nubefact_QueryReceiptFromProviderAsync_UpdatesDetailsFromNubeFact()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-QUERY-TEST",
+                CustomerName = "Consulta NubeFact",
+                CustomerDni = "88990011",
+                TotalAmount = 100m,
+                PaidAmount = 100m,
+                Status = BookingStatus.Confirmed
+            };
+            context.Bookings.Add(booking);
+
+            var existingReceipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "B001",
+                Number = "55",
+                Status = "Submitted"
+            };
+            context.ElectronicReceipts.Add(existingReceipt);
+            await context.SaveChangesAsync();
+
+            var demoSettings = new Dictionary<string, string?>
+            {
+                { "Nubefact:Mode", "Demo" },
+                { "Nubefact:Ruta", "https://demo.nubefact.com/api/v1/test" },
+                { "Nubefact:Token", "demo_token_12345" }
+            };
+            var config = new ConfigurationBuilder().AddInMemoryCollection(demoSettings).Build();
+
+            var queryResponseJson = "{\"tipo_de_comprobante\":2,\"serie\":\"B001\",\"numero\":55,\"enlace_del_pdf\":\"https://demo.nubefact.com/pdf/B001-55.pdf\",\"enlace_del_xml\":\"https://demo.nubefact.com/xml/B001-55.xml\",\"codigo_hash\":\"queryhash123\",\"sunat_description\":\"Aceptado por SUNAT\"}";
+            var mockHttp = new HttpClient(new MockCulqiHttpHandler(req =>
+            {
+                Assert.Equal(HttpMethod.Post, req.Method);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(queryResponseJson, Encoding.UTF8, "application/json")
+                };
+            }));
+
+            var service = new NubefactInvoiceService(context, config, mockHttp, NullLogger<NubefactInvoiceService>.Instance);
+            var updated = await service.QueryReceiptFromProviderAsync(existingReceipt.Id, CancellationToken.None);
+
+            Assert.NotNull(updated);
+            Assert.Equal("Accepted", updated.Status);
+            Assert.Equal("https://demo.nubefact.com/pdf/B001-55.pdf", updated.PdfUrl);
+            Assert.Equal("queryhash123", updated.DigitalHash);
+        }
     }
 }

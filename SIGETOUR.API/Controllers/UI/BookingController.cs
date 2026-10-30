@@ -211,5 +211,30 @@ namespace SIGETOUR.API.Controllers.UI
             ViewBag.Receipt = receipt;
             return View(booking);
         }
+
+        [HttpGet]
+        public async Task<IActionResult> Ticket(Guid id, string size = "80")
+        {
+            ElectronicReceipt? receipt = await _context.ElectronicReceipts
+                .Include(r => r.Booking)
+                .ThenInclude(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
+                .FirstOrDefaultAsync(r => r.Id == id || r.BookingId == id);
+
+            Booking? booking = receipt?.Booking;
+            if (booking == null)
+            {
+                booking = await _context.Bookings
+                    .Include(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .FirstOrDefaultAsync(b => b.Id == id);
+            }
+
+            if (booking == null) return NotFound("Comprobante o reserva no encontrada");
+
+            ViewBag.Booking = booking;
+            ViewBag.TicketSize = (size == "58") ? "58" : "80";
+            return View("Ticket", receipt);
+        }
     }
 }

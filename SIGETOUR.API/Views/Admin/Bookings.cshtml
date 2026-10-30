@@ -306,6 +306,15 @@
 
                             <!-- ACCIONES -->
                             <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                                <a href="@Url.Action("Voucher", "Booking", new { id = booking.Id })" target="_blank" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Ver Boleto Oficial">
+                                    <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+                                </a>
+                                @if (booking.Status == BookingStatus.Confirmed)
+                                {
+                                    <a href="@Url.Action("Ticket", "Booking", new { id = booking.Id })" target="_blank" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-amber-600 rounded-lg hover:bg-amber-50 transition-colors cursor-pointer" title="Imprimir Ticket POS (80mm / 58mm)">
+                                        <span class="material-symbols-outlined text-[20px]">receipt_long</span>
+                                    </a>
+                                }
                                 <button type="button" onclick="openManifestForBooking('@booking.TravelDate.ToString("yyyy-MM-dd")', '@tour?.Id', '@booking.ShiftName', '@tour?.DefaultVehicleId')" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Exportar Manifiesto de esta Salida en Excel">
                                     <span class="material-symbols-outlined text-[20px]">table_view</span>
                                 </button>
