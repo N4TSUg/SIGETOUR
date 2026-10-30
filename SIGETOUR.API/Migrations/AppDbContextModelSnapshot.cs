@@ -432,6 +432,9 @@ namespace SIGETOUR.API.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("CulqiPaymentId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text");
@@ -457,6 +460,10 @@ namespace SIGETOUR.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BookingId");
+
+                    b.HasIndex("CulqiPaymentId")
+                        .IsUnique()
+                        .HasFilter("\"CulqiPaymentId\" IS NOT NULL");
 
                     b.HasIndex("ShiftId");
 
@@ -1284,6 +1291,11 @@ namespace SIGETOUR.API.Migrations
                         .WithMany()
                         .HasForeignKey("BookingId");
 
+                    b.HasOne("SIGETOUR.API.Core.Entities.CulqiPayment", "CulqiPayment")
+                        .WithMany()
+                        .HasForeignKey("CulqiPaymentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SIGETOUR.API.Core.Entities.CashRegisterShift", "Shift")
                         .WithMany("Transactions")
                         .HasForeignKey("ShiftId")
@@ -1291,6 +1303,8 @@ namespace SIGETOUR.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Booking");
+
+                    b.Navigation("CulqiPayment");
 
                     b.Navigation("Shift");
                 });

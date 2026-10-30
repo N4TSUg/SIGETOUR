@@ -673,12 +673,12 @@
 <!-- Inline JavaScript -->
 <script src="~/js/checkout-culqi.js"></script>
 <script>
-    const bookingId = "@Model.Id";
-    const checkoutToken = "@checkoutToken";
-    const customerEmail = "@Model.CustomerEmail";
-    const totalAmount = @Model.TotalAmount;
-    const advanceAmount = @advanceAmount;
-    const advancePercent = @advancePercent;
+    const bookingId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Id.ToString()));
+    const checkoutToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(checkoutToken));
+    const customerEmail = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CustomerEmail ?? ""));
+    const totalAmount = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TotalAmount));
+    const advanceAmount = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(advanceAmount));
+    const advancePercent = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(advancePercent));
     
     let currentModality = "full"; // 'full' or 'deposit'
     let currentTab = "yape"; // 'yape', 'card', 'transfer', 'cash'

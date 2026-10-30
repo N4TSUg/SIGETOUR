@@ -203,6 +203,12 @@ namespace SIGETOUR.API.Controllers.UI
                 
             if (booking == null) return RedirectToAction("Catalog", "Tour");
             
+            var receipt = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == id)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            ViewBag.Receipt = receipt;
             return View(booking);
         }
     }

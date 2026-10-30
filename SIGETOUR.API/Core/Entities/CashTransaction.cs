@@ -17,6 +17,9 @@ namespace SIGETOUR.API.Core.Entities
         public Guid? BookingId { get; set; }
         public Booking? Booking { get; set; }
 
+        public Guid? CulqiPaymentId { get; set; }
+        public CulqiPayment? CulqiPayment { get; set; }
+
         public string Description { get; set; } = string.Empty;
         public string RegisteredBy { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

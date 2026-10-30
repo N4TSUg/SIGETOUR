@@ -21,6 +21,12 @@ async function getDeviceFingerprint() {
 
 // Escuchador global de respuestas de autenticación 3D Secure del banco emisor
 window.addEventListener("message", async function (event) {
+  // Validación estricta del origen del evento (solo Culqi 3DS oficial)
+  const origin = event.origin || "";
+  if (origin !== "https://3ds.culqi.com" && !origin.endsWith(".culqi.com")) {
+    return;
+  }
+
   if (!currentBookingContext || !currentBookingContext.attemptId) return;
 
   const data = event.data;
@@ -106,7 +112,11 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
     throw new Error(msg);
   }
 
-  // Pre-generar fingerprint de dispositivo para antifraude 3DS
+  // Pre-generar fingerprint de dispositivo y configurar Culqi3DS
+  if (typeof Culqi3DS !== "undefined") {
+    Culqi3DS.publicKey = data.publicKey;
+    Culqi3DS.options = { showModal: true, showLoading: true, showDirect: true };
+  }
   await getDeviceFingerprint();
 
   currentBookingContext = {

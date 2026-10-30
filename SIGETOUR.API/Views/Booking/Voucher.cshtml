@@ -25,6 +25,11 @@
         }
         catch { }
     }
+
+    var receipt = ViewBag.Receipt as SIGETOUR.API.Core.Entities.ElectronicReceipt;
+    var hasValidReceipt = receipt != null && (receipt.Status == "Accepted" || receipt.Status == "Simulation");
+    var hasExternalPdf = !string.IsNullOrWhiteSpace(receipt?.PdfUrl) && receipt.PdfUrl.StartsWith("http");
+    var hasXml = !string.IsNullOrWhiteSpace(receipt?.XmlUrl);
 }
 
 <style>
@@ -113,6 +118,21 @@
           <span class="material-symbols-outlined text-[18px]">print</span>
           <span>Imprimir Boleto (1 Hoja / PDF)</span>
         </button>
+
+        @if (hasExternalPdf)
+        {
+          <a href="@receipt!.PdfUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-3.5 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs active:scale-95" title="Descargar comprobante tributario oficial de SUNAT/NubeFact">
+            <span class="material-symbols-outlined text-[18px]">receipt_long</span>
+            <span>Descargar @receipt.ReceiptType (PDF)</span>
+          </a>
+        }
+        @if (hasXml)
+        {
+          <a href="@receipt!.XmlUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 px-3 py-2.5 rounded-xl text-label-md font-semibold transition-all shadow-xs active:scale-95" title="Descargar archivo XML firmado">
+            <span class="material-symbols-outlined text-[18px]">code</span>
+            <span>XML</span>
+          </a>
+        }
 
         <a class="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs active:scale-95" href="https://wa.me/51901195392?text=Hola,%20adjunto%20mi%20código%20de%20reserva%20@Model.ReferenceCode%20para%20el%20Tour%20@(Uri.EscapeDataString(tour?.Title ?? "Cajamarca"))" target="_blank" rel="noopener noreferrer">
           <span class="material-symbols-outlined text-[18px]">chat</span>
@@ -322,7 +342,18 @@
             </div>
 
             <p class="text-[10px] text-gray-500 text-center pt-1">
-              @(Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed ? "Comprobante: Boleta Electrónica Generada" : "Presentar este código en Counter para efectuar tu pago")
+              @if (hasValidReceipt)
+              {
+                <span>Comprobante Tributario: <strong>@receipt!.ReceiptType @receipt.FullNumber</strong></span>
+              }
+              else if (Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed)
+              {
+                <span>Boleto Confirmado (Comprobante electrónico en emisión)</span>
+              }
+              else
+              {
+                <span>Presentar este código en Counter para efectuar tu pago</span>
+              }
             </p>
           </div>
 
@@ -335,6 +366,48 @@
         <span class="font-bold text-gray-900 shrink-0">Central: +51 901 195 392 / +51 944 746 364</span>
       </div>
 
+    </div>
+
+    <!-- DISTINCIÓN DE DOCUMENTOS: VOUCHER TURÍSTICO DE ABORDAJE VS COMPROBANTE TRIBUTARIO -->
+    <div class="bg-white border border-outline-variant/60 rounded-2xl p-4 mb-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-2xl">verified</span>
+        </div>
+        <div>
+          <h4 class="text-label-lg font-bold text-on-surface">Distinción de Documentos: Boleto de Abordaje vs Comprobante Tributario</h4>
+          <p class="text-xs text-secondary mt-0.5">
+            El <strong>Boleto Oficial de Viaje</strong> (hoja superior) acredita tu reserva e itinerario de viaje.
+            @if (hasValidReceipt)
+            {
+              <span>Tu <strong>@receipt!.ReceiptType Electrónica (@receipt.FullNumber)</strong> está disponible para descarga oficial.</span>
+            }
+            else
+            {
+              <span>El comprobante tributario se emite de forma desacoplada tras la confirmación de la pasarela.</span>
+            }
+          </p>
+        </div>
+      </div>
+      @if (hasExternalPdf || hasXml)
+      {
+        <div class="flex items-center gap-2 shrink-0">
+          @if (hasExternalPdf)
+          {
+            <a href="@receipt!.PdfUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs">
+              <span class="material-symbols-outlined text-[16px]">download</span>
+              <span>PDF @receipt.ReceiptType</span>
+            </a>
+          }
+          @if (hasXml)
+          {
+            <a href="@receipt!.XmlUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold transition-all border border-gray-300">
+              <span class="material-symbols-outlined text-[16px]">code</span>
+              <span>XML SUNAT</span>
+            </a>
+          }
+        </div>
+      }
     </div>
 
   </div>

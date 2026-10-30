@@ -76,15 +76,8 @@ public sealed class CulqiPaymentsController : ControllerBase
 
         foreach (var existingAttempt in existingAttempts)
         {
-            // Caducidad de intentos por tiempo (25 min de vigencia en Culqi)
-            if (existingAttempt.CreatedAtUtc < DateTime.UtcNow.AddMinutes(-25))
-            {
-                existingAttempt.Status = "failed";
-                continue;
-            }
-
-            // Si está en verificación y tiene ID de proveedor, consultar a Culqi para conciliar antes de bloquear
-            if (existingAttempt.Status == "verification" && existingAttempt.ProviderId != null)
+            // 1. Si tiene ProviderId (orden o cargo en Culqi), SIEMPRE conciliar con Culqi primero sin importar antigüedad
+            if (existingAttempt.ProviderId != null)
             {
                 var isVerified = await VerifyAndApply(existingAttempt.Id, ct);
                 if (isVerified)
@@ -98,44 +91,70 @@ public sealed class CulqiPaymentsController : ControllerBase
                 var route = existingAttempt.Channel == "wallet_qr"
                     ? $"orders/{Uri.EscapeDataString(existingAttempt.ProviderId)}"
                     : $"charges/{Uri.EscapeDataString(existingAttempt.ProviderId)}";
-                using var queryResult = await _culqi.GetAsync(route, ct);
-                if (queryResult.Success)
+
+                try
                 {
-                    var culqiState = queryResult.Text("state") ?? queryResult.Text("status");
-                    if (culqiState is "expired" or "failed" or "canceled" or "deleted")
+                    using var queryResult = await _culqi.GetAsync(route, ct);
+                    if (queryResult.Success)
+                    {
+                        var culqiState = queryResult.Text("state") ?? queryResult.Text("status");
+                        if (culqiState is "expired" or "failed" or "canceled" or "deleted")
+                        {
+                            existingAttempt.Status = "failed";
+                            continue;
+                        }
+
+                        if (culqiState is "paid")
+                        {
+                            var verifiedNow = await VerifyAndApply(existingAttempt.Id, ct);
+                            if (verifiedNow)
+                            {
+                                await _db.SaveChangesAsync(ct);
+                                return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
+                                    publicKey = _config["Culqi:PublicKey"], status = "paid", message = "Pago verificado exitosamente" });
+                            }
+                        }
+                    }
+                    else if (queryResult.HttpStatus == 404)
                     {
                         existingAttempt.Status = "failed";
                         continue;
                     }
+                    else
+                    {
+                        // Fallo en la consulta (5xx u otro error): NO asumir que falló, resultado ambiguo
+                        await _db.SaveChangesAsync(ct);
+                        return Conflict(new { message = "Existe un intento previo en verificación en Culqi pero no se pudo consultar su estado actual. Por favor consulte el estado antes de iniciar un nuevo cobro.", attemptId = existingAttempt.Id });
+                    }
+                }
+                catch (Exception)
+                {
+                    // Fallo o timeout consultando Culqi: no marcar failed
+                    await _db.SaveChangesAsync(ct);
+                    return Conflict(new { message = "Existe un pago pendiente de confirmación en Culqi y el servicio no responde. Espere un momento y consulte el estado.", attemptId = existingAttempt.Id });
                 }
 
                 await _db.SaveChangesAsync(ct);
                 return Conflict(new { message = "Existe un pago en verificación en Culqi. Por favor consulte el estado antes de intentar otro abono.", attemptId = existingAttempt.Id });
             }
 
-            // Si quedó en verificación pero nunca obtuvo ProviderId tras 2 minutos (fallo antes de recibir ID)
-            if (existingAttempt.Status == "verification" && existingAttempt.ProviderId == null && existingAttempt.CreatedAtUtc < DateTime.UtcNow.AddMinutes(-2))
-            {
-                existingAttempt.Status = "failed";
-                continue;
-            }
-
+            // 2. Si no tiene ProviderId (nunca interactuó con Culqi):
             // Si es un intento activo en created con el mismo importe y canal, reutilizarlo
-            if (existingAttempt.Status == "created" && existingAttempt.AmountCents == cents && existingAttempt.Channel == request.Channel)
+            if (existingAttempt.Status == "created" && existingAttempt.AmountCents == cents && existingAttempt.Channel == request.Channel && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-20))
             {
                 await _db.SaveChangesAsync(ct);
                 return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
                     publicKey = _config["Culqi:PublicKey"], status = existingAttempt.Status });
             }
 
-            // Si hay un intento en procesamiento activo reciente (< 1 min), pedir esperar
+            // Si hay un intento en procesamiento activo reciente (< 2 min), pedir esperar
             if (existingAttempt.Status == "processing" && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-2))
             {
                 await _db.SaveChangesAsync(ct);
                 return Conflict(new { message = "Existe un cobro en procesamiento activo en Culqi. Espere unos momentos." });
             }
 
-            // Si no fue reutilizable, marcar como failed para dar paso al nuevo intento
+            // Si no fue reutilizable y no tiene ProviderId, marcar como failed
             existingAttempt.Status = "failed";
         }
 
@@ -434,21 +453,23 @@ public sealed class CulqiPaymentsController : ControllerBase
             booking.Status = BookingStatus.Confirmed;
         }
 
-        // Registrar ingreso en el turno de caja activo para conciliación inmediata (estrictamente sin duplicados)
+        // Registrar ingreso en el turno de caja activo para conciliación inmediata (estrictamente sin duplicados por CulqiPaymentId)
         var activeShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen, ct);
-        if (activeShift != null && !_db.CashTransactions.Any(t => t.BookingId == booking.Id && (t.ReferenceCode == booking.ReferenceCode || (current.ProviderId != null && t.ReferenceCode == current.ProviderId))))
+        if (activeShift != null && !_db.CashTransactions.Any(t => t.CulqiPaymentId == current.Id))
         {
+            var isPartial = booking.PaidAmount < booking.TotalAmount;
             _db.CashTransactions.Add(new CashTransaction
             {
                 Id = Guid.NewGuid(),
                 ShiftId = activeShift.Id,
+                CulqiPaymentId = current.Id,
                 TransactionType = "Ingreso",
                 Category = "Cobro de Reserva",
                 Amount = paidIncrement,
                 PaymentMethod = booking.PaymentMethod,
                 ReferenceCode = booking.ReferenceCode,
                 BookingId = booking.Id,
-                Description = $"Pago Culqi confirmado para reserva {booking.ReferenceCode} - {booking.CustomerName}",
+                Description = $"Pago Culqi confirmado {(isPartial ? "(Adelanto)" : "(Saldo / Total)")} para reserva {booking.ReferenceCode} - {booking.CustomerName}",
                 RegisteredBy = "Pasarela Culqi Sandbox",
                 CreatedAt = DateTime.UtcNow
             });
