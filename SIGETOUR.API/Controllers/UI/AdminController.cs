@@ -2078,6 +2078,25 @@ namespace SIGETOUR.API.Controllers.UI
             var tour = booking.Items.FirstOrDefault()?.TourPackage;
             var currentTourShifts = tour?.Shifts?.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() ?? new List<string>();
 
+            var pMethod = booking.PaymentMethod;
+            if (string.Equals(pMethod, "tarjeta", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(pMethod, "Tarjeta / Pasarela Online", StringComparison.OrdinalIgnoreCase))
+            {
+                pMethod = "Culqi";
+            }
+            else if (string.Equals(pMethod, "yape", StringComparison.OrdinalIgnoreCase))
+            {
+                pMethod = "Yape / Plin";
+            }
+            else if (string.Equals(pMethod, "transferencia", StringComparison.OrdinalIgnoreCase))
+            {
+                pMethod = "Transferencia BCP / BBVA";
+            }
+            else if (string.Equals(pMethod, "efectivo", StringComparison.OrdinalIgnoreCase))
+            {
+                pMethod = "Efectivo";
+            }
+
             var vm = new SIGETOUR.API.Models.EditBookingViewModel
             {
                 Id = booking.Id,
@@ -2091,7 +2110,7 @@ namespace SIGETOUR.API.Controllers.UI
                 TotalPassengers = booking.TotalPassengers,
                 TotalAmount = booking.TotalAmount,
                 PaidAmount = booking.PaidAmount,
-                PaymentMethod = booking.PaymentMethod,
+                PaymentMethod = pMethod,
                 OperationNumber = booking.OperationNumber,
                 InvoiceType = booking.InvoiceType,
                 InvoiceNumber = booking.InvoiceNumber,

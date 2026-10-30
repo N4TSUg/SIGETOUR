@@ -270,10 +270,11 @@
             <div class="mt-6 pt-5 border-t border-outline-variant">
               <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Método de Pago (Abono)</label>
               <select asp-for="PaymentMethod" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary mb-3">
-                <option value="yape">Yape / Plin Interbancario</option>
-                <option value="transferencia">Transferencia BCP / BBVA</option>
-                <option value="efectivo">Efectivo (Caja Agencia)</option>
-                <option value="tarjeta">POS Tarjeta (Niubiz/IziPay)</option>
+                <option value="Efectivo">Efectivo (Caja Agencia)</option>
+                <option value="Yape / Plin">Yape / Plin Interbancario</option>
+                <option value="Transferencia BCP / BBVA">Transferencia BCP / BBVA</option>
+                <option value="Culqi">Tarjeta Débito / Crédito (Culqi)</option>
+                <option value="Culqi QR">Culqi QR (Billetera Digital)</option>
               </select>
 
               <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">N° de Operación (Voucher)</label>
