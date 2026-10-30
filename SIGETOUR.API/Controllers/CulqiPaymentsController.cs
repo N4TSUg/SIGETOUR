@@ -184,13 +184,25 @@ public sealed class CulqiPaymentsController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Check([FromBody] CheckPayment request, CancellationToken ct)
     {
-        var payment = await _db.Set<CulqiPayment>().AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == request.AttemptId, ct);
+        CulqiPayment? payment = null;
+        if (request.AttemptId != Guid.Empty)
+        {
+            payment = await _db.Set<CulqiPayment>().AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == request.AttemptId, ct);
+        }
+        else if (request.BookingId.HasValue && request.BookingId.Value != Guid.Empty)
+        {
+            payment = await _db.Set<CulqiPayment>().AsNoTracking()
+                .Where(p => p.BookingId == request.BookingId.Value)
+                .OrderByDescending(p => p.CreatedAtUtc)
+                .FirstOrDefaultAsync(ct);
+        }
+
         if (payment == null) return NotFound();
         if (!_access.Verify(payment.BookingId, request.CheckoutToken)) return Unauthorized();
         if (payment.ProviderId != null && payment.Status != "paid") await VerifyAndApply(payment.Id, ct);
         var status = await _db.Set<CulqiPayment>().AsNoTracking()
-            .Where(p => p.Id == request.AttemptId).Select(p => p.Status).SingleAsync(ct);
+            .Where(p => p.Id == payment.Id).Select(p => p.Status).SingleAsync(ct);
         return Ok(new { attemptId = payment.Id, status, bookingId = payment.BookingId });
     }
 
@@ -239,10 +251,24 @@ public sealed class CulqiPaymentsController : ControllerBase
             return false;
         var root = result.Body?.RootElement;
         if (root == null) return false;
-        var isPaid = payment.Channel == "wallet_qr"
-            ? result.Text("object") == "order" && result.Text("state") == "paid"
-            : result.Text("object") == "charge" && root.Value.TryGetProperty("captured", out var captured)
-                 && captured.ValueKind == JsonValueKind.True;
+        var isPaid = false;
+        if (payment.Channel == "wallet_qr")
+        {
+            isPaid = result.Text("object") == "order" && result.Text("state") == "paid";
+        }
+        else
+        {
+            // Culqi v2 API devuelve "capture": true y/o "outcome": { "type": "venta_exitosa" }
+            var isChargeObj = result.Text("object") == "charge";
+            var hasCapture = (root.Value.TryGetProperty("capture", out var capProp) && capProp.ValueKind == JsonValueKind.True)
+                             || (root.Value.TryGetProperty("captured", out var capDProp) && capDProp.ValueKind == JsonValueKind.True);
+            var isSuccessfulOutcome = root.Value.TryGetProperty("outcome", out var outcomeProp)
+                                      && outcomeProp.ValueKind == JsonValueKind.Object
+                                      && outcomeProp.TryGetProperty("type", out var typeProp)
+                                      && typeProp.GetString() == "venta_exitosa";
+
+            isPaid = isChargeObj && (hasCapture || isSuccessfulOutcome);
+        }
         if (!isPaid) return false;
 
         // La transacción en PostgreSQL evita contabilizar dos veces la MISMA operación.
@@ -299,4 +325,4 @@ public sealed class CulqiPaymentsController : ControllerBase
 
 public sealed record PreparePayment(Guid BookingId, string CheckoutToken, string Mode, string Channel);
 public sealed record ChargePayment(Guid AttemptId, string CheckoutToken, string SourceId);
-public sealed record CheckPayment(Guid AttemptId, string CheckoutToken);
+public sealed record CheckPayment(Guid AttemptId, string CheckoutToken, Guid? BookingId = null);

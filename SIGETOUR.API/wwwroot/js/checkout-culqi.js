@@ -32,7 +32,7 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
     if (onStatus) onStatus("La reserva ya cuenta con un pago verificado. Redirigiendo al voucher...", "success");
     setTimeout(() => {
       window.location.href = `/Booking/Voucher/${bookingId}`;
-    }, 1000);
+    }, 800);
     return { attemptId: data.attemptId, status: "paid" };
   }
 
@@ -63,6 +63,7 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
   checkout.culqi = async () => {
     try {
       if (checkout.token) {
+        checkout.close(); // Cerramos el modal de inmediato para dar retroalimentación clara
         if (onStatus) onStatus("Procesando cobro en Culqi...", "info");
         const res = await fetch("/api/culqi/charge", {
           method: "POST",
@@ -71,11 +72,10 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
         });
         const statusData = await res.json();
         if (res.ok && statusData.status === "paid") {
-          checkout.close();
           if (onStatus) onStatus("¡Pago exitoso verificado! Redirigiendo a tu voucher...", "success");
           setTimeout(() => {
             window.location.href = `/Booking/Voucher/${bookingId}`;
-          }, 1000);
+          }, 800);
         } else {
           if (onStatus) onStatus(statusData.message || "Pago en verificación. Consulta el estado antes de intentar nuevamente.", "warning");
         }
@@ -95,7 +95,7 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
 }
 
 // Para verificar sin generar cargos nuevamente
-async function revisarPagoSigetour({ attemptId, checkoutToken, bookingId = null, onStatus = null }) {
+async function revisarPagoSigetour({ attemptId = null, checkoutToken, bookingId = null, onStatus = null }) {
   if (!attemptId && bookingId) {
     try {
       attemptId = sessionStorage.getItem("culqi_attempt_" + bookingId) || lastCulqiAttempt;
@@ -103,16 +103,16 @@ async function revisarPagoSigetour({ attemptId, checkoutToken, bookingId = null,
       attemptId = lastCulqiAttempt;
     }
   }
-  if (!attemptId) {
-    if (onStatus) onStatus("No hay ningún intento de pago registrado recientemente para esta reserva.", "warning");
-    return null;
-  }
 
   if (onStatus) onStatus("Consultando estado de pago en el servidor...", "info");
   const res = await fetch("/api/culqi/check", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ attemptId, checkoutToken })
+    body: JSON.stringify({
+      attemptId: attemptId || "00000000-0000-0000-0000-000000000000",
+      bookingId: bookingId || null,
+      checkoutToken
+    })
   });
 
   const data = await res.json();
@@ -128,7 +128,7 @@ async function revisarPagoSigetour({ attemptId, checkoutToken, bookingId = null,
     if (targetBookingId) {
       setTimeout(() => {
         window.location.href = `/Booking/Voucher/${targetBookingId}`;
-      }, 1000);
+      }, 800);
     }
   } else if (data.status === "verification" || data.status === "processing") {
     if (onStatus) onStatus(`El pago está en estado "${data.status}". Si ya pagó, espere unos segundos y vuelva a consultar.`, "warning");
