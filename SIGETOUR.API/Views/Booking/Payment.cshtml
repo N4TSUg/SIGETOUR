@@ -3,6 +3,11 @@
     Layout = null;
     var booking = Model;
     var tourTitle = booking.Items.FirstOrDefault()?.TourPackage?.Title ?? "Tour";
+    var advancePercent = (int)(ViewBag.AdvancePercentage ?? 50);
+    var advanceAmount = (decimal)(ViewBag.AdvanceAmount ?? (Model.TotalAmount / 2m));
+    var balanceAmount = (decimal)(ViewBag.BalanceAmount ?? (Model.TotalAmount - advanceAmount));
+    var checkoutToken = (string)(ViewBag.CheckoutToken ?? "");
+    var culqiPublicKey = (string)(ViewBag.CulqiPublicKey ?? "");
 }
 <!DOCTYPE html>
 <html class="light" lang="es">
@@ -10,6 +15,9 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Checkout Seguro | Turismo Chilón Cajamarca</title>
+<!-- Culqi Checkout JS & 3D Secure -->
+<script src="https://js.culqi.com/checkout-js"></script>
+<script src="https://3ds.culqi.com/js/v1"></script>
 <!-- Fonts & Material Symbols -->
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -215,10 +223,10 @@
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Option A: Total 100% -->
-            <label class="relative flex flex-col p-4 rounded-xl border-2 border-primary bg-[#f4fffa] cursor-pointer transition-all duration-150 hover:shadow-sm">
+            <label id="card-modality-full" class="relative flex flex-col p-4 rounded-xl border-2 border-primary bg-[#f4fffa] cursor-pointer transition-all duration-150 hover:shadow-sm">
               <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2">
-                  <input checked class="h-4 w-4 text-primary focus:ring-primary border-outline" name="payment_modality" type="radio" value="full"/>
+                  <input id="radio-modality-full" checked class="h-4 w-4 text-primary focus:ring-primary border-outline" name="payment_modality" type="radio" value="full" onchange="seleccionarModalidad('full')"/>
                   <span class="text-label-lg font-label-lg font-bold text-on-surface">Pagar Total 100%</span>
                 </div>
                 <span class="bg-primary text-white text-label-sm font-label-sm font-bold px-2 py-0.5 rounded uppercase">Recomendado</span>
@@ -230,20 +238,20 @@
                 Confirmación inmediata, emisión de voucher definitivo y abordaje directo.
               </p>
             </label>
-            <!-- Option B: Seña 50% -->
-            <label class="relative flex flex-col p-4 rounded-xl border border-outline-variant bg-surface-container-lowest cursor-pointer transition-all duration-150 hover:border-primary/50">
+            <!-- Option B: Seña (Porcentaje configurado por tour) -->
+            <label id="card-modality-deposit" class="relative flex flex-col p-4 rounded-xl border border-outline-variant bg-surface-container-lowest cursor-pointer transition-all duration-150 hover:border-primary/50">
               <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2">
-                  <input class="h-4 w-4 text-primary focus:ring-primary border-outline" name="payment_modality" type="radio" value="deposit"/>
-                  <span class="text-label-lg font-label-lg font-bold text-on-surface">Pagar Seña 50%</span>
+                  <input id="radio-modality-deposit" class="h-4 w-4 text-primary focus:ring-primary border-outline" name="payment_modality" type="radio" value="deposit" onchange="seleccionarModalidad('deposit')"/>
+                  <span class="text-label-lg font-label-lg font-bold text-on-surface">Pagar Seña @advancePercent%</span>
                 </div>
                 <span class="bg-surface-container text-secondary text-label-sm font-label-sm font-medium px-2 py-0.5 rounded">Anticipo</span>
               </div>
               <div class="text-headline-sm font-headline-sm font-extrabold text-inverse-surface mb-1">
-                S/ @((Model.TotalAmount / 2).ToString("N2")) <span class="text-label-md font-label-md font-normal text-secondary">PEN</span>
+                S/ @advanceAmount.ToString("N2") <span class="text-label-md font-label-md font-normal text-secondary">PEN</span>
               </div>
               <p class="text-body-sm font-body-sm text-secondary">
-                Garantiza tus asientos hoy. El saldo se abona en counter antes de partir.
+                Garantiza tus asientos hoy. El saldo (S/ @balanceAmount.ToString("N2")) se abona en counter antes de partir.
               </p>
             </label>
           </div>
@@ -283,26 +291,13 @@
           <!-- TAB 1: YAPE / PLIN -->
           <div class="block space-y-6" id="tab-yape">
             <div class="p-4 bg-[#f0fdf9] border border-primary/20 rounded-xl flex flex-col md:flex-row items-center gap-6">
-              <div class="bg-surface-container-lowest p-3 rounded-lg border border-outline-variant/40 shadow-xs flex flex-col items-center w-48 text-center shrink-0">
-                <div class="w-36 h-36 bg-surface-container-low rounded flex items-center justify-center relative overflow-hidden border border-outline-variant/30">
-                  <div class="absolute inset-2 grid grid-cols-5 gap-1 opacity-80">
-                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
-                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-surface-container-lowest"></div>
-                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
-                    <div class="bg-surface-container-lowest"></div><div class="bg-inverse-surface rounded-xs"></div>
-                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-surface-container-lowest"></div>
-                    <div class="bg-surface-container-lowest"></div><div class="bg-primary rounded-xs"></div>
-                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-surface-container-lowest"></div>
-                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
-                    <div class="bg-surface-container-lowest"></div><div class="bg-surface-container-lowest"></div>
-                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
-                    <div class="bg-inverse-surface rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
-                    <div class="bg-primary rounded-xs"></div><div class="bg-inverse-surface rounded-xs"></div>
-                    <div class="bg-inverse-surface rounded-xs"></div>
-                  </div>
-                  <span class="absolute bg-white px-2 py-1 rounded text-[10px] font-bold text-primary shadow-xs border border-primary/20">YAPE / PLIN</span>
+              <div class="bg-surface-container-lowest p-4 rounded-xl border border-primary/20 shadow-xs flex flex-col items-center justify-center w-48 text-center shrink-0">
+                <div class="w-16 h-16 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center mb-2 shadow-xs">
+                  <span class="material-symbols-outlined text-3xl">phone_android</span>
                 </div>
-                <span class="text-label-sm font-label-sm font-bold text-primary mt-2">Escanear para Pagar</span>
+                <div class="text-label-md font-bold text-inverse-surface">Yape / Plin</div>
+                <span class="text-[11px] text-secondary mt-0.5">Billeteras Móviles</span>
+                <span class="inline-block mt-2 px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold rounded-full">Oficial Turismo Chilón</span>
               </div>
               <div class="space-y-3 w-full">
                 <div>
@@ -320,8 +315,13 @@
                 <ol class="space-y-1.5 text-body-sm font-body-sm text-secondary list-decimal list-inside bg-surface-container-lowest p-3 rounded-lg border border-outline-variant/30">
                   <li>Abre tu aplicación <strong class="text-on-surface">Yape</strong> o <strong class="text-on-surface">Plin</strong>.</li>
                   <li>Escanea el QR o yapea el monto al número <strong class="text-on-surface">901 195 392</strong>.</li>
-                  <li>Ingresa el código de aprobación de la operación abajo.</li>
+                  <li>O si prefieres, genera un QR oficial Culqi con confirmación automática.</li>
                 </ol>
+                <div class="pt-2">
+                  <button type="button" onclick="ejecutarPagoCulqi('wallet_qr')" class="px-4 py-2 bg-primary hover:bg-[#005045] text-white text-label-sm font-bold rounded-lg shadow-xs flex items-center gap-2 transition-all">
+                    <span class="material-symbols-outlined text-lg">qr_code_2</span> Generar QR Dinámico Culqi Sandbox
+                  </button>
+                </div>
               </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
@@ -357,25 +357,20 @@
                 <span class="px-2 py-0.5 bg-sky-50 text-sky-800 text-[10px] font-bold rounded border border-sky-200">AMEX</span>
               </div>
             </div>
-            <div>
-              <label class="block text-label-md font-label-md text-inverse-surface mb-1">Número de Tarjeta</label>
-              <div class="relative">
-                <span class="material-symbols-outlined absolute left-3 top-2.5 text-outline text-lg">credit_card</span>
-                <input class="w-full pl-10 pr-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono" maxlength="19" placeholder="4213 5400 0000 0000" type="text"/>
+            <div class="p-4 bg-[#f0fdf9] border border-primary/20 rounded-xl space-y-3">
+              <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-primary text-3xl">verified_user</span>
+                <div>
+                  <h4 class="font-bold text-inverse-surface text-label-lg">Pasarela Segura Culqi Sandbox</h4>
+                  <p class="text-secondary text-body-sm">Cifrado de extremo a extremo mediante el estándar PCI-DSS.</p>
+                </div>
               </div>
-            </div>
-            <div>
-              <label class="block text-label-md font-label-md text-inverse-surface mb-1">Nombre del Titular (como aparece en la tarjeta)</label>
-              <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent uppercase" type="text" placeholder="NOMBRE APELLIDO"/>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-label-md font-label-md text-inverse-surface mb-1">Vencimiento (MM/AA)</label>
-                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono" maxlength="5" placeholder="08/27" type="text"/>
-              </div>
-              <div>
-                <label class="block text-label-md font-label-md text-inverse-surface mb-1">CVV / CVC</label>
-                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-center font-mono" maxlength="4" placeholder="•••" type="password"/>
+              <div class="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/30 text-body-sm text-secondary">
+                <div class="font-semibold text-inverse-surface mb-1">Tarjetas de Prueba Culqi Sandbox:</div>
+                <div class="font-mono text-xs space-y-1">
+                  <div>Visa: <span class="text-primary font-bold">4213 5400 0000 0000</span> (Cualquier fecha futura, CVV 123)</div>
+                  <div>Mastercard: <span class="text-primary font-bold">5454 5454 5454 5454</span> (Cualquier fecha futura, CVV 123)</div>
+                </div>
               </div>
             </div>
           </div>
@@ -481,14 +476,34 @@
 
         <!-- 4. SUBMIT ACTION BUTTON -->
         <div class="space-y-3 pt-2">
-          <form method="post" action="/Booking/ConfirmPayment">
+          <!-- Online Culqi Action (Active for Yape and Card) -->
+          <div id="culqi-action-container">
+            <button id="btn-pay-culqi" onclick="ejecutarPagoCulqi()" class="w-full py-4 px-6 bg-primary hover:bg-[#005045] active:scale-[0.99] text-white font-label-lg text-title-md font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3" type="button">
+              <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">lock</span>
+              <span id="btn-pay-culqi-text">Pagar con Culqi (S/ @Model.TotalAmount.ToString("N2") PEN)</span>
+            </button>
+            <div id="culqi-status-feedback" class="hidden mt-3 p-3 rounded-lg text-body-sm font-body-sm transition-all"></div>
+          </div>
+
+          <!-- Manual Offline Action (Active for Transfer and Cash) -->
+          <form id="form-confirm-manual" method="post" action="/Booking/ConfirmPayment" class="hidden">
             <input type="hidden" name="bookingId" value="@Model.Id" />
+            <input type="hidden" name="manualPaymentMethod" id="input-manual-payment-method" value="Pago en Counter (Efectivo)" />
             @Html.AntiForgeryToken()
-            <button class="w-full py-4 px-6 bg-primary hover:bg-[#005045] active:scale-[0.99] text-white font-label-lg text-title-md font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3" type="submit">
-              <span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">verified</span>
-              <span>Confirmar Pago y Emitir Voucher (S/ @Model.TotalAmount.ToString("N2") PEN)</span>
+            <button class="w-full py-4 px-6 bg-amber-700 hover:bg-amber-800 active:scale-[0.99] text-white font-label-lg text-title-md font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3" type="submit">
+              <span class="material-symbols-outlined text-2xl">receipt_long</span>
+              <span id="btn-manual-text">Registrar Reserva Provisional</span>
             </button>
           </form>
+
+          <!-- Check Payment Status Button -->
+          <div class="flex justify-center pt-1">
+            <button type="button" onclick="consultarEstadoPago()" class="text-label-sm font-label-sm text-primary hover:underline flex items-center gap-1.5 font-medium py-1 px-3 rounded-lg hover:bg-[#edf7f5] transition-colors">
+              <span class="material-symbols-outlined text-sm">sync</span>
+              <span>¿Ya pagaste o generaste QR? Consultar estado de pago</span>
+            </button>
+          </div>
+
           <div class="flex items-center justify-center gap-4 text-body-sm font-body-sm text-secondary">
             <span class="flex items-center gap-1">
               <span class="material-symbols-outlined text-primary text-base">shield</span>
@@ -574,10 +589,10 @@
               <div class="pt-3 border-t border-outline-variant/40 flex items-center justify-between">
                 <div>
                   <span class="block text-title-sm font-title-sm font-bold text-inverse-surface">Total a Pagar Hoy:</span>
-                  <span class="text-label-sm font-label-sm text-primary font-medium">Pago del 100% Total</span>
+                  <span id="summary-total-label" class="text-label-sm font-label-sm text-primary font-medium">Pago del 100% Total</span>
                 </div>
                 <div class="text-right">
-                  <span class="text-headline-md font-headline-md font-extrabold text-primary">S/ @Model.TotalAmount.ToString("N2")</span>
+                  <span id="summary-total-amount" class="text-headline-md font-headline-md font-extrabold text-primary">S/ @Model.TotalAmount.ToString("N2")</span>
                   <span class="block text-label-sm font-label-sm text-secondary">PEN</span>
                 </div>
               </div>
@@ -656,8 +671,53 @@
 </footer>
 
 <!-- Inline JavaScript -->
+<script src="~/js/checkout-culqi.js"></script>
 <script>
+    const bookingId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Id.ToString()));
+    const checkoutToken = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(checkoutToken));
+    const customerEmail = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.CustomerEmail ?? ""));
+    const totalAmount = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.TotalAmount));
+    const advanceAmount = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(advanceAmount));
+    const advancePercent = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(advancePercent));
+    
+    let currentModality = "full"; // 'full' or 'deposit'
+    let currentTab = "yape"; // 'yape', 'card', 'transfer', 'cash'
+
+    function updateActionButtons() {
+        const isOnline = (currentTab === 'yape' || currentTab === 'card');
+        const culqiContainer = document.getElementById('culqi-action-container');
+        const manualForm = document.getElementById('form-confirm-manual');
+        const culqiText = document.getElementById('btn-pay-culqi-text');
+        
+        if (culqiContainer && manualForm) {
+            if (isOnline) {
+                culqiContainer.classList.remove('hidden');
+                manualForm.classList.add('hidden');
+            } else {
+                culqiContainer.classList.add('hidden');
+                manualForm.classList.remove('hidden');
+            }
+        }
+        
+        if (culqiText) {
+            const amount = currentModality === 'full' ? totalAmount : advanceAmount;
+            const label = currentModality === 'full' ? 'Total 100%' : `Seña ${advancePercent}%`;
+            culqiText.textContent = `Pagar con Culqi ${label} (S/ ${amount.toFixed(2)} PEN)`;
+        }
+    }
+
     function switchPaymentTab(tabId) {
+        currentTab = tabId;
+        const manualInput = document.getElementById('input-manual-payment-method');
+        const manualBtnText = document.getElementById('btn-manual-text');
+        if (tabId === 'transfer') {
+            if (manualInput) manualInput.value = 'Transferencia Bancaria (BCP/BBVA)';
+            if (manualBtnText) manualBtnText.textContent = 'Registrar Reserva (Pago por Transferencia)';
+        } else if (tabId === 'cash') {
+            if (manualInput) manualInput.value = 'Efectivo (Pago en Counter)';
+            if (manualBtnText) manualBtnText.textContent = 'Registrar Reserva Provisional (Pago en Counter)';
+        }
+
         const tabs = ['yape', 'card', 'transfer', 'cash'];
         tabs.forEach(t => {
             const el = document.getElementById('tab-' + t);
@@ -676,7 +736,91 @@
                 }
             }
         });
+        updateActionButtons();
     }
+
+    function seleccionarModalidad(mode) {
+        currentModality = mode;
+        const cardFull = document.getElementById('card-modality-full');
+        const cardDeposit = document.getElementById('card-modality-deposit');
+        const radioFull = document.getElementById('radio-modality-full');
+        const radioDeposit = document.getElementById('radio-modality-deposit');
+        const summaryLabel = document.getElementById('summary-total-label');
+        const summaryAmount = document.getElementById('summary-total-amount');
+
+        if (mode === 'deposit') {
+            if (radioDeposit) radioDeposit.checked = true;
+            if (cardDeposit) cardDeposit.className = 'relative flex flex-col p-4 rounded-xl border-2 border-primary bg-[#f4fffa] cursor-pointer transition-all duration-150 hover:shadow-sm';
+            if (cardFull) cardFull.className = 'relative flex flex-col p-4 rounded-xl border border-outline-variant bg-surface-container-lowest cursor-pointer transition-all duration-150 hover:border-primary/50';
+            if (summaryLabel) summaryLabel.textContent = `Abono de Seña (${advancePercent}%)`;
+            if (summaryAmount) summaryAmount.textContent = `S/ ${advanceAmount.toFixed(2)}`;
+        } else {
+            if (radioFull) radioFull.checked = true;
+            if (cardFull) cardFull.className = 'relative flex flex-col p-4 rounded-xl border-2 border-primary bg-[#f4fffa] cursor-pointer transition-all duration-150 hover:shadow-sm';
+            if (cardDeposit) cardDeposit.className = 'relative flex flex-col p-4 rounded-xl border border-outline-variant bg-surface-container-lowest cursor-pointer transition-all duration-150 hover:border-primary/50';
+            if (summaryLabel) summaryLabel.textContent = 'Pago del 100% Total';
+            if (summaryAmount) summaryAmount.textContent = `S/ ${totalAmount.toFixed(2)}`;
+        }
+        updateActionButtons();
+    }
+
+    function showStatusFeedback(message, type) {
+        const el = document.getElementById('culqi-status-feedback');
+        if (!el) return;
+        el.className = 'mt-3 p-3 rounded-lg text-body-sm font-body-sm border transition-all';
+        
+        if (type === 'error') {
+            el.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+        } else if (type === 'success') {
+            el.classList.add('bg-green-50', 'text-green-700', 'border-green-200');
+        } else if (type === 'warning') {
+            el.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+        } else {
+            el.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+        }
+        el.textContent = message;
+    }
+
+    async function ejecutarPagoCulqi(explicitChannel = null) {
+        const channel = explicitChannel || (currentTab === 'yape' ? 'wallet_qr' : 'charge');
+        const mode = currentModality;
+        try {
+            await abrirPagoSigetour({
+                bookingId,
+                checkoutToken,
+                email: customerEmail,
+                mode,
+                channel,
+                onStatus: showStatusFeedback
+            });
+        } catch (err) {
+            console.error("Culqi payment error:", err);
+            showStatusFeedback(err.message, "error");
+        }
+    }
+
+    async function consultarEstadoPago() {
+        try {
+            await revisarPagoSigetour({
+                bookingId,
+                checkoutToken,
+                onStatus: showStatusFeedback
+            });
+        } catch (err) {
+            console.error("Culqi check error:", err);
+            showStatusFeedback(err.message, "error");
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        updateActionButtons();
+        try {
+            const savedAttempt = sessionStorage.getItem("culqi_attempt_" + bookingId);
+            if (savedAttempt) {
+                revisarPagoSigetour({ attemptId: savedAttempt, checkoutToken, bookingId, onStatus: showStatusFeedback });
+            }
+        } catch (e) {}
+    });
 </script>
 </body>
 </html>
