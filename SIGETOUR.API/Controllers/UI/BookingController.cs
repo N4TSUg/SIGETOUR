@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SIGETOUR.API.Application.Invoicing;
 using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
@@ -214,7 +215,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        public async Task<IActionResult> Ticket(Guid id, string size = "80")
+        public async Task<IActionResult> Ticket(Guid id, string size = "80", [FromServices] IElectronicReceiptService? receiptService = null)
         {
             ElectronicReceipt? receipt = await _context.ElectronicReceipts
                 .Include(r => r.Booking)
@@ -233,9 +234,26 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound("Comprobante o reserva no encontrada");
 
+            // Si la reserva está confirmada y el comprobante no existe o quedó rechazado, intentar emitir/actualizar con NubeFact
+            if (receiptService != null && booking.Status == BookingStatus.Confirmed && (receipt == null || receipt.Status == "Rejected" || receipt.Status == "Pending"))
+            {
+                try
+                {
+                    receipt = await receiptService.GenerateReceiptAsync(booking.Id);
+                }
+                catch { }
+            }
+
             ViewBag.Booking = booking;
             ViewBag.TicketSize = (size == "58") ? "58" : "80";
             return View("Ticket", receipt);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RetryReceipt(Guid bookingId, [FromServices] IElectronicReceiptService receiptService)
+        {
+            await receiptService.GenerateReceiptAsync(bookingId);
+            return RedirectToAction("Ticket", new { id = bookingId });
         }
     }
 }

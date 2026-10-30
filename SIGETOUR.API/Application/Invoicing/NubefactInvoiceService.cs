@@ -58,11 +58,17 @@ namespace SIGETOUR.API.Application.Invoicing
 
         public async Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId = null, CancellationToken ct = default)
         {
-            // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya existe)
+            // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado o Simulado)
             var existing = await _db.ElectronicReceipts
-                .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
-                    || (culqiPaymentId == null && r.BookingId == bookingId && (r.Status == "Accepted" || r.Status == "Simulation")), ct);
+                .FirstOrDefaultAsync(r => ((culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId) || (culqiPaymentId == null && r.BookingId == bookingId))
+                    && (r.Status == "Accepted" || r.Status == "Simulation"), ct);
             if (existing != null) return existing;
+
+            // Reutilizar registro si quedó en estado fallido/rechazado para actualizarlo en vez de duplicarlo
+            var receipt = await _db.ElectronicReceipts
+                .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
+                    || (culqiPaymentId == null && r.BookingId == bookingId), ct);
+            bool isNew = receipt == null;
 
             var booking = await _db.Bookings
                 .Include(b => b.Items)
@@ -144,22 +150,29 @@ namespace SIGETOUR.API.Application.Invoicing
                 docType = "0"; // Doc Trib No Domic / Sin Documento
             }
 
-            var receipt = new ElectronicReceipt
+            if (receipt == null)
             {
-                BookingId = booking.Id,
-                CulqiPaymentId = culqiPaymentId,
-                ReceiptType = receiptType,
-                Series = defaultSeries,
-                Number = $"{DateTime.UtcNow:yyMMdd}{new Random().Next(1000, 9999)}",
-                CustomerDocType = docType,
-                CustomerDocNumber = !string.IsNullOrWhiteSpace(dni) ? dni : "00000000",
-                CustomerName = !string.IsNullOrWhiteSpace(booking.CustomerName) ? booking.CustomerName : "Cliente General",
-                CustomerEmail = booking.CustomerEmail ?? string.Empty,
-                SubtotalAmount = subtotal,
-                IgvAmount = igv,
-                TotalAmount = total,
-                CreatedAtUtc = DateTime.UtcNow
-            };
+                receipt = new ElectronicReceipt
+                {
+                    BookingId = booking.Id,
+                    CulqiPaymentId = culqiPaymentId,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+            }
+
+            receipt.ReceiptType = receiptType;
+            receipt.Series = defaultSeries;
+            if (string.IsNullOrWhiteSpace(receipt.Number))
+            {
+                receipt.Number = $"{DateTime.UtcNow:yyMMdd}{new Random().Next(1000, 9999)}";
+            }
+            receipt.CustomerDocType = docType;
+            receipt.CustomerDocNumber = !string.IsNullOrWhiteSpace(dni) ? dni : "00000000";
+            receipt.CustomerName = !string.IsNullOrWhiteSpace(booking.CustomerName) ? booking.CustomerName : "Cliente General";
+            receipt.CustomerEmail = booking.CustomerEmail ?? string.Empty;
+            receipt.SubtotalAmount = subtotal;
+            receipt.IgvAmount = igv;
+            receipt.TotalAmount = total;
 
             // 5. Separación de Modos: Mock, Demo y Production
             var mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
@@ -182,7 +195,10 @@ namespace SIGETOUR.API.Application.Invoicing
                 receipt.DigitalHash = Convert.ToBase64String(Guid.NewGuid().ToByteArray())[..16];
                 receipt.QrData = $"20601234567|{cpeType}|{receipt.Series}|{receipt.Number}|{receipt.IgvAmount:F2}|{receipt.TotalAmount:F2}|{cleanDate}|{receipt.CustomerDocType}|{receipt.CustomerDocNumber}|{receipt.DigitalHash}|";
 
-                _db.ElectronicReceipts.Add(receipt);
+                if (isNew)
+                {
+                    _db.ElectronicReceipts.Add(receipt);
+                }
                 booking.InvoiceNumber = receipt.FullNumber;
                 await _db.SaveChangesAsync(ct);
                 return receipt;
@@ -202,7 +218,7 @@ namespace SIGETOUR.API.Application.Invoicing
                 precio_unitario = total.ToString("F2", CultureInfo.InvariantCulture),
                 descuento = (string?)null,
                 subtotal = subtotal.ToString("F2", CultureInfo.InvariantCulture),
-                tipo_de_igv = isExonerado ? "8" : "1",
+                tipo_de_igv = isExonerado ? 8 : 1, // 1 = Gravada - Operación Onerosa, 8 = Exonerado
                 igv = igv.ToString("F2", CultureInfo.InvariantCulture),
                 total = total.ToString("F2", CultureInfo.InvariantCulture),
                 anticipo_regularizacion = false,
@@ -218,18 +234,18 @@ namespace SIGETOUR.API.Application.Invoicing
             var payload = new Dictionary<string, object?>
             {
                 ["operacion"] = "generar_comprobante",
-                ["tipo_de_comprobante"] = isFactura ? "1" : "2",
+                ["tipo_de_comprobante"] = isFactura ? 1 : 2,
                 ["serie"] = receipt.Series,
                 ["numero"] = null,
-                ["sunat_transaction"] = isAdvance ? "2" : "1",
-                ["cliente_tipo_de_documento"] = receipt.CustomerDocType,
+                ["sunat_transaction"] = 1, // 1 = Venta Interna (siempre para turismo nacional; 2 es Exportación)
+                ["cliente_tipo_de_documento"] = int.TryParse(receipt.CustomerDocType, out var dt) ? dt : 1,
                 ["cliente_numero_de_documento"] = receipt.CustomerDocNumber,
                 ["cliente_denominacion"] = receipt.CustomerName,
                 ["cliente_direccion"] = "Cajamarca, Perú",
                 ["cliente_email"] = receipt.CustomerEmail,
                 ["fecha_de_emision"] = DateTime.UtcNow.ToString("dd-MM-yyyy"),
-                ["moneda"] = "1",
-                ["porcentaje_de_igv"] = isExonerado ? "0.00" : (igvRate * 100m).ToString("F2", CultureInfo.InvariantCulture),
+                ["moneda"] = 1,
+                ["porcentaje_de_igv"] = isExonerado ? 0 : 18.00,
                 ["total_gravada"] = isExonerado ? null : subtotal.ToString("F2", CultureInfo.InvariantCulture),
                 ["total_exonerada"] = isExonerado ? total.ToString("F2", CultureInfo.InvariantCulture) : null,
                 ["total_inafecta"] = null,
@@ -309,7 +325,14 @@ namespace SIGETOUR.API.Application.Invoicing
                 receipt.LastError = ex.Message;
             }
 
-            _db.ElectronicReceipts.Add(receipt);
+            if (isNew)
+            {
+                _db.ElectronicReceipts.Add(receipt);
+            }
+            if (receipt.Status == "Accepted")
+            {
+                receipt.LastError = null;
+            }
             booking.InvoiceNumber = receipt.FullNumber;
             await _db.SaveChangesAsync(ct);
             return receipt;

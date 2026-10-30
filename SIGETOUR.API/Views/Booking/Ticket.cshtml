@@ -42,10 +42,10 @@
                 display: none !important;
             }
             .ticket-container {
-                width: @(is58 ? "54mm" : "76mm") !important;
-                max-width: @(is58 ? "54mm" : "76mm") !important;
+                width: @(is58 ? "50mm" : "74mm") !important;
+                max-width: @(is58 ? "50mm" : "74mm") !important;
                 margin: 0 auto !important;
-                padding: 1mm !important;
+                padding: @(is58 ? "1mm" : "2mm") !important;
                 box-shadow: none !important;
                 border: none !important;
             }
@@ -101,15 +101,15 @@
 
     <!-- 2. LIENZO / CONTENEDOR DEL TICKET TÉRMICO -->
     <main class="my-6 px-2 flex justify-center w-full">
-        <div class="ticket-container bg-white text-black p-4 shadow-xl border border-gray-300 ticket-font leading-tight text-[11px] @(is58 ? "w-[58mm] text-[9.5px]" : "w-[80mm]")">
+        <div class="ticket-container bg-white text-black shadow-xl border border-gray-300 ticket-font leading-tight @(is58 ? "w-[54mm] max-w-[54mm] p-2 text-[9px]" : "w-[80mm] max-w-[80mm] p-4 text-[11px]")">
             
             <!-- ENCABEZADO FISCAL -->
             <div class="text-center">
-                <div class="font-extrabold text-base tracking-tight uppercase">TURISMO CHILÓN</div>
-                <div class="font-bold text-[10px]">TRANSPORTE &amp; TURISMO CAJAMARCA S.A.C.</div>
+                <div class="font-extrabold @(is58 ? "text-sm" : "text-base") tracking-tight uppercase">TURISMO CHILÓN</div>
+                <div class="font-bold @(is58 ? "text-[8.5px]" : "text-[10px]")">TRANSPORTE &amp; TURISMO CAJAMARCA S.A.C.</div>
                 <div class="font-bold">RUC: 20601234567</div>
-                <div class="text-[9.5px] mt-0.5">Jr. 2 de Mayo 569, Cajamarca - Perú</div>
-                <div class="text-[9.5px]">Tel: +51 901 195 392 / +51 944 746 364</div>
+                <div class="@(is58 ? "text-[8px]" : "text-[9.5px]") mt-0.5">Jr. 2 de Mayo 569, Cajamarca - Perú</div>
+                <div class="@(is58 ? "text-[8px]" : "text-[9.5px]")">Tel: +51 901 195 392 / +51 944 746 364</div>
             </div>
 
             <!-- SEPARADOR -->
@@ -121,18 +121,47 @@
                 SIN VALIDEZ TRIBUTARIA (DEMO)
             </div>
 
+            @{
+                var rawErr = receipt?.LastError ?? receipt?.ProviderDescription ?? "No aceptado o pendiente por SUNAT";
+                string cleanErr = rawErr;
+                if (cleanErr.Contains("\"errors\":") || cleanErr.Contains("{\"errors\""))
+                {
+                    try
+                    {
+                        using var errDoc = System.Text.Json.JsonDocument.Parse(cleanErr);
+                        if (errDoc.RootElement.TryGetProperty("errors", out var ep))
+                        {
+                            cleanErr = ep.GetString() ?? cleanErr;
+                        }
+                    }
+                    catch { }
+                }
+                if (cleanErr.Length > 150)
+                {
+                    cleanErr = cleanErr.Substring(0, 150) + "...";
+                }
+            }
             @if (receipt != null && receipt.Status != "Accepted" && receipt.Status != "Simulation")
             {
-                <div class="text-center font-bold text-[9px] bg-red-100 text-red-900 p-1 border border-red-500 rounded mb-1.5 uppercase">
+                <div class="text-center font-bold text-[8.5px] bg-red-100 text-red-900 p-1.5 border border-red-500 rounded mb-1.5 break-words uppercase">
                     *** COMPROBANTE @receipt.Status.ToUpper() ***<br />
-                    @(receipt.LastError ?? receipt.ProviderDescription ?? "No aceptado o pendiente por SUNAT / Proveedor")
+                    <span class="normal-case font-medium block mt-0.5 text-[8px]">@cleanErr</span>
+                    @if (booking != null)
+                    {
+                        <form asp-controller="Booking" asp-action="RetryReceipt" method="post" class="mt-1 no-print">
+                            <input type="hidden" name="bookingId" value="@booking.Id" />
+                            <button type="submit" class="px-2 py-0.5 bg-red-700 hover:bg-red-800 text-white rounded text-[8px] font-bold cursor-pointer transition-colors shadow-xs">
+                                ↻ Reintentar Emisión NubeFact
+                            </button>
+                        </form>
+                    }
                 </div>
             }
 
             <!-- TÍTULO DEL COMPROBANTE -->
             <div class="text-center">
-                <div class="font-bold text-sm tracking-wide">@title</div>
-                <div class="font-extrabold text-base mt-0.5">@fullNumber</div>
+                <div class="font-bold @(is58 ? "text-xs" : "text-sm") tracking-wide">@title</div>
+                <div class="font-extrabold @(is58 ? "text-sm" : "text-base") mt-0.5">@fullNumber</div>
             </div>
 
             <!-- FECHA Y EMISIÓN -->
@@ -176,10 +205,10 @@
             <!-- DETALLE DE CONCEPTOS -->
             <table class="w-full text-left">
                 <thead>
-                    <tr class="border-b border-black text-[9.5px]">
-                        <th class="py-0.5 w-6">CANT</th>
+                    <tr class="border-b border-black @(is58 ? "text-[8.5px]" : "text-[9.5px]")">
+                        <th class="py-0.5 @(is58 ? "w-4 text-center" : "w-6")">CANT</th>
                         <th class="py-0.5">DESCRIPCIÓN</th>
-                        <th class="py-0.5 text-right w-14">TOTAL</th>
+                        <th class="py-0.5 text-right @(is58 ? "w-11" : "w-14")">TOTAL</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-dashed divide-gray-400">
@@ -191,10 +220,10 @@
                             var isPartial = booking.PaidAmount < booking.TotalAmount;
                             var concept = isPartial ? " (Adelanto)" : "";
                             <tr>
-                                <td class="py-1 align-top font-bold">@item.Passengers</td>
-                                <td class="py-1 align-top">
-                                    <div class="font-bold uppercase">@tourTitle@concept</div>
-                                    <div class="text-[9px] text-gray-700">P.Unit: S/ @item.UnitPrice.ToString("N2")</div>
+                                <td class="py-1 align-top font-bold @(is58 ? "text-center" : "")">@item.Passengers</td>
+                                <td class="py-1 align-top break-words">
+                                    <div class="font-bold uppercase @(is58 ? "text-[8.5px]" : "text-[10px]")">@tourTitle@concept</div>
+                                    <div class="@(is58 ? "text-[8px]" : "text-[9px]") text-gray-700">P.Unit: S/ @item.UnitPrice.ToString("N2")</div>
                                 </td>
                                 <td class="py-1 align-top text-right font-bold whitespace-nowrap">
                                     S/ @totalAmount.ToString("N2")
@@ -205,8 +234,8 @@
                     else
                     {
                         <tr>
-                            <td class="py-1 align-top font-bold">1</td>
-                            <td class="py-1 align-top font-bold uppercase">Servicio de Transporte Turístico</td>
+                            <td class="py-1 align-top font-bold @(is58 ? "text-center" : "")">1</td>
+                            <td class="py-1 align-top font-bold uppercase break-words @(is58 ? "text-[8.5px]" : "text-[10px]")">Servicio de Transporte Turístico</td>
                             <td class="py-1 align-top text-right font-bold whitespace-nowrap">S/ @totalAmount.ToString("N2")</td>
                         </tr>
                     }
@@ -295,7 +324,7 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const qrText = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(qrString));
-            const qrSize = @(is58 ? 100 : 124);
+            const qrSize = @(is58 ? 84 : 124);
             const container = document.getElementById("qrcode");
             if (container && typeof QRCode !== "undefined") {
                 new QRCode(container, {
