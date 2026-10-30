@@ -436,7 +436,7 @@ public sealed class CulqiPaymentsController : ControllerBase
 
         // Registrar ingreso en el turno de caja activo para conciliación inmediata (estrictamente sin duplicados)
         var activeShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen, ct);
-        if (activeShift != null && !_db.CashTransactions.Any(t => t.BookingId == booking.Id && t.ReferenceCode == current.ProviderId))
+        if (activeShift != null && !_db.CashTransactions.Any(t => t.BookingId == booking.Id && (t.ReferenceCode == booking.ReferenceCode || (current.ProviderId != null && t.ReferenceCode == current.ProviderId))))
         {
             _db.CashTransactions.Add(new CashTransaction
             {
@@ -446,9 +446,9 @@ public sealed class CulqiPaymentsController : ControllerBase
                 Category = "Cobro de Reserva",
                 Amount = paidIncrement,
                 PaymentMethod = booking.PaymentMethod,
-                ReferenceCode = current.ProviderId ?? booking.ReferenceCode,
+                ReferenceCode = booking.ReferenceCode,
                 BookingId = booking.Id,
-                Description = $"Pago Culqi ({current.Channel} - {current.ProviderId}) para reserva {booking.ReferenceCode} - {booking.CustomerName}",
+                Description = $"Pago Culqi confirmado para reserva {booking.ReferenceCode} - {booking.CustomerName}",
                 RegisteredBy = "Pasarela Culqi Sandbox",
                 CreatedAt = DateTime.UtcNow
             });
