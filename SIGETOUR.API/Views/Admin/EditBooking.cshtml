@@ -63,6 +63,14 @@
         </div>
       </div>
       <div class="flex gap-2 items-center">
+        <a href="@Url.Action("Voucher", "Booking", new { id = Model.Id })" target="_blank" class="bg-surface-container border border-outline-variant hover:bg-surface-container-low text-on-surface transition-colors font-label-md px-3.5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer" title="Ver Boleto Oficial">
+          <span class="material-symbols-outlined text-[18px] text-primary">confirmation_number</span>
+          Boleto
+        </a>
+        <a href="@Url.Action("Ticket", "Booking", new { id = Model.Id })" target="_blank" class="bg-amber-50 border border-amber-300 hover:bg-amber-100 text-amber-900 transition-colors font-label-md px-3.5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer" title="Ver / Imprimir Ticket POS (80mm / 58mm)">
+          <span class="material-symbols-outlined text-[18px] text-amber-700">receipt_long</span>
+          Ticket POS
+        </a>
         @if (!isCancelled)
         {
           <button type="button" onclick="openCancelModal()" class="bg-surface-container border border-red-300 text-red-600 hover:bg-red-50 transition-colors font-label-md px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold cursor-pointer" title="Anular esta reserva">

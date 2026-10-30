@@ -141,7 +141,8 @@
                     <th class="p-3.5 font-semibold">Fecha y Turno</th>
                     <th class="p-3.5 font-semibold">Titular / Contacto</th>
                     <th class="p-3.5 font-semibold text-center">Pax</th>
-                    <th class="p-3.5 font-semibold">Total / Pago</th>
+                    <th class="p-3.5 font-semibold">Total / Abonado</th>
+                    <th class="p-3.5 font-semibold text-center">Saldo Pendiente</th>
                     <th class="p-3.5 font-semibold text-center">Estado</th>
                     <th class="p-3.5 font-semibold text-right">Acciones</th>
                 </tr>
@@ -270,15 +271,48 @@
                                 </span>
                             </td>
 
-                            <!-- TOTAL / PAGO -->
+                            <!-- TOTAL / ABONADO -->
                             <td class="p-3.5 whitespace-nowrap">
-                                <div class="font-bold text-on-surface text-body-md">S/ @booking.TotalAmount.ToString("F2")</div>
+                                <div class="font-bold text-on-surface text-body-md">Total: S/ @booking.TotalAmount.ToString("F2")</div>
+                                <div class="text-xs font-semibold @(booking.PaidAmount > 0 ? "text-emerald-700 font-bold" : "text-outline") mt-0.5 flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[14px]">payments</span>
+                                    <span>Abonado: S/ @booking.PaidAmount.ToString("F2")</span>
+                                </div>
                                 @if (!string.IsNullOrWhiteSpace(booking.PaymentMethod))
                                 {
-                                    <div class="text-xs text-outline font-medium mt-0.5 flex items-center gap-1">
-                                        <span class="material-symbols-outlined text-[13px]">payments</span>
-                                        <span>@booking.PaymentMethod</span>
+                                    <div class="text-[11px] text-outline font-medium mt-0.5">
+                                        @booking.PaymentMethod
                                     </div>
+                                }
+                            </td>
+
+                            <!-- SALDO PENDIENTE -->
+                            <td class="p-3.5 whitespace-nowrap text-center">
+                                @{
+                                    var pendingBalance = booking.TotalAmount - booking.PaidAmount;
+                                    var isFullyPaid = booking.PaidAmount >= booking.TotalAmount && booking.TotalAmount > 0;
+                                    var isPartial = booking.PaidAmount > 0 && pendingBalance > 0;
+                                }
+                                @if (isFullyPaid)
+                                {
+                                    <span class="inline-flex items-center gap-1 text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-full font-label-sm font-bold text-xs">
+                                        <span class="material-symbols-outlined text-[14px]">verified</span> Pagado 100%
+                                    </span>
+                                }
+                                else if (isPartial)
+                                {
+                                    <div class="inline-flex flex-col items-center">
+                                        <span class="inline-flex items-center gap-1 text-amber-900 bg-amber-100 border border-amber-400 px-2.5 py-1 rounded-full font-label-sm font-bold text-xs">
+                                            <span class="material-symbols-outlined text-[14px]">toll</span> Saldo: S/ @pendingBalance.ToString("F2")
+                                        </span>
+                                        <span class="text-[10px] text-amber-800 font-bold mt-0.5 uppercase tracking-tight">Cobrar en Counter</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="inline-flex items-center gap-1 text-gray-700 bg-gray-100 border border-gray-300 px-2.5 py-1 rounded-full font-label-sm text-xs">
+                                        S/ @booking.TotalAmount.ToString("F2") (Sin abono)
+                                    </span>
                                 }
                             </td>
 
@@ -306,6 +340,15 @@
 
                             <!-- ACCIONES -->
                             <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                                <a href="@Url.Action("Voucher", "Booking", new { id = booking.Id })" target="_blank" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Ver Boleto Oficial">
+                                    <span class="material-symbols-outlined text-[20px]">confirmation_number</span>
+                                </a>
+                                @if (booking.Status == BookingStatus.Confirmed)
+                                {
+                                    <a href="@Url.Action("Ticket", "Booking", new { id = booking.Id })" target="_blank" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-amber-600 rounded-lg hover:bg-amber-50 transition-colors cursor-pointer" title="Imprimir Ticket POS (80mm / 58mm)">
+                                        <span class="material-symbols-outlined text-[20px]">receipt_long</span>
+                                    </a>
+                                }
                                 <button type="button" onclick="openManifestForBooking('@booking.TravelDate.ToString("yyyy-MM-dd")', '@tour?.Id', '@booking.ShiftName', '@tour?.DefaultVehicleId')" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Exportar Manifiesto de esta Salida en Excel">
                                     <span class="material-symbols-outlined text-[20px]">table_view</span>
                                 </button>
@@ -322,7 +365,7 @@
                 else
                 {
                     <tr id="noResultsServerRow">
-                        <td colspan="8" class="p-8 text-center text-on-surface-variant">
+                        <td colspan="9" class="p-8 text-center text-on-surface-variant">
                             <span class="material-symbols-outlined text-outline text-4xl block mb-2">departure_board</span>
                             No se encontraron reservas con los criterios seleccionados.
                             @if (hasFilters)
@@ -335,7 +378,7 @@
                     </tr>
                 }
                 <tr id="noResultsClientRow" class="hidden">
-                    <td colspan="8" class="p-8 text-center text-on-surface-variant">
+                    <td colspan="9" class="p-8 text-center text-on-surface-variant">
                         <span class="material-symbols-outlined text-outline text-4xl block mb-2">search_off</span>
                         No hay reservas que coincidan con la búsqueda en tiempo real.
                     </td>

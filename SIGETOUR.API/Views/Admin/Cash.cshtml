@@ -356,6 +356,14 @@
                                     @(isIncome ? "+" : "-") S/ @tx.Amount.ToString("N2")
                                 </td>
                                 <td class="p-3.5 text-right pr-6 whitespace-nowrap space-x-1">
+                                    @if (tx.BookingId.HasValue)
+                                    {
+                                        <a href="/Booking/Ticket/@tx.BookingId.Value" target="_blank"
+                                           class="inline-flex items-center justify-center p-1.5 text-on-surface-variant hover:text-amber-600 rounded-lg hover:bg-amber-50 transition-colors cursor-pointer" 
+                                           title="Imprimir Ticket POS (80mm / 58mm)">
+                                            <span class="material-symbols-outlined text-[19px]">receipt_long</span>
+                                        </a>
+                                    }
                                     <button type="button" 
                                             onclick="openEditTxModal('@tx.Id', '@tx.TransactionType', '@Html.Raw(Html.Encode(tx.Category))', '@tx.Amount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)', '@tx.PaymentMethod', '@Html.Raw(Html.Encode(displayRef ?? ""))', '@Html.Raw(Html.Encode(cleanDesc))')"
                                             class="inline-flex items-center justify-center p-1.5 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" 

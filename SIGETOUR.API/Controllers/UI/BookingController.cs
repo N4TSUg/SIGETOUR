@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SIGETOUR.API.Application.Invoicing;
 using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
@@ -199,6 +200,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(b => b.Items)
                 .ThenInclude(i => i.TourPackage)
                 .ThenInclude(t => t.Category)
+                .Include(b => b.AssignedVehicle)
                 .FirstOrDefaultAsync(b => b.Id == id);
                 
             if (booking == null) return RedirectToAction("Catalog", "Tour");
@@ -210,6 +212,48 @@ namespace SIGETOUR.API.Controllers.UI
 
             ViewBag.Receipt = receipt;
             return View(booking);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Ticket(Guid id, string size = "80", [FromServices] IElectronicReceiptService? receiptService = null)
+        {
+            ElectronicReceipt? receipt = await _context.ElectronicReceipts
+                .Include(r => r.Booking)
+                .ThenInclude(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
+                .FirstOrDefaultAsync(r => r.Id == id || r.BookingId == id);
+
+            Booking? booking = receipt?.Booking;
+            if (booking == null)
+            {
+                booking = await _context.Bookings
+                    .Include(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .FirstOrDefaultAsync(b => b.Id == id);
+            }
+
+            if (booking == null) return NotFound("Comprobante o reserva no encontrada");
+
+            // Si la reserva está confirmada y el comprobante no existe o quedó rechazado, intentar emitir/actualizar con NubeFact
+            if (receiptService != null && booking.Status == BookingStatus.Confirmed && (receipt == null || receipt.Status == "Rejected" || receipt.Status == "Pending"))
+            {
+                try
+                {
+                    receipt = await receiptService.GenerateReceiptAsync(booking.Id);
+                }
+                catch { }
+            }
+
+            ViewBag.Booking = booking;
+            ViewBag.TicketSize = (size == "58") ? "58" : "80";
+            return View("Ticket", receipt);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RetryReceipt(Guid bookingId, [FromServices] IElectronicReceiptService receiptService)
+        {
+            await receiptService.GenerateReceiptAsync(bookingId);
+            return RedirectToAction("Ticket", new { id = bookingId });
         }
     }
 }

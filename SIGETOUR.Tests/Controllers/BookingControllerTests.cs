@@ -215,5 +215,56 @@ namespace SIGETOUR.Tests.Controllers
             Assert.Equal("Catalog", redirectResult.ActionName);
             Assert.Equal("Tour", redirectResult.ControllerName);
         }
+
+        [Fact]
+        public async Task Ticket_Get_ExistingBooking_ReturnsTicketView_Default80mm()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = new BookingController(context);
+            var booking = context.Bookings.First();
+
+            // Act
+            var result = await controller.Ticket(booking.Id, "80");
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            Assert.Equal("Ticket", viewResult.ViewName);
+            Assert.Equal("80", controller.ViewBag.TicketSize);
+            Assert.Equal(booking.Id, ((Booking)controller.ViewBag.Booking).Id);
+        }
+
+        [Fact]
+        public async Task Ticket_Get_58mm_SetsViewBagTicketSize58()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = new BookingController(context);
+            var booking = context.Bookings.First();
+
+            // Act
+            var result = await controller.Ticket(booking.Id, "58");
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            Assert.Equal("Ticket", viewResult.ViewName);
+            Assert.Equal("58", controller.ViewBag.TicketSize);
+        }
+
+        [Fact]
+        public async Task Ticket_Get_NonExistingBookingOrReceipt_ReturnsNotFound()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            var controller = new BookingController(context);
+
+            // Act
+            var result = await controller.Ticket(Guid.NewGuid());
+
+            // Assert
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
     }
 }

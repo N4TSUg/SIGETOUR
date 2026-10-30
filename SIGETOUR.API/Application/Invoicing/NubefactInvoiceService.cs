@@ -35,10 +35,22 @@ namespace SIGETOUR.API.Application.Invoicing
             _logger = logger;
         }
 
+        public async Task<ElectronicReceipt?> GetReceiptByIdAsync(Guid receiptId, CancellationToken ct = default)
+        {
+            return await _db.ElectronicReceipts
+                .Include(r => r.Booking)
+                .ThenInclude(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
+                .FirstOrDefaultAsync(r => r.Id == receiptId, ct);
+        }
+
         public async Task<ElectronicReceipt?> GetReceiptByBookingIdAsync(Guid bookingId, CancellationToken ct = default)
         {
             return await _db.ElectronicReceipts
                 .AsNoTracking()
+                .Include(r => r.Booking)
+                .ThenInclude(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
                 .Where(r => r.BookingId == bookingId)
                 .OrderByDescending(r => r.CreatedAtUtc)
                 .FirstOrDefaultAsync(ct);
@@ -46,11 +58,17 @@ namespace SIGETOUR.API.Application.Invoicing
 
         public async Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId = null, CancellationToken ct = default)
         {
-            // 1. Prevención estricta de duplicados / idempotencia
+            // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado o Simulado)
             var existing = await _db.ElectronicReceipts
-                .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
-                    || (culqiPaymentId == null && r.BookingId == bookingId && (r.Status == "Accepted" || r.Status == "Simulation")), ct);
+                .FirstOrDefaultAsync(r => ((culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId) || (culqiPaymentId == null && r.BookingId == bookingId))
+                    && (r.Status == "Accepted" || r.Status == "Simulation"), ct);
             if (existing != null) return existing;
+
+            // Reutilizar registro si quedó en estado fallido/rechazado para actualizarlo en vez de duplicarlo
+            var receipt = await _db.ElectronicReceipts
+                .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
+                    || (culqiPaymentId == null && r.BookingId == bookingId), ct);
+            bool isNew = receipt == null;
 
             var booking = await _db.Bookings
                 .Include(b => b.Items)
@@ -106,8 +124,8 @@ namespace SIGETOUR.API.Application.Invoicing
             var isFactura = string.Equals(booking.InvoiceType, "factura", StringComparison.OrdinalIgnoreCase);
             var receiptType = isFactura ? "Factura" : "Boleta";
             var defaultSeries = isFactura
-                ? (_config["Nubefact:FacturaSeries"] ?? "FFF1")
-                : (_config["Nubefact:BoletaSeries"] ?? "BBB1");
+                ? (_config["Nubefact:FacturaSeries"] ?? "F001")
+                : (_config["Nubefact:BoletaSeries"] ?? "B001");
 
             var dni = (booking.CustomerDni ?? "").Trim();
             string docType;
@@ -132,22 +150,29 @@ namespace SIGETOUR.API.Application.Invoicing
                 docType = "0"; // Doc Trib No Domic / Sin Documento
             }
 
-            var receipt = new ElectronicReceipt
+            if (receipt == null)
             {
-                BookingId = booking.Id,
-                CulqiPaymentId = culqiPaymentId,
-                ReceiptType = receiptType,
-                Series = defaultSeries,
-                Number = $"{DateTime.UtcNow:yyMMdd}{new Random().Next(1000, 9999)}",
-                CustomerDocType = docType,
-                CustomerDocNumber = !string.IsNullOrWhiteSpace(dni) ? dni : "00000000",
-                CustomerName = !string.IsNullOrWhiteSpace(booking.CustomerName) ? booking.CustomerName : "Cliente General",
-                CustomerEmail = booking.CustomerEmail ?? string.Empty,
-                SubtotalAmount = subtotal,
-                IgvAmount = igv,
-                TotalAmount = total,
-                CreatedAtUtc = DateTime.UtcNow
-            };
+                receipt = new ElectronicReceipt
+                {
+                    BookingId = booking.Id,
+                    CulqiPaymentId = culqiPaymentId,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+            }
+
+            receipt.ReceiptType = receiptType;
+            receipt.Series = defaultSeries;
+            if (string.IsNullOrWhiteSpace(receipt.Number))
+            {
+                receipt.Number = $"{DateTime.UtcNow:yyMMdd}{new Random().Next(1000, 9999)}";
+            }
+            receipt.CustomerDocType = docType;
+            receipt.CustomerDocNumber = !string.IsNullOrWhiteSpace(dni) ? dni : "00000000";
+            receipt.CustomerName = !string.IsNullOrWhiteSpace(booking.CustomerName) ? booking.CustomerName : "Cliente General";
+            receipt.CustomerEmail = booking.CustomerEmail ?? string.Empty;
+            receipt.SubtotalAmount = subtotal;
+            receipt.IgvAmount = igv;
+            receipt.TotalAmount = total;
 
             // 5. Separación de Modos: Mock, Demo y Production
             var mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
@@ -162,10 +187,18 @@ namespace SIGETOUR.API.Application.Invoicing
                 receipt.Status = "Simulation";
                 receipt.ProviderResponseCode = "0";
                 receipt.ProviderDescription = "Comprobante generado en modo Simulación/Mock (sin impacto SUNAT)";
-                receipt.PdfUrl = $"/Booking/Voucher/{booking.Id}";
+                receipt.PdfUrl = $"/Booking/Ticket/{receipt.Id}";
                 receipt.IssuedAtUtc = DateTime.UtcNow;
 
-                _db.ElectronicReceipts.Add(receipt);
+                var cpeType = isFactura ? "01" : "03";
+                var cleanDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                receipt.DigitalHash = Convert.ToBase64String(Guid.NewGuid().ToByteArray())[..16];
+                receipt.QrData = $"20601234567|{cpeType}|{receipt.Series}|{receipt.Number}|{receipt.IgvAmount:F2}|{receipt.TotalAmount:F2}|{cleanDate}|{receipt.CustomerDocType}|{receipt.CustomerDocNumber}|{receipt.DigitalHash}|";
+
+                if (isNew)
+                {
+                    _db.ElectronicReceipts.Add(receipt);
+                }
                 booking.InvoiceNumber = receipt.FullNumber;
                 await _db.SaveChangesAsync(ct);
                 return receipt;
@@ -185,7 +218,7 @@ namespace SIGETOUR.API.Application.Invoicing
                 precio_unitario = total.ToString("F2", CultureInfo.InvariantCulture),
                 descuento = (string?)null,
                 subtotal = subtotal.ToString("F2", CultureInfo.InvariantCulture),
-                tipo_de_igv = isExonerado ? "8" : "1",
+                tipo_de_igv = isExonerado ? 8 : 1, // 1 = Gravada - Operación Onerosa, 8 = Exonerado
                 igv = igv.ToString("F2", CultureInfo.InvariantCulture),
                 total = total.ToString("F2", CultureInfo.InvariantCulture),
                 anticipo_regularizacion = false,
@@ -196,21 +229,23 @@ namespace SIGETOUR.API.Application.Invoicing
             var sendToSunat = string.Equals(mode, "Production", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(_config["Nubefact:SendToSunat"], "true", StringComparison.OrdinalIgnoreCase);
 
+            var pdfFormat = _config["Nubefact:PdfFormat"] ?? "TICKET"; // Soporte nativo para tickets térmicos
+
             var payload = new Dictionary<string, object?>
             {
                 ["operacion"] = "generar_comprobante",
-                ["tipo_de_comprobante"] = isFactura ? "1" : "2",
+                ["tipo_de_comprobante"] = isFactura ? 1 : 2,
                 ["serie"] = receipt.Series,
                 ["numero"] = null,
-                ["sunat_transaction"] = isAdvance ? "2" : "1",
-                ["cliente_tipo_de_documento"] = receipt.CustomerDocType,
+                ["sunat_transaction"] = 1, // 1 = Venta Interna (siempre para turismo nacional; 2 es Exportación)
+                ["cliente_tipo_de_documento"] = int.TryParse(receipt.CustomerDocType, out var dt) ? dt : 1,
                 ["cliente_numero_de_documento"] = receipt.CustomerDocNumber,
                 ["cliente_denominacion"] = receipt.CustomerName,
                 ["cliente_direccion"] = "Cajamarca, Perú",
                 ["cliente_email"] = receipt.CustomerEmail,
                 ["fecha_de_emision"] = DateTime.UtcNow.ToString("dd-MM-yyyy"),
-                ["moneda"] = "1",
-                ["porcentaje_de_igv"] = isExonerado ? "0.00" : (igvRate * 100m).ToString("F2", CultureInfo.InvariantCulture),
+                ["moneda"] = 1,
+                ["porcentaje_de_igv"] = isExonerado ? 0 : 18.00,
                 ["total_gravada"] = isExonerado ? null : subtotal.ToString("F2", CultureInfo.InvariantCulture),
                 ["total_exonerada"] = isExonerado ? total.ToString("F2", CultureInfo.InvariantCulture) : null,
                 ["total_inafecta"] = null,
@@ -222,8 +257,8 @@ namespace SIGETOUR.API.Application.Invoicing
                 ["enviar_al_cliente"] = false,
                 ["codigo_unico"] = $"SIG-{receipt.Id:N}",
                 ["condiciones_de_pago"] = "Contado",
-                ["medio_de_pago"] = "tarjeta_de_credito",
-                ["formato_de_pdf"] = "A4",
+                ["medio_de_pago"] = !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod.ToLowerInvariant() : "tarjeta_de_credito",
+                ["formato_de_pdf"] = pdfFormat,
                 ["items"] = new[] { itemPayload }
             };
 
@@ -241,19 +276,40 @@ namespace SIGETOUR.API.Application.Invoicing
 
                 if (response.IsSuccessStatusCode)
                 {
-                    receipt.Status = "Accepted";
-                    if (root.TryGetProperty("numero", out var numProp))
+                    if (root.TryGetProperty("errors", out var errProp) && !string.IsNullOrWhiteSpace(errProp.GetString()))
                     {
-                        receipt.Number = numProp.ValueKind == JsonValueKind.Number
-                            ? numProp.GetInt64().ToString()
-                            : numProp.GetString() ?? receipt.Number;
+                        receipt.Status = "Rejected";
+                        receipt.LastError = errProp.GetString();
+                        _logger.LogWarning("NubeFact devolvió errores para reserva {RefCode}: {Errors}", booking.ReferenceCode, errProp.GetString());
                     }
-                    receipt.PdfUrl = root.TryGetProperty("enlace_del_pdf", out var pdfProp) ? pdfProp.GetString() : null;
-                    receipt.XmlUrl = root.TryGetProperty("enlace_del_xml", out var xmlProp) ? xmlProp.GetString() : null;
-                    receipt.CdrUrl = root.TryGetProperty("enlace_del_cdr", out var cdrProp) ? cdrProp.GetString() : null;
-                    receipt.DigitalHash = root.TryGetProperty("codigo_hash", out var hashProp) ? hashProp.GetString() : null;
-                    receipt.ProviderDescription = root.TryGetProperty("sunat_description", out var descProp) ? descProp.GetString() : "Aceptado";
-                    receipt.IssuedAtUtc = DateTime.UtcNow;
+                    else
+                    {
+                        receipt.Status = "Accepted";
+                        if (root.TryGetProperty("numero", out var numProp))
+                        {
+                            receipt.Number = numProp.ValueKind == JsonValueKind.Number
+                                ? numProp.GetInt64().ToString()
+                                : numProp.GetString() ?? receipt.Number;
+                        }
+                        receipt.PdfUrl = root.TryGetProperty("enlace_del_pdf", out var pdfProp) ? pdfProp.GetString() : null;
+                        receipt.XmlUrl = root.TryGetProperty("enlace_del_xml", out var xmlProp) ? xmlProp.GetString() : null;
+                        receipt.CdrUrl = root.TryGetProperty("enlace_del_cdr", out var cdrProp) ? cdrProp.GetString() : null;
+                        receipt.DigitalHash = root.TryGetProperty("codigo_hash", out var hashProp) ? hashProp.GetString() : null;
+                        receipt.ProviderDescription = root.TryGetProperty("sunat_description", out var descProp) ? descProp.GetString() : "Aceptado";
+
+                        if (root.TryGetProperty("cadena_para_codigo_qr", out var qrProp) && !string.IsNullOrWhiteSpace(qrProp.GetString()))
+                        {
+                            receipt.QrData = qrProp.GetString();
+                        }
+                        else
+                        {
+                            var cpeType = isFactura ? "01" : "03";
+                            var cleanDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+                            receipt.QrData = $"20601234567|{cpeType}|{receipt.Series}|{receipt.Number}|{receipt.IgvAmount:F2}|{receipt.TotalAmount:F2}|{cleanDate}|{receipt.CustomerDocType}|{receipt.CustomerDocNumber}|{receipt.DigitalHash}|";
+                        }
+
+                        receipt.IssuedAtUtc = DateTime.UtcNow;
+                    }
                 }
                 else
                 {
@@ -269,9 +325,73 @@ namespace SIGETOUR.API.Application.Invoicing
                 receipt.LastError = ex.Message;
             }
 
-            _db.ElectronicReceipts.Add(receipt);
+            if (isNew)
+            {
+                _db.ElectronicReceipts.Add(receipt);
+            }
+            if (receipt.Status == "Accepted")
+            {
+                receipt.LastError = null;
+            }
             booking.InvoiceNumber = receipt.FullNumber;
             await _db.SaveChangesAsync(ct);
+            return receipt;
+        }
+
+        public async Task<ElectronicReceipt?> QueryReceiptFromProviderAsync(Guid receiptId, CancellationToken ct = default)
+        {
+            var receipt = await _db.ElectronicReceipts
+                .Include(r => r.Booking)
+                .FirstOrDefaultAsync(r => r.Id == receiptId, ct);
+            if (receipt == null) return null;
+
+            var ruta = _config["Nubefact:Ruta"]?.Trim();
+            var token = _config["Nubefact:Token"]?.Trim();
+            if (string.IsNullOrWhiteSpace(ruta) || string.IsNullOrWhiteSpace(token))
+                return receipt;
+
+            try
+            {
+                var isFactura = receipt.ReceiptType == "Factura";
+                int.TryParse(receipt.Number, out var numInt);
+                var payload = new
+                {
+                    operacion = "consultar_comprobante",
+                    tipo_de_comprobante = isFactura ? 1 : 2,
+                    serie = receipt.Series,
+                    numero = numInt > 0 ? numInt : 1
+                };
+
+                using var requestMsg = new HttpRequestMessage(HttpMethod.Post, ruta);
+                requestMsg.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                requestMsg.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+                var response = await _http.SendAsync(requestMsg, ct);
+                var jsonStr = await response.Content.ReadAsStringAsync(ct);
+                using var doc = JsonDocument.Parse(jsonStr);
+                var root = doc.RootElement;
+
+                if (response.IsSuccessStatusCode && !root.TryGetProperty("errors", out _))
+                {
+                    var sunatAccepted = root.TryGetProperty("aceptada_por_sunat", out var a) ? a.GetBoolean() : true;
+                    receipt.Status = sunatAccepted ? "Accepted" : "Submitted";
+                    receipt.PdfUrl = root.TryGetProperty("enlace_del_pdf", out var p) ? p.GetString() : receipt.PdfUrl;
+                    receipt.XmlUrl = root.TryGetProperty("enlace_del_xml", out var x) ? x.GetString() : receipt.XmlUrl;
+                    receipt.CdrUrl = root.TryGetProperty("enlace_del_cdr", out var c) ? c.GetString() : receipt.CdrUrl;
+                    receipt.DigitalHash = root.TryGetProperty("codigo_hash", out var h) ? h.GetString() : receipt.DigitalHash;
+                    receipt.ProviderDescription = root.TryGetProperty("sunat_description", out var s) ? s.GetString() : receipt.ProviderDescription;
+                    if (root.TryGetProperty("cadena_para_codigo_qr", out var q) && !string.IsNullOrWhiteSpace(q.GetString()))
+                    {
+                        receipt.QrData = q.GetString();
+                    }
+                    await _db.SaveChangesAsync(ct);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error al consultar estado en NubeFact para comprobante {FullNumber}", receipt.FullNumber);
+            }
+
             return receipt;
         }
     }

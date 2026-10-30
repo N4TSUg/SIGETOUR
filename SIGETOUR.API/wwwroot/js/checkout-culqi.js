@@ -6,6 +6,8 @@
 let lastCulqiAttempt = null;
 let currentDeviceFingerprint = null;
 let currentBookingContext = null;
+let qrPollingTimer = null;
+let qrCountdownTimer = null;
 
 async function getDeviceFingerprint() {
   if (currentDeviceFingerprint) return currentDeviceFingerprint;
@@ -17,6 +19,37 @@ async function getDeviceFingerprint() {
     }
   }
   return currentDeviceFingerprint;
+}
+
+// Detener temporizadores de sondeo QR
+function detenerSondeoQr() {
+  if (qrPollingTimer) {
+    clearInterval(qrPollingTimer);
+    qrPollingTimer = null;
+  }
+  if (qrCountdownTimer) {
+    clearInterval(qrCountdownTimer);
+    qrCountdownTimer = null;
+  }
+}
+
+// Iniciar temporizador regresivo visual de orden QR (25 minutos oficiales Culqi)
+function iniciarCuentaRegresivaQr(segundosRestantes, onTick, onExpired) {
+  if (qrCountdownTimer) clearInterval(qrCountdownTimer);
+  let tiempo = segundosRestantes;
+  qrCountdownTimer = setInterval(() => {
+    tiempo--;
+    if (tiempo <= 0) {
+      clearInterval(qrCountdownTimer);
+      qrCountdownTimer = null;
+      if (onExpired) onExpired();
+    } else {
+      const min = Math.floor(tiempo / 60);
+      const seg = tiempo % 60;
+      const fmt = `${min.toString().padStart(2, '0')}:${seg.toString().padStart(2, '0')}`;
+      if (onTick) onTick(fmt);
+    }
+  }, 1000);
 }
 
 // Escuchador global de respuestas de autenticación 3D Secure del banco emisor
@@ -67,8 +100,9 @@ window.addEventListener("message", async function (event) {
   }
 }, false);
 
-async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full", channel = "charge", onStatus = null }) {
-  if (onStatus) onStatus("Preparando pago seguro con Culqi...", "info");
+async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full", channel = "charge", onStatus = null, onQrState = null }) {
+  detenerSondeoQr();
+  if (onStatus) onStatus(channel === "wallet_qr" ? "Generando orden QR dinámica con Culqi Sandbox..." : "Preparando pago seguro con Culqi...", "info");
   
   const prepareRes = await fetch("/api/culqi/prepare", {
     method: "POST",
@@ -90,7 +124,7 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
     console.warn("Storage not available", e);
   }
 
-  // Idempotencia: si ya estaba acreditado
+  // Idempotencia: si ya estaba acreditado previamente
   if (data.status === "paid") {
     if (onStatus) onStatus("La reserva ya cuenta con un pago verificado. Redirigiendo al voucher...", "success");
     setTimeout(() => {
@@ -100,7 +134,7 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
   }
 
   const methods = channel === "wallet_qr"
-    ? { tarjeta: false, yape: false, billetera: true, bancaMovil: false, agente: false, cuotealo: false }
+    ? { tarjeta: false, yape: true, billetera: true, bancaMovil: false, agente: false, cuotealo: false }
     : { tarjeta: true, yape: true, billetera: false, bancaMovil: false, agente: false, cuotealo: false };
 
   const settings = { title: "Turismo Chilón - SIGETOUR", currency: "PEN", amount: data.amountCents };
@@ -136,6 +170,58 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
       paymentMethodsSort: Object.keys(methods)
     }
   });
+
+  // Si es canal wallet_qr, iniciar sondeo automático cada 3.5 segundos en paralelo
+  if (channel === "wallet_qr") {
+    if (onQrState) {
+      onQrState({
+        state: "waiting",
+        orderId: data.orderId,
+        amount: data.amountCents / 100,
+        reused: !!data.reused,
+        message: data.reused ? "Orden QR activa recuperada" : "Orden QR creada"
+      });
+    }
+
+    iniciarCuentaRegresivaQr(24 * 60, (timerFmt) => {
+      if (onQrState) onQrState({ state: "tick", timer: timerFmt });
+    }, () => {
+      detenerSondeoQr();
+      if (onStatus) onStatus("La orden QR de Culqi ha expirado. Por favor, genera un nuevo código QR.", "warning");
+      if (onQrState) onQrState({ state: "expired" });
+    });
+
+    qrPollingTimer = setInterval(async () => {
+      try {
+        const checkRes = await fetch("/api/culqi/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            attemptId: data.attemptId,
+            bookingId,
+            checkoutToken
+          })
+        });
+        const checkData = await checkRes.json();
+        if (checkRes.ok && checkData.status === "paid") {
+          detenerSondeoQr();
+          try { checkout.close(); } catch (e) {}
+          if (onStatus) onStatus("¡Pago QR con Yape/Plin verificado exitosamente! Redirigiendo...", "success");
+          if (onQrState) onQrState({ state: "paid" });
+          setTimeout(() => {
+            window.location.href = `/Booking/Voucher/${bookingId}`;
+          }, 900);
+        } else if (checkRes.ok && (checkData.status === "expired" || checkData.status === "failed")) {
+          detenerSondeoQr();
+          try { checkout.close(); } catch (e) {}
+          if (onStatus) onStatus("La orden QR expiró o fue cancelada en Culqi. Genera un nuevo código para pagar.", "warning");
+          if (onQrState) onQrState({ state: "expired" });
+        }
+      } catch (pollErr) {
+        // Red transitoria: el sondeo continuará en el siguiente intervalo
+      }
+    }, 3500);
+  }
 
   checkout.culqi = async () => {
     try {
@@ -183,15 +269,19 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
           if (onStatus) onStatus(statusData.message || "Pago en verificación. Consulta el estado antes de intentar nuevamente.", "warning");
         }
       } else if (checkout.order) {
-        checkout.close();
-        if (onStatus) onStatus("Orden QR Culqi generada exitosamente. Se confirmará automáticamente al completar el pago en tu aplicación.", "info");
+        // En Culqi Checkout Custom, cuando el usuario ve el QR de la orden generada
+        if (onStatus) onStatus("Código QR Culqi en pantalla. Escanéalo desde tu app Yape o Plin. El pago se confirmará automáticamente.", "info");
       } else {
-        if (onStatus) onStatus("No se completó la operación en Culqi.", "warning");
+        if (onStatus) onStatus("Ventana de pago cerrada o cancelada por el usuario.", "info");
       }
     } catch (err) {
       if (onStatus) onStatus("Error al procesar cargo: " + err.message, "error");
     }
   };
+
+  checkout.open();
+  return { attemptId: data.attemptId, orderId: data.orderId };
+}
 
   checkout.open();
   return { attemptId: data.attemptId };
