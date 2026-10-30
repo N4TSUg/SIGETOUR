@@ -1,6 +1,6 @@
 /*
   Integración Culqi Checkout Sandbox para SIGETOUR
-  Prerrequisito: <script src="https://js.culqi.com/checkout-js"></script>
+  El script https://js.culqi.com/checkout-js expone el constructor global: CulqiCheckout
 */
 let lastCulqiAttempt = null;
 
@@ -43,8 +43,9 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
   const settings = { title: "Turismo Chilón - SIGETOUR", currency: "PEN", amount: data.amountCents };
   if (data.orderId) settings.order = data.orderId;
 
+  // La librería checkout-js expone CulqiCheckout (constructor del modal), NO un objeto 'Culqi'
   if (typeof CulqiCheckout === "undefined") {
-    const msg = "La pasarela de pago Culqi no pudo cargarse en el navegador. Por favor refresque la página.";
+    const msg = "La pasarela de pago Culqi no pudo cargarse. Verifica tu conexión a internet y recarga la página.";
     if (onStatus) onStatus(msg, "error");
     throw new Error(msg);
   }
@@ -63,7 +64,7 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
   checkout.culqi = async () => {
     try {
       if (checkout.token) {
-        checkout.close(); // Cerramos el modal de inmediato para dar retroalimentación clara
+        checkout.close();
         if (onStatus) onStatus("Procesando cobro en Culqi...", "info");
         const res = await fetch("/api/culqi/charge", {
           method: "POST",
