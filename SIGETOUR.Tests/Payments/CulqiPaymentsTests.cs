@@ -1424,6 +1424,83 @@ namespace SIGETOUR.Tests.Payments
         }
 
         [Fact]
+        public async Task Check_WalletQr_WhenDirectOrderPending_ButPaidInOrdersList_ReconcilesAndConfirms()
+        {
+            using var context = TestDbContextFactory.Create();
+            var shift = new CashRegisterShift { Id = Guid.NewGuid(), IsOpen = true, OpenedAt = DateTime.UtcNow };
+            context.CashRegisterShifts.Add(shift);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-CHECK-STALE",
+                CustomerName = "Reconciliación Sandbox",
+                CustomerDni = "77889904",
+                TotalAmount = 40m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            context.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 4000,
+                Channel = "wallet_qr",
+                Status = "verification",
+                ProviderId = "ord_test_stale_99",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.Set<CulqiPayment>().Add(payment);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            // Simula comportamiento real de Culqi Sandbox:
+            // GET /orders/ord_test_stale_99 retorna pending (stale snapshot)
+            // pero GET /orders?state=paid retorna la orden confirmada
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                var url = req.RequestUri!.ToString();
+                if (url.Contains("orders/ord_test_stale_99"))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_stale_99\",\"state\":\"pending\",\"currency_code\":\"PEN\",\"amount\":4000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                if (url.Contains("orders?state=paid"))
+                {
+                    var json = "{\"data\":[{\"object\":\"order\",\"id\":\"ord_test_stale_99\",\"state\":\"paid\",\"currency_code\":\"PEN\",\"amount\":4000,\"paid_at\":1793407821}]}";
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(json, Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Check(new CheckPayment(
+                payment.Id, token, booking.Id
+            ), CancellationToken.None);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            using var docVal = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+            Assert.Equal("paid", docVal.RootElement.GetProperty("status").GetString());
+            Assert.Equal(40m, docVal.RootElement.GetProperty("paidAmount").GetDecimal());
+
+            var updatedBooking = await context.Bookings.FindAsync(booking.Id);
+            Assert.Equal(BookingStatus.Confirmed, updatedBooking!.Status);
+            Assert.Equal(40m, updatedBooking.PaidAmount);
+
+            var cashTx = await context.CashTransactions.FirstOrDefaultAsync(c => c.CulqiPaymentId == payment.Id);
+            Assert.NotNull(cashTx);
+            Assert.Equal(40m, cashTx.Amount);
+        }
+
+        [Fact]
         public async Task Check_WalletQr_WhenCulqiOrderExpired_SetsExpiredWithoutCrediting()
         {
             using var context = TestDbContextFactory.Create();

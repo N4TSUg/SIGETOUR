@@ -318,6 +318,19 @@ namespace SIGETOUR.API.Application.Invoicing
 
             var pdfFormat = _config["Nubefact:PdfFormat"] ?? "TICKET";
 
+            // Fecha de emisión en zona horaria oficial de Perú (SUNAT exige hora local UTC-5, no fecha UTC)
+            DateTime peruTime;
+            try
+            {
+                var peruZone = TimeZoneInfo.FindSystemTimeZoneById("SA Pacific Standard Time");
+                peruTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, peruZone);
+            }
+            catch
+            {
+                peruTime = DateTime.UtcNow.AddHours(-5);
+            }
+            var fechaEmision = peruTime.ToString("dd-MM-yyyy");
+
             var payload = new Dictionary<string, object?>
             {
                 ["operacion"] = "generar_comprobante",
@@ -330,7 +343,7 @@ namespace SIGETOUR.API.Application.Invoicing
                 ["cliente_denominacion"] = receipt.CustomerName,
                 ["cliente_direccion"] = "Cajamarca, Perú",
                 ["cliente_email"] = receipt.CustomerEmail,
-                ["fecha_de_emision"] = DateTime.UtcNow.ToString("dd-MM-yyyy"),
+                ["fecha_de_emision"] = fechaEmision,
                 ["moneda"] = 1, // Soles
                 ["porcentaje_de_igv"] = isExonerado ? 0 : 18.00,
                 ["total_gravada"] = isExonerado ? null : subtotal.ToString("F2", CultureInfo.InvariantCulture),
@@ -428,6 +441,15 @@ namespace SIGETOUR.API.Application.Invoicing
                     {
                         receipt.Status = "Rejected"; // 4xx: Parámetros inválidos o rechazo de negocio
                         receipt.LastError = jsonStr;
+                        try
+                        {
+                            using var errDoc = JsonDocument.Parse(jsonStr);
+                            if (errDoc.RootElement.TryGetProperty("errors", out var errProp))
+                                receipt.ProviderDescription = errProp.GetString();
+                            if (errDoc.RootElement.TryGetProperty("codigo", out var codProp))
+                                receipt.ProviderResponseCode = codProp.ToString();
+                        }
+                        catch {}
                     }
                     _logger.LogWarning("NubeFact respondió HTTP {StatusCode} para {RefCode}: {Response}", response.StatusCode, booking.ReferenceCode, jsonStr);
                 }

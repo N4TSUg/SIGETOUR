@@ -290,117 +290,55 @@
 
           <!-- TAB 1: YAPE / PLIN -->
           <div class="block space-y-4" id="tab-yape">
-            <!-- Sub-selector de Modalidad Yape / Plin -->
-            <div class="flex border-b border-outline-variant/40 gap-2 overflow-x-auto pb-0.5">
-              <button type="button" id="subtab-btn-qr" onclick="switchYapeSubtab('qr')" class="pb-2.5 px-3 text-label-md font-bold border-b-2 border-primary text-primary flex items-center gap-1.5 whitespace-nowrap transition-colors">
-                <span class="material-symbols-outlined text-lg">qr_code_scanner</span>
-                <span>⚡ QR Dinámico Culqi (Confirmación Inmediata)</span>
-              </button>
-              <button type="button" id="subtab-btn-manual" onclick="switchYapeSubtab('manual')" class="pb-2.5 px-3 text-label-md font-semibold text-secondary hover:text-on-surface border-b-2 border-transparent flex items-center gap-1.5 whitespace-nowrap transition-colors">
-                <span class="material-symbols-outlined text-lg">edit_note</span>
-                <span>📝 Transferencia Directa Manual (+51 901 195 392)</span>
-              </button>
-            </div>
-
-            <!-- MODALIDAD A: QR DINÁMICO CULQI (100% ONLINE AUTOMÁTICO) -->
-            <div id="subtab-yape-qr" class="space-y-4">
-              <div class="p-4 bg-[#f0fdf9] border border-primary/20 rounded-xl flex flex-col md:flex-row items-center gap-5">
-                <div class="bg-surface-container-lowest p-3.5 rounded-xl border border-primary/20 shadow-xs flex flex-col items-center justify-center w-44 text-center shrink-0">
-                  <div class="w-14 h-14 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center mb-1.5 shadow-xs">
-                    <span class="material-symbols-outlined text-3xl">qr_code_2</span>
-                  </div>
-                  <div class="text-label-md font-bold text-inverse-surface">QR Culqi Oficial</div>
-                  <span class="text-[10px] text-secondary">Yape • Plin • Billeteras</span>
-                  <span class="inline-block mt-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-bold rounded-full">Confirmación Automática</span>
+            <div class="p-4 bg-[#f0fdf9] border border-primary/20 rounded-xl flex flex-col md:flex-row items-center gap-5">
+              <div class="bg-surface-container-lowest p-3.5 rounded-xl border border-primary/20 shadow-xs flex flex-col items-center justify-center w-44 text-center shrink-0">
+                <div class="w-14 h-14 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center mb-1.5 shadow-xs">
+                  <span class="material-symbols-outlined text-3xl">qr_code_2</span>
                 </div>
-                <div class="space-y-2.5 w-full">
-                  <div class="flex items-center justify-between">
-                    <span class="text-label-md font-bold text-inverse-surface flex items-center gap-1.5">
-                      <span class="material-symbols-outlined text-primary text-lg">verified</span>
-                      Pago Directo con QR Sandbox
-                    </span>
-                    <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Sin subir fotos de voucher</span>
-                  </div>
-                  <p class="text-body-sm text-secondary leading-snug">
-                    Presiona el botón para generar tu <strong>código QR dinámico oficial Culqi</strong>. Escanéalo desde tu app Yape o Plin.
-                    El sistema detectará el pago en tiempo real y emitirá tu boleto y comprobante al instante.
-                  </p>
-                  <div class="pt-1 flex flex-wrap gap-2 items-center">
-                    <button type="button" onclick="ejecutarPagoCulqi('wallet_qr')" class="px-4 py-2.5 bg-primary hover:bg-[#005045] text-white text-label-sm font-bold rounded-lg shadow-xs flex items-center gap-2 transition-all">
-                      <span class="material-symbols-outlined text-lg">qr_code_2</span> Generar QR Dinámico Culqi Sandbox
-                    </button>
-                    <span class="text-[11px] text-secondary italic">Válido por 25 minutos desde su emisión</span>
-                  </div>
-                </div>
+                <div class="text-label-md font-bold text-inverse-surface">QR Culqi Oficial</div>
+                <span class="text-[10px] text-secondary">Yape • Plin • Billeteras</span>
+                <span class="inline-block mt-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-bold rounded-full">Confirmación Automática</span>
               </div>
-
-              <!-- Monitor en vivo de estado de Orden QR -->
-              <div id="qr-monitor-box" class="hidden p-4 rounded-xl border border-primary/30 bg-[#f7fffc] shadow-xs space-y-3">
+              <div class="space-y-2.5 w-full">
                 <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <span class="relative flex h-3 w-3">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                    </span>
-                    <span id="qr-monitor-title" class="text-label-md font-bold text-inverse-surface">Esperando confirmación de pago...</span>
-                  </div>
-                  <span id="qr-monitor-timer" class="font-mono text-xs font-bold px-2 py-0.5 bg-primary-container text-white rounded">24:59</span>
+                  <span class="text-label-md font-bold text-inverse-surface flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-primary text-lg">verified</span>
+                    Pago Directo con QR Sandbox
+                  </span>
+                  <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Sin subir fotos de voucher</span>
                 </div>
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-body-sm text-secondary border-t border-outline-variant/30 pt-2.5">
-                  <div class="text-xs">
-                    Identificador de Orden: <strong id="qr-monitor-order-id" class="font-mono text-primary font-semibold">--</strong>
-                  </div>
-                  <button type="button" onclick="ejecutarPagoCulqi('wallet_qr')" class="text-xs text-primary font-bold hover:underline flex items-center gap-1 self-start sm:self-auto">
-                    <span class="material-symbols-outlined text-sm">open_in_new</span> Reabrir ventana de QR
+                <p class="text-body-sm text-secondary leading-snug">
+                  Presiona el botón para generar tu <strong>código QR dinámico oficial Culqi</strong>. Escanéalo desde tu app Yape o Plin.
+                  El sistema detectará el pago en tiempo real y emitirá tu boleto y comprobante al instante.
+                </p>
+                <div class="pt-1 flex flex-wrap gap-2 items-center">
+                  <button type="button" onclick="ejecutarPagoCulqi('wallet_qr')" class="px-4 py-2.5 bg-primary hover:bg-[#005045] text-white text-label-sm font-bold rounded-lg shadow-xs flex items-center gap-2 transition-all">
+                    <span class="material-symbols-outlined text-lg">qr_code_2</span> Generar QR Dinámico Culqi Sandbox
                   </button>
+                  <span class="text-[11px] text-secondary italic">Válido por 25 minutos desde su emisión</span>
                 </div>
               </div>
             </div>
 
-            <!-- MODALIDAD B: TRANSFERENCIA DIRECTA MANUAL (NÚMERO COMERCIAL) -->
-            <div id="subtab-yape-manual" class="hidden space-y-4">
-              <div class="p-4 bg-[#f8fafc] border border-outline-variant/50 rounded-xl space-y-3">
-                <div class="flex items-center gap-3">
-                  <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-                    <span class="material-symbols-outlined text-2xl">call</span>
-                  </div>
-                  <div>
-                    <h4 class="font-bold text-inverse-surface text-label-md">Transferencia Directa a la Agencia</h4>
-                    <p class="text-xs text-secondary">Para pagos transferidos manualmente fuera de la pasarela Culqi.</p>
-                  </div>
+            <!-- Monitor en vivo de estado de Orden QR -->
+            <div id="qr-monitor-box" class="hidden p-4 rounded-xl border border-primary/30 bg-[#f7fffc] shadow-xs space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <span id="qr-monitor-title" class="text-label-md font-bold text-inverse-surface">Esperando confirmación de pago...</span>
                 </div>
-                <div class="p-3 bg-white rounded-lg border border-outline-variant/40 space-y-1 text-body-sm">
-                  <div class="flex items-center justify-between flex-wrap gap-2">
-                    <span class="text-secondary text-xs">Línea Oficial Yape / Plin Comercial:</span>
-                    <button class="text-xs text-primary hover:underline flex items-center gap-0.5 bg-surface-container-lowest px-2 py-0.5 rounded border border-outline-variant/30" onclick="navigator.clipboard.writeText('901195392')" type="button">
-                      <span class="material-symbols-outlined text-sm">content_copy</span> Copiar número
-                    </button>
-                  </div>
-                  <div class="text-headline-sm font-extrabold text-inverse-surface tracking-tight">+51 901 195 392</div>
-                  <div class="text-xs text-secondary">Titular: <strong class="text-inverse-surface">TURISMO CHILÓN TRANSPORTE &amp; TURISMO S.A.C.</strong></div>
+                <span id="qr-monitor-timer" class="font-mono text-xs font-bold px-2 py-0.5 bg-primary-container text-white rounded">24:59</span>
+              </div>
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-body-sm text-secondary border-t border-outline-variant/30 pt-2.5">
+                <div class="text-xs">
+                  Identificador de Orden: <strong id="qr-monitor-order-id" class="font-mono text-primary font-semibold">--</strong>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <label class="block text-label-sm font-semibold text-inverse-surface mb-1">
-                      Número de Operación <span class="text-tertiary">*</span>
-                    </label>
-                    <input id="input-manual-op-number" class="w-full px-3 py-2 bg-white border border-[#cbd5e1] rounded-lg text-body-sm font-mono focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. 783921" type="text"/>
-                  </div>
-                  <div>
-                    <label class="block text-label-sm font-semibold text-inverse-surface mb-1">
-                      Adjuntar Voucher (Opcional)
-                    </label>
-                    <label class="flex items-center justify-center gap-2 px-3 py-2 bg-white border border-dashed border-[#cbd5e1] rounded-lg cursor-pointer hover:bg-surface-container-low transition-colors">
-                      <span class="material-symbols-outlined text-primary text-base">upload_file</span>
-                      <span class="text-xs text-secondary truncate" id="file-label-manual">Subir JPG / PNG</span>
-                      <input accept="image/*" class="hidden" onchange="document.getElementById('file-label-manual').textContent = this.files[0] ? this.files[0].name : 'Subir JPG / PNG'" type="file"/>
-                    </label>
-                  </div>
-                </div>
-                <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 flex items-start gap-2">
-                  <span class="material-symbols-outlined text-base shrink-0 mt-0.5">info</span>
-                  <span><strong>Nota de Validación:</strong> Al registrar este pago manual, la reserva quedará en estado <em>Pendiente</em> y será verificada por el personal de counter en la agencia antes del embarque. No se marcará como pagada automáticamente por Culqi.</span>
-                </div>
+                <button type="button" onclick="ejecutarPagoCulqi('wallet_qr')" class="text-xs text-primary font-bold hover:underline flex items-center gap-1 self-start sm:self-auto">
+                  <span class="material-symbols-outlined text-sm">open_in_new</span> Reabrir ventana de QR
+                </button>
               </div>
             </div>
           </div>
@@ -740,35 +678,9 @@
     
     let currentModality = "full"; // 'full' or 'deposit'
     let currentTab = "yape"; // 'yape', 'card', 'transfer', 'cash'
-    let currentYapeSubtab = "qr"; // 'qr' or 'manual'
-
-    function switchYapeSubtab(subtab) {
-        currentYapeSubtab = subtab;
-        const btnQr = document.getElementById('subtab-btn-qr');
-        const btnManual = document.getElementById('subtab-btn-manual');
-        const divQr = document.getElementById('subtab-yape-qr');
-        const divManual = document.getElementById('subtab-yape-manual');
-
-        if (subtab === 'qr') {
-            btnQr.className = 'pb-2.5 px-3 text-label-md font-bold border-b-2 border-primary text-primary flex items-center gap-1.5 whitespace-nowrap transition-colors';
-            btnManual.className = 'pb-2.5 px-3 text-label-md font-semibold text-secondary hover:text-on-surface border-b-2 border-transparent flex items-center gap-1.5 whitespace-nowrap transition-colors';
-            divQr.classList.remove('hidden');
-            divManual.classList.add('hidden');
-        } else {
-            btnManual.className = 'pb-2.5 px-3 text-label-md font-bold border-b-2 border-primary text-primary flex items-center gap-1.5 whitespace-nowrap transition-colors';
-            btnQr.className = 'pb-2.5 px-3 text-label-md font-semibold text-secondary hover:text-on-surface border-b-2 border-transparent flex items-center gap-1.5 whitespace-nowrap transition-colors';
-            divManual.classList.remove('hidden');
-            divQr.classList.add('hidden');
-            
-            const manualInput = document.getElementById('input-manual-payment-method');
-            if (manualInput) manualInput.value = 'Yape / Plin (Transferencia Manual)';
-        }
-        updateActionButtons();
-    }
 
     function updateActionButtons() {
-        // En Yape, es online SOLO si está seleccionado el subtab 'qr'
-        const isOnline = (currentTab === 'card') || (currentTab === 'yape' && currentYapeSubtab === 'qr');
+        const isOnline = (currentTab === 'card') || (currentTab === 'yape');
         const culqiContainer = document.getElementById('culqi-action-container');
         const manualForm = document.getElementById('form-confirm-manual');
         const culqiText = document.getElementById('btn-pay-culqi-text');
@@ -796,9 +708,7 @@
         }
 
         if (manualBtnText) {
-            if (currentTab === 'yape') {
-                manualBtnText.textContent = 'Registrar Pago Manual Yape/Plin (Validación en Counter)';
-            } else if (currentTab === 'transfer') {
+            if (currentTab === 'transfer') {
                 manualBtnText.textContent = 'Registrar Reserva (Pago por Transferencia)';
             } else if (currentTab === 'cash') {
                 manualBtnText.textContent = 'Registrar Reserva Provisional (Pago en Counter)';
@@ -813,8 +723,6 @@
             if (manualInput) manualInput.value = 'Transferencia Bancaria (BCP/BBVA)';
         } else if (tabId === 'cash') {
             if (manualInput) manualInput.value = 'Efectivo (Pago en Counter)';
-        } else if (tabId === 'yape' && currentYapeSubtab === 'manual') {
-            if (manualInput) manualInput.value = 'Yape / Plin (Transferencia Manual)';
         }
 
         const tabs = ['yape', 'card', 'transfer', 'cash'];

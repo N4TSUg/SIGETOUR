@@ -373,80 +373,98 @@ public sealed class CulqiPaymentsController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Check([FromBody] CheckPayment request, CancellationToken ct)
     {
-        CulqiPayment? payment = null;
-        if (request.AttemptId != Guid.Empty)
+        try
         {
-            payment = await _db.Set<CulqiPayment>()
-                .FirstOrDefaultAsync(p => p.Id == request.AttemptId, ct);
-        }
-        else if (request.BookingId.HasValue && request.BookingId.Value != Guid.Empty)
-        {
-            payment = await _db.Set<CulqiPayment>()
-                .Where(p => p.BookingId == request.BookingId.Value)
-                .OrderByDescending(p => p.CreatedAtUtc)
-                .FirstOrDefaultAsync(ct);
-        }
-
-        if (payment == null) return NotFound();
-        if (!_access.Verify(payment.BookingId, request.CheckoutToken)) return Unauthorized();
-
-        if (payment.ProviderId != null && payment.Status != "paid")
-        {
-            var route = payment.Channel == "wallet_qr"
-                ? $"orders/{Uri.EscapeDataString(payment.ProviderId)}"
-                : $"charges/{Uri.EscapeDataString(payment.ProviderId)}";
-
-            try
+            CulqiPayment? payment = null;
+            if (request.AttemptId != Guid.Empty)
             {
-                using var queryResult = await _culqi.GetAsync(route, ct);
-                if (queryResult.Success)
+                payment = await _db.Set<CulqiPayment>()
+                    .FirstOrDefaultAsync(p => p.Id == request.AttemptId, ct);
+            }
+            else if (request.BookingId.HasValue && request.BookingId.Value != Guid.Empty)
+            {
+                payment = await _db.Set<CulqiPayment>()
+                    .Where(p => p.BookingId == request.BookingId.Value)
+                    .OrderByDescending(p => p.CreatedAtUtc)
+                    .FirstOrDefaultAsync(ct);
+            }
+
+            if (payment == null) return NotFound();
+            if (!_access.Verify(payment.BookingId, request.CheckoutToken)) return Unauthorized();
+
+            if (payment.ProviderId != null && payment.Status != "paid")
+            {
+                // Reconciliación inmediata: si Culqi ya registró el pago, aplicar con safe token para no abortar si el cliente cierra la pestaña
+                var applied = await VerifyAndApply(payment.Id, CancellationToken.None);
+                if (!applied && !ct.IsCancellationRequested)
                 {
-                    var culqiState = queryResult.Text("state") ?? queryResult.Text("status");
-                    if (culqiState is "expired" or "failed" or "canceled" or "deleted")
+                    var route = payment.Channel == "wallet_qr"
+                        ? $"orders/{Uri.EscapeDataString(payment.ProviderId)}"
+                        : $"charges/{Uri.EscapeDataString(payment.ProviderId)}";
+
+                    try
                     {
-                        payment.Status = "expired";
-                        await _db.SaveChangesAsync(ct);
+                        using var queryResult = await _culqi.GetAsync(route, ct);
+                        if (queryResult.Success)
+                        {
+                            var culqiState = queryResult.Text("state") ?? queryResult.Text("status");
+                            if (culqiState is "expired" or "failed" or "canceled" or "deleted")
+                            {
+                                payment.Status = "expired";
+                                await _db.SaveChangesAsync(CancellationToken.None);
+                            }
+                        }
                     }
-                    else if (culqiState is "paid")
+                    catch (OperationCanceledException)
                     {
-                        await VerifyAndApply(payment.Id, ct);
+                        // Desconexión normal del cliente HTTP durante el sondeo
+                    }
+                    catch
+                    {
+                        // Timeout o error de red: se mantiene en su estado previo para siguiente sondeo
                     }
                 }
             }
-            catch
+
+            if (ct.IsCancellationRequested)
             {
-                // Timeout o error de red: se mantiene en su estado previo para siguiente sondeo
+                return StatusCode(499);
             }
+
+            var refreshed = await _db.Set<CulqiPayment>().AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == payment.Id, CancellationToken.None);
+            var status = refreshed?.Status ?? payment.Status;
+
+            var booking = await _db.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == payment.BookingId, CancellationToken.None);
+
+            long? expirationDateUnix = null;
+            int? expiresInSeconds = null;
+            if (payment.Channel == "wallet_qr")
+            {
+                var expDate = payment.CreatedAtUtc.AddMinutes(25);
+                expirationDateUnix = new DateTimeOffset(expDate).ToUnixTimeSeconds();
+                expiresInSeconds = Math.Max(0, (int)(expDate - DateTime.UtcNow).TotalSeconds);
+            }
+
+            return Ok(new
+            {
+                attemptId = payment.Id,
+                status,
+                bookingId = payment.BookingId,
+                orderId = payment.ProviderId,
+                channel = payment.Channel,
+                amountCents = payment.AmountCents,
+                paidAmount = booking?.PaidAmount ?? 0m,
+                pendingBalance = booking != null ? Math.Max(0m, booking.TotalAmount - booking.PaidAmount) : 0m,
+                expirationDateUnix,
+                expiresInSeconds
+            });
         }
-
-        var refreshed = await _db.Set<CulqiPayment>().AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == payment.Id, ct);
-        var status = refreshed?.Status ?? payment.Status;
-
-        var booking = await _db.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == payment.BookingId, ct);
-
-        long? expirationDateUnix = null;
-        int? expiresInSeconds = null;
-        if (payment.Channel == "wallet_qr")
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            var expDate = payment.CreatedAtUtc.AddMinutes(25);
-            expirationDateUnix = new DateTimeOffset(expDate).ToUnixTimeSeconds();
-            expiresInSeconds = Math.Max(0, (int)(expDate - DateTime.UtcNow).TotalSeconds);
+            // El navegador recargó, cerró la pestaña o abortó el sondeo fetch()
+            return StatusCode(499);
         }
-
-        return Ok(new
-        {
-            attemptId = payment.Id,
-            status,
-            bookingId = payment.BookingId,
-            orderId = payment.ProviderId,
-            channel = payment.Channel,
-            amountCents = payment.AmountCents,
-            paidAmount = booking?.PaidAmount ?? 0m,
-            pendingBalance = booking != null ? Math.Max(0m, booking.TotalAmount - booking.PaidAmount) : 0m,
-            expirationDateUnix,
-            expiresInSeconds
-        });
     }
 
     [HttpPost("webhook")]
@@ -560,41 +578,140 @@ public sealed class CulqiPaymentsController : ControllerBase
         return Ok();
     }
 
-    private async Task<bool> VerifyAndApply(Guid attemptId, CancellationToken ct)
+    private async Task<bool> IsOrderPaidInCulqi(string orderId, long expectedAmountCents, CancellationToken ct)
     {
-        var payment = await _db.Set<CulqiPayment>().AsNoTracking().FirstOrDefaultAsync(p => p.Id == attemptId, ct);
+        // 1. Verificación directa mediante el endpoint oficial de orden /v2/orders/{id}
+        try
+        {
+            using var direct = await _culqi.GetAsync($"orders/{Uri.EscapeDataString(orderId)}", ct);
+            if (direct.Success && direct.Text("id") == orderId && direct.Number("amount") == expectedAmountCents)
+            {
+                var currency = direct.Text("currency_code") ?? direct.Text("currency");
+                if (currency == null || currency == "PEN")
+                {
+                    var state = direct.Text("state");
+                    if (state == "paid") return true;
+                }
+            }
+        }
+        catch
+        {
+            // Continuar con verificación de reconciliación
+        }
+
+        // 2. Reconciliación Culqi Sandbox: en ambiente de prueba, Culqi puede retener la instantánea inicial 'pending'
+        // en GET /orders/{id} tras el abono en simulador/billetera. Consultamos la lista oficial de órdenes pagadas (?state=paid):
+        try
+        {
+            using var paidList = await _culqi.GetAsync("orders?state=paid&limit=50", ct);
+            if (paidList.Success && paidList.Body != null &&
+                paidList.Body.RootElement.TryGetProperty("data", out var dataArr) &&
+                dataArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in dataArr.EnumerateArray())
+                {
+                    if (item.TryGetProperty("id", out var idProp) && idProp.GetString() == orderId &&
+                        item.TryGetProperty("state", out var stProp) && stProp.GetString() == "paid" &&
+                        item.TryGetProperty("amount", out var amProp) && amProp.GetInt64() == expectedAmountCents)
+                    {
+                        var curr = item.TryGetProperty("currency_code", out var currProp) ? currProp.GetString() : "PEN";
+                        if (curr == null || curr == "PEN")
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Continuar con eventos
+        }
+
+        // 3. Reconciliación por eventos Culqi /v2/events (order.status.changed)
+        try
+        {
+            using var eventsList = await _culqi.GetAsync("events?limit=50", ct);
+            if (eventsList.Success && eventsList.Body != null &&
+                eventsList.Body.RootElement.TryGetProperty("data", out var evArr) &&
+                evArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var ev in evArr.EnumerateArray())
+                {
+                    if (ev.TryGetProperty("type", out var typeProp) && typeProp.GetString() == "order.status.changed" &&
+                        ev.TryGetProperty("data", out var evData) && evData.ValueKind == JsonValueKind.Object &&
+                        evData.TryGetProperty("id", out var idProp) && idProp.GetString() == orderId &&
+                        evData.TryGetProperty("state", out var stProp) && stProp.GetString() == "paid" &&
+                        evData.TryGetProperty("amount", out var amProp) && amProp.GetInt64() == expectedAmountCents)
+                    {
+                        var curr = evData.TryGetProperty("currency_code", out var currProp) ? currProp.GetString() : "PEN";
+                        if (curr == null || curr == "PEN")
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fallo transitorio de red
+        }
+
+        return false;
+    }
+
+    private async Task<bool> VerifyAndApply(Guid attemptId, CancellationToken ct = default)
+    {
+        // Se utiliza CancellationToken.None para la persistencia transaccional crítica en base de datos.
+        // Esto garantiza que si el cliente HTTP desconecta o recarga su navegador durante el sondeo,
+        // no se anule ni aborte el registro financiero ni la emisión tributaria.
+        var safeCt = CancellationToken.None;
+
+        var payment = await _db.Set<CulqiPayment>().AsNoTracking().FirstOrDefaultAsync(p => p.Id == attemptId, safeCt);
         if (payment?.ProviderId == null) return false;
 
-        var route = payment.Channel == "wallet_qr" ? $"orders/{Uri.EscapeDataString(payment.ProviderId)}"
-            : $"charges/{Uri.EscapeDataString(payment.ProviderId)}";
-        using var result = await _culqi.GetAsync(route, ct);
-        if (!result.Success || result.Text("id") != payment.ProviderId || result.Number("amount") != payment.AmountCents)
-            return false;
-
-        var root = result.Body?.RootElement;
-        if (root == null) return false;
         var isPaid = false;
         if (payment.Channel == "wallet_qr")
         {
-            var currency = result.Text("currency_code") ?? result.Text("currency");
-            if (currency != null && currency != "PEN") return false;
-
-            var orderState = result.Text("state");
-            if (orderState is "expired" or "canceled")
+            isPaid = await IsOrderPaidInCulqi(payment.ProviderId, payment.AmountCents, safeCt);
+            if (!isPaid)
             {
-                var curExp = await _db.Set<CulqiPayment>().FirstAsync(p => p.Id == attemptId, ct);
-                if (curExp.Status != "paid")
+                // Si aún no está confirmado como pagado, verificar si la orden fue expirada o cancelada
+                try
                 {
-                    curExp.Status = "expired";
-                    await _db.SaveChangesAsync(ct);
+                    using var result = await _culqi.GetAsync($"orders/{Uri.EscapeDataString(payment.ProviderId)}", safeCt);
+                    if (result.Success)
+                    {
+                        var orderState = result.Text("state");
+                        if (orderState is "expired" or "canceled" or "deleted")
+                        {
+                            var curExp = await _db.Set<CulqiPayment>().FirstAsync(p => p.Id == attemptId, safeCt);
+                            if (curExp.Status != "paid")
+                            {
+                                curExp.Status = "expired";
+                                await _db.SaveChangesAsync(safeCt);
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Error transitorio
                 }
                 return false;
             }
-
-            isPaid = result.Text("object") == "order" && orderState == "paid";
         }
         else
         {
+            var route = $"charges/{Uri.EscapeDataString(payment.ProviderId)}";
+            using var result = await _culqi.GetAsync(route, safeCt);
+            if (!result.Success || result.Text("id") != payment.ProviderId || result.Number("amount") != payment.AmountCents)
+                return false;
+
+            var root = result.Body?.RootElement;
+            if (root == null) return false;
+
             var isChargeObj = result.Text("object") == "charge";
             var hasCapture = (root.Value.TryGetProperty("capture", out var capProp) && capProp.ValueKind == JsonValueKind.True)
                              || (root.Value.TryGetProperty("captured", out var capDProp) && capDProp.ValueKind == JsonValueKind.True);
@@ -604,26 +721,26 @@ public sealed class CulqiPaymentsController : ControllerBase
                                       && typeProp.GetString() == "venta_exitosa";
 
             isPaid = isChargeObj && (hasCapture || isSuccessfulOutcome);
+            if (!isPaid) return false;
         }
-        if (!isPaid) return false;
 
         // La transacción en PostgreSQL evita contabilizar dos veces la MISMA operación.
-        await using var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct) : null;
-        var current = await _db.Set<CulqiPayment>().FirstAsync(p => p.Id == attemptId, ct);
+        await using var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, safeCt) : null;
+        var current = await _db.Set<CulqiPayment>().FirstAsync(p => p.Id == attemptId, safeCt);
         if (current.Status == "paid")
         {
-            if (tx != null) await tx.CommitAsync(ct);
+            if (tx != null) await tx.CommitAsync(safeCt);
             return true;
         }
 
         var booking = await _db.Bookings
             .Include(b => b.Items)
             .ThenInclude(i => i.TourPackage)
-            .FirstAsync(b => b.Id == current.BookingId, ct);
+            .FirstAsync(b => b.Id == current.BookingId, safeCt);
 
         if (booking.Status == BookingStatus.Cancelled || booking.PaidAmount + current.AmountCents / 100m > booking.TotalAmount)
         {
-            if (tx != null) await tx.RollbackAsync(ct);
+            if (tx != null) await tx.RollbackAsync(safeCt);
             return false;
         }
 
@@ -643,7 +760,7 @@ public sealed class CulqiPaymentsController : ControllerBase
         }
 
         // Registrar ingreso en el turno de caja activo para conciliación inmediata (estrictamente sin duplicados por CulqiPaymentId)
-        var activeShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen, ct);
+        var activeShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen, safeCt);
         if (activeShift != null && !_db.CashTransactions.Any(t => t.CulqiPaymentId == current.Id))
         {
             var isPartial = booking.PaidAmount < booking.TotalAmount;
@@ -664,13 +781,13 @@ public sealed class CulqiPaymentsController : ControllerBase
             });
         }
 
-        await _db.SaveChangesAsync(ct);
-        if (tx != null) await tx.CommitAsync(ct);
+        await _db.SaveChangesAsync(safeCt);
+        if (tx != null) await tx.CommitAsync(safeCt);
 
         // Disparo desacoplado para emisión asíncrona de comprobante NubeFact (modo simulación en Sandbox)
         try
         {
-            await _receiptService.GenerateReceiptAsync(booking.Id, current.Id, ct);
+            await _receiptService.GenerateReceiptAsync(booking.Id, current.Id, safeCt);
         }
         catch
         {
