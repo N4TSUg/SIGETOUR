@@ -115,10 +115,14 @@ public sealed class CulqiPaymentsController : ControllerBase
                             }
                         }
 
-                        // Si es una orden QR activa (< 20 min) con el mismo monto y canal, reutilizarla
+                        // Si es una orden QR activa (< 20 min) con el mismo monto y canal, reutilizarla calculando expiración real
                         if (existingAttempt.Channel == "wallet_qr" && request.Channel == "wallet_qr"
                             && existingAttempt.AmountCents == cents && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-20))
                         {
+                            var expDate = existingAttempt.CreatedAtUtc.AddMinutes(25);
+                            var expUnix = new DateTimeOffset(expDate).ToUnixTimeSeconds();
+                            var remainingSecs = Math.Max(0, (int)(expDate - DateTime.UtcNow).TotalSeconds);
+
                             await _db.SaveChangesAsync(ct);
                             return Ok(new
                             {
@@ -129,6 +133,8 @@ public sealed class CulqiPaymentsController : ControllerBase
                                 publicKey = _config["Culqi:PublicKey"],
                                 status = existingAttempt.Status,
                                 reused = true,
+                                expirationDateUnix = expUnix,
+                                expiresInSeconds = remainingSecs,
                                 message = "Orden QR activa recuperada exitosamente"
                             });
                         }
@@ -156,7 +162,7 @@ public sealed class CulqiPaymentsController : ControllerBase
                 return Conflict(new { message = "Existe un pago en verificación en Culqi. Por favor consulte el estado antes de intentar otro abono.", attemptId = existingAttempt.Id });
             }
 
-            // 2. Si no tiene ProviderId (nunca interactuó con Culqi):
+            // 2. Si no tiene ProviderId (interacción pendiente o en vuelo con Culqi):
             // Si es un intento activo en created con el mismo importe y canal, reutilizarlo
             if (existingAttempt.Status == "created" && existingAttempt.AmountCents == cents && existingAttempt.Channel == request.Channel && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-20))
             {
@@ -165,15 +171,24 @@ public sealed class CulqiPaymentsController : ControllerBase
                     publicKey = _config["Culqi:PublicKey"], status = existingAttempt.Status });
             }
 
-            // Si hay un intento en procesamiento activo reciente (< 2 min), pedir esperar
-            if (existingAttempt.Status == "processing" && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-2))
+            // Si hay un intento en verificación o procesamiento sin ProviderId (< 10 min), resultado ambiguo recuperable: NO marcar como fallido inmediatamente
+            if ((existingAttempt.Status == "verification" || existingAttempt.Status == "processing")
+                && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-10))
             {
                 await _db.SaveChangesAsync(ct);
-                return Conflict(new { message = "Existe un cobro en procesamiento activo en Culqi. Espere unos momentos." });
+                return Conflict(new
+                {
+                    message = "Existe una transacción previa en verificación pendiente de confirmación. Por seguridad financiera para evitar cargos dobles, consulte el estado antes de iniciar un nuevo cobro.",
+                    attemptId = existingAttempt.Id,
+                    status = existingAttempt.Status
+                });
             }
 
-            // Si no fue reutilizable y no tiene ProviderId, marcar como failed
-            existingAttempt.Status = "failed";
+            // Solo si expiró la ventana de espera prudencial (> 10-20 min) sin registrar actividad en Culqi, marcar como expired
+            if (existingAttempt.CreatedAtUtc <= DateTime.UtcNow.AddMinutes(-10))
+            {
+                existingAttempt.Status = "expired";
+            }
         }
 
         await _db.SaveChangesAsync(ct);
@@ -186,6 +201,10 @@ public sealed class CulqiPaymentsController : ControllerBase
         {
             var words = (booking.CustomerName ?? "Cliente SIGETOUR").Trim().Split(' ', 2);
             var phone = booking.CustomerPhone?.Trim() ?? "";
+            var expTime = DateTimeOffset.UtcNow.AddMinutes(25);
+            var expUnix = expTime.ToUnixTimeSeconds();
+            var expRemaining = (int)(expTime - DateTimeOffset.UtcNow).TotalSeconds;
+
             using var order = await _culqi.PostAsync("orders", new
             {
                 amount = cents, currency_code = "PEN", description = $"Reserva {booking.ReferenceCode}",
@@ -197,7 +216,7 @@ public sealed class CulqiPaymentsController : ControllerBase
                     email = booking.CustomerEmail,
                     phone_number = phone.StartsWith("+") ? phone : "+51" + phone
                 },
-                expiration_date = DateTimeOffset.UtcNow.AddMinutes(25).ToUnixTimeSeconds(),
+                expiration_date = expUnix,
                 confirm = false,
                 metadata = new { booking_id = booking.Id.ToString() }
             }, ct);
@@ -213,8 +232,18 @@ public sealed class CulqiPaymentsController : ControllerBase
             attempt.ProviderId = orderId;
             attempt.Status = "verification"; // QR: en espera de pago del usuario en app
             await _db.SaveChangesAsync(ct);
-            return Ok(new { attemptId = attempt.Id, amountCents = cents, currency = "PEN", orderId,
-                publicKey = _config["Culqi:PublicKey"], status = attempt.Status });
+            return Ok(new
+            {
+                attemptId = attempt.Id,
+                amountCents = cents,
+                currency = "PEN",
+                orderId,
+                publicKey = _config["Culqi:PublicKey"],
+                status = attempt.Status,
+                reused = false,
+                expirationDateUnix = expUnix,
+                expiresInSeconds = expRemaining
+            });
         }
 
         return Ok(new { attemptId = attempt.Id, amountCents = cents, currency = "PEN",
@@ -396,6 +425,15 @@ public sealed class CulqiPaymentsController : ControllerBase
 
         var booking = await _db.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == payment.BookingId, ct);
 
+        long? expirationDateUnix = null;
+        int? expiresInSeconds = null;
+        if (payment.Channel == "wallet_qr")
+        {
+            var expDate = payment.CreatedAtUtc.AddMinutes(25);
+            expirationDateUnix = new DateTimeOffset(expDate).ToUnixTimeSeconds();
+            expiresInSeconds = Math.Max(0, (int)(expDate - DateTime.UtcNow).TotalSeconds);
+        }
+
         return Ok(new
         {
             attemptId = payment.Id,
@@ -405,7 +443,9 @@ public sealed class CulqiPaymentsController : ControllerBase
             channel = payment.Channel,
             amountCents = payment.AmountCents,
             paidAmount = booking?.PaidAmount ?? 0m,
-            pendingBalance = booking != null ? Math.Max(0m, booking.TotalAmount - booking.PaidAmount) : 0m
+            pendingBalance = booking != null ? Math.Max(0m, booking.TotalAmount - booking.PaidAmount) : 0m,
+            expirationDateUnix,
+            expiresInSeconds
         });
     }
 

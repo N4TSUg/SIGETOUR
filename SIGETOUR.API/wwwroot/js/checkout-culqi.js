@@ -183,7 +183,11 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
       });
     }
 
-    iniciarCuentaRegresivaQr(24 * 60, (timerFmt) => {
+    const remainingSeconds = typeof data.expiresInSeconds === "number" && data.expiresInSeconds > 0
+      ? data.expiresInSeconds
+      : (data.expirationDateUnix ? Math.max(0, Math.floor(data.expirationDateUnix - (Date.now() / 1000))) : 24 * 60);
+
+    iniciarCuentaRegresivaQr(remainingSeconds, (timerFmt) => {
       if (onQrState) onQrState({ state: "tick", timer: timerFmt });
     }, () => {
       detenerSondeoQr();
@@ -281,10 +285,6 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
 
   checkout.open();
   return { attemptId: data.attemptId, orderId: data.orderId };
-}
-
-  checkout.open();
-  return { attemptId: data.attemptId };
 }
 
 // Para verificar sin generar cargos nuevamente (recuperación de estado al recargar)

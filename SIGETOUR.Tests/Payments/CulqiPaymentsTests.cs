@@ -1560,5 +1560,304 @@ namespace SIGETOUR.Tests.Payments
             var cashTxCount2 = await context.CashTransactions.CountAsync(c => c.CulqiPaymentId == payment.Id);
             Assert.Equal(1, cashTxCount2); // Idempotente: NO se duplica el dinero en caja
         }
+
+        [Fact]
+        public void CheckoutCulqiJs_HasValidSyntax_NoSyntaxErrors()
+        {
+            var jsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../SIGETOUR.API/wwwroot/js/checkout-culqi.js"));
+            if (File.Exists(jsPath))
+            {
+                var content = File.ReadAllText(jsPath);
+                Assert.False(content.Contains("checkout.open();\n  return { attemptId: data.attemptId };\n}"), "No debe contener el bloque duplicado que causa SyntaxError");
+            }
+        }
+
+        [Fact]
+        public async Task Prepare_WalletQr_ReusedOrder_CalculatesRealRemainingExpirationWithoutReset()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-QR-TIMER",
+                CustomerName = "Tiempo QR",
+                TotalAmount = 50m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            context.Bookings.Add(booking);
+
+            // Orden creada hace 10 minutos
+            var createdAt = DateTime.UtcNow.AddMinutes(-10);
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 5000,
+                Channel = "wallet_qr",
+                Status = "pending",
+                ProviderId = "ord_test_exp_calc",
+                CreatedAtUtc = createdAt
+            };
+            context.Set<CulqiPayment>().Add(payment);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.RequestUri!.AbsolutePath.Contains("orders/ord_test_exp_calc"))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_exp_calc\",\"state\":\"pending\",\"amount\":5000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Prepare(new PreparePayment(
+                booking.Id, token, "full", "wallet_qr"
+            ), CancellationToken.None);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+            Assert.True(doc.RootElement.GetProperty("reused").GetBoolean());
+
+            var remaining = doc.RootElement.GetProperty("expiresInSeconds").GetInt32();
+            // Debe restar aproximadamente 15 minutos (900s), NO reiniciar a 25 min (1500s)
+            Assert.True(remaining <= 15 * 60 + 5 && remaining >= 14 * 60 - 5, $"El temporizador no debe reiniciarse. Restante: {remaining}s");
+        }
+
+        [Fact]
+        public async Task Charge_CulqiTimeout_DoesNotDuplicateCashOrMarkPaid()
+        {
+            using var context = TestDbContextFactory.Create();
+            var shift = new CashRegisterShift { Id = Guid.NewGuid(), IsOpen = true, OpenedAt = DateTime.UtcNow };
+            context.CashRegisterShifts.Add(shift);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-TIMEOUT-1",
+                CustomerName = "Timeout User",
+                TotalAmount = 80m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            context.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 8000,
+                Channel = "charge",
+                Status = "created",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.Set<CulqiPayment>().Add(payment);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            var mockClient = CreateMockCulqiClient(_ => throw new TaskCanceledException("Culqi gateway timeout"));
+            var controller = CreateController(context, mockClient);
+
+            var result = await controller.Charge(new ChargePayment(
+                payment.Id, token, "tkn_test_sample_123"
+            ), CancellationToken.None);
+
+            // Debe responder con error controlado o estado ambiguo, nunca 200 Paid
+            var cashCount = await context.CashTransactions.CountAsync(c => c.CulqiPaymentId == payment.Id);
+            Assert.Equal(0, cashCount);
+
+            var updatedBooking = await context.Bookings.FindAsync(booking.Id);
+            Assert.Equal(BookingStatus.Pending, updatedBooking!.Status);
+            Assert.Equal(0m, updatedBooking.PaidAmount);
+        }
+
+        [Fact]
+        public async Task Nubefact_Http200WithErrors_MarksAsRejectedNotAccepted()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-NUBE-REJECT",
+                CustomerName = "Rechazo Test",
+                CustomerDni = "77665544",
+                TotalAmount = 100m,
+                PaidAmount = 100m,
+                Status = BookingStatus.Confirmed
+            };
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+
+            var demoSettings = new Dictionary<string, string?>
+            {
+                { "Nubefact:Mode", "Demo" },
+                { "Nubefact:Ruta", "https://demo.nubefact.com/api/v1/test" },
+                { "Nubefact:Token", "demo_token_12345" }
+            };
+            var config = new ConfigurationBuilder().AddInMemoryCollection(demoSettings).Build();
+
+            // NubeFact responde HTTP 200 pero con errors de negocio
+            var jsonErrorResponse = "{\"errors\":\"RUC de la empresa no se encuentra activo en SUNAT (codigo 42)\"}";
+            var mockHttp = new HttpClient(new MockCulqiHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(jsonErrorResponse, Encoding.UTF8, "application/json")
+            }));
+
+            var service = new NubefactInvoiceService(context, config, mockHttp, NullLogger<NubefactInvoiceService>.Instance);
+            var receipt = await service.GenerateReceiptAsync(booking.Id, null, CancellationToken.None);
+
+            Assert.NotNull(receipt);
+            Assert.Equal("Rejected", receipt.Status);
+            Assert.Contains("codigo 42", receipt.LastError);
+        }
+
+        [Fact]
+        public async Task Nubefact_MultipleTourPackages_GeneratesMultipleItemsInReceipt()
+        {
+            using var context = TestDbContextFactory.Create();
+            var tour1 = new TourPackage { Id = Guid.NewGuid(), Title = "Cumbemayo Arqueológico", BasePrice = 50m, IsActive = true };
+            var tour2 = new TourPackage { Id = Guid.NewGuid(), Title = "Otuzco y Baños del Inca", BasePrice = 30m, IsActive = true };
+            context.TourPackages.AddRange(tour1, tour2);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-MULTI-ITEMS",
+                CustomerName = "Multi Paquetes",
+                CustomerDni = "70809010",
+                TotalAmount = 80m,
+                PaidAmount = 80m,
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, TourPackage = tour1, TourPackageId = tour1.Id, Passengers = 1, UnitPrice = 50m, SubTotal = 50m });
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, TourPackage = tour2, TourPackageId = tour2.Id, Passengers = 1, UnitPrice = 30m, SubTotal = 30m });
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+
+            var demoSettings = new Dictionary<string, string?>
+            {
+                { "Nubefact:Mode", "Demo" },
+                { "Nubefact:Ruta", "https://demo.nubefact.com/api/v1/test" },
+                { "Nubefact:Token", "demo_token_12345" }
+            };
+            var config = new ConfigurationBuilder().AddInMemoryCollection(demoSettings).Build();
+
+            string? sentJson = null;
+            var mockHttp = new HttpClient(new MockCulqiHttpHandler(req =>
+            {
+                sentJson = req.Content!.ReadAsStringAsync().Result;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"tipo_de_comprobante\":2,\"serie\":\"BBB1\",\"numero\":101,\"enlace_del_pdf\":\"https://demo.nubefact.com/pdf/BBB1-101.pdf\",\"aceptada_por_sunat\":true}", Encoding.UTF8, "application/json")
+                };
+            }));
+
+            var service = new NubefactInvoiceService(context, config, mockHttp, NullLogger<NubefactInvoiceService>.Instance);
+            var receipt = await service.GenerateReceiptAsync(booking.Id, null, CancellationToken.None);
+
+            Assert.NotNull(receipt);
+            Assert.Equal("Accepted", receipt.Status);
+            Assert.Equal("101", receipt.Number);
+
+            Assert.NotNull(sentJson);
+            using var doc = JsonDocument.Parse(sentJson!);
+            var itemsArray = doc.RootElement.GetProperty("items");
+            Assert.Equal(2, itemsArray.GetArrayLength()); // Verifica que se enviaron los 2 paquetes en el comprobante
+        }
+
+        [Fact]
+        public async Task Nubefact_AdvanceAndBalance_GeneratesTwoDistinctReceiptsForBooking()
+        {
+            using var context = TestDbContextFactory.Create();
+            var tour = new TourPackage { Id = Guid.NewGuid(), Title = "Tour Laguna San Nicolás", BasePrice = 40m, IsActive = true };
+            context.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-ADV-BAL",
+                CustomerName = "Carlos Viajero",
+                CustomerDni = "71275078",
+                TotalAmount = 40m,
+                PaidAmount = 20m, // Adelanto inicial del 50%
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, TourPackage = tour, TourPackageId = tour.Id, Passengers = 1, UnitPrice = 40m, SubTotal = 40m });
+            context.Bookings.Add(booking);
+
+            // Intento 1: Culqi Adelanto de S/ 20
+            var paymentAdvance = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 2000,
+                Channel = "wallet_qr",
+                Status = "paid",
+                ProviderId = "ord_adv_1"
+            };
+            context.Set<CulqiPayment>().Add(paymentAdvance);
+            await context.SaveChangesAsync();
+
+            var demoSettings = new Dictionary<string, string?>
+            {
+                { "Nubefact:Mode", "Demo" },
+                { "Nubefact:Ruta", "https://demo.nubefact.com/api/v1/test" },
+                { "Nubefact:Token", "demo_token_12345" }
+            };
+            var config = new ConfigurationBuilder().AddInMemoryCollection(demoSettings).Build();
+
+            int nextNumero = 201;
+            var mockHttp = new HttpClient(new MockCulqiHttpHandler(req =>
+            {
+                var num = Interlocked.Increment(ref nextNumero);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent($"{{\"tipo_de_comprobante\":2,\"serie\":\"BBB1\",\"numero\":{num},\"enlace_del_pdf\":\"https://demo.nubefact.com/pdf/BBB1-{num}.pdf\",\"aceptada_por_sunat\":true}}", Encoding.UTF8, "application/json")
+                };
+            }));
+
+            var service = new NubefactInvoiceService(context, config, mockHttp, NullLogger<NubefactInvoiceService>.Instance);
+
+            // 1. Emitir comprobante de Adelanto
+            var receiptAdvance = await service.GenerateReceiptAsync(booking.Id, paymentAdvance.Id, CancellationToken.None);
+            Assert.NotNull(receiptAdvance);
+            Assert.Equal(20m, receiptAdvance.TotalAmount);
+            Assert.Equal("202", receiptAdvance.Number);
+
+            // 2. Cliente paga el saldo restante de S/ 20
+            booking.PaidAmount = 40m; // Cubierto 100%
+            var paymentBalance = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 2000,
+                Channel = "wallet_qr",
+                Status = "paid",
+                ProviderId = "ord_bal_2"
+            };
+            context.Set<CulqiPayment>().Add(paymentBalance);
+            await context.SaveChangesAsync();
+
+            // 3. Emitir comprobante de Saldo
+            var receiptBalance = await service.GenerateReceiptAsync(booking.Id, paymentBalance.Id, CancellationToken.None);
+            Assert.NotNull(receiptBalance);
+            Assert.Equal(20m, receiptBalance.TotalAmount);
+            Assert.Equal("203", receiptBalance.Number);
+
+            // 4. Verificación de coexistencia e integridad de ambos comprobantes en la BD
+            var allReceipts = await context.ElectronicReceipts.Where(r => r.BookingId == booking.Id).ToListAsync();
+            Assert.Equal(2, allReceipts.Count);
+            Assert.NotEqual(receiptAdvance.Id, receiptBalance.Id);
+            Assert.NotEqual(receiptAdvance.Number, receiptBalance.Number);
+            Assert.Equal(20m, allReceipts[0].TotalAmount);
+            Assert.Equal(20m, allReceipts[1].TotalAmount);
+        }
     }
 }

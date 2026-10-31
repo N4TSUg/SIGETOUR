@@ -215,8 +215,9 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        public async Task<IActionResult> Ticket(Guid id, string size = "80", [FromServices] IElectronicReceiptService? receiptService = null)
+        public async Task<IActionResult> Ticket(Guid id, string size = "80")
         {
+            // Solo consultar y mostrar datos existentes (operación GET estrictamente idempotente y de solo lectura)
             ElectronicReceipt? receipt = await _context.ElectronicReceipts
                 .Include(r => r.Booking)
                 .ThenInclude(b => b.Items)
@@ -234,16 +235,6 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound("Comprobante o reserva no encontrada");
 
-            // Si la reserva está confirmada y el comprobante no existe o quedó rechazado, intentar emitir/actualizar con NubeFact
-            if (receiptService != null && booking.Status == BookingStatus.Confirmed && (receipt == null || receipt.Status == "Rejected" || receipt.Status == "Pending"))
-            {
-                try
-                {
-                    receipt = await receiptService.GenerateReceiptAsync(booking.Id);
-                }
-                catch { }
-            }
-
             ViewBag.Booking = booking;
             ViewBag.TicketSize = (size == "58") ? "58" : "80";
             return View("Ticket", receipt);
@@ -252,8 +243,17 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> RetryReceipt(Guid bookingId, [FromServices] IElectronicReceiptService receiptService)
         {
+            // Acción explícita para reintentar emisión ante fallo o rechazo
             await receiptService.GenerateReceiptAsync(bookingId);
             return RedirectToAction("Ticket", new { id = bookingId });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> QueryReceipt(Guid receiptId, [FromServices] IElectronicReceiptService receiptService)
+        {
+            // Acción explícita para consultar y conciliar el estado tributario directamente con NubeFact
+            await receiptService.QueryReceiptFromProviderAsync(receiptId);
+            return RedirectToAction("Ticket", new { id = receiptId });
         }
     }
 }
