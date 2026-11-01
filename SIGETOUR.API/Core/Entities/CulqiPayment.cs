@@ -14,4 +14,5 @@ public sealed class CulqiPayment
     public string? ProviderId { get; set; } // chr_test_... | ord_test_...
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? ConfirmedAtUtc { get; set; }
+    public DateTime? ExpirationDateUtc { get; set; }
 }

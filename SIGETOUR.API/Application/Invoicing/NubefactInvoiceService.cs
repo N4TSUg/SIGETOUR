@@ -58,10 +58,10 @@ namespace SIGETOUR.API.Application.Invoicing
 
         public async Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId = null, CancellationToken ct = default)
         {
-            // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado o Simulado)
+            // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado, Demo o Simulado)
             var existing = await _db.ElectronicReceipts
                 .FirstOrDefaultAsync(r => ((culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId) || (culqiPaymentId == null && r.BookingId == bookingId))
-                    && (r.Status == "Accepted" || r.Status == "Simulation"), ct);
+                    && (r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation"), ct);
             if (existing != null) return existing;
 
             // Reutilizar registro si quedó en estado fallido/rechazado para actualizarlo en vez de duplicarlo
@@ -96,6 +96,16 @@ namespace SIGETOUR.API.Application.Invoicing
 
             var isAdvance = culqiPayment != null && booking.PaidAmount < booking.TotalAmount;
             var isBalance = culqiPayment != null && booking.PaidAmount >= booking.TotalAmount && (booking.PaidAmount - paymentAmount > 0);
+
+            // Búsqueda de comprobante previo para regularización de anticipo conforme al manual NubeFact
+            ElectronicReceipt? prevAdvanceReceipt = null;
+            if (isBalance)
+            {
+                prevAdvanceReceipt = await _db.ElectronicReceipts
+                    .FirstOrDefaultAsync(r => r.BookingId == bookingId && r.Id != (receipt != null ? receipt.Id : Guid.Empty)
+                        && (r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation"), ct);
+            }
+            bool isAdvanceRegularization = isBalance && prevAdvanceReceipt != null;
 
             // 3. Configuración tributaria (Gravada vs Exonerada)
             var operationType = _config["Nubefact:OperationType"]?.Trim().ToLowerInvariant() ?? "gravada";
@@ -250,9 +260,9 @@ namespace SIGETOUR.API.Application.Invoicing
                     tipo_de_igv = isExonerado ? 8 : 1,
                     igv = igv.ToString("F2", CultureInfo.InvariantCulture),
                     total = total.ToString("F2", CultureInfo.InvariantCulture),
-                    anticipo_regularizacion = false,
-                    anticipo_documento_serie = (string?)null,
-                    anticipo_documento_numero = (string?)null
+                    anticipo_regularizacion = isAdvanceRegularization,
+                    anticipo_documento_serie = isAdvanceRegularization ? prevAdvanceReceipt!.Series : (string?)null,
+                    anticipo_documento_numero = isAdvanceRegularization ? (int.TryParse(prevAdvanceReceipt!.Number, out var pn) ? (object)pn : prevAdvanceReceipt!.Number) : (object?)null
                 });
             }
             else
@@ -306,9 +316,9 @@ namespace SIGETOUR.API.Application.Invoicing
                         tipo_de_igv = isExonerado ? 8 : 1,
                         igv = itmIgv.ToString("F2", CultureInfo.InvariantCulture),
                         total = itmTotal.ToString("F2", CultureInfo.InvariantCulture),
-                        anticipo_regularizacion = false,
-                        anticipo_documento_serie = (string?)null,
-                        anticipo_documento_numero = (string?)null
+                        anticipo_regularizacion = isAdvanceRegularization,
+                        anticipo_documento_serie = isAdvanceRegularization ? prevAdvanceReceipt!.Series : (string?)null,
+                        anticipo_documento_numero = isAdvanceRegularization ? (int.TryParse(prevAdvanceReceipt!.Number, out var pn) ? (object)pn : prevAdvanceReceipt!.Number) : (object?)null
                     });
                 }
             }
@@ -351,8 +361,11 @@ namespace SIGETOUR.API.Application.Invoicing
                 ["total_inafecta"] = null,
                 ["total_gratuita"] = null,
                 ["total_descuento"] = null,
+                ["total_anticipos"] = isAdvanceRegularization ? prevAdvanceReceipt!.TotalAmount.ToString("F2", CultureInfo.InvariantCulture) : "0.00",
                 ["total_igv"] = igv.ToString("F2", CultureInfo.InvariantCulture),
                 ["total"] = total.ToString("F2", CultureInfo.InvariantCulture),
+                ["enviar_automaticamente_a_la_sunat"] = sendToSunat,
+                ["enviar_automaticamente_al_cliente"] = false,
                 ["enviar_a_sunat"] = sendToSunat,
                 ["enviar_al_cliente"] = false,
                 ["codigo_unico"] = $"SIG-{receipt.Id:N}",
@@ -366,7 +379,7 @@ namespace SIGETOUR.API.Application.Invoicing
             try
             {
                 using var requestMsg = new HttpRequestMessage(HttpMethod.Post, ruta);
-                requestMsg.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                requestMsg.Headers.TryAddWithoutValidation("Authorization", $"Token token=\"{token}\"");
                 requestMsg.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
                 var response = await _http.SendAsync(requestMsg, ct);
@@ -385,7 +398,7 @@ namespace SIGETOUR.API.Application.Invoicing
                     }
                     else
                     {
-                        // Comprobar explícitamente aceptación tributaria
+                        // Comprobar explícitamente aceptación tributaria SUNAT
                         bool isSunatAccepted = false;
                         if (root.TryGetProperty("aceptada_por_sunat", out var asp) && asp.ValueKind == JsonValueKind.True)
                         {
@@ -395,13 +408,24 @@ namespace SIGETOUR.API.Application.Invoicing
                         {
                             isSunatAccepted = true;
                         }
-                        else if (!sendToSunat && root.TryGetProperty("enlace_del_pdf", out _))
-                        {
-                            // En modo DEMO con enviar_a_sunat = false, el documento es emitido válidamente por NubeFact DEMO
-                            isSunatAccepted = true;
-                        }
 
-                        receipt.Status = isSunatAccepted ? "Accepted" : "Submitted";
+                        var sunatDesc = root.TryGetProperty("sunat_description", out var descProp) ? descProp.GetString() : null;
+                        if (isSunatAccepted)
+                        {
+                            receipt.Status = "Accepted";
+                            receipt.ProviderDescription = sunatDesc ?? "Aceptado por SUNAT";
+                        }
+                        else if (!sendToSunat || string.Equals(mode, "Demo", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // En modo DEMO, la disponibilidad de un PDF no equivale a aceptación tributaria SUNAT
+                            receipt.Status = "Demo";
+                            receipt.ProviderDescription = sunatDesc ?? "Documento generado en DEMO NubeFact (sin aceptación tributaria SUNAT)";
+                        }
+                        else
+                        {
+                            receipt.Status = "Submitted";
+                            receipt.ProviderDescription = sunatDesc ?? "Enviado a SUNAT (pendiente de respuesta)";
+                        }
 
                         if (root.TryGetProperty("numero", out var numProp))
                         {
@@ -414,7 +438,6 @@ namespace SIGETOUR.API.Application.Invoicing
                         receipt.XmlUrl = root.TryGetProperty("enlace_del_xml", out var xmlProp) ? xmlProp.GetString() : null;
                         receipt.CdrUrl = root.TryGetProperty("enlace_del_cdr", out var cdrProp) ? cdrProp.GetString() : null;
                         receipt.DigitalHash = root.TryGetProperty("codigo_hash", out var hashProp) ? hashProp.GetString() : null;
-                        receipt.ProviderDescription = root.TryGetProperty("sunat_description", out var descProp) ? descProp.GetString() : (isSunatAccepted ? "Aceptado" : "Enviado");
 
                         if (root.TryGetProperty("cadena_para_codigo_qr", out var qrProp) && !string.IsNullOrWhiteSpace(qrProp.GetString()))
                         {
@@ -465,7 +488,7 @@ namespace SIGETOUR.API.Application.Invoicing
             {
                 _db.ElectronicReceipts.Add(receipt);
             }
-            if (receipt.Status == "Accepted")
+            if (receipt.Status == "Accepted" || receipt.Status == "Demo" || receipt.Status == "Simulation")
             {
                 receipt.LastError = null;
             }
@@ -495,6 +518,10 @@ namespace SIGETOUR.API.Application.Invoicing
 
             try
             {
+                var mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
+                var sendToSunat = string.Equals(mode, "Production", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(_config["Nubefact:SendToSunat"], "true", StringComparison.OrdinalIgnoreCase);
+
                 var isFactura = receipt.ReceiptType == "Factura";
                 var payload = new
                 {
@@ -505,7 +532,7 @@ namespace SIGETOUR.API.Application.Invoicing
                 };
 
                 using var requestMsg = new HttpRequestMessage(HttpMethod.Post, ruta);
-                requestMsg.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                requestMsg.Headers.TryAddWithoutValidation("Authorization", $"Token token=\"{token}\"");
                 requestMsg.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
                 var response = await _http.SendAsync(requestMsg, ct);
@@ -525,18 +552,27 @@ namespace SIGETOUR.API.Application.Invoicing
                     {
                         sunatAccepted = true;
                     }
-                    else if (root.TryGetProperty("enlace_del_pdf", out _) && root.TryGetProperty("codigo_hash", out _))
-                    {
-                        // En demo, si tiene PDF y hash generado sin errores SUNAT
-                        sunatAccepted = true;
-                    }
 
-                    receipt.Status = sunatAccepted ? "Accepted" : "Submitted";
+                    var sunatQueryDesc = root.TryGetProperty("sunat_description", out var qDescProp) ? qDescProp.GetString() : null;
+                    if (sunatAccepted)
+                    {
+                        receipt.Status = "Accepted";
+                        receipt.ProviderDescription = sunatQueryDesc ?? "Aceptado por SUNAT";
+                    }
+                    else if (!sendToSunat || string.Equals(mode, "Demo", StringComparison.OrdinalIgnoreCase))
+                    {
+                        receipt.Status = "Demo";
+                        receipt.ProviderDescription = sunatQueryDesc ?? "Documento generado en DEMO NubeFact (sin aceptación tributaria SUNAT)";
+                    }
+                    else
+                    {
+                        receipt.Status = "Submitted";
+                        receipt.ProviderDescription = sunatQueryDesc ?? "Enviado a SUNAT";
+                    }
                     receipt.PdfUrl = root.TryGetProperty("enlace_del_pdf", out var p) ? p.GetString() : receipt.PdfUrl;
                     receipt.XmlUrl = root.TryGetProperty("enlace_del_xml", out var x) ? x.GetString() : receipt.XmlUrl;
                     receipt.CdrUrl = root.TryGetProperty("enlace_del_cdr", out var c) ? c.GetString() : receipt.CdrUrl;
                     receipt.DigitalHash = root.TryGetProperty("codigo_hash", out var h) ? h.GetString() : receipt.DigitalHash;
-                    receipt.ProviderDescription = root.TryGetProperty("sunat_description", out var s) ? s.GetString() : receipt.ProviderDescription;
                     if (root.TryGetProperty("cadena_para_codigo_qr", out var q) && !string.IsNullOrWhiteSpace(q.GetString()))
                     {
                         receipt.QrData = q.GetString();

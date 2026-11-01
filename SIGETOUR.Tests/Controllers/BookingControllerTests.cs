@@ -266,5 +266,124 @@ namespace SIGETOUR.Tests.Controllers
             // Assert
             Assert.IsType<NotFoundObjectResult>(result);
         }
+
+        [Fact]
+        public async Task Audit7_Ticket_TotalsAndTaxBreakdown_StrictlyMatchReceipt()
+        {
+            // 7. Verifica que el detalle, importes unitarios, impuestos y totales del ticket de 58/80 mm coincidan con el comprobante electrónico.
+            using var context = TestDbContextFactory.Create();
+            var tour1 = new TourPackage { Id = Guid.NewGuid(), Title = "Ventanillas de Otuzco", BasePrice = 40m, IsActive = true };
+            var tour2 = new TourPackage { Id = Guid.NewGuid(), Title = "Cumbemayo", BasePrice = 60m, IsActive = true };
+            context.TourPackages.AddRange(tour1, tour2);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-TICKET-MATCH",
+                CustomerName = "Amilcar Arana",
+                CustomerDni = "26625235",
+                TotalAmount = 100m,
+                PaidAmount = 100m,
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, TourPackage = tour1, TourPackageId = tour1.Id, Passengers = 1, UnitPrice = 40m, SubTotal = 40m });
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, TourPackage = tour2, TourPackageId = tour2.Id, Passengers = 2, UnitPrice = 30m, SubTotal = 60m });
+            context.Bookings.Add(booking);
+
+            var receipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Number = "777",
+                TotalAmount = 100m,
+                SubtotalAmount = 84.75m,
+                IgvAmount = 15.25m,
+                Status = "Accepted",
+                QrData = "20601234567|03|BBB1|777|15.25|100.00|2026-11-01|1|26625235|hash|",
+                DigitalHash = "hash123",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.ElectronicReceipts.Add(receipt);
+            await context.SaveChangesAsync();
+
+            var controller = new BookingController(context);
+            var result = await controller.Ticket(receipt.Id, "80");
+
+            var vr = Assert.IsType<ViewResult>(result);
+            Assert.Equal("Ticket", vr.ViewName);
+            var modelReceipt = Assert.IsType<ElectronicReceipt>(vr.Model);
+
+            // Totales e impuestos coinciden exactamente
+            Assert.Equal(100m, modelReceipt.TotalAmount);
+            Assert.Equal(84.75m, modelReceipt.SubtotalAmount);
+            Assert.Equal(15.25m, modelReceipt.IgvAmount);
+            Assert.Equal("777", modelReceipt.Number);
+            Assert.Equal("BBB1", modelReceipt.Series);
+
+            // Booking items asociados coinciden con el comprobante
+            var viewBooking = Assert.IsType<Booking>(controller.ViewBag.Booking);
+            Assert.Equal(2, viewBooking.Items.Count);
+            decimal totalItemsSum = 0m;
+            foreach (var bi in viewBooking.Items) totalItemsSum += bi.SubTotal;
+            Assert.Equal(100m, totalItemsSum);
+        }
+
+        [Fact]
+        public async Task Audit5_RetryReceipt_UsesExactIdentifiers_AvoidsDuplicates()
+        {
+            // 5. Corrige BookingController.Ticket() y RetryReceipt() para trabajar con el identificador exacto del comprobante o pago y evitar emisiones duplicadas.
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-RETRY-EXACT",
+                CustomerName = "Retry Test",
+                CustomerDni = "71234567",
+                TotalAmount = 40m,
+                PaidAmount = 40m,
+                Status = BookingStatus.Confirmed
+            };
+            context.Bookings.Add(booking);
+
+            var culqiPayment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 4000,
+                Channel = "wallet_qr",
+                Status = "paid"
+            };
+            context.Set<CulqiPayment>().Add(culqiPayment);
+
+            var failedReceipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                CulqiPaymentId = culqiPayment.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Status = "Rejected",
+                TotalAmount = 40m,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.ElectronicReceipts.Add(failedReceipt);
+            await context.SaveChangesAsync();
+
+            var mockReceiptService = new Moq.Mock<SIGETOUR.API.Application.Invoicing.IElectronicReceiptService>();
+            mockReceiptService.Setup(s => s.GenerateReceiptAsync(booking.Id, culqiPayment.Id, System.Threading.CancellationToken.None))
+                .Returns(Task.FromResult(failedReceipt));
+
+            var controller = new BookingController(context);
+            var result = await controller.RetryReceipt(failedReceipt.Id, null, null, mockReceiptService.Object);
+
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Ticket", redirect.ActionName);
+            Assert.Equal(failedReceipt.Id, redirect.RouteValues?["id"]);
+
+            // Verifica que se invocó con los identificadores exactos de la reserva y del pago para no duplicar
+            mockReceiptService.Verify(s => s.GenerateReceiptAsync(booking.Id, culqiPayment.Id, System.Threading.CancellationToken.None), Moq.Times.Once);
+        }
     }
 }

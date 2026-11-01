@@ -523,6 +523,9 @@ namespace SIGETOUR.API.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("ExpirationDateUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ProviderId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
