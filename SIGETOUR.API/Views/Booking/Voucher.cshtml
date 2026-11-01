@@ -27,7 +27,7 @@
     }
 
     var receipt = ViewBag.Receipt as SIGETOUR.API.Core.Entities.ElectronicReceipt;
-    var hasValidReceipt = receipt != null && (receipt.Status == "Accepted" || receipt.Status == "Simulation");
+    var hasValidReceipt = receipt != null && (receipt.Status == "Accepted" || receipt.Status == "Demo" || receipt.Status == "Simulation");
     var hasExternalPdf = !string.IsNullOrWhiteSpace(receipt?.PdfUrl) && receipt.PdfUrl.StartsWith("http");
 }
 

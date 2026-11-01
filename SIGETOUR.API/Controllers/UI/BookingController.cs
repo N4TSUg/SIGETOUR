@@ -215,14 +215,46 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        public async Task<IActionResult> Ticket(Guid id, string size = "80")
+        public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null)
         {
             // Solo consultar y mostrar datos existentes (operación GET estrictamente idempotente y de solo lectura)
+            // 1. Búsqueda por identificador exacto de comprobante (receiptId)
             ElectronicReceipt? receipt = await _context.ElectronicReceipts
                 .Include(r => r.Booking)
                 .ThenInclude(b => b.Items)
                 .ThenInclude(i => i.TourPackage)
-                .FirstOrDefaultAsync(r => r.Id == id || r.BookingId == id);
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            // 2. Búsqueda por identificador exacto de pago (paymentId o id como paymentId)
+            if (receipt == null && paymentId.HasValue)
+            {
+                receipt = await _context.ElectronicReceipts
+                    .Include(r => r.Booking)
+                    .ThenInclude(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .FirstOrDefaultAsync(r => r.CulqiPaymentId == paymentId.Value);
+            }
+
+            if (receipt == null)
+            {
+                receipt = await _context.ElectronicReceipts
+                    .Include(r => r.Booking)
+                    .ThenInclude(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .FirstOrDefaultAsync(r => r.CulqiPaymentId == id);
+            }
+
+            // 3. Respaldo por BookingId si id coincide con una reserva (priorizando el comprobante más reciente)
+            if (receipt == null)
+            {
+                receipt = await _context.ElectronicReceipts
+                    .Include(r => r.Booking)
+                    .ThenInclude(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .Where(r => r.BookingId == id)
+                    .OrderByDescending(r => r.CreatedAtUtc)
+                    .FirstOrDefaultAsync();
+            }
 
             Booking? booking = receipt?.Booking;
             if (booking == null)
@@ -241,11 +273,25 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> RetryReceipt(Guid bookingId, [FromServices] IElectronicReceiptService receiptService)
+        public async Task<IActionResult> RetryReceipt(Guid? receiptId, Guid? bookingId, Guid? paymentId, [FromServices] IElectronicReceiptService receiptService)
         {
-            // Acción explícita para reintentar emisión ante fallo o rechazo
-            await receiptService.GenerateReceiptAsync(bookingId);
-            return RedirectToAction("Ticket", new { id = bookingId });
+            // Acción explícita para reintentar emisión ante fallo o rechazo trabajando con el identificador exacto
+            ElectronicReceipt? existingReceipt = null;
+            if (receiptId.HasValue && receiptId.Value != Guid.Empty)
+            {
+                existingReceipt = await _context.ElectronicReceipts.FindAsync(receiptId.Value);
+            }
+
+            var targetBookingId = existingReceipt?.BookingId ?? bookingId ?? Guid.Empty;
+            var targetPaymentId = existingReceipt?.CulqiPaymentId ?? paymentId;
+
+            if (targetBookingId == Guid.Empty)
+            {
+                return BadRequest("Se requiere el identificador de la reserva o del comprobante.");
+            }
+
+            var result = await receiptService.GenerateReceiptAsync(targetBookingId, targetPaymentId);
+            return RedirectToAction("Ticket", new { id = result.Id });
         }
 
         [HttpPost]

@@ -148,8 +148,15 @@
             else if (receipt?.Status == "Accepted")
             {
                 <div class="text-center font-bold text-[8.5px] bg-emerald-50 text-emerald-900 p-1 border border-emerald-400 rounded mb-1.5 uppercase">
+                    *** COMPROBANTE ACEPTADO POR SUNAT ***<br />
+                    VALIDEZ TRIBUTARIA OFICIAL
+                </div>
+            }
+            else if (receipt?.Status == "Demo")
+            {
+                <div class="text-center font-bold text-[8.5px] bg-emerald-50 text-emerald-900 p-1 border border-emerald-400 rounded mb-1.5 uppercase">
                     *** COMPROBANTE DEMO NUBEFACT ***<br />
-                    EMITIDO CON VALIDEZ DE PRUEBA
+                    EMITIDO CON VALIDEZ DE PRUEBA (NO ENVIADO A SUNAT)
                 </div>
             }
             else if (receipt?.Status == "Submitted")
@@ -180,10 +187,18 @@
                 <div class="text-center font-bold text-[8.5px] bg-red-100 text-red-900 p-1.5 border border-red-500 rounded mb-1.5 break-words uppercase">
                     *** COMPROBANTE RECHAZADO ***<br />
                     <span class="normal-case font-medium block mt-0.5 text-[8px]">@cleanErr</span>
-                    @if (booking != null)
+                    @if (booking != null || receipt != null)
                     {
                         <form asp-controller="Booking" asp-action="RetryReceipt" method="post" class="mt-1 no-print">
-                            <input type="hidden" name="bookingId" value="@booking.Id" />
+                            @if (receipt != null)
+                            {
+                                <input type="hidden" name="receiptId" value="@receipt.Id" />
+                            }
+                            <input type="hidden" name="bookingId" value="@(booking?.Id ?? receipt?.BookingId)" />
+                            @if (receipt?.CulqiPaymentId.HasValue == true)
+                            {
+                                <input type="hidden" name="paymentId" value="@receipt.CulqiPaymentId.Value" />
+                            }
                             <button type="submit" class="px-2 py-0.5 bg-red-700 hover:bg-red-800 text-white rounded text-[8px] font-bold cursor-pointer transition-colors shadow-xs">
                                 ↻ Reintentar Emisión NubeFact
                             </button>
@@ -266,16 +281,32 @@
                         var ratio = (booking != null && booking.TotalAmount > 0) ? (totalAmount / booking.TotalAmount) : 1m;
                         var isPartial = booking != null && booking.PaidAmount < booking.TotalAmount;
                         var concept = isPartial ? " (Adelanto)" : "";
+                        var bookingItemsList = booking?.Items?.ToList() ?? new List<SIGETOUR.API.Core.Entities.BookingItem>();
+                        decimal runningItemsTotal = 0m;
                     }
-                    @if (booking?.Items != null && booking.Items.Any())
+                    @if (bookingItemsList.Any())
                     {
-                        foreach (var item in booking.Items)
+                        for (int i = 0; i < bookingItemsList.Count; i++)
                         {
+                            var item = bookingItemsList[i];
+                            var isLastItem = (i == bookingItemsList.Count - 1);
                             var tourTitle = item.TourPackage?.Title ?? "Servicio Turístico";
-                            var itemAmount = Math.Round(item.SubTotal * ratio, 2);
-                            var itemUnit = Math.Round(item.UnitPrice * ratio, 2);
+                            var qty = Math.Max(1, item.Passengers);
+
+                            decimal itemAmount;
+                            if (isLastItem)
+                            {
+                                itemAmount = totalAmount - runningItemsTotal;
+                            }
+                            else
+                            {
+                                itemAmount = Math.Round(item.SubTotal * ratio, 2);
+                                runningItemsTotal += itemAmount;
+                            }
+
+                            var itemUnit = Math.Round(itemAmount / qty, 2);
                             <tr>
-                                <td class="py-1 align-top font-bold @(is58 ? "text-center" : "")">@item.Passengers</td>
+                                <td class="py-1 align-top font-bold @(is58 ? "text-center" : "")">@qty</td>
                                 <td class="py-1 align-top break-words">
                                     <div class="font-bold uppercase @(is58 ? "text-[8.5px]" : "text-[10px]")">@tourTitle@concept</div>
                                     <div class="@(is58 ? "text-[8px]" : "text-[9px]") text-gray-700">P.Unit: S/ @itemUnit.ToString("N2")</div>
@@ -302,14 +333,28 @@
 
             <!-- TOTALES CONTABLES -->
             <div class="space-y-0.5 text-[10px]">
-                <div class="flex justify-between">
-                    <span>OP. GRAVADA:</span>
-                    <span>S/ @subtotalAmount.ToString("N2")</span>
-                </div>
-                <div class="flex justify-between">
-                    <span>I.G.V. (18%):</span>
-                    <span>S/ @igvAmount.ToString("N2")</span>
-                </div>
+                @if (igvAmount == 0m)
+                {
+                    <div class="flex justify-between">
+                        <span>OP. EXONERADA:</span>
+                        <span>S/ @subtotalAmount.ToString("N2")</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>I.G.V. (0%):</span>
+                        <span>S/ 0.00</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="flex justify-between">
+                        <span>OP. GRAVADA:</span>
+                        <span>S/ @subtotalAmount.ToString("N2")</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>I.G.V. (18%):</span>
+                        <span>S/ @igvAmount.ToString("N2")</span>
+                    </div>
+                }
                 <div class="flex justify-between text-sm font-extrabold border-t border-b border-black py-1 my-1">
                     <span>TOTAL A PAGAR:</span>
                     <span>S/ @totalAmount.ToString("N2")</span>

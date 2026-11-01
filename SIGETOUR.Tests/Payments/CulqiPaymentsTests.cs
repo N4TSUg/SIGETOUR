@@ -1056,11 +1056,11 @@ namespace SIGETOUR.Tests.Payments
             };
             var config = new ConfigurationBuilder().AddInMemoryCollection(demoSettings).Build();
 
-            var fakeNubefactResponse = "{\"tipo_de_comprobante\":1,\"serie\":\"FFF1\",\"numero\":104,\"enlace_del_pdf\":\"https://demo.nubefact.com/pdf/FFF1-104.pdf\",\"enlace_del_xml\":\"https://demo.nubefact.com/xml/FFF1-104.xml\",\"enlace_del_cdr\":\"https://demo.nubefact.com/cdr/R-FFF1-104.zip\",\"codigo_hash\":\"abc123hash\",\"sunat_description\":\"La Factura FFF1-104 ha sido aceptada\"}";
+            var fakeNubefactResponse = "{\"tipo_de_comprobante\":1,\"serie\":\"FFF1\",\"numero\":104,\"enlace_del_pdf\":\"https://demo.nubefact.com/pdf/FFF1-104.pdf\",\"enlace_del_xml\":\"https://demo.nubefact.com/xml/FFF1-104.xml\",\"enlace_del_cdr\":\"https://demo.nubefact.com/cdr/R-FFF1-104.zip\",\"codigo_hash\":\"abc123hash\",\"sunat_description\":\"La Factura FFF1-104 ha sido emitida en demo\"}";
             var mockHttp = new HttpClient(new MockCulqiHttpHandler(req =>
             {
-                Assert.Equal("Bearer", req.Headers.Authorization?.Scheme);
-                Assert.Equal("demo_token_12345", req.Headers.Authorization?.Parameter);
+                var authHeader = req.Headers.GetValues("Authorization").FirstOrDefault();
+                Assert.Equal("Token token=\"demo_token_12345\"", authHeader);
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(fakeNubefactResponse, Encoding.UTF8, "application/json")
@@ -1071,7 +1071,7 @@ namespace SIGETOUR.Tests.Payments
             var receipt = await service.GenerateReceiptAsync(booking.Id, null, CancellationToken.None);
 
             Assert.NotNull(receipt);
-            Assert.Equal("Accepted", receipt.Status);
+            Assert.Equal("Demo", receipt.Status); // Diferenciación estricta de DEMO (sin aceptación SUNAT)
             Assert.Equal("FFF1", receipt.Series);
             Assert.Equal("104", receipt.Number);
             Assert.Equal("https://demo.nubefact.com/pdf/FFF1-104.pdf", receipt.PdfUrl);
@@ -1239,13 +1239,13 @@ namespace SIGETOUR.Tests.Payments
             var updated = await service.QueryReceiptFromProviderAsync(existingReceipt.Id, CancellationToken.None);
 
             Assert.NotNull(updated);
-            Assert.Equal("Accepted", updated.Status);
+            Assert.Equal("Demo", updated.Status); // En DEMO sin aceptada_por_sunat=true se diferencia de Accepted
             Assert.Equal("https://demo.nubefact.com/pdf/B001-55.pdf", updated.PdfUrl);
             Assert.Equal("queryhash123", updated.DigitalHash);
         }
 
         [Fact]
-        public async Task Prepare_WalletQr_CreatesOrderWithConfirmFalseAndExpiration()
+        public async Task Prepare_WalletQr_CreatesOrderWithConfirmTrueAndExpiration_CompatibleWithCheckout()
         {
             using var context = TestDbContextFactory.Create();
             var booking = new Booking
@@ -1271,7 +1271,7 @@ namespace SIGETOUR.Tests.Payments
                     capturedBody = req.Content!.ReadAsStringAsync().Result;
                     return new HttpResponseMessage(HttpStatusCode.Created)
                     {
-                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_qr_123\",\"state\":\"pending\",\"amount\":8000}", Encoding.UTF8, "application/json")
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_qr_123\",\"state\":\"pending\",\"amount\":8000,\"expiration_date\":1793500000}", Encoding.UTF8, "application/json")
                     };
                 }
                 return new HttpResponseMessage(HttpStatusCode.NotFound);
@@ -1286,11 +1286,19 @@ namespace SIGETOUR.Tests.Payments
             using var docVal = JsonDocument.Parse(JsonSerializer.Serialize(obj.Value));
             Assert.Equal("ord_test_qr_123", docVal.RootElement.GetProperty("orderId").GetString());
             Assert.Equal(8000, docVal.RootElement.GetProperty("amountCents").GetInt64());
+            Assert.Equal(1793500000, docVal.RootElement.GetProperty("expirationDateUnix").GetInt64());
 
             Assert.NotNull(capturedBody);
             using var doc = JsonDocument.Parse(capturedBody!);
-            Assert.False(doc.RootElement.GetProperty("confirm").GetBoolean());
+            // Compatible con Checkout Custom de Culqi (confirm = true genera orden en pending lista para cobro)
+            Assert.True(doc.RootElement.GetProperty("confirm").GetBoolean());
             Assert.True(doc.RootElement.GetProperty("expiration_date").GetInt64() > DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+            // Persistencia del expiration_date real en CulqiPayment
+            var payment = await context.Set<CulqiPayment>().FirstOrDefaultAsync(p => p.BookingId == booking.Id);
+            Assert.NotNull(payment);
+            Assert.NotNull(payment.ExpirationDateUtc);
+            Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1793500000).UtcDateTime, payment.ExpirationDateUtc.Value);
         }
 
         [Fact]
@@ -1935,6 +1943,496 @@ namespace SIGETOUR.Tests.Payments
             Assert.NotEqual(receiptAdvance.Number, receiptBalance.Number);
             Assert.Equal(20m, allReceipts[0].TotalAmount);
             Assert.Equal(20m, allReceipts[1].TotalAmount);
+        }
+
+        [Fact]
+        public async Task Audit1_Charge_UnknownResult_ReconcilesAgainstChargesList_DoesNotMarkExpiredWithoutVerification()
+        {
+            // 1. Evita declarar expirados los cargos Culqi con resultado desconocido solo por haber transcurrido 10 minutos.
+            // Implementa conciliación e idempotencia verificables consultando /v2/charges.
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-AUDIT-1",
+                CustomerName = "Reconciliación Auditoría",
+                CustomerDni = "76543210",
+                TotalAmount = 50m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, UnitPrice = 50m, SubTotal = 50m, Passengers = 1 });
+            context.Bookings.Add(booking);
+
+            var oldAttempt = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 5000,
+                Channel = "charge",
+                Status = "verification", // Resultado ambiguo
+                ProviderId = null, // Fallo de red previo antes de guardar el ID
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-12) // Más de 10 min
+            };
+            context.Set<CulqiPayment>().Add(oldAttempt);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                var path = req.RequestUri!.PathAndQuery;
+                if (path.Contains("charges?limit=50"))
+                {
+                    // Culqi charges list contiene el cargo capturado
+                    var json = $"{{\"data\":[{{\"id\":\"chr_test_audit_rec_1\",\"amount\":5000,\"metadata\":{{\"attempt_id\":\"{oldAttempt.Id}\",\"booking_id\":\"{booking.Id}\"}}}}]}}";
+                    return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+                }
+                if (path.Contains("charges/chr_test_audit_rec_1"))
+                {
+                    var json = "{\"object\":\"charge\",\"id\":\"chr_test_audit_rec_1\",\"amount\":5000,\"capture\":true,\"outcome\":{\"type\":\"venta_exitosa\"}}";
+                    return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Prepare(new PreparePayment(booking.Id, token, "full", "charge"), CancellationToken.None);
+
+            var okObj = Assert.IsAssignableFrom<OkObjectResult>(result);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(okObj.Value));
+            Assert.Equal("paid", doc.RootElement.GetProperty("status").GetString());
+
+            var updatedAttempt = await context.Set<CulqiPayment>().FindAsync(oldAttempt.Id);
+            Assert.NotNull(updatedAttempt);
+            Assert.Equal("paid", updatedAttempt.Status);
+            Assert.Equal("chr_test_audit_rec_1", updatedAttempt.ProviderId);
+        }
+
+        [Fact]
+        public async Task Audit1_Charge_CulqiServiceDown_ReturnsConflict_DoesNotDeclareExpired()
+        {
+            // Si el proveedor no responde, el resultado es desconocido y NO debe marcarse como expirado.
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-AUDIT-DOWN",
+                CustomerName = "Culqi Down Test",
+                CustomerDni = "76543211",
+                TotalAmount = 50m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, UnitPrice = 50m, SubTotal = 50m, Passengers = 1 });
+            context.Bookings.Add(booking);
+
+            var oldAttempt = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 5000,
+                Channel = "charge",
+                Status = "verification",
+                ProviderId = null,
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-15)
+            };
+            context.Set<CulqiPayment>().Add(oldAttempt);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            var mockClient = CreateMockCulqiClient(_ =>
+            {
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+                {
+                    Content = new StringContent("{\"message\":\"Culqi Maintenance\"}", Encoding.UTF8, "application/json")
+                };
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Prepare(new PreparePayment(booking.Id, token, "full", "charge"), CancellationToken.None);
+
+            var conflict = Assert.IsAssignableFrom<ConflictObjectResult>(result);
+            Assert.Equal(409, conflict.StatusCode);
+
+            // Verificar que NO se marcó como expirado
+            var reloadedAttempt = await context.Set<CulqiPayment>().FindAsync(oldAttempt.Id);
+            Assert.NotNull(reloadedAttempt);
+            Assert.Equal("verification", reloadedAttempt.Status);
+        }
+
+        [Fact]
+        public async Task Audit2_Prepare_WalletQr_SavesRealCulqiExpirationDate_AndEnforcesConfirmTrue()
+        {
+            // 2. Revisa la creación de órdenes QR con confirm = false y asegura que el estado sea compatible con el Checkout.
+            // Guarda el expiration_date real de Culqi.
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-AUDIT-QR-EXP",
+                CustomerName = "Auditoría QR Exp",
+                CustomerDni = "76543212",
+                TotalAmount = 60m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, UnitPrice = 60m, SubTotal = 60m, Passengers = 1 });
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            string? sentOrderBody = null;
+            long expectedRealUnix = 1795000000;
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.RequestUri!.AbsolutePath.Contains("orders"))
+                {
+                    sentOrderBody = req.Content!.ReadAsStringAsync().Result;
+                    return new HttpResponseMessage(HttpStatusCode.Created)
+                    {
+                        Content = new StringContent($"{{\"object\":\"order\",\"id\":\"ord_real_exp_123\",\"state\":\"pending\",\"amount\":6000,\"expiration_date\":{expectedRealUnix}}}", Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var result = await controller.Prepare(new PreparePayment(booking.Id, token, "full", "wallet_qr"), CancellationToken.None);
+
+            var okObj = Assert.IsAssignableFrom<OkObjectResult>(result);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(okObj.Value));
+            Assert.Equal(expectedRealUnix, doc.RootElement.GetProperty("expirationDateUnix").GetInt64());
+
+            // Verificar que se envió confirm = true para compatibilidad con Checkout
+            Assert.NotNull(sentOrderBody);
+            using var sentDoc = JsonDocument.Parse(sentOrderBody!);
+            Assert.True(sentDoc.RootElement.GetProperty("confirm").GetBoolean());
+
+            // Verificar que se persistió el ExpirationDateUtc real en la base de datos
+            var payment = await context.Set<CulqiPayment>().FirstOrDefaultAsync(p => p.BookingId == booking.Id);
+            Assert.NotNull(payment);
+            Assert.NotNull(payment.ExpirationDateUtc);
+            Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(expectedRealUnix).UtcDateTime, payment.ExpirationDateUtc.Value);
+        }
+
+        [Fact]
+        public async Task Audit3_Nubefact_DistinguishesDemoFromSunatAccepted()
+        {
+            // 3. Corrige NubeFact para diferenciar un documento generado en DEMO de uno aceptado por SUNAT.
+            // Un PDF disponible no equivale a aceptación tributaria.
+            using var context = TestDbContextFactory.Create();
+            var tour = new TourPackage { Id = Guid.NewGuid(), Title = "Tour Namora", BasePrice = 50m, IsActive = true };
+            context.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-AUDIT-DEMO-SUNAT",
+                CustomerName = "Demo Check",
+                CustomerDni = "76543213",
+                TotalAmount = 50m,
+                PaidAmount = 50m,
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, TourPackage = tour, TourPackageId = tour.Id, Passengers = 1, UnitPrice = 50m, SubTotal = 50m });
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+
+            var demoSettings = new Dictionary<string, string?>
+            {
+                { "Nubefact:Mode", "Demo" },
+                { "Nubefact:Ruta", "https://demo.nubefact.com/api/v1/test" },
+                { "Nubefact:Token", "demo_token_xyz" }
+            };
+            var config = new ConfigurationBuilder().AddInMemoryCollection(demoSettings).Build();
+
+            // Caso A: Documento con PDF disponible en DEMO pero SIN aceptación SUNAT
+            var mockHttpDemo = new HttpClient(new MockCulqiHttpHandler(_ =>
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"tipo_de_comprobante\":2,\"serie\":\"BBB1\",\"numero\":801,\"enlace_del_pdf\":\"https://demo.nubefact.com/pdf/BBB1-801.pdf\",\"sunat_description\":\"Documento generado en DEMO\"}", Encoding.UTF8, "application/json")
+                };
+            }));
+
+            var service = new NubefactInvoiceService(context, config, mockHttpDemo, NullLogger<NubefactInvoiceService>.Instance);
+            var receiptDemo = await service.GenerateReceiptAsync(booking.Id, null, CancellationToken.None);
+
+            Assert.NotNull(receiptDemo);
+            // Debe ser estrictamente "Demo", no "Accepted"
+            Assert.Equal("Demo", receiptDemo.Status);
+
+            // Caso B: Documento con aceptación oficial SUNAT (aceptada_por_sunat = true)
+            var mockHttpAccepted = new HttpClient(new MockCulqiHttpHandler(_ =>
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"tipo_de_comprobante\":2,\"serie\":\"BBB1\",\"numero\":802,\"enlace_del_pdf\":\"https://demo.nubefact.com/pdf/BBB1-802.pdf\",\"aceptada_por_sunat\":true,\"sunat_description\":\"La Boleta ha sido aceptada por SUNAT\"}", Encoding.UTF8, "application/json")
+                };
+            }));
+
+            var service2 = new NubefactInvoiceService(context, config, mockHttpAccepted, NullLogger<NubefactInvoiceService>.Instance);
+            // Forzar actualización de consulta con aceptación
+            receiptDemo.Number = "802";
+            var receiptAccepted = await service2.QueryReceiptFromProviderAsync(receiptDemo.Id, CancellationToken.None);
+
+            Assert.NotNull(receiptAccepted);
+            Assert.Equal("Accepted", receiptAccepted.Status);
+        }
+
+        [Fact]
+        public async Task Audit4_Nubefact_JsonPayload_ConformsToManual_Headers_Numbering_UniqueId_And_AdvanceRegularization()
+        {
+            // 4. Ajusta el JSON de NubeFact conforme al manual de la cuenta:
+            // autenticación Token token="...", identificador único, numeración null, campos de envío y tratamiento de anticipos.
+            using var context = TestDbContextFactory.Create();
+            var tour = new TourPackage { Id = Guid.NewGuid(), Title = "Cumbemayo", BasePrice = 100m, IsActive = true };
+            context.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-AUDIT-MANUAL",
+                CustomerName = "Manual Check",
+                CustomerDni = "76543214",
+                TotalAmount = 100m,
+                PaidAmount = 100m,
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, TourPackage = tour, TourPackageId = tour.Id, Passengers = 1, UnitPrice = 100m, SubTotal = 100m });
+            context.Bookings.Add(booking);
+
+            // Comprobante previo de anticipo (50%)
+            var prevAdvance = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Number = "500",
+                TotalAmount = 50m,
+                SubtotalAmount = 42.37m,
+                IgvAmount = 7.63m,
+                Status = "Demo",
+                CreatedAtUtc = DateTime.UtcNow.AddHours(-2)
+            };
+            context.ElectronicReceipts.Add(prevAdvance);
+
+            // Pago Culqi correspondiente al saldo restante
+            var paymentBalance = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 5000,
+                Channel = "wallet_qr",
+                Status = "paid"
+            };
+            context.Set<CulqiPayment>().Add(paymentBalance);
+            await context.SaveChangesAsync();
+
+            var demoSettings = new Dictionary<string, string?>
+            {
+                { "Nubefact:Mode", "Demo" },
+                { "Nubefact:Ruta", "https://demo.nubefact.com/api/v1/test" },
+                { "Nubefact:Token", "secret_token_123" }
+            };
+            var config = new ConfigurationBuilder().AddInMemoryCollection(demoSettings).Build();
+
+            string? sentPayloadJson = null;
+            string? sentAuthHeader = null;
+            var mockHttp = new HttpClient(new MockCulqiHttpHandler(req =>
+            {
+                sentAuthHeader = req.Headers.GetValues("Authorization").FirstOrDefault();
+                sentPayloadJson = req.Content!.ReadAsStringAsync().Result;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"tipo_de_comprobante\":2,\"serie\":\"BBB1\",\"numero\":501,\"enlace_del_pdf\":\"https://demo.nubefact.com/pdf/BBB1-501.pdf\",\"sunat_description\":\"Demo\"}", Encoding.UTF8, "application/json")
+                };
+            }));
+
+            var service = new NubefactInvoiceService(context, config, mockHttp, NullLogger<NubefactInvoiceService>.Instance);
+            var balanceReceipt = await service.GenerateReceiptAsync(booking.Id, paymentBalance.Id, CancellationToken.None);
+
+            Assert.NotNull(balanceReceipt);
+
+            // Verificación del Header de autenticación según manual NubeFact
+            Assert.Equal("Token token=\"secret_token_123\"", sentAuthHeader);
+
+            // Verificación de campos en el payload JSON
+            Assert.NotNull(sentPayloadJson);
+            using var doc = JsonDocument.Parse(sentPayloadJson!);
+            var root = doc.RootElement;
+
+            // Identificador único presente
+            Assert.True(root.TryGetProperty("codigo_unico", out var cuProp));
+            Assert.StartsWith("SIG-", cuProp.GetString());
+
+            // Numeración null para control de auto-correlativo por NubeFact
+            Assert.True(root.TryGetProperty("numero", out var numProp));
+            Assert.Equal(JsonValueKind.Null, numProp.ValueKind);
+
+            // Campos de envío configurados
+            Assert.True(root.TryGetProperty("enviar_automaticamente_a_la_sunat", out _));
+            Assert.True(root.TryGetProperty("enviar_automaticamente_al_cliente", out var ecProp));
+            Assert.False(ecProp.GetBoolean());
+
+            // Tratamiento de anticipos
+            Assert.True(root.TryGetProperty("total_anticipos", out var taProp));
+            Assert.Equal("50.00", taProp.GetString());
+
+            // Detalle de ítem con regularización de anticipo
+            var items = root.GetProperty("items");
+            Assert.True(items.GetArrayLength() > 0);
+            var firstItem = items[0];
+            Assert.True(firstItem.GetProperty("anticipo_regularizacion").GetBoolean());
+            Assert.Equal("BBB1", firstItem.GetProperty("anticipo_documento_serie").GetString());
+            Assert.Equal(500, firstItem.GetProperty("anticipo_documento_numero").GetInt32());
+        }
+
+        [Fact]
+        public async Task Audit6_VerifyAndApply_GuaranteesCashReconciliation_WhenNoOpenShiftExists()
+        {
+            // 6. Garantiza la conciliación contable de pagos confirmados aunque no exista turno de caja abierto.
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-AUDIT-NO-SHIFT",
+                CustomerName = "No Shift Check",
+                CustomerDni = "76543215",
+                TotalAmount = 40m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, UnitPrice = 40m, SubTotal = 40m, Passengers = 1 });
+            context.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 4000,
+                Channel = "wallet_qr",
+                Status = "verification",
+                ProviderId = "ord_test_noshift_1"
+            };
+            context.Set<CulqiPayment>().Add(payment);
+            await context.SaveChangesAsync();
+
+            // Asegurarse de que NO exista ningún turno de caja abierto
+            var openShifts = await context.CashRegisterShifts.Where(s => s.IsOpen).ToListAsync();
+            foreach (var s in openShifts) s.IsOpen = false;
+            await context.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.RequestUri!.AbsolutePath.Contains("orders/ord_test_noshift_1"))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"object\":\"order\",\"id\":\"ord_test_noshift_1\",\"state\":\"paid\",\"amount\":4000}", Encoding.UTF8, "application/json")
+                    };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+            var checkResult = await controller.Check(new CheckPayment(payment.Id, token), CancellationToken.None);
+
+            var okObj = Assert.IsAssignableFrom<OkObjectResult>(checkResult);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(okObj.Value));
+            Assert.Equal("paid", doc.RootElement.GetProperty("status").GetString());
+
+            // Verificación contable: la transacción se registró obligatoriamente
+            var cashTx = await context.CashTransactions.FirstOrDefaultAsync(t => t.CulqiPaymentId == payment.Id);
+            Assert.NotNull(cashTx);
+            Assert.Equal(40m, cashTx.Amount);
+            Assert.Equal("Ingreso", cashTx.TransactionType);
+
+            // El turno asignado fue creado automáticamente para recaudación online
+            var shift = await context.CashRegisterShifts.FindAsync(cashTx.ShiftId);
+            Assert.NotNull(shift);
+            Assert.StartsWith("CJ-WEB-", shift.ShiftNumber);
+        }
+
+        [Fact]
+        public async Task Audit5_BookingController_TicketAndRetry_UseExactIdentifiers()
+        {
+            // 5. Corrige BookingController.Ticket() y RetryReceipt() para trabajar con el identificador exacto
+            // del comprobante o pago y evitar emisiones duplicadas.
+            using var context = TestDbContextFactory.Create();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "ST-AUDIT-EXACT-ID",
+                CustomerName = "Exact ID Check",
+                CustomerDni = "76543216",
+                TotalAmount = 80m,
+                PaidAmount = 80m,
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem { Id = Guid.NewGuid(), BookingId = booking.Id, UnitPrice = 80m, SubTotal = 80m, Passengers = 1 });
+            context.Bookings.Add(booking);
+
+            var payment1 = new CulqiPayment { Id = Guid.NewGuid(), BookingId = booking.Id, AmountCents = 4000, Channel = "wallet_qr", Status = "paid" };
+            var payment2 = new CulqiPayment { Id = Guid.NewGuid(), BookingId = booking.Id, AmountCents = 4000, Channel = "wallet_qr", Status = "paid" };
+            context.Set<CulqiPayment>().AddRange(payment1, payment2);
+
+            var receipt1 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                CulqiPaymentId = payment1.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Number = "1001",
+                TotalAmount = 40m,
+                SubtotalAmount = 33.90m,
+                IgvAmount = 6.10m,
+                Status = "Demo",
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-30)
+            };
+            var receipt2 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                CulqiPaymentId = payment2.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Number = "1002",
+                TotalAmount = 40m,
+                SubtotalAmount = 33.90m,
+                IgvAmount = 6.10m,
+                Status = "Demo",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            context.ElectronicReceipts.AddRange(receipt1, receipt2);
+            await context.SaveChangesAsync();
+
+            var controller = new BookingController(context);
+
+            // A. Ticket por identificador exacto de comprobante (receipt1)
+            var res1 = await controller.Ticket(receipt1.Id);
+            var vr1 = Assert.IsType<ViewResult>(res1);
+            var model1 = Assert.IsType<ElectronicReceipt>(vr1.Model);
+            Assert.Equal("1001", model1.Number);
+
+            // B. Ticket por identificador exacto de comprobante (receipt2)
+            var res2 = await controller.Ticket(receipt2.Id);
+            var vr2 = Assert.IsType<ViewResult>(res2);
+            var model2 = Assert.IsType<ElectronicReceipt>(vr2.Model);
+            Assert.Equal("1002", model2.Number);
+
+            // C. Ticket por paymentId específico
+            var resByPayment = await controller.Ticket(booking.Id, "80", payment1.Id);
+            var vrByPay = Assert.IsType<ViewResult>(resByPayment);
+            var modelByPay = Assert.IsType<ElectronicReceipt>(vrByPay.Model);
+            Assert.Equal("1001", modelByPay.Number);
         }
     }
 }

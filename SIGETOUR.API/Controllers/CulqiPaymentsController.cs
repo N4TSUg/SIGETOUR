@@ -115,11 +115,15 @@ public sealed class CulqiPaymentsController : ControllerBase
                             }
                         }
 
-                        // Si es una orden QR activa (< 20 min) con el mismo monto y canal, reutilizarla calculando expiración real
+                        // Si es una orden QR activa con el mismo monto y canal, reutilizarla calculando expiración real
+                        var isQrActive = existingAttempt.ExpirationDateUtc.HasValue
+                            ? existingAttempt.ExpirationDateUtc.Value > DateTime.UtcNow
+                            : existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-20);
+
                         if (existingAttempt.Channel == "wallet_qr" && request.Channel == "wallet_qr"
-                            && existingAttempt.AmountCents == cents && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-20))
+                            && existingAttempt.AmountCents == cents && isQrActive)
                         {
-                            var expDate = existingAttempt.CreatedAtUtc.AddMinutes(25);
+                            var expDate = existingAttempt.ExpirationDateUtc ?? existingAttempt.CreatedAtUtc.AddMinutes(25);
                             var expUnix = new DateTimeOffset(expDate).ToUnixTimeSeconds();
                             var remainingSecs = Math.Max(0, (int)(expDate - DateTime.UtcNow).TotalSeconds);
 
@@ -171,21 +175,65 @@ public sealed class CulqiPaymentsController : ControllerBase
                     publicKey = _config["Culqi:PublicKey"], status = existingAttempt.Status });
             }
 
-            // Si hay un intento en verificación o procesamiento sin ProviderId (< 10 min), resultado ambiguo recuperable: NO marcar como fallido inmediatamente
-            if ((existingAttempt.Status == "verification" || existingAttempt.Status == "processing")
-                && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-10))
+            // Si es un intento de cargo sin ProviderId en estado ambiguo (processing o verification):
+            if (existingAttempt.Channel == "charge" && (existingAttempt.Status == "verification" || existingAttempt.Status == "processing"))
             {
-                await _db.SaveChangesAsync(ct);
-                return Conflict(new
+                // Conciliación verificable: consultar si el cargo existe en Culqi antes de cualquier decisión
+                bool chargeReconciled = await ReconcileMissingProviderChargeAsync(existingAttempt, ct);
+                if (chargeReconciled)
                 {
-                    message = "Existe una transacción previa en verificación pendiente de confirmación. Por seguridad financiera para evitar cargos dobles, consulte el estado antes de iniciar un nuevo cobro.",
-                    attemptId = existingAttempt.Id,
-                    status = existingAttempt.Status
-                });
-            }
+                    await _db.SaveChangesAsync(ct);
+                    var verifiedNow = await VerifyAndApply(existingAttempt.Id, ct);
+                    if (verifiedNow)
+                    {
+                        await _db.SaveChangesAsync(ct);
+                        return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
+                            publicKey = _config["Culqi:PublicKey"], status = "paid", message = "La reserva ya cuenta con un cargo verificado tras conciliación" });
+                    }
+                }
 
-            // Solo si expiró la ventana de espera prudencial (> 10-20 min) sin registrar actividad en Culqi, marcar como expired
-            if (existingAttempt.CreatedAtUtc <= DateTime.UtcNow.AddMinutes(-10))
+                // Consultar expresamente el estado de Culqi para saber si la consulta fue exitosa
+                bool querySuccess = false;
+                try
+                {
+                    using var pingTest = await _culqi.GetAsync("charges?limit=1", ct);
+                    querySuccess = pingTest.Success;
+                }
+                catch
+                {
+                    querySuccess = false;
+                }
+
+                // Si la consulta a Culqi falló (5xx / timeout): resultado desconocido, NO marcar expirado
+                if (!querySuccess)
+                {
+                    await _db.SaveChangesAsync(ct);
+                    return Conflict(new
+                    {
+                        message = "Existe una transacción previa con resultado desconocido y el proveedor de pagos no responde. Por seguridad financiera para evitar cargos duplicados, consulte el estado antes de iniciar un nuevo cobro.",
+                        attemptId = existingAttempt.Id,
+                        status = existingAttempt.Status
+                    });
+                }
+
+                // Si Culqi respondió con éxito y definitivamente NO existe ningún cargo registrado para este intento:
+                // Solo si transcurrió la ventana de espera prudencial (> 10 min) se puede declarar expirado con certeza verificable
+                if (existingAttempt.CreatedAtUtc <= DateTime.UtcNow.AddMinutes(-10))
+                {
+                    existingAttempt.Status = "expired";
+                }
+                else
+                {
+                    await _db.SaveChangesAsync(ct);
+                    return Conflict(new
+                    {
+                        message = "Existe una transacción previa en verificación pendiente de confirmación. Por seguridad financiera para evitar cargos dobles, consulte el estado antes de iniciar un nuevo cobro.",
+                        attemptId = existingAttempt.Id,
+                        status = existingAttempt.Status
+                    });
+                }
+            }
+            else if (existingAttempt.CreatedAtUtc <= DateTime.UtcNow.AddMinutes(-10))
             {
                 existingAttempt.Status = "expired";
             }
@@ -203,11 +251,12 @@ public sealed class CulqiPaymentsController : ControllerBase
             var phone = booking.CustomerPhone?.Trim() ?? "";
             var expTime = DateTimeOffset.UtcNow.AddMinutes(25);
             var expUnix = expTime.ToUnixTimeSeconds();
-            var expRemaining = (int)(expTime - DateTimeOffset.UtcNow).TotalSeconds;
 
             using var order = await _culqi.PostAsync("orders", new
             {
-                amount = cents, currency_code = "PEN", description = $"Reserva {booking.ReferenceCode}",
+                amount = cents,
+                currency_code = "PEN",
+                description = $"Reserva {booking.ReferenceCode}",
                 order_number = $"SIG-{attempt.Id:N}",
                 client_details = new
                 {
@@ -217,8 +266,8 @@ public sealed class CulqiPaymentsController : ControllerBase
                     phone_number = phone.StartsWith("+") ? phone : "+51" + phone
                 },
                 expiration_date = expUnix,
-                confirm = false,
-                metadata = new { booking_id = booking.Id.ToString() }
+                confirm = true, // Compatible con Checkout Custom: crea la orden en estado 'pending' para que pueda pagarse al instante
+                metadata = new { booking_id = booking.Id.ToString(), attempt_id = attempt.Id.ToString() }
             }, ct);
 
             if (!order.Success || order.Text("object") != "order" ||
@@ -229,9 +278,16 @@ public sealed class CulqiPaymentsController : ControllerBase
                 return StatusCode(502, new { message = "No fue posible crear la orden Culqi en sandbox" });
             }
 
+            // Guardar el expiration_date real devuelto por la API de Culqi
+            var actualExpUnix = order.Number("expiration_date") ?? expUnix;
+            var actualExpDate = DateTimeOffset.FromUnixTimeSeconds(actualExpUnix).UtcDateTime;
+
             attempt.ProviderId = orderId;
             attempt.Status = "verification"; // QR: en espera de pago del usuario en app
+            attempt.ExpirationDateUtc = actualExpDate;
             await _db.SaveChangesAsync(ct);
+
+            var expRemaining = Math.Max(0, (int)(actualExpDate - DateTime.UtcNow).TotalSeconds);
             return Ok(new
             {
                 attemptId = attempt.Id,
@@ -241,7 +297,7 @@ public sealed class CulqiPaymentsController : ControllerBase
                 publicKey = _config["Culqi:PublicKey"],
                 status = attempt.Status,
                 reused = false,
-                expirationDateUnix = expUnix,
+                expirationDateUnix = actualExpUnix,
                 expiresInSeconds = expRemaining
             });
         }
@@ -425,6 +481,16 @@ public sealed class CulqiPaymentsController : ControllerBase
                     }
                 }
             }
+            else if (payment.ProviderId == null && payment.Channel == "charge" && (payment.Status == "verification" || payment.Status == "processing"))
+            {
+                // Conciliación de cargos sin ProviderId: verificar si el cargo fue capturado en Culqi
+                var reconciled = await ReconcileMissingProviderChargeAsync(payment, CancellationToken.None);
+                if (reconciled)
+                {
+                    await _db.SaveChangesAsync(CancellationToken.None);
+                    await VerifyAndApply(payment.Id, CancellationToken.None);
+                }
+            }
 
             if (ct.IsCancellationRequested)
             {
@@ -441,9 +507,16 @@ public sealed class CulqiPaymentsController : ControllerBase
             int? expiresInSeconds = null;
             if (payment.Channel == "wallet_qr")
             {
-                var expDate = payment.CreatedAtUtc.AddMinutes(25);
+                var expDate = payment.ExpirationDateUtc ?? payment.CreatedAtUtc.AddMinutes(25);
                 expirationDateUnix = new DateTimeOffset(expDate).ToUnixTimeSeconds();
                 expiresInSeconds = Math.Max(0, (int)(expDate - DateTime.UtcNow).TotalSeconds);
+
+                if (expiresInSeconds <= 0 && status != "paid")
+                {
+                    payment.Status = "expired";
+                    status = "expired";
+                    await _db.SaveChangesAsync(CancellationToken.None);
+                }
             }
 
             return Ok(new
@@ -576,6 +649,59 @@ public sealed class CulqiPaymentsController : ControllerBase
         await VerifyAndApply(attempt.Id, ct);
 
         return Ok();
+    }
+
+    private async Task<bool> ReconcileMissingProviderChargeAsync(CulqiPayment attempt, CancellationToken ct)
+    {
+        if (attempt.ProviderId != null || attempt.Channel != "charge") return false;
+
+        try
+        {
+            using var chargesResp = await _culqi.GetAsync("charges?limit=50", ct);
+            if (!chargesResp.Success || chargesResp.Body == null) return false;
+
+            var root = chargesResp.Body.RootElement;
+            if (!root.TryGetProperty("data", out var dataArr) || dataArr.ValueKind != JsonValueKind.Array)
+                return false;
+
+            var attemptIdStr = attempt.Id.ToString();
+            var bookingIdStr = attempt.BookingId.ToString();
+
+            foreach (var chr in dataArr.EnumerateArray())
+            {
+                var match = false;
+                if (chr.TryGetProperty("metadata", out var meta) && meta.ValueKind == JsonValueKind.Object)
+                {
+                    if (meta.TryGetProperty("attempt_id", out var attProp) &&
+                        string.Equals(attProp.GetString(), attemptIdStr, StringComparison.OrdinalIgnoreCase))
+                    {
+                        match = true;
+                    }
+                    else if (meta.TryGetProperty("booking_id", out var bkProp) &&
+                             string.Equals(bkProp.GetString(), bookingIdStr, StringComparison.OrdinalIgnoreCase) &&
+                             chr.TryGetProperty("amount", out var amProp) && amProp.GetInt64() == attempt.AmountCents)
+                    {
+                        match = true;
+                    }
+                }
+
+                if (match && chr.TryGetProperty("id", out var idProp))
+                {
+                    var foundId = idProp.GetString();
+                    if (!string.IsNullOrWhiteSpace(foundId))
+                    {
+                        attempt.ProviderId = foundId;
+                        return true;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Error transitorio consultando Culqi
+        }
+
+        return false;
     }
 
     private async Task<bool> IsOrderPaidInCulqi(string orderId, long expectedAmountCents, CancellationToken ct)
@@ -759,10 +885,33 @@ public sealed class CulqiPaymentsController : ControllerBase
             booking.Status = BookingStatus.Confirmed;
         }
 
-        // Registrar ingreso en el turno de caja activo para conciliación inmediata (estrictamente sin duplicados por CulqiPaymentId)
-        var activeShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen, safeCt);
-        if (activeShift != null && !_db.CashTransactions.Any(t => t.CulqiPaymentId == current.Id))
+        // Registrar ingreso para conciliación contable garantizada (incluso si no hay turno presencial abierto)
+        // estrictamente sin duplicados por CulqiPaymentId
+        if (!_db.CashTransactions.Any(t => t.CulqiPaymentId == current.Id))
         {
+            var activeShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen, safeCt);
+            if (activeShift == null)
+            {
+                var todayStr = DateTime.UtcNow.ToString("yyyyMMdd");
+                var shiftNumber = $"CJ-WEB-{todayStr}";
+                activeShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber, safeCt);
+                if (activeShift == null)
+                {
+                    activeShift = new CashRegisterShift
+                    {
+                        Id = Guid.NewGuid(),
+                        ShiftNumber = shiftNumber,
+                        OpenedByUserName = "Sistema / Pasarela Culqi",
+                        OpenedAt = DateTime.UtcNow,
+                        InitialAmount = 0m,
+                        IsOpen = false,
+                        Notes = "Turno automático de recaudación online (pagos confirmados sin turno presencial abierto)."
+                    };
+                    _db.CashRegisterShifts.Add(activeShift);
+                    await _db.SaveChangesAsync(safeCt);
+                }
+            }
+
             var isPartial = booking.PaidAmount < booking.TotalAmount;
             _db.CashTransactions.Add(new CashTransaction
             {
