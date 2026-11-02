@@ -1,6 +1,7 @@
 @model SIGETOUR.API.Core.Entities.TourPackage
 @{
     ViewData["Title"] = "Checkout Seguro - " + Model.Title;
+    var effectiveUnitPrice = ViewBag.EffectiveUnitPrice is decimal ep ? ep : Model.BasePrice;
 }
 
 <!-- TRUST HEADER -->
@@ -72,7 +73,7 @@
         <form method="post" action="/Booking/Checkout" id="checkout-form" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
     
             <input type="hidden" name="TourId" value="@Model.Id" />
-            <input type="hidden" id="tour-price" value="@Model.BasePrice" />
+            <input type="hidden" id="tour-price" value="@effectiveUnitPrice" />
 
             <!-- FORM COLUMN (LEFT - 8 cols) -->
             <div class="lg:col-span-8 space-y-8">
@@ -306,7 +307,7 @@
                     <div class="py-4 border-b border-outline-variant space-y-2">
                         <div class="flex justify-between font-body-sm text-body-sm text-secondary">
                             <span id="summary-pax-count">1x Pasajero</span>
-                            <span class="font-semibold text-on-surface" id="summary-pax-total">S/ @Model.BasePrice.ToString("0.00")</span>
+                            <span class="font-semibold text-on-surface" id="summary-pax-total">S/ @effectiveUnitPrice.ToString("0.00")</span>
                         </div>
                         <div class="flex justify-between font-body-sm text-body-sm text-secondary hidden" id="summary-hotel-fee">
                             <span>Recargo Hotel (Afueras)</span>
@@ -314,7 +315,7 @@
                         </div>
                         <div class="flex justify-between font-headline-sm text-headline-sm font-bold text-on-surface pt-2">
                             <span>Total a Pagar:</span>
-                            <span class="text-primary" id="summary-grand-total">S/ @Model.BasePrice.ToString("0.00")</span>
+                            <span class="text-primary" id="summary-grand-total">S/ @effectiveUnitPrice.ToString("0.00")</span>
                         </div>
                     </div>
                 </div>

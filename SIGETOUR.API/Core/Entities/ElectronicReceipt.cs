@@ -12,7 +12,7 @@ namespace SIGETOUR.API.Core.Entities
 
         public string ReceiptType { get; set; } = "Boleta"; // "Boleta", "Factura", "NotaCredito"
         public string Series { get; set; } = string.Empty; // e.g. "BBB1", "FFF1"
-        public string Number { get; set; } = string.Empty; // e.g. "00000001"
+        public string? Number { get; set; } = string.Empty; // e.g. "00000001"
         public string FullNumber => $"{Series}-{Number}";
 
         public string CustomerDocType { get; set; } = "1"; // "1" = DNI, "6" = RUC, "4" = CE, "0" = Sin doc
@@ -25,6 +25,8 @@ namespace SIGETOUR.API.Core.Entities
         public decimal TotalAmount { get; set; }
 
         public string Status { get; set; } = "Pending"; // "Pending", "Submitted", "Accepted", "Rejected", "Cancelled"
+        public string Environment { get; set; } = "Demo"; // "Demo", "Production", "Simulation"
+        public string? SnapshotJson { get; set; }
         public string? ProviderResponseCode { get; set; }
         public string? ProviderDescription { get; set; }
         public string? PdfUrl { get; set; }

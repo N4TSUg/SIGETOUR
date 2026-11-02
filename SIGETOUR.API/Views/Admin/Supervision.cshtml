@@ -1,0 +1,228 @@
+@using SIGETOUR.API.Core.Entities
+@model IEnumerable<PaymentIncident>
+@{
+    ViewData["Title"] = "Supervisión y Control de Pagos - SuperAdmin";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var incidents = Model?.ToList() ?? new List<PaymentIncident>();
+    var currentStatus = ViewBag.CurrentStatus as string;
+    var pendingCount = incidents.Count(i => i.Status == "PendingReview");
+    var resolvedCount = incidents.Count(i => i.Status == "Resolved");
+    var dismissedCount = incidents.Count(i => i.Status == "Dismissed");
+}
+
+<!-- Mensajes -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="mb-5 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-green-600 text-[22px]">check_circle</span>
+            <span class="font-medium text-body-sm">@TempData["SuccessMessage"]</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="text-green-600 hover:text-green-800 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+    </div>
+}
+
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100 text-purple-900 text-xs font-bold uppercase tracking-wider mb-2">
+            <span class="material-symbols-outlined text-sm">security</span>
+            Panel Exclusivo de Supervisión SuperAdmin
+        </div>
+        <h1 class="text-display-sm font-bold text-on-surface">Supervisión e Incidencias Financieras</h1>
+        <p class="text-body-md text-on-surface-variant">Trazabilidad de cobros anómalos, reservas canceladas con pago externo, excesos y discrepancias de pasarela.</p>
+    </div>
+</div>
+
+<!-- Métricas de Incidencias -->
+<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+    <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/40 shadow-xs">
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-secondary font-bold uppercase">Total Incidencias</span>
+            <span class="material-symbols-outlined text-primary text-xl">policy</span>
+        </div>
+        <div class="text-2xl font-black text-on-surface mt-1">@incidents.Count</div>
+    </div>
+    <div class="bg-surface-container-lowest p-4 rounded-xl border border-amber-200 bg-amber-50/40 shadow-xs">
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-amber-800 font-bold uppercase">Pendientes de Revisión</span>
+            <span class="material-symbols-outlined text-amber-600 text-xl">warning</span>
+        </div>
+        <div class="text-2xl font-black text-amber-900 mt-1">@pendingCount</div>
+    </div>
+    <div class="bg-surface-container-lowest p-4 rounded-xl border border-emerald-200 bg-emerald-50/40 shadow-xs">
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-emerald-800 font-bold uppercase">Resueltas</span>
+            <span class="material-symbols-outlined text-emerald-600 text-xl">task_alt</span>
+        </div>
+        <div class="text-2xl font-black text-emerald-900 mt-1">@resolvedCount</div>
+    </div>
+    <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/40 shadow-xs">
+        <div class="flex items-center justify-between">
+            <span class="text-xs text-secondary font-bold uppercase">Descartadas</span>
+            <span class="material-symbols-outlined text-gray-400 text-xl">do_not_disturb</span>
+        </div>
+        <div class="text-2xl font-black text-secondary mt-1">@dismissedCount</div>
+    </div>
+</div>
+
+<!-- Filtros de Estado -->
+<div class="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
+    <a href="/Admin/Supervision" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all @(string.IsNullOrWhiteSpace(currentStatus) ? "bg-primary text-white" : "bg-surface-container text-secondary hover:text-on-surface")">
+        Todas (@incidents.Count)
+    </a>
+    <a href="/Admin/Supervision?status=PendingReview" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all @(currentStatus == "PendingReview" ? "bg-amber-600 text-white" : "bg-surface-container text-secondary hover:text-on-surface")">
+        Pendientes (@pendingCount)
+    </a>
+    <a href="/Admin/Supervision?status=Resolved" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all @(currentStatus == "Resolved" ? "bg-emerald-600 text-white" : "bg-surface-container text-secondary hover:text-on-surface")">
+        Resueltas (@resolvedCount)
+    </a>
+    <a href="/Admin/Supervision?status=Dismissed" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all @(currentStatus == "Dismissed" ? "bg-slate-700 text-white" : "bg-surface-container text-secondary hover:text-on-surface")">
+        Descartadas (@dismissedCount)
+    </a>
+</div>
+
+<!-- Tabla de Incidencias -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/40 shadow-xs overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+            <thead class="bg-surface-container-low text-secondary uppercase font-bold border-b border-outline-variant/40">
+                <tr>
+                    <th class="py-3 px-4">Fecha / ID</th>
+                    <th class="py-3 px-4">Tipo &amp; Severidad</th>
+                    <th class="py-3 px-4">Reserva &amp; Proveedor</th>
+                    <th class="py-3 px-4">Importe</th>
+                    <th class="py-3 px-4">Descripción</th>
+                    <th class="py-3 px-4">Estado</th>
+                    <th class="py-3 px-4 text-right">Acción</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-outline-variant/20">
+                @if (incidents.Any())
+                {
+                    foreach (var inc in incidents)
+                    {
+                        var isPending = inc.Status == "PendingReview";
+                        var severityClass = inc.Severity switch
+                        {
+                            "Critical" => "bg-red-100 text-red-900 border-red-300",
+                            "High" => "bg-amber-100 text-amber-900 border-amber-300",
+                            _ => "bg-blue-100 text-blue-900 border-blue-300"
+                        };
+                        var statusClass = inc.Status switch
+                        {
+                            "PendingReview" => "bg-amber-50 text-amber-800 border-amber-200",
+                            "Resolved" => "bg-emerald-50 text-emerald-800 border-emerald-200",
+                            _ => "bg-gray-100 text-gray-700 border-gray-200"
+                        };
+                        <tr class="hover:bg-surface-container-low/50 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap">
+                                <div class="font-bold text-on-surface">@inc.CreatedAtUtc.ToString("dd/MM/yyyy HH:mm")</div>
+                                <div class="font-mono text-[10px] text-secondary">@inc.Id.ToString()[..8]...</div>
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap">
+                                <div class="font-bold text-on-surface">@inc.IncidentType</div>
+                                <span class="inline-block mt-0.5 px-2 py-0.5 rounded text-[9px] font-extrabold border @severityClass">
+                                    @inc.Severity
+                                </span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="font-bold text-primary">@(inc.Booking?.ReferenceCode ?? "Sin Reserva")</div>
+                                @if (!string.IsNullOrWhiteSpace(inc.ProviderId))
+                                {
+                                    <div class="font-mono text-[10px] text-secondary" title="@inc.ProviderId">@inc.ProviderId</div>
+                                }
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap font-bold text-on-surface">
+                                @inc.Currency S/ @inc.Amount.ToString("N2")
+                            </td>
+                            <td class="py-3 px-4 max-w-xs break-words text-secondary">
+                                @inc.Description
+                                @if (!string.IsNullOrWhiteSpace(inc.ResolutionNotes))
+                                {
+                                    <div class="mt-1 p-1.5 rounded bg-gray-50 border border-gray-200 text-[10px] text-gray-800">
+                                        <strong>Resolución (@inc.ResolvedBy):</strong> @inc.ResolutionNotes
+                                    </div>
+                                }
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border @statusClass">
+                                    @inc.Status
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-right whitespace-nowrap">
+                                @if (isPending)
+                                {
+                                    <button type="button" onclick="openResolveModal('@inc.Id', '@inc.IncidentType', '@inc.Currency S/ @inc.Amount.ToString("N2")')" class="px-2.5 py-1 bg-primary text-white rounded text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer">
+                                        Resolver
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="text-[11px] text-gray-400">@inc.ResolvedAtUtc?.ToString("dd/MM/yy")</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" class="py-8 text-center text-secondary">
+                            <span class="material-symbols-outlined text-4xl text-gray-300 block mb-1">check_circle</span>
+                            No se registran incidencias en este estado.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal para Resolver Incidencia -->
+<div id="modal-resolve" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant/40">
+        <h3 class="text-title-md font-bold text-on-surface mb-1" id="modal-title">Resolver Incidencia</h3>
+        <p class="text-xs text-secondary mb-4" id="modal-desc"></p>
+
+        <form asp-controller="Admin" asp-action="ResolveIncident" method="post" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="modal-incident-id" />
+
+            <div>
+                <label class="block text-xs font-bold text-secondary mb-1">Acción / Estado</label>
+                <select name="status" class="w-full px-3 py-2 rounded-lg border border-outline-variant text-xs font-medium">
+                    <option value="Resolved">Marcar como Resuelta (Revisada y auditada)</option>
+                    <option value="Dismissed">Descartar (Falsa alarma / Regularizada externamente)</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-secondary mb-1">Notas de Resolución y Justificación</label>
+                <textarea name="resolutionNotes" rows="3" required placeholder="Detalla la acción correctiva realizada, reprogramación de tour o devolución..." class="w-full px-3 py-2 rounded-lg border border-outline-variant text-xs"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onclick="closeResolveModal()" class="px-4 py-2 rounded-lg bg-surface-container text-secondary text-xs font-bold hover:bg-surface-container-high transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors cursor-pointer">
+                    Guardar Resolución
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openResolveModal(id, type, amount) {
+        document.getElementById('modal-incident-id').value = id;
+        document.getElementById('modal-title').textContent = "Resolver Incidencia: " + type;
+        document.getElementById('modal-desc').textContent = "Monto involucrado: " + amount + ". Registro auditado de resolución.";
+        document.getElementById('modal-resolve').classList.remove('hidden');
+    }
+    function closeResolveModal() {
+        document.getElementById('modal-resolve').classList.add('hidden');
+    }
+</script>

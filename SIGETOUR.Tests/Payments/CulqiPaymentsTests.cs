@@ -1008,10 +1008,10 @@ namespace SIGETOUR.Tests.Payments
             using var doc1 = JsonDocument.Parse(JsonSerializer.Serialize(res1.Value));
             Assert.Equal("3ds_required", doc1.RootElement.GetProperty("status").GetString());
 
-            // El intento vuelve a "created" para permitir el reintento autenticado
+            // El intento pasa a estado específico "3ds_required" para permitir el reintento autenticado
             var attemptAfterStep1 = await context.CulqiPayments.FindAsync(payment.Id);
             Assert.NotNull(attemptAfterStep1);
-            Assert.Equal("created", attemptAfterStep1.Status);
+            Assert.Equal("3ds_required", attemptAfterStep1.Status);
 
             // 2. Segundo llamado con Parameters3DS emitidos por el iframe bancario
             step = 2;
@@ -1982,7 +1982,7 @@ namespace SIGETOUR.Tests.Payments
             var mockClient = CreateMockCulqiClient(req =>
             {
                 var path = req.RequestUri!.PathAndQuery;
-                if (path.Contains("charges?limit=50"))
+                if (path.Contains("charges?") || path.EndsWith("charges"))
                 {
                     // Culqi charges list contiene el cargo capturado
                     var json = $"{{\"data\":[{{\"id\":\"chr_test_audit_rec_1\",\"amount\":5000,\"metadata\":{{\"attempt_id\":\"{oldAttempt.Id}\",\"booking_id\":\"{booking.Id}\"}}}}]}}";

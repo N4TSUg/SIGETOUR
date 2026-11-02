@@ -22,6 +22,37 @@
     var igvAmount = receipt?.IgvAmount ?? (totalAmount - subtotalAmount);
     var issuedDate = receipt?.IssuedAtUtc ?? booking?.BookingDate ?? DateTime.UtcNow;
 
+    // Snapshot inmutable si está disponible para reimpresión histórica desacoplada
+    bool hasSnapshot = false;
+    System.Text.Json.JsonElement snapshotRoot = default;
+    if (!string.IsNullOrWhiteSpace(receipt?.SnapshotJson))
+    {
+        try
+        {
+            var doc = System.Text.Json.JsonDocument.Parse(receipt.SnapshotJson);
+            snapshotRoot = doc.RootElement;
+            hasSnapshot = true;
+        }
+        catch { }
+    }
+
+    if (hasSnapshot)
+    {
+        if (snapshotRoot.TryGetProperty("Emisor", out var snapEmisor))
+        {
+            legalName = snapEmisor.TryGetProperty("RazonSocial", out var sn) ? sn.GetString() ?? legalName : legalName;
+            ruc = snapEmisor.TryGetProperty("Ruc", out var sr) ? sr.GetString() ?? ruc : ruc;
+            fiscalAddress = snapEmisor.TryGetProperty("Direccion", out var sd) ? sd.GetString() ?? fiscalAddress : fiscalAddress;
+            phone = snapEmisor.TryGetProperty("Telefono", out var sp) ? sp.GetString() ?? phone : phone;
+        }
+        if (snapshotRoot.TryGetProperty("Totales", out var snapTotales))
+        {
+            totalAmount = snapTotales.TryGetProperty("Total", out var st) ? st.GetDecimal() : totalAmount;
+            subtotalAmount = snapTotales.TryGetProperty("Subtotal", out var ss) ? ss.GetDecimal() : subtotalAmount;
+            igvAmount = snapTotales.TryGetProperty("Igv", out var si) ? si.GetDecimal() : igvAmount;
+        }
+    }
+
     // QR tributario estricto: únicamente datos oficiales devueltos por el proveedor
     var hasValidQr = !string.IsNullOrWhiteSpace(receipt?.QrData);
     var qrString = receipt?.QrData ?? string.Empty;
@@ -138,25 +169,25 @@
             <div class="border-t border-dashed border-black my-2"></div>
 
             <!-- ESTADO Y LEYENDA DEL COMPROBANTE -->
-            @if (receipt?.Status == "Simulation")
+            @if (receipt?.Status == "Simulation" || receipt?.Environment == "Simulation")
             {
                 <div class="text-center font-bold text-[9px] bg-amber-100 p-1 border border-black/30 rounded mb-1.5 uppercase">
                     *** DOCUMENTO DE PRUEBA (MOCK) ***<br />
                     SIN VALIDEZ TRIBUTARIA
                 </div>
             }
-            else if (receipt?.Status == "Accepted")
+            else if (receipt?.Status == "Demo" || receipt?.Environment == "Demo")
+            {
+                <div class="text-center font-bold text-[8.5px] bg-amber-50 text-amber-900 p-1 border border-amber-400 rounded mb-1.5 uppercase">
+                    *** COMPROBANTE DEMO NUBEFACT ***<br />
+                    DOCUMENTO DE PRUEBA - SIN VALIDEZ TRIBUTARIA OFICIAL
+                </div>
+            }
+            else if (receipt?.Status == "Accepted" && receipt?.Environment == "Production")
             {
                 <div class="text-center font-bold text-[8.5px] bg-emerald-50 text-emerald-900 p-1 border border-emerald-400 rounded mb-1.5 uppercase">
                     *** COMPROBANTE ACEPTADO POR SUNAT ***<br />
                     VALIDEZ TRIBUTARIA OFICIAL
-                </div>
-            }
-            else if (receipt?.Status == "Demo")
-            {
-                <div class="text-center font-bold text-[8.5px] bg-emerald-50 text-emerald-900 p-1 border border-emerald-400 rounded mb-1.5 uppercase">
-                    *** COMPROBANTE DEMO NUBEFACT ***<br />
-                    EMITIDO CON VALIDEZ DE PRUEBA (NO ENVIADO A SUNAT)
                 </div>
             }
             else if (receipt?.Status == "Submitted")
@@ -284,7 +315,27 @@
                         var bookingItemsList = booking?.Items?.ToList() ?? new List<SIGETOUR.API.Core.Entities.BookingItem>();
                         decimal runningItemsTotal = 0m;
                     }
-                    @if (bookingItemsList.Any())
+                    @if (hasSnapshot && snapshotRoot.TryGetProperty("Items", out var snapItems) && snapItems.ValueKind == System.Text.Json.JsonValueKind.Array && snapItems.GetArrayLength() > 0)
+                    {
+                        foreach (var sItem in snapItems.EnumerateArray())
+                        {
+                            var sTitle = sItem.TryGetProperty("TourTitle", out var stp) ? stp.GetString() : "Servicio Turístico";
+                            var sQty = sItem.TryGetProperty("Quantity", out var sqp) ? sqp.GetInt32() : 1;
+                            var sUnitPrice = sItem.TryGetProperty("UnitPrice", out var sup) ? sup.GetDecimal() : 0m;
+                            var sTotal = sItem.TryGetProperty("Total", out var sttot) ? sttot.GetDecimal() : 0m;
+                            <tr>
+                                <td class="py-1 align-top font-bold @(is58 ? "text-center" : "")">@sQty</td>
+                                <td class="py-1 align-top break-words">
+                                    <div class="font-bold uppercase @(is58 ? "text-[8.5px]" : "text-[10px]")">@sTitle</div>
+                                    <div class="@(is58 ? "text-[8px]" : "text-[9px]") text-gray-700">P.Unit: S/ @sUnitPrice.ToString("N2")</div>
+                                </td>
+                                <td class="py-1 align-top text-right font-bold whitespace-nowrap">
+                                    S/ @sTotal.ToString("N2")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else if (bookingItemsList.Any())
                     {
                         for (int i = 0; i < bookingItemsList.Count; i++)
                         {
@@ -381,15 +432,37 @@
 
             <!-- FORMA DE PAGO -->
             <div class="mt-2 text-[9.5px]">
+                @{
+                    var snapshotPaymentMethod = hasSnapshot && snapshotRoot.TryGetProperty("Documento", out var sDocMp) && sDocMp.TryGetProperty("MedioPago", out var sMpVal)
+                        ? sMpVal.GetString()
+                        : null;
+                    var displayPaymentMethod = !string.IsNullOrWhiteSpace(snapshotPaymentMethod) ? snapshotPaymentMethod : (booking?.PaymentMethod ?? "Tarjeta Culqi / Online");
+
+                    var snapshotOpNumber = hasSnapshot && snapshotRoot.TryGetProperty("Documento", out var sDocOp) && sDocOp.TryGetProperty("OperacionNumero", out var sOpVal)
+                        ? sOpVal.GetString()
+                        : null;
+                    var displayOpNumber = !string.IsNullOrWhiteSpace(snapshotOpNumber) ? snapshotOpNumber : booking?.OperationNumber;
+
+                    var snapshotModalidad = hasSnapshot && snapshotRoot.TryGetProperty("Documento", out var sDocMod) && sDocMod.TryGetProperty("Modalidad", out var sModVal)
+                        ? sModVal.GetString()
+                        : null;
+                }
                 <div class="flex justify-between">
                     <span>MEDIO DE PAGO:</span>
-                    <strong class="uppercase font-bold">@(booking?.PaymentMethod ?? "Tarjeta Culqi / Online")</strong>
+                    <strong class="uppercase font-bold">@displayPaymentMethod</strong>
                 </div>
-                @if (!string.IsNullOrWhiteSpace(booking?.OperationNumber))
+                @if (!string.IsNullOrWhiteSpace(displayOpNumber))
                 {
                     <div class="flex justify-between">
                         <span>N° OPERACIÓN:</span>
-                        <strong class="font-mono">@booking.OperationNumber</strong>
+                        <strong class="font-mono">@displayOpNumber</strong>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(snapshotModalidad))
+                {
+                    <div class="flex justify-between">
+                        <span>MODALIDAD:</span>
+                        <strong class="font-mono">@snapshotModalidad</strong>
                     </div>
                 }
             </div>

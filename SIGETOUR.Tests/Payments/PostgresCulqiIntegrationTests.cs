@@ -79,7 +79,11 @@ namespace SIGETOUR.Tests.Payments
         [Fact]
         public async Task Postgres_FullPaymentCycle_AtomicUpdateAndNoDuplicates()
         {
-            if (!await IsPostgresAvailableAsync()) return;
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
 
             await using var db = CreatePostgresDbContext();
 
@@ -197,7 +201,11 @@ namespace SIGETOUR.Tests.Payments
         [Fact]
         public async Task Postgres_SplitPayment_AdvanceThenBalance_PersistsBothUniqueCashTransactions()
         {
-            if (!await IsPostgresAvailableAsync()) return;
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
 
             await using var db = CreatePostgresDbContext();
 
@@ -307,6 +315,200 @@ namespace SIGETOUR.Tests.Payments
             var bToDelete = await db.Bookings.FindAsync(booking.Id);
             if (bToDelete != null) db.Bookings.Remove(bToDelete);
             await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task Postgres_FilteredIndex_AllowsMultiplePendingReceiptsWithoutNumber_EnforcesUniqueOnRealNumbers()
+        {
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
+
+            await using var db = CreatePostgresDbContext();
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-INDEX-" + Guid.NewGuid().ToString("N")[..6].ToUpper(),
+                CustomerName = "Filtered Index Test",
+                CustomerEmail = "index@sigetour.com",
+                CustomerDni = "71829399",
+                TotalAmount = 100m,
+                PaidAmount = 100m,
+                Status = BookingStatus.Confirmed,
+                TravelDate = DateTime.UtcNow.Date.AddDays(3)
+            };
+            db.Bookings.Add(booking);
+            await db.SaveChangesAsync();
+
+            // Bloque 2 Item 3: Múltiples comprobantes en estado Pending sin correlativo numérico asignado
+            var pending1 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "B001",
+                Number = "",
+                Status = "Pending",
+                TotalAmount = 50m,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            var pending2 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "B001",
+                Number = "",
+                Status = "Pending",
+                TotalAmount = 50m,
+                CreatedAtUtc = DateTime.UtcNow.AddSeconds(1)
+            };
+            var pending3 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "B001",
+                Number = "",
+                Status = "Pending",
+                TotalAmount = 50m,
+                CreatedAtUtc = DateTime.UtcNow.AddSeconds(2)
+            };
+
+            db.ElectronicReceipts.AddRange(pending1, pending2, pending3);
+            // No debe violar restricción de unicidad porque Number es nulo o vacío
+            await db.SaveChangesAsync();
+
+            var countPending = await db.ElectronicReceipts.CountAsync(r => r.BookingId == booking.Id && r.Series == "B001");
+            Assert.Equal(3, countPending);
+
+            // Ahora intentar insertar dos comprobantes con el MISMO número correlativo real
+            var uniqueNumber = Random.Shared.Next(100000, 999999).ToString();
+            var real1 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "B001",
+                Number = uniqueNumber,
+                Status = "Accepted",
+                TotalAmount = 50m,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.ElectronicReceipts.Add(real1);
+            await db.SaveChangesAsync();
+
+            var real2Duplicate = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "B001",
+                Number = uniqueNumber, // Mismo número real en la misma serie y tipo
+                Status = "Accepted",
+                TotalAmount = 50m,
+                CreatedAtUtc = DateTime.UtcNow.AddSeconds(1)
+            };
+            db.ElectronicReceipts.Add(real2Duplicate);
+
+            // Debe lanzar excepción por violación del índice filtrado único en PostgreSQL
+            await Assert.ThrowsAsync<DbUpdateException>(async () => await db.SaveChangesAsync());
+
+            // Cleanup
+            db.ChangeTracker.Clear();
+            db.ElectronicReceipts.RemoveRange(await db.ElectronicReceipts.Where(r => r.BookingId == booking.Id).ToListAsync());
+            var bClean = await db.Bookings.FindAsync(booking.Id);
+            if (bClean != null) db.Bookings.Remove(bClean);
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task Postgres_CancelledBookingPayment_RetainsExternalMoney_PersistsIncidentAndCashTransaction()
+        {
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
+
+            await using var db = CreatePostgresDbContext();
+
+            // Reserva previamente ANULADA
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-CANC-" + Guid.NewGuid().ToString("N")[..6].ToUpper(),
+                CustomerName = "Cancelled Payment Client",
+                CustomerEmail = "cancelled@sigetour.com",
+                CustomerDni = "72918273",
+                TotalAmount = 80m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Cancelled, // Anulada
+                TravelDate = DateTime.UtcNow.Date.AddDays(5)
+            };
+            db.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 8000,
+                Channel = "charge",
+                Status = "verification",
+                ProviderId = "chr_test_canc_pg_" + Guid.NewGuid().ToString("N")[..8],
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.CulqiPayments.Add(payment);
+            await db.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                var json = $"{{\"object\":\"charge\",\"id\":\"{payment.ProviderId}\",\"amount\":8000,\"currency_code\":\"PEN\",\"capture\":true,\"outcome\":{{\"type\":\"venta_exitosa\"}}}}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            });
+
+            var controller = CreateController(db, mockClient);
+            var result = await controller.Check(new CheckPayment(payment.Id, token, booking.Id), CancellationToken.None) as OkObjectResult;
+            Assert.NotNull(result);
+
+            // Verificar en PostgreSQL: Dinero acreditado en CashTransactions y PaymentIncident registrado
+            var incident = await db.PaymentIncidents.FirstOrDefaultAsync(i => i.CulqiPaymentId == payment.Id);
+            Assert.NotNull(incident);
+            Assert.Equal("CancelledBookingPayment", incident.IncidentType);
+            Assert.Equal("Critical", incident.Severity);
+            Assert.Equal(80m, incident.Amount);
+            Assert.Equal("PendingReview", incident.Status);
+
+            var cashTx = await db.CashTransactions.FirstOrDefaultAsync(t => t.CulqiPaymentId == payment.Id);
+            Assert.NotNull(cashTx);
+            Assert.Equal("Cobro de Reserva Cancelada", cashTx.Category);
+            Assert.Equal(80m, cashTx.Amount);
+
+            // Cleanup
+            db.PaymentIncidents.RemoveRange(await db.PaymentIncidents.Where(i => i.CulqiPaymentId == payment.Id).ToListAsync());
+            db.CashTransactions.RemoveRange(await db.CashTransactions.Where(t => t.CulqiPaymentId == payment.Id).ToListAsync());
+            db.CulqiPayments.RemoveRange(await db.CulqiPayments.Where(p => p.BookingId == booking.Id).ToListAsync());
+            var bClean = await db.Bookings.FindAsync(booking.Id);
+            if (bClean != null) db.Bookings.Remove(bClean);
+            await db.SaveChangesAsync();
+        }
+
+        private CulqiApiClient CreateMockCulqiClient(Func<HttpRequestMessage, HttpResponseMessage> handler)
+        {
+            var mockHttp = new HttpClient(new MockCulqiHttpHandler(handler));
+            return new CulqiApiClient(mockHttp, _config);
+        }
+
+        private CulqiPaymentsController CreateController(AppDbContext context, CulqiApiClient culqiClient)
+        {
+            var dummyHttp = new HttpClient(new MockCulqiHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+            var receiptService = new NubefactInvoiceService(context, _config, dummyHttp, NullLogger<NubefactInvoiceService>.Instance);
+            return new CulqiPaymentsController(context, culqiClient, _checkoutAccess, _config, receiptService);
         }
     }
 }

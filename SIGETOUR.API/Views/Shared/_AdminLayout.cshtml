@@ -229,6 +229,7 @@
     var bookingsClass = action == "Bookings" || action == "EditBooking" ? activeClass : inactiveClass;
     var cashClass = action == "Cash" ? activeClass : inactiveClass;
     var usersClass = action == "Users" ? activeClass : inactiveClass;
+    var supervisionClass = action == "Supervision" ? activeClass : inactiveClass;
 }
   <!-- Navigation Tabs -->
 <nav class="space-y-1 flex-1">
@@ -272,11 +273,19 @@
   <span class="material-symbols-outlined text-[20px]">point_of_sale</span>
   <span class="">Caja y Finanzas</span>
   </a>
+@if (User.IsInRole("SuperAdmin"))
+{
+<!-- Item: Supervisión de Incidencias -->
+  <a class="@supervisionClass" asp-controller="Admin" asp-action="Supervision">
+  <span class="material-symbols-outlined text-[20px]">policy</span>
+  <span class="">Supervisión</span>
+  </a>
 <!-- Item 6: Usuarios y Roles -->
   <a class="@usersClass" asp-controller="Admin" asp-action="Users">
   <span class="material-symbols-outlined text-[20px]">group</span>
   <span class="">Usuarios y Roles</span>
   </a>
+}
 <!-- Side Action CTA -->
 <div class="pt-space-md px-1">
 <a asp-controller="Admin" asp-action="CreateTour" class="w-full bg-primary hover:bg-[#0e5a52] text-on-primary py-2.5 px-space-md rounded-lg font-label-lg flex items-center justify-center gap-2 shadow-sm transition-all duration-150 active:scale-95">

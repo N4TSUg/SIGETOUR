@@ -1053,6 +1053,8 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction("Drivers");
         }
 
+        [HttpGet]
+        [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> Users(string? search, int page = 1)
         {
             var query = _userManager.Users.AsQueryable();
@@ -1122,6 +1124,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateUser(CreateUserViewModel model)
         {
@@ -1134,12 +1137,6 @@ namespace SIGETOUR.API.Controllers.UI
 
             var cleanUserName = model.UserName.Trim();
             var cleanEmail = model.Email.Trim();
-
-            if (string.Equals(cleanUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
-            {
-                TempData["ErrorMessage"] = "El nombre de usuario 'superadmin' es exclusivo del sistema y no puede ser registrado.";
-                return RedirectToAction(nameof(Users));
-            }
 
             var existingByName = await _userManager.FindByNameAsync(cleanUserName);
             if (existingByName != null)
@@ -1180,11 +1177,10 @@ namespace SIGETOUR.API.Controllers.UI
                 roleName = "Operador";
             }
 
-            var currentUserName = User.Identity?.Name ?? "";
-            bool isLoggedAsSuperAdmin = string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+            bool isLoggedAsSuperAdmin = User.IsInRole("SuperAdmin");
             if (string.Equals(roleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase) && !isLoggedAsSuperAdmin)
             {
-                TempData["ErrorMessage"] = "Solo el SuperAdmin tiene autorización para asignar el rol SuperAdmin a otro usuario.";
+                TempData["ErrorMessage"] = "Solo un usuario con rol SuperAdmin puede asignar el rol SuperAdmin a otro usuario.";
                 return RedirectToAction(nameof(Users));
             }
 
@@ -1199,6 +1195,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditUser(EditUserViewModel model)
         {
@@ -1217,13 +1214,26 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             var currentUserName = User.Identity?.Name ?? "";
-            var isTargetSuperAdmin = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+            var isTargetSuperAdmin = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase) || await _userManager.IsInRoleAsync(user, "SuperAdmin");
 
-            // Regla de seguridad estricta: Cualquier tipo de edición del superadmin
-            // que no sea realizada por el propio superadmin no es permisible para nadie.
-            if (isTargetSuperAdmin && !string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+            if (isTargetSuperAdmin && string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase) && !string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
             {
                 TempData["ErrorMessage"] = "Acción no permisible: La cuenta 'superadmin' únicamente puede ser modificada por el propio SuperAdmin.";
+                return RedirectToAction(nameof(Users));
+            }
+            else if (isTargetSuperAdmin && !User.IsInRole("SuperAdmin") && !string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = "Acción no permisible: Las cuentas de SuperAdmin únicamente pueden ser modificadas por un SuperAdmin.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var superAdmins = (await _userManager.GetUsersInRoleAsync("SuperAdmin")) ?? (IList<ApplicationUser>)Array.Empty<ApplicationUser>();
+            var activeSuperAdmins = superAdmins.Where(u => u.IsActive).ToList();
+            bool isLastActiveSuperAdmin = isTargetSuperAdmin && activeSuperAdmins.Count <= 1 && (activeSuperAdmins.Count == 0 || activeSuperAdmins.Any(u => u.Id == user.Id));
+
+            if (isLastActiveSuperAdmin && !model.IsActive)
+            {
+                TempData["ErrorMessage"] = "Acción denegada: No es posible desactivar al último SuperAdmin activo del sistema.";
                 return RedirectToAction(nameof(Users));
             }
 
@@ -1232,18 +1242,6 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (!string.Equals(user.UserName, cleanUserName, StringComparison.OrdinalIgnoreCase))
             {
-                if (isTargetSuperAdmin)
-                {
-                    TempData["ErrorMessage"] = "El nombre de usuario de la cuenta raíz 'superadmin' es inmutable y no puede ser cambiado.";
-                    return RedirectToAction(nameof(Users));
-                }
-
-                if (string.Equals(cleanUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
-                {
-                    TempData["ErrorMessage"] = "El nombre de usuario 'superadmin' está reservado y protegido por el sistema.";
-                    return RedirectToAction(nameof(Users));
-                }
-
                 var existingByName = await _userManager.FindByNameAsync(cleanUserName);
                 if (existingByName != null && existingByName.Id != user.Id)
                 {
@@ -1267,16 +1265,7 @@ namespace SIGETOUR.API.Controllers.UI
             user.FirstName = model.FirstName.Trim();
             user.LastName = model.LastName.Trim();
             user.PhoneNumber = model.PhoneNumber?.Trim();
-            
-            // La cuenta raíz 'superadmin' siempre debe permanecer activa
-            if (isTargetSuperAdmin)
-            {
-                user.IsActive = true;
-            }
-            else
-            {
-                user.IsActive = model.IsActive;
-            }
+            user.IsActive = model.IsActive;
 
             var updateResult = await _userManager.UpdateAsync(user);
             if (!updateResult.Succeeded)
@@ -1310,20 +1299,18 @@ namespace SIGETOUR.API.Controllers.UI
                 roleName = "Operador";
             }
 
-            // 1. Proteger usuario raíz 'superadmin': Su rol es INMUTABLE
-            if (isTargetSuperAdmin)
+            if (isLastActiveSuperAdmin && roleName != "SuperAdmin")
             {
-                roleName = "SuperAdmin";
+                TempData["ErrorMessage"] = "Acción denegada: No es posible degradar el rol del último SuperAdmin activo del sistema.";
+                return RedirectToAction(nameof(Users));
             }
-            // 2. Proteger la propia cuenta en sesión: No puede cambiar o degradar su propio rol
             else if (isSelf)
             {
                 roleName = currentRoles.FirstOrDefault() ?? "Admin";
             }
-            // 3. Proteger elevación a SuperAdmin: Solo el propio SuperAdmin puede asignar SuperAdmin a otros
-            else if (string.Equals(roleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase) && !string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+            else if (string.Equals(roleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase) && !User.IsInRole("SuperAdmin"))
             {
-                TempData["ErrorMessage"] = "Solo el SuperAdmin tiene autorización para asignar el rol SuperAdmin a otro usuario.";
+                TempData["ErrorMessage"] = "Solo un usuario con rol SuperAdmin puede asignar el rol SuperAdmin a otro usuario.";
                 return RedirectToAction(nameof(Users));
             }
 
@@ -1347,6 +1334,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteUser(string id)
         {
@@ -1364,10 +1352,16 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(Users));
             }
 
-            if (string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase))
+            var isTargetSuperAdmin = await _userManager.IsInRoleAsync(user, "SuperAdmin");
+            if (isTargetSuperAdmin)
             {
-                TempData["ErrorMessage"] = "La cuenta principal 'superadmin' está protegida por el sistema y no puede ser eliminada.";
-                return RedirectToAction(nameof(Users));
+                var superAdmins = (await _userManager.GetUsersInRoleAsync("SuperAdmin")) ?? (IList<ApplicationUser>)Array.Empty<ApplicationUser>();
+                var activeSuperAdmins = superAdmins.Where(u => u.IsActive).ToList();
+                if (activeSuperAdmins.Count <= 1 && (activeSuperAdmins.Count == 0 || activeSuperAdmins.Any(u => u.Id == user.Id)))
+                {
+                    TempData["ErrorMessage"] = "Acción denegada: No es posible eliminar al último SuperAdmin activo del sistema.";
+                    return RedirectToAction(nameof(Users));
+                }
             }
 
             var result = await _userManager.DeleteAsync(user);
@@ -2001,9 +1995,15 @@ namespace SIGETOUR.API.Controllers.UI
                 return View(model);
             }
 
+            string refCode;
+            do
+            {
+                refCode = $"RES-{Random.Shared.Next(1000, 9999)}";
+            } while (await _context.Bookings.AnyAsync(b => b.ReferenceCode == refCode));
+
             var booking = new SIGETOUR.API.Core.Entities.Booking
             {
-                ReferenceCode = "RES-" + new Random().Next(1000, 9999),
+                ReferenceCode = refCode,
                 CustomerName = model.CustomerName ?? "",
                 CustomerDni = model.CustomerDni ?? "",
                 CustomerPhone = model.CustomerPhone ?? "",
@@ -2146,6 +2146,9 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound();
 
+            var originalPaidAmount = booking.PaidAmount;
+            var paidDelta = model.PaidAmount - originalPaidAmount;
+
             var selectedTour = await _context.TourPackages.FindAsync(model.TourPackageId);
 
             booking.CustomerName = model.CustomerName ?? string.Empty;
@@ -2193,27 +2196,50 @@ namespace SIGETOUR.API.Controllers.UI
             _context.Bookings.Update(booking);
             await _context.SaveChangesAsync();
 
-            if (booking.PaidAmount > 0 && !_context.CashTransactions.Any(t => t.BookingId == booking.Id))
+            // Bloque 4 Item 4: Registrar pagos incrementales para deltas positivos
+            if (paidDelta > 0)
             {
                 var activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
-                if (activeShift != null)
+                if (activeShift == null)
                 {
-                    _context.CashTransactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
+                    var peruNow = DateTime.UtcNow.AddHours(-5);
+                    var todayStr = peruNow.ToString("yyyyMMdd");
+                    var shiftNumber = $"CJ-ADM-{todayStr}";
+                    activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber);
+                    if (activeShift == null)
                     {
-                        Id = Guid.NewGuid(),
-                        ShiftId = activeShift.Id,
-                        TransactionType = "Ingreso",
-                        Category = "Cobro de Reserva",
-                        Amount = booking.PaidAmount,
-                        PaymentMethod = !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Efectivo",
-                        ReferenceCode = booking.ReferenceCode,
-                        BookingId = booking.Id,
-                        Description = $"Cobro registrado en edición de reserva {booking.ReferenceCode} - {booking.CustomerName}",
-                        RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
-                        CreatedAt = DateTime.UtcNow
-                    });
-                    await _context.SaveChangesAsync();
+                        activeShift = new CashRegisterShift
+                        {
+                            Id = Guid.NewGuid(),
+                            ShiftNumber = shiftNumber,
+                            OpenedByUserName = User.Identity?.Name ?? "Administración",
+                            OpenedAt = DateTime.UtcNow,
+                            InitialAmount = 0m,
+                            IsOpen = false,
+                            Notes = "Turno administrativo automático para abonos en reservas."
+                        };
+                        _context.CashRegisterShifts.Add(activeShift);
+                        await _context.SaveChangesAsync();
+                    }
                 }
+
+                _context.CashTransactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    ShiftId = activeShift.Id,
+                    TransactionType = "Ingreso",
+                    Category = originalPaidAmount > 0 ? "Abono de Saldo" : "Cobro de Reserva",
+                    Amount = paidDelta,
+                    PaymentMethod = !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Efectivo",
+                    ReferenceCode = booking.ReferenceCode,
+                    BookingId = booking.Id,
+                    Description = originalPaidAmount > 0
+                        ? $"Abono incremental de saldo para reserva {booking.ReferenceCode}. Anterior: S/ {originalPaidAmount:N2}, Nuevo: S/ {model.PaidAmount:N2} (Delta: S/ {paidDelta:N2})."
+                        : $"Cobro de reserva {booking.ReferenceCode} - {booking.CustomerName} (S/ {paidDelta:N2}).",
+                    RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
+                    CreatedAt = DateTime.UtcNow
+                });
+                await _context.SaveChangesAsync();
             }
 
             TempData["SuccessMessage"] = $"Reserva {booking.ReferenceCode} actualizada con éxito.";
@@ -3349,6 +3375,42 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             return TimeSpan.Zero;
+        }
+
+        [HttpGet]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> Supervision(string? status)
+        {
+            var query = _context.PaymentIncidents
+                .Include(i => i.Booking)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(i => i.Status == status);
+            }
+
+            var incidents = await query.OrderByDescending(i => i.CreatedAtUtc).ToListAsync();
+            ViewBag.CurrentStatus = status;
+            return View(incidents);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "SuperAdmin")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResolveIncident(Guid id, string? resolutionNotes, string status = "Resolved")
+        {
+            var incident = await _context.PaymentIncidents.FindAsync(id);
+            if (incident == null) return NotFound();
+
+            incident.Status = (status == "Dismissed") ? "Dismissed" : "Resolved";
+            incident.ResolutionNotes = resolutionNotes?.Trim() ?? string.Empty;
+            incident.ResolvedBy = User.Identity?.Name ?? "SuperAdmin";
+            incident.ResolvedAtUtc = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Incidencia {incident.IncidentType} actualizada a estado {incident.Status}.";
+            return RedirectToAction(nameof(Supervision));
         }
     }
 }

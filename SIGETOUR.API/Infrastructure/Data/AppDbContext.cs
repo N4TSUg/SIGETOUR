@@ -23,6 +23,8 @@ namespace SIGETOUR.API.Infrastructure.Data
         public DbSet<Booking> Bookings { get; set; }
         public DbSet<CulqiPayment> CulqiPayments { get; set; }
         public DbSet<ElectronicReceipt> ElectronicReceipts { get; set; }
+        public DbSet<PaymentIncident> PaymentIncidents { get; set; }
+        public DbSet<PaymentWebhookEvent> PaymentWebhookEvents { get; set; }
         public DbSet<BookingItem> BookingItems { get; set; }
         public DbSet<CashRegisterShift> CashRegisterShifts { get; set; }
         public DbSet<CashTransaction> CashTransactions { get; set; }

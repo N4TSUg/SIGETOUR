@@ -340,6 +340,9 @@ namespace SIGETOUR.API.Migrations
 
                     b.HasIndex("AssignedVehicleId");
 
+                    b.HasIndex("ReferenceCode")
+                        .IsUnique();
+
                     b.ToTable("Bookings");
                 });
 
@@ -638,6 +641,13 @@ namespace SIGETOUR.API.Migrations
                     b.Property<string>("DigitalHash")
                         .HasColumnType("text");
 
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Demo");
+
                     b.Property<decimal>("IgvAmount")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -675,6 +685,9 @@ namespace SIGETOUR.API.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<string>("SnapshotJson")
+                        .HasColumnType("text");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -695,10 +708,13 @@ namespace SIGETOUR.API.Migrations
 
                     b.HasIndex("BookingId");
 
-                    b.HasIndex("CulqiPaymentId");
+                    b.HasIndex("CulqiPaymentId")
+                        .IsUnique()
+                        .HasFilter("\"CulqiPaymentId\" IS NOT NULL");
 
                     b.HasIndex("Series", "Number", "ReceiptType")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"Number\" IS NOT NULL AND \"Number\" <> ''");
 
                     b.ToTable("ElectronicReceipts", (string)null);
                 });
@@ -764,6 +780,118 @@ namespace SIGETOUR.API.Migrations
                     b.HasIndex("TourPackageId");
 
                     b.ToTable("ItineraryStops");
+                });
+
+            modelBuilder.Entity("SIGETOUR.API.Core.Entities.PaymentIncident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<Guid?>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CulqiPaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("PEN");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("IncidentType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ProviderId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ResolutionNotes")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResolvedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("PendingReview");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId");
+
+                    b.HasIndex("CulqiPaymentId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("PaymentIncidents", (string)null);
+                });
+
+            modelBuilder.Entity("SIGETOUR.API.Core.Entities.PaymentWebhookEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("OrderState")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("Processed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProviderId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Processed");
+
+                    b.HasIndex("ProviderId");
+
+                    b.ToTable("PaymentWebhookEvents", (string)null);
                 });
 
             modelBuilder.Entity("SIGETOUR.API.Core.Entities.PettyCashAccount", b =>
@@ -1371,6 +1499,23 @@ namespace SIGETOUR.API.Migrations
                         .IsRequired();
 
                     b.Navigation("TourPackage");
+                });
+
+            modelBuilder.Entity("SIGETOUR.API.Core.Entities.PaymentIncident", b =>
+                {
+                    b.HasOne("SIGETOUR.API.Core.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SIGETOUR.API.Core.Entities.CulqiPayment", "CulqiPayment")
+                        .WithMany()
+                        .HasForeignKey("CulqiPaymentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Booking");
+
+                    b.Navigation("CulqiPayment");
                 });
 
             modelBuilder.Entity("SIGETOUR.API.Core.Entities.PettyCashMovement", b =>

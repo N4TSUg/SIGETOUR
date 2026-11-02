@@ -49,6 +49,13 @@ namespace SIGETOUR.API.Controllers.UI
 
                 if (user != null)
                 {
+                    if (!user.IsActive)
+                    {
+                        ModelState.AddModelError(string.Empty, "La cuenta de usuario se encuentra desactivada. Contacte al Administrador.");
+                        ViewData["ReturnUrl"] = returnUrl;
+                        return View(model);
+                    }
+
                     var result = await _signInManager.PasswordSignInAsync(user.UserName!, model.Password, model.RememberMe, lockoutOnFailure: false);
 
                     if (result.Succeeded)

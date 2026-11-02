@@ -129,7 +129,7 @@ namespace SIGETOUR.API.Controllers.UI
             var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tour.Id);
             if (featured != null && featured.PromoPrice.HasValue)
             {
-                tour.BasePrice = featured.PromoPrice.Value;
+                ViewBag.PromoPrice = featured.PromoPrice.Value;
             }
 
             var reviews = await _context.TourReviews

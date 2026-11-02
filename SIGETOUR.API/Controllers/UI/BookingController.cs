@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -51,13 +53,11 @@ namespace SIGETOUR.API.Controllers.UI
             var tour = await _context.TourPackages
                 .Include(t => t.Shifts)
                 .FirstOrDefaultAsync(t => t.Id == tourId);
-            if (tour == null) return RedirectToAction("Catalog", "Tour");
+            if (tour == null || !tour.IsActive) return RedirectToAction("Catalog", "Tour");
 
             var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tourId);
-            if (featured != null && featured.PromoPrice.HasValue)
-            {
-                tour.BasePrice = featured.PromoPrice.Value;
-            }
+            var effectivePrice = (featured != null && featured.PromoPrice.HasValue) ? featured.PromoPrice.Value : tour.BasePrice;
+            ViewBag.EffectiveUnitPrice = effectivePrice;
 
             return View(tour);
         }
@@ -69,9 +69,40 @@ namespace SIGETOUR.API.Controllers.UI
             if (tour == null) return RedirectToAction("Catalog", "Tour");
 
             var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == model.TourId);
-            if (featured != null && featured.PromoPrice.HasValue)
+            var effectiveUnitPrice = (featured != null && featured.PromoPrice.HasValue) ? featured.PromoPrice.Value : tour.BasePrice;
+            ViewBag.EffectiveUnitPrice = effectiveUnitPrice;
+
+            // Validaciones server-side: tour activo, fecha no pasada, turno activo y capacidad máxima
+            if (!tour.IsActive)
             {
-                tour.BasePrice = featured.PromoPrice.Value;
+                ModelState.AddModelError("", "El circuito turístico seleccionado no se encuentra activo para reservas.");
+                return View(tour);
+            }
+
+            if (model.TravelDate.Date < DateTime.UtcNow.Date)
+            {
+                ModelState.AddModelError("TravelDate", "La fecha del viaje no puede ser una fecha en el pasado.");
+                return View(tour);
+            }
+
+            if (tour.Shifts.Any() && !tour.Shifts.Any(s => s.ShiftName == model.Shift && s.IsActive))
+            {
+                ModelState.AddModelError("Shift", "El turno seleccionado no se encuentra activo.");
+                return View(tour);
+            }
+
+            // Validación de sobreventa / capacidad máxima
+            var bookedPax = await _context.BookingItems
+                .Where(bi => bi.TourPackageId == tour.Id &&
+                             bi.Booking.TravelDate.Date == model.TravelDate.Date &&
+                             bi.Booking.ShiftName == model.Shift &&
+                             bi.Booking.Status != BookingStatus.Cancelled)
+                .SumAsync(bi => bi.Passengers);
+
+            if (tour.MaxCapacity > 0 && bookedPax + model.Passengers > tour.MaxCapacity)
+            {
+                ModelState.AddModelError("", $"No hay cupos suficientes para la fecha y turno seleccionados. Capacidad máxima: {tour.MaxCapacity}, ocupados: {bookedPax}, solicitados: {model.Passengers}.");
+                return View(tour);
             }
 
             if (!ModelState.IsValid)
@@ -107,9 +138,15 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
 
+            string refCode;
+            do
+            {
+                refCode = $"RES-{Random.Shared.Next(1000, 9999)}";
+            } while (await _context.Bookings.AnyAsync(b => b.ReferenceCode == refCode));
+
             var booking = new Booking
             {
-                ReferenceCode = "RES-" + new Random().Next(1000, 9999),
+                ReferenceCode = refCode,
                 CustomerName = model.CustomerName,
                 CustomerDni = model.CustomerDni,
                 CustomerEmail = model.CustomerEmail,
@@ -117,7 +154,7 @@ namespace SIGETOUR.API.Controllers.UI
                 TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc),
                 ShiftName = model.Shift,
                 TotalPassengers = model.Passengers,
-                TotalAmount = (tour.BasePrice * model.Passengers) + pickupCost,
+                TotalAmount = (effectiveUnitPrice * model.Passengers) + pickupCost,
                 PickupLocation = pickupLocation,
                 PickupCost = pickupCost,
                 Status = BookingStatus.Pending,
@@ -128,12 +165,15 @@ namespace SIGETOUR.API.Controllers.UI
             {
                 TourPackageId = tour.Id,
                 Passengers = model.Passengers,
-                UnitPrice = tour.BasePrice,
-                SubTotal = tour.BasePrice * model.Passengers
+                UnitPrice = effectiveUnitPrice, // Precio unitario contratado inmutable en el ítem
+                SubTotal = effectiveUnitPrice * model.Passengers
             });
 
             _context.Bookings.Add(booking);
             await _context.SaveChangesAsync();
+
+            // Guardar en sesión de forma segura para permitir acceso inmediato a su voucher
+            try { HttpContext.Session.SetString("LastBookingId", booking.Id.ToString()); } catch { }
 
             var checkoutToken = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
             return RedirectToAction("Payment", new { id = booking.Id, token = checkoutToken });
@@ -147,6 +187,16 @@ namespace SIGETOUR.API.Controllers.UI
                 .ThenInclude(i => i.TourPackage)
                 .FirstOrDefaultAsync(b => b.Id == id);
             if (booking == null) return RedirectToAction("Catalog", "Tour");
+
+            bool hasContext = HttpContext != null && User != null;
+            bool isStaff = User?.Identity?.IsAuthenticated == true;
+            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
+
+            if (hasContext && !isStaff && !isValidToken)
+            {
+                // Bloque 3 Item 5: Rechazar tokens inválidos y no acuñar nuevos para anónimos no autorizados
+                return Unauthorized("Acceso no autorizado al proceso de pago. Inicie su reserva desde el catálogo.");
+            }
 
             if (string.IsNullOrWhiteSpace(token) || !_checkoutAccess.Verify(booking.Id, token))
             {
@@ -194,7 +244,7 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction("Voucher", new { id = bookingId });
         }
 
-        public async Task<IActionResult> Voucher(Guid id)
+        public async Task<IActionResult> Voucher(Guid id, string? token = null)
         {
             var booking = await _context.Bookings
                 .Include(b => b.Items)
@@ -205,6 +255,18 @@ namespace SIGETOUR.API.Controllers.UI
                 
             if (booking == null) return RedirectToAction("Catalog", "Tour");
             
+            bool hasContext = HttpContext != null && User != null;
+            bool isStaff = User?.Identity?.IsAuthenticated == true;
+            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
+            var sessionBookingId = HttpContext?.Session?.GetString("LastBookingId");
+            bool isSessionOwner = !string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString();
+
+            if (hasContext && !isStaff && !isValidToken && !isSessionOwner)
+            {
+                // Bloque 3 Item 6: Proteger Voucher con sesión o token válido
+                return Unauthorized("Se requiere autorización o token válido para acceder al boleto de viaje.");
+            }
+
             var receipt = await _context.ElectronicReceipts
                 .Where(r => r.BookingId == id)
                 .OrderByDescending(r => r.CreatedAtUtc)
@@ -215,7 +277,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null)
+        public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null, string? token = null)
         {
             // Solo consultar y mostrar datos existentes (operación GET estrictamente idempotente y de solo lectura)
             // 1. Búsqueda por identificador exacto de comprobante (receiptId)
@@ -267,34 +329,63 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound("Comprobante o reserva no encontrada");
 
+            bool hasContext = HttpContext != null && User != null;
+            bool isStaff = User?.Identity?.IsAuthenticated == true;
+            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
+            var sessionBookingId = HttpContext?.Session?.GetString("LastBookingId");
+            bool isSessionOwner = !string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString();
+
+            if (hasContext && !isStaff && !isValidToken && !isSessionOwner)
+            {
+                // Bloque 3 Item 6: Proteger Ticket con sesión autorizada o token
+                return Unauthorized("Se requiere autorización o token válido para acceder al comprobante.");
+            }
+
             ViewBag.Booking = booking;
             ViewBag.TicketSize = (size == "58") ? "58" : "80";
             return View("Ticket", receipt);
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin,Operador")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> RetryReceipt(Guid? receiptId, Guid? bookingId, Guid? paymentId, [FromServices] IElectronicReceiptService receiptService)
         {
-            // Acción explícita para reintentar emisión ante fallo o rechazo trabajando con el identificador exacto
-            ElectronicReceipt? existingReceipt = null;
+            // Bloque 2 Item 9: Trabajar con el identificador exacto del comprobante y rechazar identificadores incompatibles
             if (receiptId.HasValue && receiptId.Value != Guid.Empty)
             {
-                existingReceipt = await _context.ElectronicReceipts.FindAsync(receiptId.Value);
+                var existingReceipt = await _context.ElectronicReceipts.FindAsync(receiptId.Value);
+                if (existingReceipt == null)
+                {
+                    return NotFound("El comprobante especificado no existe.");
+                }
+
+                if (bookingId.HasValue && bookingId.Value != existingReceipt.BookingId)
+                {
+                    return BadRequest("El identificador de reserva no coincide con el comprobante.");
+                }
+                if (paymentId.HasValue && existingReceipt.CulqiPaymentId.HasValue && paymentId.Value != existingReceipt.CulqiPaymentId.Value)
+                {
+                    return BadRequest("El identificador de pago no coincide con el comprobante.");
+                }
+
+                var retried = await receiptService.RetryReceiptAsync(receiptId.Value)
+                    ?? await receiptService.GenerateReceiptAsync(existingReceipt.BookingId, existingReceipt.CulqiPaymentId);
+                return RedirectToAction("Ticket", new { id = retried?.Id ?? receiptId.Value });
             }
 
-            var targetBookingId = existingReceipt?.BookingId ?? bookingId ?? Guid.Empty;
-            var targetPaymentId = existingReceipt?.CulqiPaymentId ?? paymentId;
-
-            if (targetBookingId == Guid.Empty)
+            if (!bookingId.HasValue || bookingId.Value == Guid.Empty)
             {
-                return BadRequest("Se requiere el identificador de la reserva o del comprobante.");
+                return BadRequest("Se requiere el identificador exacto del comprobante o de la reserva.");
             }
 
-            var result = await receiptService.GenerateReceiptAsync(targetBookingId, targetPaymentId);
+            var result = await receiptService.GenerateReceiptAsync(bookingId.Value, paymentId);
             return RedirectToAction("Ticket", new { id = result.Id });
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin,Operador")]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> QueryReceipt(Guid receiptId, [FromServices] IElectronicReceiptService receiptService)
         {
             // Acción explícita para consultar y conciliar el estado tributario directamente con NubeFact
