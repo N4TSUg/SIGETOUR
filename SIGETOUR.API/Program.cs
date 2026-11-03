@@ -70,6 +70,15 @@ builder.Services.AddAutoMapper(config => {
     config.AddProfile<SIGETOUR.API.Application.Mappings.TourPackageProfile>();
 });
 
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(2);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+});
+
 // 5. Inyección de Dependencias
 builder.Services.AddScoped<ITourPackageService, TourPackageService>();
 builder.Services.AddScoped<IManifestExportService, ManifestExportService>();
@@ -616,6 +625,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+app.UseRouting();
+app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();
