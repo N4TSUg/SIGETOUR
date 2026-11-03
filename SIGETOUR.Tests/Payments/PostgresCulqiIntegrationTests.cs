@@ -53,7 +53,7 @@ namespace SIGETOUR.Tests.Payments
         private AppDbContext CreatePostgresDbContext()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(ConnectionString)
+                .UseNpgsql(ConnectionString, npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
                 .Options;
 
             return new AppDbContext(options);

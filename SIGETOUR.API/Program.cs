@@ -16,9 +16,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddControllersWithViews();
 
-// 1. Configuración de PostgreSQL
+// 1. Configuración de PostgreSQL con SplitQuery para evitar advertencias de colecciones relacionadas y producto cartesiano
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 // 2. Identity Configuration
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
