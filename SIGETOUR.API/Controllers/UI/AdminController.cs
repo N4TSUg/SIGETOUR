@@ -2843,9 +2843,11 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(Cash), new { tab = "general" });
             }
 
-            var todayStr = DateTime.UtcNow.ToString("yyyyMMdd");
+            var todayUtc = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+            var tomorrowUtc = todayUtc.AddDays(1);
+            var todayStr = todayUtc.ToString("yyyyMMdd");
             var shiftCountToday = await _context.CashRegisterShifts
-                .CountAsync(s => s.OpenedAt.Date == DateTime.UtcNow.Date);
+                .CountAsync(s => s.OpenedAt >= todayUtc && s.OpenedAt < tomorrowUtc);
 
             var newShift = new SIGETOUR.API.Core.Entities.CashRegisterShift
             {

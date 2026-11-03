@@ -79,7 +79,8 @@ namespace SIGETOUR.API.Controllers.UI
                 return View(tour);
             }
 
-            if (model.TravelDate.Date < DateTime.UtcNow.Date)
+            var peruToday = DateTime.UtcNow.AddHours(-5).Date;
+            if (model.TravelDate.Date < peruToday)
             {
                 ModelState.AddModelError("TravelDate", "La fecha del viaje no puede ser una fecha en el pasado.");
                 return View(tour);
@@ -91,13 +92,22 @@ namespace SIGETOUR.API.Controllers.UI
                 return View(tour);
             }
 
-            // Validación de sobreventa / capacidad máxima
-            var bookedPax = await _context.BookingItems
+            // Validación de sobreventa / capacidad máxima (compatible con PostgreSQL timestamptz UTC)
+            var travelDateUtc = DateTime.SpecifyKind(model.TravelDate.Date, DateTimeKind.Utc);
+            var nextDayUtc = travelDateUtc.AddDays(1);
+
+            var bookedPaxQuery = _context.BookingItems
                 .Where(bi => bi.TourPackageId == tour.Id &&
-                             bi.Booking.TravelDate.Date == model.TravelDate.Date &&
-                             bi.Booking.ShiftName == model.Shift &&
-                             bi.Booking.Status != BookingStatus.Cancelled)
-                .SumAsync(bi => bi.Passengers);
+                             bi.Booking.TravelDate >= travelDateUtc &&
+                             bi.Booking.TravelDate < nextDayUtc &&
+                             bi.Booking.Status != BookingStatus.Cancelled);
+
+            if (!string.IsNullOrWhiteSpace(model.Shift))
+            {
+                bookedPaxQuery = bookedPaxQuery.Where(bi => bi.Booking.ShiftName == model.Shift);
+            }
+
+            var bookedPax = await bookedPaxQuery.SumAsync(bi => bi.Passengers);
 
             if (tour.MaxCapacity > 0 && bookedPax + model.Passengers > tour.MaxCapacity)
             {
@@ -151,7 +161,7 @@ namespace SIGETOUR.API.Controllers.UI
                 CustomerDni = model.CustomerDni,
                 CustomerEmail = model.CustomerEmail,
                 CustomerPhone = model.CustomerPhone,
-                TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc),
+                TravelDate = DateTime.SpecifyKind(model.TravelDate.Date, DateTimeKind.Utc),
                 ShiftName = model.Shift,
                 TotalPassengers = model.Passengers,
                 TotalAmount = (effectiveUnitPrice * model.Passengers) + pickupCost,

@@ -13,8 +13,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using SIGETOUR.API.Application.Invoicing;
 using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Controllers;
+using SIGETOUR.API.Controllers.UI;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
+using SIGETOUR.API.Models;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -495,6 +497,62 @@ namespace SIGETOUR.Tests.Payments
             db.CulqiPayments.RemoveRange(await db.CulqiPayments.Where(p => p.BookingId == booking.Id).ToListAsync());
             var bClean = await db.Bookings.FindAsync(booking.Id);
             if (bClean != null) db.Bookings.Remove(bClean);
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task Postgres_CapacityCheck_DoesNotThrowDateTimeUnspecifiedException()
+        {
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
+
+            await using var db = CreatePostgresDbContext();
+
+            var tour = new TourPackage
+            {
+                Id = Guid.NewGuid(),
+                Title = "PG Capacity Test Tour " + Guid.NewGuid().ToString("N")[..6],
+                Slug = "pg-cap-test-" + Guid.NewGuid().ToString("N")[..6],
+                BasePrice = 60m,
+                MaxCapacity = 20,
+                IsActive = true
+            };
+            db.TourPackages.Add(tour);
+            await db.SaveChangesAsync();
+
+            var controller = new BookingController(db, _checkoutAccess, _config);
+
+            // TravelDate enviada desde navegador/formulario HTML como DateTimeKind.Unspecified
+            var unspecifiedDate = new DateTime(2026, 11, 25, 0, 0, 0, DateTimeKind.Unspecified);
+
+            var checkoutModel = new CheckoutRequestViewModel
+            {
+                TourId = tour.Id,
+                CustomerName = "Unspecified Tester",
+                CustomerDni = "72918234",
+                CustomerEmail = "unspecified@sigetour.com",
+                CustomerPhone = "987654321",
+                TravelDate = unspecifiedDate,
+                Shift = "",
+                Passengers = 2,
+                BoardingPoint = "central"
+            };
+
+            // Act: no debe lanzar System.ArgumentException sobre Npgsql timestamptz
+            var result = await controller.Checkout(checkoutModel);
+            Assert.IsType<RedirectToActionResult>(result);
+
+            // Cleanup
+            var savedBooking = await db.Bookings.Include(b => b.Items).FirstOrDefaultAsync(b => b.CustomerEmail == "unspecified@sigetour.com");
+            if (savedBooking != null)
+            {
+                db.BookingItems.RemoveRange(savedBooking.Items);
+                db.Bookings.Remove(savedBooking);
+            }
+            db.TourPackages.Remove(tour);
             await db.SaveChangesAsync();
         }
 
