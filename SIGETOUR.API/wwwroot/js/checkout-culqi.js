@@ -179,6 +179,9 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
         orderId: data.orderId,
         amount: data.amountCents / 100,
         reused: !!data.reused,
+        qrCodeUrl: data.qrCodeUrl || null,
+        paymentCode: data.paymentCode || null,
+        urlPe: data.urlPe || null,
         message: data.reused ? "Orden QR activa recuperada" : "Orden QR creada"
       });
     }

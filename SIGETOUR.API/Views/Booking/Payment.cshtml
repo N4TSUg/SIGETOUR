@@ -332,6 +332,19 @@
                 </div>
                 <span id="qr-monitor-timer" class="font-mono text-xs font-bold px-2 py-0.5 bg-primary-container text-white rounded">24:59</span>
               </div>
+              <!-- Contenedor visual del QR oficial y CIP PagoEfectivo -->
+              <div id="qr-visual-container" class="hidden flex flex-col items-center justify-center p-3.5 bg-white rounded-lg border border-primary/20 space-y-2.5">
+                <img id="qr-monitor-image" src="" alt="Código QR Oficial Culqi" class="w-52 h-52 object-contain rounded-md border border-outline-variant/30 shadow-xs" />
+                <div class="text-center text-xs text-secondary">
+                  <span>Código de Pago (CIP): </span><strong id="qr-monitor-cip" class="text-primary font-mono text-sm tracking-wider">--</strong>
+                </div>
+                <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  <a id="qr-monitor-simular-link" href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all">
+                    <span class="material-symbols-outlined text-sm">open_in_new</span> Simular Pago en Sandbox (PagoEfectivo)
+                  </a>
+                </div>
+              </div>
+
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-body-sm text-secondary border-t border-outline-variant/30 pt-2.5">
                 <div class="text-xs">
                   Identificador de Orden: <strong id="qr-monitor-order-id" class="font-mono text-primary font-semibold">--</strong>
@@ -757,6 +770,22 @@
             monitorBox.classList.remove('hidden');
             if (orderIdEl && info.orderId) orderIdEl.textContent = info.orderId;
             if (titleEl) titleEl.textContent = 'Esperando confirmación en tiempo real...';
+
+            const qrVisual = document.getElementById('qr-visual-container');
+            const qrImg = document.getElementById('qr-monitor-image');
+            const cipEl = document.getElementById('qr-monitor-cip');
+            const simularLink = document.getElementById('qr-monitor-simular-link');
+
+            if (info.qrCodeUrl && qrImg) {
+                qrImg.src = info.qrCodeUrl;
+                if (qrVisual) qrVisual.classList.remove('hidden');
+            }
+            if (info.paymentCode && cipEl) {
+                cipEl.textContent = info.paymentCode;
+            }
+            if (info.urlPe && simularLink) {
+                simularLink.href = info.urlPe;
+            }
         } else if (info.state === 'tick') {
             if (timerEl && info.timer) timerEl.textContent = info.timer;
         } else if (info.state === 'paid') {

@@ -218,6 +218,9 @@ public sealed class CulqiPaymentsController : ControllerBase
                                 publicKey = _config["Culqi:PublicKey"],
                                 status = existingAttempt.Status,
                                 reused = true,
+                                qrCodeUrl = queryResult.Text("qr"),
+                                paymentCode = queryResult.Text("payment_code"),
+                                urlPe = queryResult.Text("url_pe"),
                                 expirationDateUnix = expUnix,
                                 expiresInSeconds = remainingSecs,
                                 message = "Orden QR activa recuperada exitosamente"
@@ -343,6 +346,9 @@ public sealed class CulqiPaymentsController : ControllerBase
                 publicKey = _config["Culqi:PublicKey"],
                 status = attempt.Status,
                 reused = false,
+                qrCodeUrl = order.Text("qr"),
+                paymentCode = order.Text("payment_code"),
+                urlPe = order.Text("url_pe"),
                 expirationDateUnix = actualExpUnix,
                 expiresInSeconds = expRemaining
             });
