@@ -10,7 +10,7 @@
 }
 
 <!-- Breadcrumbs & Header Section -->
-<section class="bg-surface-container-lowest px-space-xl py-space-lg border-b border-outline-variant mb-6 rounded-t-2xl">
+<section class="bg-surface-container-lowest px-4 sm:px-6 lg:px-8 py-4 sm:py-space-lg border-b border-outline-variant mb-6 rounded-2xl">
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
         <div>
             <div class="flex items-center gap-3">
@@ -35,7 +35,7 @@
 <!-- Feedback Messages -->
 @if (TempData["SuccessMessage"] != null)
 {
-    <div class="px-space-xl mb-6">
+    <div class="px-4 sm:px-6 lg:px-8 mb-6">
         <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between shadow-xs">
             <div class="flex items-center gap-3">
                 <span class="material-symbols-outlined text-emerald-600 text-2xl">check_circle</span>
@@ -49,7 +49,7 @@
 }
 
 <!-- Dashboard Metric Ribbon -->
-<section class="px-space-xl py-space-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-space-md mb-6">
+<section class="px-4 sm:px-6 lg:px-8 py-4 sm:py-space-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
     <!-- Metric 1: Total Paquetes Configurados -->
     <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
         <div class="flex flex-col">
@@ -94,7 +94,7 @@
 </section>
 
 <!-- Main Content Bento Grid -->
-<section class="px-space-xl pb-space-xl flex flex-col gap-space-lg w-full max-w-7xl mx-auto">
+<section class="px-4 sm:px-6 lg:px-8 pb-8 flex flex-col gap-4 w-full max-w-7xl mx-auto">
     <div class="flex flex-col gap-4 w-full">
         @if (Model != null && Model.Any())
         {

@@ -147,7 +147,10 @@
 <body class="bg-surface font-body-md text-on-surface h-screen max-h-screen flex flex-col overflow-hidden antialiased">
 <!-- TOP APP BAR -->
 <header class="bg-surface-container-lowest dark:bg-inverse-surface border-b border-outline-variant dark:border-outline shadow-sm flex justify-between items-center w-full px-space-lg py-space-sm shrink-0 z-30">
-<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-2 sm:gap-space-md">
+<button type="button" id="admin-sidebar-toggle" onclick="toggleAdminSidebar()" class="lg:hidden p-2 rounded-xl text-primary hover:bg-surface-container active:scale-95 transition-all" aria-label="Abrir Menú">
+<span class="material-symbols-outlined text-2xl">menu</span>
+</button>
 <a asp-controller="Home" asp-action="Index" class="flex items-center gap-space-sm bg-white p-1 rounded-lg border border-outline-variant/30 hover:bg-surface-container-lowest cursor-pointer transition-colors" title="Volver a la página principal">
 <img alt="Foto de perfil del Administrador de Turismo Chilón" class="h-10 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA418HlYgLM2V8ufbicRSZe3WiwFD80IhK7kjiUezcwFF9F_CeRFGUIPTJulkVhUOhEN5cmAaj3ta3_l3-UkTwCEYXMYTeor7kI8L2fQHDEo5sOt_FV8VWsQDU612MgYBMHH9AsPAWdl4YuPE8m8w_ZE42u43C21Iom_xU0OiAnStcNdpefRgQCdz1gi1QqB5ZI08SrQT6KVzYGfxDLj-5UPh5CbtpJ-wE1Fwr_bXVdjKYEqmFEgkTRksJJuWe00M9grak">
 <span class="text-title-md font-title-md font-bold text-primary dark:text-inverse-primary tracking-wide hidden sm:inline">Turismo Chilón</span>
@@ -172,7 +175,7 @@
 <!-- Trailing Actions Cluster -->
 <div class="flex items-center gap-space-sm">
 <!-- Caja Chica Quick Button -->
-<a asp-controller="Admin" asp-action="Cash" asp-route-tab="petty" class="flex items-center gap-space-xs bg-primary/10 hover:bg-primary/20 border border-primary/20 px-space-md py-1.5 rounded-lg text-primary transition-all cursor-pointer" title="Ver Módulo de Caja Chica">
+<a asp-controller="Admin" asp-action="Cash" asp-route-tab="petty" class="hidden sm:flex items-center gap-space-xs bg-primary/10 hover:bg-primary/20 border border-primary/20 px-space-md py-1.5 rounded-lg text-primary transition-all cursor-pointer" title="Ver Módulo de Caja Chica">
 <span class="material-symbols-outlined text-[20px]">point_of_sale</span>
 <div class="flex flex-col text-left">
 <span class="text-label-sm font-label-sm leading-none text-primary font-bold">Caja Chica</span>
@@ -180,12 +183,12 @@
 </div>
 </a>
 <!-- Notifications -->
-<button class="relative p-2 rounded-lg text-on-surface-variant hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-200 active:scale-95" title="Notificaciones">
+<button class="hidden sm:inline-flex relative p-2 rounded-lg text-on-surface-variant hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-200 active:scale-95" title="Notificaciones">
 <span class="material-symbols-outlined text-[22px]">notifications</span>
 <span class="absolute top-1 right-1 w-2 h-2 bg-tertiary rounded-full"></span>
 </button>
 <!-- Help Desk -->
-<button class="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-200 active:scale-95" title="Soporte y Ayuda">
+<button class="hidden sm:inline-flex p-2 rounded-lg text-on-surface-variant hover:bg-surface-container dark:hover:bg-surface-variant transition-colors duration-150 transition-all duration-200 active:scale-95" title="Soporte y Ayuda">
 <span class="material-symbols-outlined text-[22px]">help</span>
 </button>
 <!-- User Profile Lockup -->
@@ -202,11 +205,14 @@
 </div>
 </header>
 <div class="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden">
-<!-- SIDE NAV BAR -->
-<aside class="bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline h-full w-64 flex flex-col justify-between shrink-0 select-none overflow-y-auto custom-scrollbar">
+<!-- Mobile Backdrop Overlay -->
+<div id="admin-sidebar-backdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden backdrop-blur-xs transition-opacity duration-300" onclick="toggleAdminSidebar()"></div>
+<!-- SIDE NAV BAR (Off-canvas Drawer on mobile, static on lg+) -->
+<aside id="admin-sidebar" class="fixed inset-y-0 left-0 z-50 w-64 -translate-x-full lg:translate-x-0 lg:static lg:flex lg:shrink-0 bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline h-full flex flex-col justify-between select-none overflow-y-auto custom-scrollbar transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none">
 <div class="flex flex-col h-full py-space-md px-space-sm shrink-0">
-<!-- Subheader context -->
-<div class="px-space-md py-space-sm mb-space-sm border-b border-outline-variant/40 flex items-center gap-space-sm">
+<!-- Subheader context with Mobile Close Button -->
+<div class="px-space-md py-space-sm mb-space-sm border-b border-outline-variant/40 flex items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-sm">
 <div class="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
 <span class="material-symbols-outlined text-[20px]">directions_bus</span>
 </div>
@@ -214,6 +220,10 @@
 <div class="text-title-sm font-title-sm font-bold text-on-surface">Panel Central</div>
 <div class="text-body-sm font-body-sm text-on-surface-variant text-[11px]">Cajamarca Operaciones</div>
 </div>
+</div>
+<button type="button" class="lg:hidden p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container" onclick="toggleAdminSidebar()" aria-label="Cerrar Menú">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
 </div>
 @{
     var action = ViewContext.RouteData.Values["Action"]?.ToString();
@@ -347,7 +357,33 @@
 </div>
 
 <script>
+function toggleAdminSidebar() {
+    const sidebar = document.getElementById('admin-sidebar');
+    const backdrop = document.getElementById('admin-sidebar-backdrop');
+    if (!sidebar || !backdrop) return;
+    const isClosed = sidebar.classList.contains('-translate-x-full');
+    if (isClosed) {
+        sidebar.classList.remove('-translate-x-full');
+        sidebar.classList.add('translate-x-0');
+        backdrop.classList.remove('hidden');
+    } else {
+        sidebar.classList.add('-translate-x-full');
+        sidebar.classList.remove('translate-x-0');
+        backdrop.classList.add('hidden');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    const adminSidebar = document.getElementById('admin-sidebar');
+    if (adminSidebar) {
+        adminSidebar.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth < 1024) {
+                    toggleAdminSidebar();
+                }
+            });
+        });
+    }
     const searchInput = document.getElementById('globalAdminSearchInput');
     const searchResults = document.getElementById('globalSearchResults');
     const clearBtn = document.getElementById('clearGlobalSearchBtn');
