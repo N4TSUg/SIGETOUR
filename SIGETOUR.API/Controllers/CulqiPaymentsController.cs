@@ -60,14 +60,14 @@ public sealed class CulqiPaymentsController : ControllerBase
 
     private async Task<CashRegisterShift> GetOrCreateWebShiftAsync(CancellationToken ct)
     {
-        var activeShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen, ct);
+        var activeShift = await _db.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.IsOpen, ct);
         if (activeShift != null) return activeShift;
 
         var peruNow = GetPeruLocalDateTime();
         var todayStr = peruNow.ToString("yyyyMMdd");
         var shiftNumber = $"CJ-WEB-{todayStr}";
 
-        var webShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber, ct);
+        var webShift = await _db.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber, ct);
         if (webShift == null)
         {
             webShift = new CashRegisterShift
@@ -87,7 +87,7 @@ public sealed class CulqiPaymentsController : ControllerBase
             }
             catch (DbUpdateException)
             {
-                webShift = await _db.CashRegisterShifts.FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber, ct)
+                webShift = await _db.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber, ct)
                     ?? webShift;
             }
         }

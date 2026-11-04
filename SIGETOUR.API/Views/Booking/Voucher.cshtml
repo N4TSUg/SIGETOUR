@@ -91,7 +91,7 @@
         <div class="w-8 h-8 rounded-full bg-primary ring-4 ring-primary/20 text-white flex items-center justify-center font-bold text-xs shadow-md">
           <span class="material-symbols-outlined text-sm font-bold">check</span>
         </div>
-        <span class="mt-1 text-label-sm font-label-sm text-primary font-bold">5. Boleto Oficial</span>
+        <span class="mt-1 text-label-sm font-label-sm text-primary font-bold">5. Ticket Oficial</span>
       </div>
     </div>
   </div>
@@ -107,21 +107,16 @@
           <span class="material-symbols-outlined text-2xl">@(Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed ? "check_circle" : "pending")</span>
         </div>
         <div>
-          <h1 class="text-title-md font-bold text-on-surface">@(Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed ? (Model.PaidAmount < Model.TotalAmount ? "Boleto con Adelanto Registrado" : "Boleto Turístico Confirmado") : "Reserva Provisional - Pendiente de Pago")</h1>
+          <h1 class="text-title-md font-bold text-on-surface">@(Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed ? (Model.PaidAmount < Model.TotalAmount ? "Ticket con Adelanto Registrado" : "Ticket Turístico Confirmado") : "Reserva Provisional - Pendiente de Pago")</h1>
           <p class="text-xs text-secondary">Localizador: <strong class="text-primary font-mono">@Model.ReferenceCode</strong></p>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
-        <button type="button" class="inline-flex items-center justify-center gap-1.5 bg-primary text-on-primary hover:bg-primary/90 px-4 py-2.5 rounded-xl text-label-md font-bold shadow-sm transition-all active:scale-95 cursor-pointer" onclick="window.print()">
-          <span class="material-symbols-outlined text-[18px]">print</span>
-          <span>Imprimir Boleto (1 Hoja / PDF)</span>
+        <button type="button" class="inline-flex items-center justify-center gap-2 bg-primary text-on-primary hover:bg-primary/90 px-5 py-2.5 rounded-xl text-label-md font-bold shadow-sm transition-all active:scale-95 cursor-pointer" onclick="window.print()" title="Descargar o imprimir ticket oficial en PDF">
+          <span class="material-symbols-outlined text-[19px]">picture_as_pdf</span>
+          <span>Ticket (PDF)</span>
         </button>
-
-        <a asp-controller="Booking" asp-action="Ticket" asp-route-id="@Model.Id" target="_blank" class="inline-flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-3.5 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs active:scale-95" title="Imprimir comprobante en formato Ticket Térmico POS">
-          <span class="material-symbols-outlined text-[18px]">receipt</span>
-          <span>Ticket POS</span>
-        </a>
 
         @if (hasExternalPdf)
         {
@@ -155,7 +150,7 @@
           <div>
             <div class="flex items-center gap-2">
               <span class="text-title-lg font-black text-primary tracking-wide">TURISMO CHILÓN</span>
-              <span class="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Boleto Oficial</span>
+              <span class="bg-primary text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Ticket Oficial</span>
             </div>
             <p class="text-xs text-gray-700 font-semibold">Transporte &amp; Turismo Cajamarca S.A.C. • RUC: 20601234567</p>
             <p class="text-[11px] text-gray-500">DIRCETUR Cert. N° 4412 • Jr. 2 de Mayo 569, Cajamarca</p>

@@ -131,7 +131,9 @@ namespace SIGETOUR.API.Controllers.UI
                 return NotFound();
             }
 
-            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tour.Id && f.IsActive);
+            var featured = await _context.FeaturedPackages
+                .OrderBy(f => f.DisplayOrder)
+                .FirstOrDefaultAsync(f => f.TourPackageId == tour.Id && f.IsActive);
             if (featured != null && featured.PromoPrice.HasValue)
             {
                 ViewBag.PromoPrice = featured.PromoPrice.Value;

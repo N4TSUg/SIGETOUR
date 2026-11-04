@@ -1405,7 +1405,7 @@ namespace SIGETOUR.API.Controllers.UI
                 }
                 else
                 {
-                    var fallbackCat = await _context.Categories.FirstOrDefaultAsync(c => c.IsActive);
+                    var fallbackCat = await _context.Categories.OrderBy(c => c.DisplayOrder).FirstOrDefaultAsync(c => c.IsActive);
                     validCategoryId = fallbackCat?.Id;
                 }
             }
@@ -1592,7 +1592,7 @@ namespace SIGETOUR.API.Controllers.UI
                 }
                 else
                 {
-                    var fallbackCat = await _context.Categories.FirstOrDefaultAsync(c => c.IsActive);
+                    var fallbackCat = await _context.Categories.OrderBy(c => c.DisplayOrder).FirstOrDefaultAsync(c => c.IsActive);
                     validCategoryId = fallbackCat?.Id;
                 }
             }
@@ -2036,7 +2036,7 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking.PaidAmount > 0)
             {
-                var activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+                var activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.IsOpen);
                 if (activeShift != null)
                 {
                     _context.CashTransactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
@@ -2199,13 +2199,13 @@ namespace SIGETOUR.API.Controllers.UI
             // Bloque 4 Item 4: Registrar pagos incrementales para deltas positivos
             if (paidDelta > 0)
             {
-                var activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+                var activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.IsOpen);
                 if (activeShift == null)
                 {
                     var peruNow = DateTime.UtcNow.AddHours(-5);
                     var todayStr = peruNow.ToString("yyyyMMdd");
                     var shiftNumber = $"CJ-ADM-{todayStr}";
-                    activeShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber);
+                    activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber);
                     if (activeShift == null)
                     {
                         activeShift = new CashRegisterShift
@@ -2871,7 +2871,7 @@ namespace SIGETOUR.API.Controllers.UI
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> OpenCashShift(decimal initialAmount, string? notes)
         {
-            var openShift = await _context.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+            var openShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.IsOpen);
             if (openShift != null)
             {
                 TempData["ErrorMessage"] = "Ya existe un turno de caja abierto actualmente.";

@@ -63,11 +63,13 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(t => t.Images)
                 .Include(t => t.Category)
                 .Include(t => t.Shifts)
+                .OrderBy(t => t.Title)
                 .FirstOrDefaultAsync(t => t.IsFlagship && t.IsActive)
                 ?? await _context.TourPackages
                     .Include(t => t.Images)
                     .Include(t => t.Category)
                     .Include(t => t.Shifts)
+                    .OrderBy(t => t.Title)
                     .FirstOrDefaultAsync(t => t.IsActive);
             ViewBag.FlagshipTour = flagshipTour;
 

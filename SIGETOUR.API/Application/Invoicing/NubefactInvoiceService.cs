@@ -72,12 +72,14 @@ namespace SIGETOUR.API.Application.Invoicing
         {
             // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado, Demo o Simulado)
             var existing = await _db.ElectronicReceipts
+                .OrderByDescending(r => r.CreatedAtUtc)
                 .FirstOrDefaultAsync(r => ((culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId) || (culqiPaymentId == null && r.BookingId == bookingId))
                     && (r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation"), ct);
             if (existing != null) return existing;
 
             // Reutilizar registro si quedó en estado fallido/rechazado para actualizarlo en vez de duplicarlo
             var receipt = await _db.ElectronicReceipts
+                .OrderByDescending(r => r.CreatedAtUtc)
                 .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
                     || (culqiPaymentId == null && r.BookingId == bookingId), ct);
             bool isNew = receipt == null;
@@ -121,6 +123,7 @@ namespace SIGETOUR.API.Application.Invoicing
             if (isBalance)
             {
                 prevAdvanceReceipt = await _db.ElectronicReceipts
+                    .OrderByDescending(r => r.CreatedAtUtc)
                     .FirstOrDefaultAsync(r => r.BookingId == bookingId && r.Id != (receipt != null ? receipt.Id : Guid.Empty)
                         && (r.Status == "Accepted" || r.Status == "Demo")
                         && r.Environment == mode
