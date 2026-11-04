@@ -26,6 +26,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .ToListAsync();
                 
             var featured = await _context.FeaturedPackages
+                .Where(f => f.IsActive)
                 .Include(f => f.TourPackage)
                 .ThenInclude(t => t!.Category)
                 .Include(f => f.TourPackage)

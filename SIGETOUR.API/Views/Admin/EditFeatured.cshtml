@@ -1,4 +1,4 @@
-﻿@using SIGETOUR.API.Models
+@using SIGETOUR.API.Models
 @using SIGETOUR.API.Core.Entities
 @model FeaturedPackageDto
 @{
@@ -74,7 +74,14 @@
             </div>
 
             <div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/80 shadow-sm space-y-4">
-                <h2 class="font-bold text-title-md">4. Posición en Home</h2>
+                <h2 class="font-bold text-title-md">4. Estado y Posición en Portada</h2>
+                <div class="p-4 rounded-xl bg-surface-container-low border border-outline-variant flex items-center gap-3">
+                    <input asp-for="IsActive" class="w-5 h-5 text-primary rounded focus:ring-primary cursor-pointer" />
+                    <div>
+                        <label asp-for="IsActive" class="font-bold text-label-md text-on-surface block cursor-pointer">Activo en Portada Pública</label>
+                        <span class="text-xs text-on-surface-variant">Si lo desmarcas, el paquete se mantendrá guardado pero oculto en la página de inicio.</span>
+                    </div>
+                </div>
                 <div>
                     <label class="block text-label-md font-bold mb-1">Orden de Visualización en Carrusel</label>
                     <select asp-for="DisplayOrder" class="w-full bg-surface-container-low border border-outline-variant rounded-lg p-2.5">

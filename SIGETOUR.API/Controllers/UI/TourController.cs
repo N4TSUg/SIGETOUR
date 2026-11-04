@@ -93,6 +93,11 @@ namespace SIGETOUR.API.Controllers.UI
                 .OrderBy(c => c.DisplayOrder)
                 .ToListAsync();
 
+            var activeFeatured = await _context.FeaturedPackages
+                .Where(f => f.IsActive)
+                .ToDictionaryAsync(f => f.TourPackageId, f => f);
+            ViewBag.ActiveFeatured = activeFeatured;
+
             ViewBag.Categories = categories;
             ViewBag.CurrentQ = q;
             ViewBag.CurrentCategoryId = categoryId;
@@ -126,10 +131,11 @@ namespace SIGETOUR.API.Controllers.UI
                 return NotFound();
             }
 
-            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tour.Id);
+            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tour.Id && f.IsActive);
             if (featured != null && featured.PromoPrice.HasValue)
             {
                 ViewBag.PromoPrice = featured.PromoPrice.Value;
+                ViewBag.PromoBadge = string.IsNullOrEmpty(featured.PromoBadge) || featured.PromoBadge == "none" ? "¡Oferta Especial!" : featured.PromoBadge;
             }
 
             var reviews = await _context.TourReviews

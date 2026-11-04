@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace SIGETOUR.API.Models
@@ -21,6 +21,8 @@ namespace SIGETOUR.API.Models
         public decimal? PromoPrice { get; set; }
         
         public bool SyncInventory { get; set; }
+
+        public bool IsActive { get; set; } = true;
         
         // Navigation property for display
         public TourPackageDto? TourPackage { get; set; }

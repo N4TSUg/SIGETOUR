@@ -2311,6 +2311,11 @@ namespace SIGETOUR.API.Controllers.UI
                 .AsQueryable();
 
             int totalItems = await query.CountAsync();
+            int totalActive = await _context.FeaturedPackages.CountAsync(f => f.IsActive);
+            int totalHidden = totalItems - totalActive;
+            ViewBag.TotalActive = totalActive;
+            ViewBag.TotalHidden = totalHidden;
+
             int pageSize = 12;
             int totalPages = Math.Max(1, (int)Math.Ceiling((double)totalItems / pageSize));
             if (page < 1) page = 1;
@@ -2342,7 +2347,7 @@ namespace SIGETOUR.API.Controllers.UI
             ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
             if (id == null)
             {
-                return View(new SIGETOUR.API.Models.FeaturedPackageDto { DisplayOrder = 1, SyncInventory = true });
+                return View(new SIGETOUR.API.Models.FeaturedPackageDto { DisplayOrder = 1, SyncInventory = true, IsActive = true });
             }
 
             var fp = await _context.FeaturedPackages.FindAsync(id);
@@ -2357,13 +2362,15 @@ namespace SIGETOUR.API.Controllers.UI
                 CommercialSubtitle = fp.CommercialSubtitle,
                 PromoBadge = fp.PromoBadge,
                 PromoPrice = fp.PromoPrice,
-                SyncInventory = fp.SyncInventory
+                SyncInventory = fp.SyncInventory,
+                IsActive = fp.IsActive
             };
 
             return View(dto);
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditFeatured(SIGETOUR.API.Models.FeaturedPackageDto dto)
         {
             ModelState.Remove("TourPackage");
@@ -2384,7 +2391,8 @@ namespace SIGETOUR.API.Controllers.UI
                     CommercialSubtitle = dto.CommercialSubtitle ?? string.Empty,
                     PromoBadge = dto.PromoBadge ?? string.Empty,
                     PromoPrice = dto.PromoPrice,
-                    SyncInventory = dto.SyncInventory
+                    SyncInventory = dto.SyncInventory,
+                    IsActive = dto.IsActive
                 };
                 _context.FeaturedPackages.Add(fp);
             }
@@ -2400,22 +2408,49 @@ namespace SIGETOUR.API.Controllers.UI
                 fp.PromoBadge = dto.PromoBadge ?? string.Empty;
                 fp.PromoPrice = dto.PromoPrice;
                 fp.SyncInventory = dto.SyncInventory;
+                fp.IsActive = dto.IsActive;
 
                 _context.FeaturedPackages.Update(fp);
             }
 
             await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Configuración del paquete de portada guardada exitosamente.";
             return RedirectToAction("Featured");
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleFeaturedStatus(Guid id)
+        {
+            var fp = await _context.FeaturedPackages
+                .Include(f => f.TourPackage)
+                .FirstOrDefaultAsync(f => f.Id == id);
+            if (fp == null) return NotFound();
+
+            fp.IsActive = !fp.IsActive;
+            await _context.SaveChangesAsync();
+
+            var title = !string.IsNullOrEmpty(fp.CommercialTitle) ? fp.CommercialTitle : (fp.TourPackage?.Title ?? "Paquete");
+            TempData["SuccessMessage"] = fp.IsActive
+                ? $"El paquete \"{title}\" ha sido activado y ahora se muestra en la portada pública."
+                : $"El paquete \"{title}\" ha sido retirado de la portada pública (oculto). Puedes volver a reactivarlo para el fin de semana en cualquier momento.";
+
+            return RedirectToAction(nameof(Featured));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteFeatured(Guid id)
         {
-            var fp = await _context.FeaturedPackages.FindAsync(id);
+            var fp = await _context.FeaturedPackages
+                .Include(f => f.TourPackage)
+                .FirstOrDefaultAsync(f => f.Id == id);
             if (fp != null)
             {
+                var title = !string.IsNullOrEmpty(fp.CommercialTitle) ? fp.CommercialTitle : (fp.TourPackage?.Title ?? "Paquete");
                 _context.FeaturedPackages.Remove(fp);
                 await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"El paquete destacado \"{title}\" ha sido eliminado permanentemente del sistema.";
             }
             return RedirectToAction("Featured");
         }

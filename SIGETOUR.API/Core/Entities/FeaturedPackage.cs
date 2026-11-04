@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace SIGETOUR.API.Core.Entities
 {
@@ -21,5 +21,8 @@ namespace SIGETOUR.API.Core.Entities
         
         // Sincronizar automticamente horarios y cupos con catlogo general
         public bool SyncInventory { get; set; } = true;
+
+        // Visibilidad en portada pública (permite pausar u ocultar sin eliminar)
+        public bool IsActive { get; set; } = true;
     }
 }

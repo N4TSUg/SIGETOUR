@@ -246,6 +246,17 @@
                 <div class="absolute inset-0 bg-gradient-to-t from-inverse-surface/80 via-transparent to-black/20"></div>
                 <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
                     <span class="bg-surface-container-lowest/90 backdrop-blur text-primary text-[11px] font-bold px-2 py-1 rounded-md shadow-sm">Acreditado DIRCETUR</span>
+                    @{
+                        var activeFeatured = ViewBag.ActiveFeatured as Dictionary<Guid, SIGETOUR.API.Core.Entities.FeaturedPackage>;
+                        var fp = (activeFeatured != null && activeFeatured.TryGetValue(tour.Id, out var fItem)) ? fItem : null;
+                    }
+                    @if (fp != null && !string.IsNullOrEmpty(fp.PromoBadge) && fp.PromoBadge != "none")
+                    {
+                        <span class="bg-amber-400 text-amber-950 text-[11px] font-extrabold px-2 py-1 rounded-md shadow-sm flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[13px]">local_offer</span>
+                            <span>@fp.PromoBadge</span>
+                        </span>
+                    }
                 </div>
             </div>
             <div class="p-5 flex-1 flex flex-col justify-between">

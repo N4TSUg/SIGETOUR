@@ -55,7 +55,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .FirstOrDefaultAsync(t => t.Id == tourId);
             if (tour == null || !tour.IsActive) return RedirectToAction("Catalog", "Tour");
 
-            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tourId);
+            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == tourId && f.IsActive);
             var effectivePrice = (featured != null && featured.PromoPrice.HasValue) ? featured.PromoPrice.Value : tour.BasePrice;
             ViewBag.EffectiveUnitPrice = effectivePrice;
 
@@ -68,7 +68,7 @@ namespace SIGETOUR.API.Controllers.UI
             var tour = await _context.TourPackages.Include(t => t.Shifts).FirstOrDefaultAsync(t => t.Id == model.TourId);
             if (tour == null) return RedirectToAction("Catalog", "Tour");
 
-            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == model.TourId);
+            var featured = await _context.FeaturedPackages.FirstOrDefaultAsync(f => f.TourPackageId == model.TourId && f.IsActive);
             var effectiveUnitPrice = (featured != null && featured.PromoPrice.HasValue) ? featured.PromoPrice.Value : tour.BasePrice;
             ViewBag.EffectiveUnitPrice = effectiveUnitPrice;
 

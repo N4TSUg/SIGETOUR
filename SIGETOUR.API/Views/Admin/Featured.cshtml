@@ -3,6 +3,10 @@
 @{
     ViewData["Title"] = "Paquetes Populares de Inicio";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    int totalActive = ViewBag.TotalActive is int ta ? ta : Model?.Count(f => f.IsActive) ?? 0;
+    int totalHidden = ViewBag.TotalHidden is int th ? th : Model?.Count(f => !f.IsActive) ?? 0;
+    var pvm = ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel;
+    int totalFeatured = pvm?.TotalItems ?? (Model?.Count() ?? 0);
 }
 
 <!-- Breadcrumbs & Header Section -->
@@ -28,23 +32,63 @@
     </div>
 </section>
 
+<!-- Feedback Messages -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="px-space-xl mb-6">
+        <div class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between shadow-xs">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-emerald-600 text-2xl">check_circle</span>
+                <span class="font-body-md font-medium">@TempData["SuccessMessage"]</span>
+            </div>
+            <button type="button" onclick="this.parentElement.remove()" class="text-emerald-700 hover:text-emerald-900">
+                <span class="material-symbols-outlined text-lg">close</span>
+            </button>
+        </div>
+    </div>
+}
+
 <!-- Dashboard Metric Ribbon -->
-<section class="px-space-xl py-space-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mb-6">
-    <!-- Metric 1: Total Paquetes en Portada -->
+<section class="px-space-xl py-space-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-space-md mb-6">
+    <!-- Metric 1: Total Paquetes Configurados -->
     <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
         <div class="flex flex-col">
-            <span class="text-label-sm font-label-sm text-secondary">Total Paquetes en Portada</span>
+            <span class="text-label-sm font-label-sm text-secondary">Total Configurados</span>
             <div class="flex items-baseline gap-2 mt-1">
-                @{
-                    var pvm = ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel;
-                    int totalFeatured = pvm?.TotalItems ?? (Model?.Count() ?? 0);
-                }
                 <span class="text-headline-md font-headline-md font-extrabold text-primary">@totalFeatured</span>
-                <span class="text-label-sm font-label-sm text-on-surface-variant font-medium">activos</span>
+                <span class="text-label-sm font-label-sm text-on-surface-variant font-medium">circuitos</span>
             </div>
         </div>
         <div class="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-primary">
             <span class="material-symbols-outlined text-headline-sm">view_carousel</span>
+        </div>
+    </div>
+
+    <!-- Metric 2: Activos en Portada -->
+    <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
+        <div class="flex flex-col">
+            <span class="text-label-sm font-label-sm text-secondary">Visibles en Portada</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-headline-md font-headline-md font-extrabold text-emerald-600">@totalActive</span>
+                <span class="text-label-sm font-label-sm text-emerald-700 font-medium">en vivo</span>
+            </div>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
+            <span class="material-symbols-outlined text-headline-sm">visibility</span>
+        </div>
+    </div>
+
+    <!-- Metric 3: Ocultos / Fin de Semana -->
+    <div class="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/60 shadow-sm flex items-center justify-between">
+        <div class="flex flex-col">
+            <span class="text-label-sm font-label-sm text-secondary">Ocultos / En Pausa</span>
+            <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-headline-md font-headline-md font-extrabold text-amber-600">@totalHidden</span>
+                <span class="text-label-sm font-label-sm text-amber-700 font-medium">reactivables</span>
+            </div>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+            <span class="material-symbols-outlined text-headline-sm">pause_circle</span>
         </div>
     </div>
 </section>
@@ -56,39 +100,114 @@
         {
             foreach (var fp in Model)
             {
-                <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant/80 shadow-sm p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative">
-                    <div class="absolute left-0 top-0 bottom-0 w-2 bg-primary"></div>
+                var tourTitle = !string.IsNullOrEmpty(fp.CommercialTitle) ? fp.CommercialTitle : (fp.TourPackage?.Title ?? "Circuito");
+                var basePrice = fp.TourPackage?.BasePrice ?? 0m;
+                var safeTitle = tourTitle.Replace("'", "\\'");
+
+                <div class="bg-surface-container-lowest rounded-2xl border @(fp.IsActive ? "border-outline-variant/80 shadow-sm" : "border-outline-variant/40 bg-surface-container-lowest/70 opacity-90") p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative transition-all">
+                    <!-- Accent side bar -->
+                    <div class="absolute left-0 top-0 bottom-0 w-2 @(fp.IsActive ? "bg-primary" : "bg-neutral-300") rounded-l-2xl"></div>
+
                     <div class="flex items-center gap-4 min-w-0 flex-1 pl-2">
                         <div class="flex items-center gap-2">
-                            <div class="flex flex-col items-center justify-center w-11 h-11 rounded-xl bg-surface-container text-primary font-extrabold text-title-md border border-outline-variant/60">@fp.DisplayOrder</div>
+                            <div class="flex flex-col items-center justify-center w-11 h-11 rounded-xl @(fp.IsActive ? "bg-surface-container text-primary" : "bg-neutral-100 text-neutral-400") font-extrabold text-title-md border border-outline-variant/60" title="Orden en el carrusel de portada">
+                                @fp.DisplayOrder
+                            </div>
                         </div>
+
                         <div class="flex flex-col min-w-0 flex-1 gap-1">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-surface-container-high text-primary border border-primary/20">Top @fp.DisplayOrder</span>
-                                @if (!string.IsNullOrEmpty(fp.PromoBadge)) {
-                                    <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-secondary-container text-on-secondary-container">@fp.PromoBadge</span>
+                                <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-surface-container-high text-primary border border-primary/20">Posición @fp.DisplayOrder</span>
+                                
+                                @if (fp.IsActive)
+                                {
+                                    <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5 shadow-2xs">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span>En Portada</span>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-surface-container-high text-on-surface-variant border border-outline-variant flex items-center gap-1.5">
+                                        <span class="w-2 h-2 rounded-full bg-neutral-400"></span>
+                                        <span>Oculto</span>
+                                    </span>
+                                }
+
+                                @if (!string.IsNullOrEmpty(fp.PromoBadge) && fp.PromoBadge != "none") {
+                                    <span class="px-2.5 py-0.5 rounded-full text-label-sm font-bold bg-secondary-container text-on-secondary-container flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[13px]">local_offer</span>
+                                        <span>@fp.PromoBadge</span>
+                                    </span>
                                 }
                             </div>
-                            <h3 class="text-title-md font-bold text-on-surface truncate">@(fp.CommercialTitle != "" ? fp.CommercialTitle : fp.TourPackage?.Title)</h3>
+
+                            <div class="flex items-baseline gap-3 flex-wrap">
+                                <h3 class="text-title-md font-bold text-on-surface truncate">@tourTitle</h3>
+                                @if (!string.IsNullOrEmpty(fp.CommercialTitle) && fp.TourPackage != null && fp.TourPackage.Title != fp.CommercialTitle)
+                                {
+                                    <span class="text-xs text-on-surface-variant font-medium">(Catálogo: @fp.TourPackage.Title)</span>
+                                }
+                            </div>
+
+                            <!-- Pricing preview -->
+                            <div class="flex items-center gap-3 text-body-sm text-on-surface-variant">
+                                @if (fp.PromoPrice.HasValue)
+                                {
+                                    <span class="text-xs">Tarifa Portada: <strong class="text-primary font-bold">S/ @fp.PromoPrice.Value.ToString("0.00")</strong></span>
+                                    <span class="text-xs line-through text-outline">Base: S/ @basePrice.ToString("0.00")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-xs">Tarifa Catálogo: <strong>S/ @basePrice.ToString("0.00")</strong></span>
+                                }
+                            </div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-3 lg:border-l lg:border-outline-variant/60 lg:pl-5 self-end lg:self-center shrink-0">
-                        <a asp-action="EditFeatured" asp-route-id="@fp.Id" class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-label-md font-bold border border-primary/20 transition-all" title="Editar Parámetros de Portada">
-                            <span class="material-symbols-outlined text-[18px]">tune</span><span>Editar</span>
+
+                    <!-- Action buttons -->
+                    <div class="flex items-center gap-2.5 lg:border-l lg:border-outline-variant/60 lg:pl-5 self-end lg:self-center shrink-0">
+                        <a asp-action="EditFeatured" asp-route-id="@fp.Id" class="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-label-md font-bold border border-primary/20 transition-all cursor-pointer" title="Editar Parámetros de Portada">
+                            <span class="material-symbols-outlined text-[18px]">tune</span>
+                            <span>Editar</span>
                         </a>
-                        <form asp-action="DeleteFeatured" method="post" style="display:inline;">
-                            <input type="hidden" name="id" value="@fp.Id" />
-                            <button type="submit" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-error-container text-tertiary transition-colors" title="Retirar de Portada" onclick="return confirm('¿Retirar este paquete de la portada?');">
+
+                        @if (fp.IsActive)
+                        {
+                            <!-- Button to Hide/Withdraw from cover (opens Hide Modal) -->
+                            <button type="button" onclick="openHideFeaturedModal('@fp.Id', '@safeTitle')" class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-label-md font-bold transition-colors cursor-pointer" title="Ocultar de Portada sin eliminar">
                                 <span class="material-symbols-outlined text-[19px]">visibility_off</span>
+                                <span class="hidden sm:inline">Retirar</span>
                             </button>
-                        </form>
+                        }
+                        else
+                        {
+                            <!-- Button to Activate in cover (opens Activate Modal) -->
+                            <button type="button" onclick="openActivateFeaturedModal('@fp.Id', '@safeTitle')" class="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-label-md font-bold transition-colors cursor-pointer" title="Activar y mostrar en portada">
+                                <span class="material-symbols-outlined text-[19px]">visibility</span>
+                                <span class="hidden sm:inline">Activar</span>
+                            </button>
+                        }
+
+                        <!-- Button to permanently delete (opens Delete Modal) -->
+                        <button type="button" onclick="openDeleteFeaturedModal('@fp.Id', '@safeTitle')" class="p-2.5 rounded-xl bg-surface-container-low hover:bg-red-50 hover:text-red-600 text-outline transition-colors cursor-pointer" title="Eliminar definitivamente de destacados">
+                            <span class="material-symbols-outlined text-[19px]">delete</span>
+                        </button>
                     </div>
                 </div>
             }
         }
         else
         {
-            <div class="p-8 text-center text-on-surface-variant">No hay paquetes destacados configurados.</div>
+            <div class="p-12 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-sm text-on-surface-variant">
+                <span class="material-symbols-outlined text-4xl text-outline mb-2">view_carousel</span>
+                <p class="font-bold text-title-md">No hay paquetes destacados configurados.</p>
+                <p class="text-body-sm mt-1">Agrega tu primer circuito para destacarlo en la portada pública con promociones y badges especiales.</p>
+                <a asp-action="EditFeatured" class="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg bg-primary text-white font-bold text-label-md hover:bg-primary/90 transition-all shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">add</span>
+                    <span>Agregar Paquete a Populares</span>
+                </a>
+            </div>
         }
 
         <div class="rounded-2xl border border-outline-variant/80 overflow-hidden bg-surface-container-lowest shadow-sm">
@@ -96,3 +215,194 @@
         </div>
     </div>
 </section>
+
+<!-- ======================================================== -->
+<!-- MODAL 1: RETIRAR / OCULTAR DE LA PORTADA                   -->
+<!-- ======================================================== -->
+<div id="hideFeaturedModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm transition-all duration-200 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-outline-variant relative animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[28px]">visibility_off</span>
+            </div>
+            <div>
+                <h3 class="text-headline-sm font-bold text-on-surface leading-snug">¿Retirar paquete de la portada?</h3>
+                <p class="text-body-sm text-outline mt-1">
+                    Circuito: <strong id="modalHidePackageTitle" class="font-bold text-on-surface"></strong>
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-4 p-4 rounded-xl bg-amber-50 border border-amber-200 text-body-sm text-amber-900 space-y-2">
+            <div class="flex items-center gap-2 font-bold text-amber-800">
+                <span class="material-symbols-outlined text-lg">lightbulb</span>
+                <span>El paquete se ocultará sin eliminarse</span>
+            </div>
+            <p class="text-body-sm text-on-surface-variant leading-relaxed">
+                Este circuito dejará de verse en la página de inicio pública, pero su información, orden de carrusel y tarifas especiales <strong>permanecerán guardadas</strong> en tu panel.
+            </p>
+            <p class="text-xs text-amber-800 font-medium">
+                💡 Podrás volver a reactivarlo con un solo clic cuando lo desees (por ejemplo, para el fin de semana).
+            </p>
+        </div>
+
+        <form asp-action="ToggleFeaturedStatus" method="post" class="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalHidePackageId" name="id" value="" />
+            <button type="button" onclick="closeHideFeaturedModal()" class="px-5 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md font-bold hover:bg-surface-container transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-label-md font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer">
+                <span class="material-symbols-outlined text-[19px]">visibility_off</span>
+                Sí, Ocultar de Portada
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 2: ACTIVAR / MOSTRAR EN LA PORTADA                   -->
+<!-- ======================================================== -->
+<div id="activateFeaturedModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm transition-all duration-200 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-outline-variant relative animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-100 border border-emerald-200 text-emerald-800 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[28px]">visibility</span>
+            </div>
+            <div>
+                <h3 class="text-headline-sm font-bold text-on-surface leading-snug">¿Activar en la portada pública?</h3>
+                <p class="text-body-sm text-outline mt-1">
+                    Circuito: <strong id="modalActivatePackageTitle" class="font-bold text-on-surface"></strong>
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-body-sm text-emerald-900 space-y-1.5">
+            <div class="flex items-center gap-2 font-bold text-emerald-800">
+                <span class="material-symbols-outlined text-lg">check_circle</span>
+                <span>Visible de inmediato para tus clientes</span>
+            </div>
+            <p class="text-body-sm text-on-surface-variant leading-relaxed">
+                El circuito volverá a mostrarse en la sección de circuitos populares de la página de inicio con sus tarifas y badges configurados.
+            </p>
+        </div>
+
+        <form asp-action="ToggleFeaturedStatus" method="post" class="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalActivatePackageId" name="id" value="" />
+            <button type="button" onclick="closeActivateFeaturedModal()" class="px-5 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md font-bold hover:bg-surface-container transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2.5 rounded-lg bg-primary hover:bg-[#0e5a52] text-white font-label-md font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer">
+                <span class="material-symbols-outlined text-[19px]">visibility</span>
+                Sí, Activar en Portada
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 3: CONFIRMACIÓN DE ELIMINACIÓN DEFINITIVA          -->
+<!-- ======================================================== -->
+<div id="deleteFeaturedModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm transition-all duration-200 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-outline-variant relative animate-in fade-in zoom-in-95 duration-150">
+        <div class="flex items-start gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-red-100 border border-red-200 text-red-600 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[28px]">delete_forever</span>
+            </div>
+            <div>
+                <h3 class="text-headline-sm font-bold text-on-surface leading-snug">¿Eliminar paquete definitivamente?</h3>
+                <p class="text-body-sm text-outline mt-1">
+                    Circuito: <strong id="modalDeletePackageTitle" class="font-bold text-red-600"></strong>
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 text-body-sm text-red-900 space-y-1.5">
+            <div class="flex items-center gap-2 font-bold text-red-700">
+                <span class="material-symbols-outlined text-lg">crisis_alert</span>
+                <span>Acción irreversible</span>
+            </div>
+            <p class="text-body-sm text-on-surface-variant leading-relaxed">
+                Esta acción eliminará permanentemente la configuración de este paquete de la lista de destacados. El tour base en el catálogo general <strong>no</strong> será eliminado.
+            </p>
+        </div>
+
+        <form asp-action="DeleteFeatured" method="post" class="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="modalDeletePackageId" name="id" value="" />
+            <button type="button" onclick="closeDeleteFeaturedModal()" class="px-5 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md font-bold hover:bg-surface-container transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-label-md font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">delete</span>
+                Sí, Eliminar Definitivamente
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openHideFeaturedModal(id, title) {
+        document.getElementById('modalHidePackageId').value = id;
+        document.getElementById('modalHidePackageTitle').textContent = title;
+        const modal = document.getElementById('hideFeaturedModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeHideFeaturedModal() {
+        const modal = document.getElementById('hideFeaturedModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    function openActivateFeaturedModal(id, title) {
+        document.getElementById('modalActivatePackageId').value = id;
+        document.getElementById('modalActivatePackageTitle').textContent = title;
+        const modal = document.getElementById('activateFeaturedModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeActivateFeaturedModal() {
+        const modal = document.getElementById('activateFeaturedModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    function openDeleteFeaturedModal(id, title) {
+        document.getElementById('modalDeletePackageId').value = id;
+        document.getElementById('modalDeletePackageTitle').textContent = title;
+        const modal = document.getElementById('deleteFeaturedModal');
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeDeleteFeaturedModal() {
+        const modal = document.getElementById('deleteFeaturedModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    // Cerrar modales con tecla Escape y click en fondo oscuro
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeHideFeaturedModal();
+            closeActivateFeaturedModal();
+            closeDeleteFeaturedModal();
+        }
+    });
+
+    ['hideFeaturedModal', 'activateFeaturedModal', 'deleteFeaturedModal'].forEach(function(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
+            });
+        }
+    });
+</script>

@@ -246,11 +246,33 @@
         </div>
         <div class="relative z-10 space-y-6">
           <div class="border-b border-outline-variant/60 pb-5">
-            <p class="text-label-sm font-label-sm text-secondary uppercase tracking-wider font-semibold mb-1">Precio Oficial de Mostrador</p>
-            <div class="flex items-end gap-2 text-primary">
-              <span class="text-label-lg font-bold pb-1">S/</span>
-              <span class="text-display-lg font-display-lg leading-none">@Model.BasePrice.ToString("0.00")</span>
-            </div>
+            @{
+                decimal? promoPrice = ViewBag.PromoPrice as decimal?;
+                string? promoBadge = ViewBag.PromoBadge as string;
+            }
+            @if (promoPrice.HasValue)
+            {
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                        <span class="material-symbols-outlined text-[15px]">local_offer</span>
+                        <span>@(string.IsNullOrEmpty(promoBadge) ? "¡Oferta de Portada!" : promoBadge)</span>
+                    </span>
+                </div>
+                <p class="text-label-sm font-label-sm text-secondary uppercase tracking-wider font-semibold mb-1">Precio Promocional en Portada</p>
+                <div class="flex items-baseline gap-2 text-primary">
+                    <span class="text-label-lg font-bold pb-1">S/</span>
+                    <span class="text-display-lg font-display-lg leading-none font-black text-primary">@promoPrice.Value.ToString("0.00")</span>
+                    <span class="text-body-md text-on-surface-variant line-through ml-2">Antes S/ @Model.BasePrice.ToString("0.00")</span>
+                </div>
+            }
+            else
+            {
+                <p class="text-label-sm font-label-sm text-secondary uppercase tracking-wider font-semibold mb-1">Precio Oficial de Mostrador</p>
+                <div class="flex items-end gap-2 text-primary">
+                    <span class="text-label-lg font-bold pb-1">S/</span>
+                    <span class="text-display-lg font-display-lg leading-none">@Model.BasePrice.ToString("0.00")</span>
+                </div>
+            }
             <p class="text-xs text-outline font-medium mt-1">Por persona (No incluye IGV si requiere factura)</p>
           </div>
           <a asp-controller="Booking" asp-action="Checkout" asp-route-tourId="@Model.Id" class="w-full flex justify-center items-center gap-2 px-6 py-4 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg uppercase tracking-wider shadow-md active:scale-95 transition-all">

@@ -736,6 +736,9 @@ namespace SIGETOUR.API.Migrations
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("PromoBadge")
                         .IsRequired()
                         .HasColumnType("text");
