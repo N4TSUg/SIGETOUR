@@ -315,7 +315,7 @@ public sealed class CulqiPaymentsController : ControllerBase
                     phone_number = phone.StartsWith("+") ? phone : "+51" + phone
                 },
                 expiration_date = expUnix,
-                confirm = true, // Compatible con Checkout Custom: crea la orden en estado 'pending' para que pueda pagarse al instante
+                confirm = false, // Compatible con Culqi Checkout: orden creada sin confirmar (state: created) para que el modal de Culqi Checkout la confirme al pulsar 'Generar QR' sin error CCKT-408
                 metadata = new { booking_id = booking.Id.ToString(), attempt_id = attempt.Id.ToString() }
             }, ct);
 

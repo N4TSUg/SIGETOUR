@@ -1245,7 +1245,7 @@ namespace SIGETOUR.Tests.Payments
         }
 
         [Fact]
-        public async Task Prepare_WalletQr_CreatesOrderWithConfirmTrueAndExpiration_CompatibleWithCheckout()
+        public async Task Prepare_WalletQr_CreatesOrderWithConfirmFalseAndExpiration_CompatibleWithCheckout()
         {
             using var context = TestDbContextFactory.Create();
             var booking = new Booking
@@ -1290,8 +1290,8 @@ namespace SIGETOUR.Tests.Payments
 
             Assert.NotNull(capturedBody);
             using var doc = JsonDocument.Parse(capturedBody!);
-            // Compatible con Checkout Custom de Culqi (confirm = true genera orden en pending lista para cobro)
-            Assert.True(doc.RootElement.GetProperty("confirm").GetBoolean());
+            // Compatible con Culqi Checkout (confirm = false permite que CulqiCheckout confirme la orden al generar QR)
+            Assert.False(doc.RootElement.GetProperty("confirm").GetBoolean());
             Assert.True(doc.RootElement.GetProperty("expiration_date").GetInt64() > DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
             // Persistencia del expiration_date real en CulqiPayment
@@ -2063,7 +2063,7 @@ namespace SIGETOUR.Tests.Payments
         }
 
         [Fact]
-        public async Task Audit2_Prepare_WalletQr_SavesRealCulqiExpirationDate_AndEnforcesConfirmTrue()
+        public async Task Audit2_Prepare_WalletQr_SavesRealCulqiExpirationDate_AndEnforcesConfirmFalse()
         {
             // 2. Revisa la creación de órdenes QR con confirm = false y asegura que el estado sea compatible con el Checkout.
             // Guarda el expiration_date real de Culqi.
@@ -2106,10 +2106,10 @@ namespace SIGETOUR.Tests.Payments
             using var doc = JsonDocument.Parse(JsonSerializer.Serialize(okObj.Value));
             Assert.Equal(expectedRealUnix, doc.RootElement.GetProperty("expirationDateUnix").GetInt64());
 
-            // Verificar que se envió confirm = true para compatibilidad con Checkout
+            // Verificar que se envió confirm = false para compatibilidad con Checkout
             Assert.NotNull(sentOrderBody);
             using var sentDoc = JsonDocument.Parse(sentOrderBody!);
-            Assert.True(sentDoc.RootElement.GetProperty("confirm").GetBoolean());
+            Assert.False(sentDoc.RootElement.GetProperty("confirm").GetBoolean());
 
             // Verificar que se persistió el ExpirationDateUtc real en la base de datos
             var payment = await context.Set<CulqiPayment>().FirstOrDefaultAsync(p => p.BookingId == booking.Id);
