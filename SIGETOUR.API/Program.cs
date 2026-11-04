@@ -16,10 +16,70 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddControllersWithViews();
 
-// 1. Configuración de PostgreSQL con SplitQuery para evitar advertencias de colecciones relacionadas y producto cartesiano
+// Cargar variables de entorno desde .env.local o .env si existen (soporte nativo Neon Postgres)
+foreach (var searchDir in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory, Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..")), Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..")) })
+{
+    foreach (var envName in new[] { ".env.local", ".env" })
+    {
+        var filePath = Path.Combine(searchDir, envName);
+        if (File.Exists(filePath))
+        {
+            foreach (var line in File.ReadAllLines(filePath))
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
+                var parts = trimmed.Split('=', 2);
+                if (parts.Length == 2)
+                {
+                    var k = parts[0].Trim();
+                    var v = parts[1].Trim().Trim('"').Trim('\'');
+                    if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(k)))
+                    {
+                        Environment.SetEnvironmentVariable(k, v);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 1. Configuración de PostgreSQL (Neon Lakebase Postgres o local) con SplitQuery
+var rawConn = Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration["DATABASE_URL"]
+    ?? builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "";
+
+string effectiveConn = rawConn;
+if (effectiveConn.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+    effectiveConn.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+{
+    try
+    {
+        var uri = new Uri(effectiveConn);
+        var userInfo = uri.UserInfo.Split(':');
+        var username = Uri.UnescapeDataString(userInfo[0]);
+        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+        var database = uri.AbsolutePath.TrimStart('/');
+        var npgsqlBuilder = new Npgsql.NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 5432,
+            Database = string.IsNullOrEmpty(database) ? "neondb" : database,
+            Username = username,
+            Password = password,
+            SslMode = Npgsql.SslMode.Require
+        };
+        effectiveConn = npgsqlBuilder.ConnectionString;
+    }
+    catch
+    {
+        // En caso de fallo en parsing de URI, usar el valor raw
+    }
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
+        effectiveConn,
         npgsqlOptions => npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 // 2. Identity Configuration
