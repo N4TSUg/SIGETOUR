@@ -37,37 +37,79 @@
     margin: 8mm;
   }
   @@media print {
+    *, *::before, *::after {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
     html, body {
       margin: 0 !important;
       padding: 0 !important;
       background: white !important;
       color: black !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    body * {
-      visibility: hidden;
-    }
-    #print-voucher-area, #print-voucher-area * {
-      visibility: visible;
-    }
-    #print-voucher-area {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
       width: 100% !important;
-      max-width: 100% !important;
-      margin: 0 !important;
-      padding: 16px !important;
-      border: 1.5px solid #00685a !important;
-      border-radius: 10px !important;
-      box-shadow: none !important;
-      page-break-inside: avoid !important;
-      page-break-after: avoid !important;
-      page-break-before: avoid !important;
+      height: auto !important;
     }
     .no-print {
       display: none !important;
+    }
+    #print-voucher-area {
+      display: block !important;
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 auto !important;
+      padding: 0 !important;
+      border: 1.5px solid #00685a !important;
+      border-radius: 16px !important;
+      box-shadow: none !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      background: white !important;
+      overflow: hidden !important;
+    }
+    /* Disposición de 2 columnas fija para impresión idéntica a pantalla */
+    .print-voucher-body {
+      display: flex !important;
+      flex-direction: row !important;
+      gap: 16px !important;
+      padding: 16px !important;
+      align-items: stretch !important;
+      width: 100% !important;
+    }
+    .print-voucher-left {
+      width: 63% !important;
+      flex: 0 0 63% !important;
+      max-width: 63% !important;
+    }
+    .print-voucher-right {
+      width: 37% !important;
+      flex: 0 0 37% !important;
+      max-width: 37% !important;
+    }
+    .print-two-col {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 10px !important;
+    }
+    .print-three-col {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr 1fr !important;
+      gap: 10px !important;
+    }
+    .print-header-row {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+    }
+    .print-footer-row {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
     }
   }
 </style>
@@ -138,11 +180,11 @@
       </div>
     </div>
 
-    <!-- BOLETO OFICIAL DE VIAJE (DISEÑADO EXACTAMENTE PARA 1 HOJA A4 IMPRESA) -->
+    <!-- BOLETO / TICKET OFICIAL DE VIAJE (EXACTAMENTE EL FORMATO DE 2 COLUMNAS DE LA IMAGEN) -->
     <div class="bg-white rounded-2xl shadow-md border-2 border-primary/30 overflow-hidden mb-6" id="print-voucher-area">
       
-      <!-- 1. ENCABEZADO DEL BOLETO -->
-      <div class="bg-emerald-50/70 border-b border-primary/20 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <!-- 1. ENCABEZADO DEL TICKET -->
+      <div class="bg-emerald-50/70 border-b border-primary/20 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 print-header-row">
         <div class="flex items-center gap-3.5">
           <div class="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center font-bold shadow-xs shrink-0">
             <span class="material-symbols-outlined text-2xl">directions_bus</span>
@@ -164,11 +206,11 @@
         </div>
       </div>
 
-      <!-- 2. CUERPO PRINCIPAL DEL BOLETO (2 COLUMNAS COMPACTAS) -->
-      <div class="p-5 grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+      <!-- 2. CUERPO PRINCIPAL DEL TICKET (2 COLUMNAS INALTERABLES EN PANTALLA Y EN IMPRESIÓN/PDF) -->
+      <div class="p-5 flex flex-col md:flex-row gap-5 items-stretch print-voucher-body">
         
-        <!-- Lado Izquierdo (8 Columnas): Circuito, Fecha, Vehículo y Pasajeros -->
-        <div class="md:col-span-8 space-y-3.5">
+        <!-- Lado Izquierdo (63% Ancho): Circuito, Fecha, Vehículo y Pasajeros -->
+        <div class="w-full md:w-[63%] print-voucher-left space-y-3.5">
           
           <!-- Circuito Turístico -->
           <div class="bg-gray-50 rounded-xl p-3.5 border border-gray-200">
@@ -182,24 +224,24 @@
               </span>
             </div>
             
-            <div class="grid grid-cols-3 gap-3 pt-2.5 mt-2.5 border-t border-gray-200 text-xs">
+            <div class="grid grid-cols-3 print-three-col gap-3 pt-2.5 mt-2.5 border-t border-gray-200 text-xs">
               <div>
                 <span class="text-[10px] text-gray-500 block font-bold">Fecha del Viaje</span>
                 <span class="font-bold text-gray-900">@Model.TravelDate.ToString("dd/MM/yyyy")</span>
               </div>
               <div>
                 <span class="text-[10px] text-gray-500 block font-bold">Turno / Horario</span>
-                <span class="font-bold text-primary">@(string.IsNullOrWhiteSpace(Model.ShiftName) ? "Mañana (09:00 AM)" : Model.ShiftName)</span>
+                <span class="font-bold text-primary">@(string.IsNullOrWhiteSpace(Model.ShiftName) ? "Turno Mañana" : Model.ShiftName)</span>
               </div>
               <div>
                 <span class="text-[10px] text-gray-500 block font-bold">Duración</span>
-                <span class="font-semibold text-gray-800">@(tour?.Duration ?? "4 Horas aprox.")</span>
+                <span class="font-semibold text-gray-800">@(tour?.Duration ?? "4 Horas (Medio Día)")</span>
               </div>
             </div>
           </div>
 
-          <!-- Unidad y Embarque -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <!-- Unidad y Embarque (2 Columnas) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 print-two-col gap-3 text-xs">
             <div class="rounded-xl p-3 border border-gray-200 bg-white">
               <span class="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1">Unidad &amp; Flota Asignada</span>
               @if (Model.AssignedVehicle != null)
@@ -278,10 +320,10 @@
 
         </div>
 
-        <!-- Lado Derecho (4 Columnas): Verificación y Desglose Financiero -->
-        <div class="md:col-span-4 bg-gray-50 rounded-xl p-4 border border-gray-200 flex flex-col justify-between h-full space-y-4">
+        <!-- Lado Derecho (37% Ancho): Verificación y Desglose Financiero -->
+        <div class="w-full md:w-[37%] print-voucher-right bg-gray-50 rounded-xl p-4 border border-gray-200 flex flex-col justify-between space-y-4">
           
-          <!-- Verificación de Abordaje (Sin QR, exactamente 1 hoja) -->
+          <!-- Verificación de Abordaje (Caja punteada idéntica a la imagen) -->
           <div class="text-center bg-white p-3.5 rounded-xl border-2 border-dashed border-primary/40">
             <span class="text-[10px] uppercase font-bold text-gray-500 tracking-wider block">Verificación de Abordaje</span>
             <div class="w-10 h-10 rounded-full bg-primary/10 text-primary mx-auto my-1.5 flex items-center justify-center font-bold">
@@ -313,7 +355,7 @@
             }
             <div class="flex justify-between items-center text-gray-600">
               <span>Método:</span>
-              <span class="font-semibold text-gray-900">@(string.IsNullOrWhiteSpace(Model.PaymentMethod) ? "Yape / Transferencia" : Model.PaymentMethod)</span>
+              <span class="font-semibold text-gray-900">@(string.IsNullOrWhiteSpace(Model.PaymentMethod) ? "Culqi" : Model.PaymentMethod)</span>
             </div>
 
             <div class="bg-white p-2.5 rounded-xl border border-gray-200 flex justify-between items-center mt-2">
@@ -361,23 +403,23 @@
       </div>
 
       <!-- 3. FRANJA INFORMATIVA INFERIOR (1 SOLA HOJA CON TÉRMINOS ESENCIALES) -->
-      <div class="bg-gray-100/80 px-5 py-2.5 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between text-[11px] text-gray-600 gap-1.5">
+      <div class="bg-gray-100/80 px-5 py-2.5 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between text-[11px] text-gray-600 gap-1.5 print-footer-row">
         <span>Válido para la fecha y turno señalados. Presentar DNI físico 15 min antes del embarque. Cajamarca: 2,750 m.s.n.m. (llevar abrigo y calzado adecuado).</span>
         <span class="font-bold text-gray-900 shrink-0">Central: +51 901 195 392 / +51 944 746 364</span>
       </div>
 
     </div>
 
-    <!-- DISTINCIÓN DE DOCUMENTOS: VOUCHER TURÍSTICO DE ABORDAJE VS COMPROBANTE TRIBUTARIO -->
-    <div class="bg-white border border-outline-variant/60 rounded-2xl p-4 mb-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+    <!-- DISTINCIÓN DE DOCUMENTOS: VOUCHER TURÍSTICO DE ABORDAJE VS COMPROBANTE TRIBUTARIO (NO-PRINT) -->
+    <div class="no-print bg-white border border-outline-variant/60 rounded-2xl p-4 mb-6 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
       <div class="flex items-start gap-3">
         <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
           <span class="material-symbols-outlined text-2xl">verified</span>
         </div>
         <div>
-          <h4 class="text-label-lg font-bold text-on-surface">Distinción de Documentos: Boleto de Abordaje vs Comprobante Tributario</h4>
+          <h4 class="text-label-lg font-bold text-on-surface">Distinción de Documentos: Ticket de Abordaje vs Comprobante Tributario</h4>
           <p class="text-xs text-secondary mt-0.5">
-            El <strong>Boleto Oficial de Viaje</strong> (hoja superior) acredita tu reserva e itinerario de viaje.
+            El <strong>Ticket Oficial de Viaje</strong> (hoja superior) acredita tu reserva e itinerario de viaje.
             @if (hasValidReceipt)
             {
               <span>Tu <strong>@receipt!.ReceiptType Electrónica (@receipt.FullNumber)</strong> está disponible para descarga oficial.</span>
@@ -390,15 +432,11 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <a asp-controller="Booking" asp-action="Ticket" asp-route-id="@Model.Id" target="_blank" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs" title="Imprimir ticket térmico POS">
-          <span class="material-symbols-outlined text-[16px]">receipt</span>
-          <span>Ticket POS</span>
-        </a>
         @if (hasExternalPdf)
         {
-          <a href="@receipt!.PdfUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs">
+          <a href="@receipt!.PdfUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95">
             <span class="material-symbols-outlined text-[16px]">download</span>
-            <span>PDF @receipt.ReceiptType</span>
+            <span>Descargar Boleta (PDF)</span>
           </a>
         }
       </div>
