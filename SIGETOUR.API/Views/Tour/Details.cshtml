@@ -27,23 +27,25 @@
     </div>
   </section>
 
-  <section class="grid grid-cols-1 md:grid-cols-4 gap-3 h-auto rounded-xl overflow-hidden shadow-sm">
+  <section class="grid grid-cols-1 md:grid-cols-4 gap-2 sm:gap-3 rounded-2xl overflow-hidden shadow-sm">
     @if (Model.Images != null && Model.Images.Any())
     {
         var mainImage = Model.Images.FirstOrDefault(i => i.IsMain) ?? Model.Images.First();
-        <div class="md:col-span-2 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[280px]">
+        <div class="md:col-span-2 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[220px] sm:min-h-[280px]">
           <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage.ImageUrl" alt="@Model.Title"/>
         </div>
-        @foreach (var img in Model.Images.Where(i => i.Id != mainImage.Id))
+        <div class="grid grid-cols-3 md:contents gap-2">
+        @foreach (var img in Model.Images.Where(i => i.Id != mainImage.Id).Take(3))
         {
-          <div class="relative group overflow-hidden bg-surface-variant min-h-[160px]">
+          <div class="relative group overflow-hidden bg-surface-variant h-20 sm:h-28 md:min-h-[160px] rounded-lg md:rounded-none">
             <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@img.ImageUrl" alt="Foto adicional"/>
           </div>
         }
+        </div>
     }
     else
     {
-        <div class="md:col-span-4 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[280px] flex items-center justify-center text-on-surface-variant">
+        <div class="md:col-span-4 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[220px] flex items-center justify-center text-on-surface-variant">
             <span class="text-headline-md font-bold">Sin imágenes referenciales</span>
         </div>
     }
@@ -282,6 +284,25 @@
         </div>
       </div>
     </aside>
+  </div>
+
+  <!-- MOBILE STICKY BOOKING BAR (Activo únicamente en celulares) -->
+  <div class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-outline-variant p-3 px-4 flex items-center justify-between shadow-2xl">
+    <div>
+      <span class="text-[10px] text-secondary font-bold uppercase tracking-wider block">Tarifa por Pasajero</span>
+      <div class="flex items-baseline gap-1">
+        <span class="text-xs font-bold text-primary">S/</span>
+        <span class="text-xl font-black text-primary">@((ViewBag.PromoPrice as decimal?)?.ToString("0.00") ?? Model.BasePrice.ToString("0.00"))</span>
+        @if (ViewBag.PromoPrice != null)
+        {
+          <span class="text-xs text-outline line-through">S/ @Model.BasePrice.ToString("0.00")</span>
+        }
+      </div>
+    </div>
+    <a asp-controller="Booking" asp-action="Checkout" asp-route-tourId="@Model.Id" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-container text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 transition-all">
+      <span class="material-symbols-outlined text-[18px]">how_to_reg</span>
+      <span>Reservar</span>
+    </a>
   </div>
 </main>
 

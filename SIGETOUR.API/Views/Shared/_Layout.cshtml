@@ -1,4 +1,4 @@
-<!DOCTYPE html><html class="scroll-smooth" lang="es" style=""><head>
+<!DOCTYPE html><html class="scroll-smooth overflow-x-hidden" lang="es"><head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
 <title>TURISMO CHILON Transporte &amp; Turismo | Agencia Oficial Cajamarca</title>
@@ -86,7 +86,7 @@
   </style>
 <link rel="icon" type="image/png" href="~/favicon.ico" />
 </head>
-<body class="bg-[#f0fdf9] text-on-surface font-body-md text-[15px] antialiased min-h-screen flex flex-col selection:bg-primary selection:text-on-primary">
+<body class="bg-[#f0fdf9] text-on-surface font-body-md text-[15px] antialiased min-h-screen flex flex-col selection:bg-primary selection:text-on-primary overflow-x-hidden">
 <!-- Top Announcement Bar (Trust & Exact Card Contact Díata) -->
 <div class="no-print bg-secondary text-surface-container-lowest py-2 px-4 text-xs font-medium border-b border-primary/20">
 <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
@@ -172,10 +172,16 @@
       <a class="block py-2 @(isFleet ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Vehicle" asp-action="Catalog">Flota Turística</a>
       <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#testimonios" : "/#testimonios")">Nosotros</a>
       <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#contacto" : "/#contacto")">Contacto</a>
+      <div class="pt-2 border-t border-outline-variant/60">
+        <a class="w-full bg-primary hover:bg-primary-dark text-white font-bold py-2.5 rounded-xl shadow-xs text-center text-sm flex items-center justify-center gap-2" asp-controller="Tour" asp-action="Catalog">
+          <span class="material-symbols-outlined text-[18px]">book_online</span>
+          <span>Reservar un Tour Ahora</span>
+        </a>
+      </div>
   </div>
 </div>
 </header>
-<main>
+<main class="flex-grow pb-16 md:pb-0">
     @RenderBody()
 </main>
 <footer id="site-footer" class="no-print bg-secondary text-surface-container-high/90 border-t border-primary/20">
@@ -264,7 +270,7 @@
 </div>
 </footer>
 <!-- Floating WhatsApp Action Button -->
-<aside class="no-print fixed bottom-6 right-6 z-50 flex items-center gap-3">
+<aside class="no-print hidden md:flex fixed bottom-6 right-6 z-50 items-center gap-3">
 <a aria-label="Hablar por WhatsApp con Turismo Chilón" class="bg-[#25D366] hover:bg-[#1EBE5D] text-white px-4 py-3 rounded-full shadow-2xl flex items-center gap-2.5 font-bold text-xs sm:text-sm transition-transform duration-200 hover:scale-105" href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20hacer%20una%20consulta" rel="noopener noreferrer" target="_blank">
 <span class="material-symbols-outlined text-2xl" data-icon="chat">chat</span>
 <span class="">WhatsApp: +51 901 195 392</span>

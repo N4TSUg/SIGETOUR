@@ -76,7 +76,19 @@
             <input type="hidden" id="tour-price" value="@effectiveUnitPrice" />
 
             <!-- FORM COLUMN (LEFT - 8 cols) -->
-            <div class="lg:col-span-8 space-y-8">
+            <div class="lg:col-span-8 space-y-6 md:space-y-8">
+
+                <!-- Mobile Tour Summary Banner -->
+                <div class="lg:hidden bg-surface-container-lowest rounded-xl p-4 border border-primary/20 shadow-xs flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] text-primary font-bold uppercase tracking-wider block">Tour Seleccionado</span>
+                        <h3 class="text-sm font-bold text-on-surface">@Model.Title</h3>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-secondary block">Tarifa base</span>
+                        <span class="text-sm font-extrabold text-primary">S/ @effectiveUnitPrice.ToString("0.00")</span>
+                    </div>
+                </div>
                 
                 <!-- SECTION 1: FECHA Y TURNO -->
                 <div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-6 relative overflow-hidden">

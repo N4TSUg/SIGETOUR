@@ -89,10 +89,20 @@
 </div>
 </section>
 <!-- CATALOG MAIN LAYOUT: Sticky Sidebar Filters + Tour Cards Grid -->
-<div class="max-w-7xl mx-auto px-4 md:px-8 py-10" id="catalogo">
+<div class="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-10" id="catalogo">
+<!-- Mobile Filters Toggle Button -->
+<div class="lg:hidden mb-4">
+  <button type="button" onclick="const f = document.getElementById('catalog-filters-drawer'); f.classList.toggle('hidden'); const isH = f.classList.contains('hidden'); document.getElementById('filter-toggle-icon').textContent = isH ? 'expand_more' : 'expand_less';" class="w-full py-3 px-4 bg-surface-container-lowest border border-primary/30 rounded-xl shadow-xs text-primary font-bold text-sm flex items-center justify-between active:scale-[0.99] transition-all">
+    <span class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-lg">tune</span>
+      <span>Filtrar Circuitos (@Model.Count() tours)</span>
+    </span>
+    <span class="material-symbols-outlined text-lg" id="filter-toggle-icon">expand_more</span>
+  </button>
+</div>
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 <!-- LEFT COLUMN: Advanced Filters Sidebar -->
-<aside class="lg:col-span-4 xl:col-span-3 sticky top-24 bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant shadow-sm">
+<aside id="catalog-filters-drawer" class="hidden lg:block lg:col-span-4 xl:col-span-3 sticky top-24 bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant shadow-sm mb-6 lg:mb-0">
 <div class="flex items-center justify-between pb-4 border-b border-outline-variant/60">
 <div class="flex items-center gap-2 text-inverse-surface font-title-sm">
 <span class="material-symbols-outlined text-primary text-[22px]">tune</span>

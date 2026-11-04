@@ -212,6 +212,24 @@
       <!-- LEFT COLUMN: Payment Methods & Options -->
       <div class="lg:col-span-7 space-y-6">
 
+        <!-- MOBILE SUMMARY BANNER -->
+        <div class="lg:hidden bg-surface-container-lowest p-4 rounded-xl border border-primary/25 shadow-xs flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-xl">tour</span>
+            </div>
+            <div>
+              <span class="text-[10px] text-primary uppercase font-bold tracking-wider block">Tour a Pagar</span>
+              <h3 class="text-sm font-bold text-inverse-surface leading-tight">@tourTitle</h3>
+              <span class="text-xs text-secondary">@Model.TravelDate.ToString("dd/MM/yyyy") • @Model.TotalPassengers persona(s)</span>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] text-secondary block">Total</span>
+            <span class="text-base font-black text-primary">S/ @Model.TotalAmount.ToString("N2")</span>
+          </div>
+        </div>
+
         <!-- 1. PAYMENT MODALITY SELECTION -->
         <section class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/40 shadow-xs">
           <div class="flex items-center justify-between mb-4">
