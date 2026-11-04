@@ -88,7 +88,7 @@
 </head>
 <body class="bg-[#f0fdf9] text-on-surface font-body-md text-[15px] antialiased min-h-screen flex flex-col selection:bg-primary selection:text-on-primary">
 <!-- Top Announcement Bar (Trust & Exact Card Contact Díata) -->
-<div class="bg-secondary text-surface-container-lowest py-2 px-4 text-xs font-medium border-b border-primary/20">
+<div class="no-print bg-secondary text-surface-container-lowest py-2 px-4 text-xs font-medium border-b border-primary/20">
 <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
 <div class="flex items-center gap-3 flex-wrap">
 <span class="inline-flex items-center gap-1.5 font-semibold text-primary-light">
@@ -113,7 +113,7 @@
 </div>
 </div>
 <!-- Header / Navigation with Exact Logo Brand Identity -->
-<header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-outline-variant transition-all">
+<header class="no-print sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-outline-variant transition-all">
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
 <!-- Brand Logo matching Business Card -->
 <a class="flex items-center gap-3 group py-2" asp-controller="Home" asp-action="Index">
@@ -178,7 +178,7 @@
 <main>
     @RenderBody()
 </main>
-<footer id="site-footer" class="bg-secondary text-surface-container-high/90 border-t border-primary/20">
+<footer id="site-footer" class="no-print bg-secondary text-surface-container-high/90 border-t border-primary/20">
 <div class="w-full py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 pb-10 border-b border-surface-container-high/15">
 <!-- Col 1: Brand -->
@@ -264,14 +264,14 @@
 </div>
 </footer>
 <!-- Floating WhatsApp Action Button -->
-<aside class="fixed bottom-6 right-6 z-50 flex items-center gap-3">
+<aside class="no-print fixed bottom-6 right-6 z-50 flex items-center gap-3">
 <a aria-label="Hablar por WhatsApp con Turismo Chilón" class="bg-[#25D366] hover:bg-[#1EBE5D] text-white px-4 py-3 rounded-full shadow-2xl flex items-center gap-2.5 font-bold text-xs sm:text-sm transition-transform duration-200 hover:scale-105" href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20hacer%20una%20consulta" rel="noopener noreferrer" target="_blank">
 <span class="material-symbols-outlined text-2xl" data-icon="chat">chat</span>
 <span class="">WhatsApp: +51 901 195 392</span>
 </a>
 </aside>
 <!-- Mobile Bottom Sticky Quick Action Bar -->
-<div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white p-2.5 border-t border-outline-variant flex items-center justify-between gap-3 shadow-2xl">
+<div class="no-print md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white p-2.5 border-t border-outline-variant flex items-center justify-between gap-3 shadow-2xl">
 <a class="flex-1 py-2.5 rounded-lg border border-secondary text-secondary font-bold text-center text-xs flex items-center justify-center gap-1.5" href="tel:+51944746364">
 <span class="material-symbols-outlined text-[17px]" data-icon="call">call</span>
     Llamar
