@@ -85,6 +85,31 @@ namespace SIGETOUR.API.Controllers.UI
             return View(tours);
         }
 
+        [HttpGet]
+        public async Task<IActionResult> Nosotros()
+        {
+            ViewBag.ActiveToursCount = await _context.TourPackages.CountAsync(t => t.IsActive);
+            ViewBag.ActiveVehiclesCount = await _context.Vehicles.CountAsync(v => v.IsActive);
+            
+            var reviews = await _context.TourReviews
+                .Include(r => r.TourPackage)
+                .Where(r => r.IsApproved && r.IsVisibleOnHome)
+                .OrderByDescending(r => r.CreatedAt)
+                .Take(3)
+                .ToListAsync();
+            ViewBag.Reviews = reviews;
+
+            var vehicles = await _context.Vehicles
+                .Include(v => v.Images)
+                .Where(v => v.IsActive)
+                .OrderByDescending(v => v.SeatCapacity)
+                .Take(2)
+                .ToListAsync();
+            ViewBag.Vehicles = vehicles;
+
+            return View();
+        }
+
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
