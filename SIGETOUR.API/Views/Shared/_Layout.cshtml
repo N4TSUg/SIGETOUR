@@ -1,3 +1,4 @@
+@inject SIGETOUR.API.Application.Interfaces.IVisitorCounterService VisitorService
 <!DOCTYPE html><html class="scroll-smooth overflow-x-hidden" lang="es"><head>
 <meta charset="utf-8">
 <meta content="width=device-width, initial-scale=1.0" name="viewport">
@@ -260,11 +261,15 @@
 <!-- Bottom Line -->
 <div class="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-surface-container-high/60">
 <p class="">© 2025 <span class="font-bold text-white/90">TURISMO CHILON</span> Transporte &amp; Turismo • Cajamarca, Perú</p>
-<div class="flex items-center gap-4">
-<span class="flex items-center gap-1 text-primary-light">
-<span class="material-symbols-outlined text-[15px]" data-icon="lock">lock</span>
-        Atención y Reservas Garantizadas
-      </span>
+<div class="flex flex-wrap items-center gap-3">
+  <span class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-white/90 border border-white/15 text-xs font-semibold" title="Total de visitas registradas en el portal">
+    <span class="material-symbols-outlined text-[15px] text-emerald-400">visibility</span>
+    <span>Visitantes Web: <strong class="text-white font-mono">@VisitorService.GetStats().TotalVisits.ToString("N0")</strong></span>
+  </span>
+  <span class="flex items-center gap-1 text-primary-light">
+    <span class="material-symbols-outlined text-[15px]" data-icon="lock">lock</span>
+    Atención y Reservas Garantizadas
+  </span>
 </div>
 </div>
 </div>

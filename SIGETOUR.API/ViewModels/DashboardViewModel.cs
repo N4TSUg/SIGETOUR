@@ -21,6 +21,15 @@ namespace SIGETOUR.API.ViewModels
         public decimal TodayIncome { get; set; }
         public decimal TodayPending { get; set; }
 
+        // Próximas Salidas & Pasajeros
+        public int UpcomingPassengersCount { get; set; }
+        public int UpcomingDeparturesCount { get; set; }
+        public string? NextDepartureDateText { get; set; }
+
+        // Contador de Visitas a la Web
+        public long TotalSiteVisits { get; set; }
+        public long TodaySiteVisits { get; set; }
+
         // Tablero de Despacho en Vivo de Hoy
         public List<DashboardDepartureItem> Departures { get; set; } = new();
 

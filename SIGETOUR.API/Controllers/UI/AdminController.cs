@@ -26,6 +26,7 @@ namespace SIGETOUR.API.Controllers.UI
         private readonly IWebHostEnvironment _env;
         private readonly IManifestExportService _manifestService;
         private readonly ICashReportExportService _cashReportService;
+        private readonly SIGETOUR.API.Application.Interfaces.IVisitorCounterService _visitorCounterService;
 
         public AdminController(
             AppDbContext context, 
@@ -33,7 +34,8 @@ namespace SIGETOUR.API.Controllers.UI
             RoleManager<IdentityRole> roleManager,
             IWebHostEnvironment env, 
             IManifestExportService manifestService,
-            ICashReportExportService cashReportService)
+            ICashReportExportService cashReportService,
+            SIGETOUR.API.Application.Interfaces.IVisitorCounterService visitorCounterService)
         {
             _context = context;
             _userManager = userManager;
@@ -41,6 +43,7 @@ namespace SIGETOUR.API.Controllers.UI
             _env = env;
             _manifestService = manifestService;
             _cashReportService = cashReportService;
+            _visitorCounterService = visitorCounterService;
         }
 
         public async Task<IActionResult> Dashboard()
@@ -74,13 +77,11 @@ namespace SIGETOUR.API.Controllers.UI
             ).ToList();
 
             var todayPax = todayBookings.Sum(b => b.TotalPassengers);
+            var upcomingBookings = allActiveBookings.Where(b => b.TravelDate.Date > todayPeru).OrderBy(b => b.TravelDate).ToList();
+            var upcomingPax = upcomingBookings.Sum(b => b.TotalPassengers);
+
             var totalDailyCapacity = vehicles.Where(v => v.IsActive).Sum(v => v.SeatCapacity);
             if (totalDailyCapacity <= 0) totalDailyCapacity = Math.Max(20, vehiclesCount * 18);
-            if (todayPax == 0 && allActiveBookings.Any())
-            {
-                // Si para hoy exacto no hay reservas programadas, reflejar el total de pasajeros de las reservas activas
-                todayPax = allActiveBookings.Sum(b => b.TotalPassengers);
-            }
             var occupancyRate = totalDailyCapacity > 0 ? (int)Math.Min(100, Math.Round((double)todayPax / totalDailyCapacity * 100)) : 0;
 
             // Recaudación del día (Caja / Reservas)
@@ -92,15 +93,7 @@ namespace SIGETOUR.API.Controllers.UI
             {
                 todayIncome = todayBookings.Sum(b => b.PaidAmount);
             }
-            if (todayIncome == 0 && allActiveBookings.Any())
-            {
-                todayIncome = allActiveBookings.Sum(b => b.PaidAmount);
-            }
             var todayPending = todayBookings.Sum(b => Math.Max(0, b.TotalAmount - b.PaidAmount));
-            if (todayPending == 0 && allActiveBookings.Any())
-            {
-                todayPending = allActiveBookings.Sum(b => Math.Max(0, b.TotalAmount - b.PaidAmount));
-            }
 
             // Alertas Regulatorias y de Flota (SOAT y CITV a 30 días)
             var fleetAlerts = new List<FleetAlertItem>();
@@ -187,7 +180,8 @@ namespace SIGETOUR.API.Controllers.UI
             // Tablero de Salidas y Despacho en Vivo con Datos Reales
             // REGLA OPERATIVA: Solo deben figurar las salidas que cuentan con pasajeros reservados
             var departures = new List<DashboardDepartureItem>();
-            var relevantBookings = todayBookings.Any() ? todayBookings : allActiveBookings;
+            var relevantBookings = allActiveBookings.Where(b => b.TravelDate.Date >= todayPeru).ToList();
+            if (!relevantBookings.Any()) relevantBookings = allActiveBookings;
 
             var tourIdsWithBookings = relevantBookings
                 .SelectMany(b => b.Items)
@@ -293,6 +287,13 @@ namespace SIGETOUR.API.Controllers.UI
                 .Take(5)
                 .ToListAsync();
 
+            var todayDeparturesCount = departures.Count(d => d.DepartureDate.Date == todayPeru);
+            var upcomingDeparturesCount = departures.Count(d => d.DepartureDate.Date > todayPeru);
+            var nextDeparture = departures.FirstOrDefault(d => d.DepartureDate.Date > todayPeru);
+            var nextDepartureDateText = nextDeparture != null ? nextDeparture.FormattedDate : null;
+
+            var visitorStats = _visitorCounterService.GetStats();
+
             var vm = new DashboardViewModel
             {
                 TotalTours = toursCount,
@@ -303,7 +304,12 @@ namespace SIGETOUR.API.Controllers.UI
                 TodayPassengers = todayPax,
                 TotalDailyCapacity = totalDailyCapacity,
                 OccupancyPercentage = occupancyRate,
-                TodayDeparturesCount = departures.Count,
+                TodayDeparturesCount = todayDeparturesCount,
+                UpcomingPassengersCount = upcomingPax,
+                UpcomingDeparturesCount = upcomingDeparturesCount,
+                NextDepartureDateText = nextDepartureDateText,
+                TotalSiteVisits = visitorStats.TotalVisits,
+                TodaySiteVisits = visitorStats.TodayVisits,
                 TodayIncome = todayIncome,
                 TodayPending = todayPending,
                 Departures = departures,
@@ -2757,6 +2763,69 @@ namespace SIGETOUR.API.Controllers.UI
             });
 
             return Json(new { bookings, tours, vehicles });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetNotifications()
+        {
+            var peruNow = DateTime.UtcNow.AddHours(-5);
+            var todayPeru = peruNow.Date;
+
+            // 1. Reservas recientes (últimas 5)
+            var recentBookings = await _context.Bookings
+                .Include(b => b.Items).ThenInclude(i => i.TourPackage)
+                .OrderByDescending(b => b.BookingDate)
+                .Take(5)
+                .Select(b => new {
+                    id = b.Id,
+                    type = "booking",
+                    title = $"Reserva {b.ReferenceCode}",
+                    detail = $"{b.CustomerName} • {b.TotalPassengers} pax • S/ {b.TotalAmount:F2}",
+                    date = b.BookingDate.ToString("dd/MM/yyyy HH:mm"),
+                    url = $"/Admin/EditBooking/{b.Id}",
+                    badge = b.Status.ToString()
+                })
+                .ToListAsync();
+
+            // 2. Alertas de salidas próximas sin asignación
+            var unassignedDepartures = await _context.Bookings
+                .Include(b => b.Items).ThenInclude(i => i.TourPackage)
+                .Where(b => b.Status != BookingStatus.Cancelled && b.TravelDate.Date >= todayPeru && b.TravelDate.Date <= todayPeru.AddDays(2))
+                .Where(b => b.AssignedVehicleId == null || b.AssignedDriverId == null)
+                .Take(3)
+                .Select(b => new {
+                    id = b.Id,
+                    type = "alert",
+                    title = $"Salida sin asignación: {b.ReferenceCode}",
+                    detail = $"{b.ShiftName} • {b.TravelDate:dd MMM} • {(b.Items.FirstOrDefault() != null && b.Items.FirstOrDefault()!.TourPackage != null ? b.Items.FirstOrDefault()!.TourPackage!.Title : "Circuito")}",
+                    date = "Pendiente de asignar van o conductor",
+                    url = "/Admin/Despacho",
+                    badge = "Despacho"
+                })
+                .ToListAsync();
+
+            // 3. Alertas de SOAT / CITV a 30 días
+            var nowUtc = DateTime.UtcNow;
+            var fleetAlerts = await _context.Vehicles
+                .Where(v => v.IsActive && ((v.SoatExpiryDate != null && v.SoatExpiryDate <= nowUtc.AddDays(30)) || (v.CitvExpiryDate != null && v.CitvExpiryDate <= nowUtc.AddDays(30))))
+                .Take(2)
+                .Select(v => new {
+                    id = v.Id,
+                    type = "fleet",
+                    title = $"Documentación: {v.LicensePlate}",
+                    detail = $"{v.Model} • Revisar póliza SOAT / CITV",
+                    date = "Revisión preventiva SUTRAN",
+                    url = "/Admin/Fleet",
+                    badge = "MTC"
+                })
+                .ToListAsync();
+
+            var allNotifs = new List<object>();
+            allNotifs.AddRange(unassignedDepartures);
+            allNotifs.AddRange(fleetAlerts);
+            allNotifs.AddRange(recentBookings);
+
+            return Json(new { count = allNotifs.Count, notifications = allNotifs });
         }
 
         [HttpGet]

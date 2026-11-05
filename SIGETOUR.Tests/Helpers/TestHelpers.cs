@@ -95,6 +95,7 @@ namespace SIGETOUR.Tests.Helpers
             Mock<IWebHostEnvironment>? env = null,
             Mock<IManifestExportService>? manifestService = null,
             Mock<ICashReportExportService>? cashReportService = null,
+            Mock<SIGETOUR.API.Application.Interfaces.IVisitorCounterService>? visitorCounterService = null,
             string currentUserId = "current-admin-id",
             string currentUserName = "admin@sigetour.com")
         {
@@ -103,6 +104,8 @@ namespace SIGETOUR.Tests.Helpers
             env ??= CreateMockEnvironment();
             manifestService ??= new Mock<IManifestExportService>();
             cashReportService ??= new Mock<ICashReportExportService>();
+            visitorCounterService ??= new Mock<SIGETOUR.API.Application.Interfaces.IVisitorCounterService>();
+            visitorCounterService.Setup(v => v.GetStats()).Returns((100, 10));
 
             var controller = new AdminController(
                 context,
@@ -110,7 +113,8 @@ namespace SIGETOUR.Tests.Helpers
                 roleManager.Object,
                 env.Object,
                 manifestService.Object,
-                cashReportService.Object);
+                cashReportService.Object,
+                visitorCounterService.Object);
 
             var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
             {

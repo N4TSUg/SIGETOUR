@@ -166,6 +166,7 @@ builder.Services.AddScoped<ICashReportExportService, CashReportExportService>();
 builder.Services.AddSingleton<CheckoutAccess>();
 builder.Services.AddHttpClient<CulqiApiClient>();
 builder.Services.AddHttpClient<SIGETOUR.API.Application.Invoicing.IElectronicReceiptService, SIGETOUR.API.Application.Invoicing.NubefactInvoiceService>();
+builder.Services.AddSingleton<SIGETOUR.API.Application.Interfaces.IVisitorCounterService, SIGETOUR.API.Application.Services.VisitorCounterService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -725,6 +726,13 @@ app.UseStaticFiles();
 
 app.UseRouting();
 app.UseSession();
+
+app.Use(async (context, next) =>
+{
+    var visitorService = context.RequestServices.GetService<SIGETOUR.API.Application.Interfaces.IVisitorCounterService>();
+    visitorService?.TrackVisit(context);
+    await next();
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
