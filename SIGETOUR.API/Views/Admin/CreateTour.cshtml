@@ -3,7 +3,7 @@
     Layout = "_AdminLayout";
     ViewData["Title"] = "Crear Tour";
 }
-<main class="flex-1 overflow-y-auto bg-surface p-4 lg:p-6"><form method="post" enctype="multipart/form-data" action="@(Model.Id == Guid.Empty ? "/Admin/CreateTour" : "/Admin/EditTour")"><input type="hidden" asp-for="Id" /><input type="hidden" asp-for="Slug" /><input type="hidden" name="SelectedMainImageId" id="SelectedMainImageId" value="@(Model.ExistingImages?.FirstOrDefault(i => i.IsMain)?.Id)" />
+<main class="flex-1 overflow-y-auto bg-surface p-4 lg:p-6"><form method="post" enctype="multipart/form-data" action="@(Model.Id == Guid.Empty ? "/Admin/CreateTour" : $"/Admin/EditTour/{Model.Id}")"><input type="hidden" asp-for="Id" /><input type="hidden" asp-for="Slug" /><input type="hidden" name="SelectedMainImageId" id="SelectedMainImageId" value="@(Model.ExistingImages?.FirstOrDefault(i => i.IsMain)?.Id)" />
 <!-- Top Action Title Bar with Quick Breadcrumbs -->
 <div class="max-w-7xl mx-auto space-y-6">
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-outline-variant/60">

@@ -1610,6 +1610,40 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> EditTour(SIGETOUR.API.Models.TourPackageDto dto, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds, Guid? SelectedMainImageId = null)
         {
+            // Respaldo para resolver el Id en caso de que en la ruta o formulario viniera como slug
+            if (dto.Id == Guid.Empty)
+            {
+                var formId = Request?.HasFormContentType == true ? Request.Form["Id"].ToString() : null;
+                if (Guid.TryParse(formId, out var parsedFormGuid))
+                {
+                    dto.Id = parsedFormGuid;
+                }
+                else
+                {
+                    var routeId = RouteData?.Values["id"]?.ToString();
+                    if (Guid.TryParse(routeId, out var parsedRouteGuid))
+                    {
+                        dto.Id = parsedRouteGuid;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(routeId))
+                    {
+                        var cleanSlug = routeId.Trim().ToLower();
+                        var existingBySlug = await _context.TourPackages.FirstOrDefaultAsync(t => t.Slug.ToLower() == cleanSlug || t.Title.ToLower() == cleanSlug);
+                        if (existingBySlug != null)
+                        {
+                            dto.Id = existingBySlug.Id;
+                        }
+                    }
+                }
+            }
+
+            // Si el Id ya está determinado, eliminar errores automáticos de conversión del parámetro "id" de ruta
+            if (dto.Id != Guid.Empty)
+            {
+                if (ModelState.ContainsKey("id")) ModelState.Remove("id");
+                if (ModelState.ContainsKey("Id")) ModelState.Remove("Id");
+            }
+
             if (!ModelState.IsValid)
             {
                 ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
@@ -1628,6 +1662,7 @@ namespace SIGETOUR.API.Controllers.UI
                         dto.ExistingInclusions = existingTour.Inclusions;
                         dto.ExistingShifts = existingTour.Shifts;
                         dto.ExistingItineraryStops = existingTour.ItineraryStops;
+                        if (string.IsNullOrWhiteSpace(dto.Title)) dto.Title = existingTour.Title;
                     }
                 }
                 return View("CreateTour", dto);
@@ -2916,7 +2951,7 @@ namespace SIGETOUR.API.Controllers.UI
                 title = t.Title,
                 price = t.BasePrice,
                 image = t.Images.FirstOrDefault(i => i.IsMain)?.ImageUrl ?? t.Images.FirstOrDefault()?.ImageUrl ?? "/images/placeholder.jpg",
-                url = Url.Action("EditTour", "Admin", new { id = !string.IsNullOrWhiteSpace(t.Slug) ? t.Slug : t.Id.ToString() })
+                url = Url.Action("EditTour", "Admin", new { id = t.Id })
             });
 
             var rawVehicles = await _context.Vehicles
