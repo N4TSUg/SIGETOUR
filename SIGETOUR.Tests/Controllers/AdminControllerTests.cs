@@ -161,6 +161,62 @@ namespace SIGETOUR.Tests.Controllers
         }
 
         [Fact]
+        public async Task EditTour_Get_WithSlug_ReturnsView_WithTourDto()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = TestHelpers.CreateAdminController(context);
+
+            var tour = context.TourPackages.First();
+
+            // Act
+            var result = await controller.EditTour(tour.Slug);
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            Assert.Equal("CreateTour", viewResult.ViewName);
+            var model = Assert.IsType<TourPackageDto>(viewResult.Model);
+            Assert.Equal(tour.Id, model.Id);
+            Assert.Equal(tour.Title, model.Title);
+            Assert.Equal(tour.Slug, model.Slug);
+        }
+
+        [Fact]
+        public async Task EditTour_Get_WithGuid_RedirectsToSlug_WhenSlugExists()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = TestHelpers.CreateAdminController(context);
+
+            var tour = context.TourPackages.First();
+
+            // Act
+            var result = await controller.EditTour(tour.Id.ToString());
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("EditTour", redirectResult.ActionName);
+            Assert.Equal(tour.Slug, redirectResult.RouteValues?["id"]);
+        }
+
+        [Fact]
+        public async Task EditTour_Get_WithNonExistentIdentifier_ReturnsNotFound()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.EditTour("slug-no-existente-xyz");
+
+            // Assert
+            Assert.IsType<NotFoundResult>(result);
+        }
+
+        [Fact]
         public async Task Fleet_ReturnsView_WithVehicleList()
         {
             // Arrange

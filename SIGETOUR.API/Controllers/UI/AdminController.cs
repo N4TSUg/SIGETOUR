@@ -1505,17 +1505,51 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        public async Task<IActionResult> EditTour(Guid id)
+        public async Task<IActionResult> EditTour(string id)
         {
-            var tour = await _context.TourPackages
-                .Include(t => t.Category)
-                .Include(t => t.Images)
-                .Include(t => t.Inclusions)
-                .Include(t => t.ItineraryStops)
-                .Include(t => t.Shifts)
-                .FirstOrDefaultAsync(t => t.Id == id);
+            if (string.IsNullOrWhiteSpace(id)) return NotFound();
+
+            TourPackage? tour = null;
+            bool searchedByGuid = Guid.TryParse(id, out var guidId);
+            if (searchedByGuid)
+            {
+                tour = await _context.TourPackages
+                    .Include(t => t.Category)
+                    .Include(t => t.Images)
+                    .Include(t => t.Inclusions)
+                    .Include(t => t.ItineraryStops)
+                    .Include(t => t.Shifts)
+                    .FirstOrDefaultAsync(t => t.Id == guidId);
+            }
+
+            if (tour == null)
+            {
+                var normalized = id.Trim().ToLower();
+                var cleanSlug = System.Text.RegularExpressions.Regex.Replace(normalized, @"[^a-z0-9\-]", "-").Trim('-');
+                tour = await _context.TourPackages
+                    .Include(t => t.Category)
+                    .Include(t => t.Images)
+                    .Include(t => t.Inclusions)
+                    .Include(t => t.ItineraryStops)
+                    .Include(t => t.Shifts)
+                    .FirstOrDefaultAsync(t => t.Slug.ToLower() == normalized || t.Slug.ToLower() == cleanSlug || t.Title.ToLower() == normalized);
+            }
                 
             if (tour == null) return NotFound();
+
+            // Si el tour no tenía slug asignado, generarlo a partir de su título y persistirlo
+            if (string.IsNullOrWhiteSpace(tour.Slug) && !string.IsNullOrWhiteSpace(tour.Title))
+            {
+                var generatedSlug = System.Text.RegularExpressions.Regex.Replace(tour.Title.Trim().ToLower(), @"[^a-z0-9\-]", "-").Trim('-');
+                tour.Slug = string.IsNullOrWhiteSpace(generatedSlug) ? tour.Id.ToString("N").Substring(0, 8) : generatedSlug;
+                await _context.SaveChangesAsync();
+            }
+
+            // Si se accedió usando el GUID y ya existe un Slug amigable, redirigir a la URL con nombre/slug
+            if (searchedByGuid && !string.IsNullOrWhiteSpace(tour.Slug) && !string.Equals(id, tour.Slug, StringComparison.OrdinalIgnoreCase))
+            {
+                return RedirectToAction(nameof(EditTour), new { id = tour.Slug });
+            }
             
             ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
 
@@ -1627,6 +1661,12 @@ namespace SIGETOUR.API.Controllers.UI
             if (!string.IsNullOrEmpty(dto.Slug)) {
                 var cleanSlug = System.Text.RegularExpressions.Regex.Replace(dto.Slug.Trim().ToLower(), @"[^a-z0-9\-]", "-").Trim('-');
                 tour.Slug = string.IsNullOrWhiteSpace(cleanSlug) ? tour.Slug : cleanSlug;
+            }
+            else
+            {
+                var baseSlug = !string.IsNullOrWhiteSpace(dto.Title) ? dto.Title : tour.Title;
+                var cleanSlug = System.Text.RegularExpressions.Regex.Replace(baseSlug.Trim().ToLower(), @"[^a-z0-9\-]", "-").Trim('-');
+                tour.Slug = string.IsNullOrWhiteSpace(cleanSlug) ? (string.IsNullOrWhiteSpace(tour.Slug) ? tour.Id.ToString("N").Substring(0, 8) : tour.Slug) : cleanSlug;
             }
 
             // Actualizar Paradas del Itinerario sincronizando ChangeTracker
@@ -2614,6 +2654,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .Select(t => new {
                     t.Id,
                     t.Title,
+                    t.Slug,
                     t.BasePrice,
                     Images = t.Images.Select(i => new { i.ImageUrl, i.IsMain }).ToList()
                 })
@@ -2624,7 +2665,7 @@ namespace SIGETOUR.API.Controllers.UI
                 title = t.Title,
                 price = t.BasePrice,
                 image = t.Images.FirstOrDefault(i => i.IsMain)?.ImageUrl ?? t.Images.FirstOrDefault()?.ImageUrl ?? "/images/placeholder.jpg",
-                url = Url.Action("EditTour", "Admin", new { id = t.Id })
+                url = Url.Action("EditTour", "Admin", new { id = !string.IsNullOrWhiteSpace(t.Slug) ? t.Slug : t.Id.ToString() })
             });
 
             var rawVehicles = await _context.Vehicles

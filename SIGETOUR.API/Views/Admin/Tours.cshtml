@@ -197,7 +197,7 @@
                                         <span class="material-symbols-outlined text-[20px]" style="@(tour.IsFlagship ? "font-variation-settings: 'FILL' 1;" : "")">verified</span>
                                     </button>
                                 </form>
-                                <a asp-action="EditTour" asp-route-id="@tour.Id" class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors inline-block" title="Editar"><span class="material-symbols-outlined text-[20px]">edit</span></a>
+                                <a asp-action="EditTour" asp-route-id="@(!string.IsNullOrWhiteSpace(tour.Slug) ? tour.Slug : tour.Id.ToString())" class="p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors inline-block" title="Editar"><span class="material-symbols-outlined text-[20px]">edit</span></a>
                                 <button type="button" class="p-2 text-on-surface-variant hover:text-red-600 rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Eliminar" onclick="openDeleteModal('@tour.Id', '@tour.Title')"><span class="material-symbols-outlined text-[20px]">delete</span></button>
                             </td>
                         </tr>

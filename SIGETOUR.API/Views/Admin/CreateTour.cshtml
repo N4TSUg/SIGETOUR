@@ -3,7 +3,7 @@
     Layout = "_AdminLayout";
     ViewData["Title"] = "Crear Tour";
 }
-<main class="flex-1 overflow-y-auto bg-surface p-4 lg:p-6"><form method="post" enctype="multipart/form-data" action="@(Model.Id == Guid.Empty ? "/Admin/CreateTour" : "/Admin/EditTour")"><input type="hidden" asp-for="Id" /><input type="hidden" name="SelectedMainImageId" id="SelectedMainImageId" value="@(Model.ExistingImages?.FirstOrDefault(i => i.IsMain)?.Id)" />
+<main class="flex-1 overflow-y-auto bg-surface p-4 lg:p-6"><form method="post" enctype="multipart/form-data" action="@(Model.Id == Guid.Empty ? "/Admin/CreateTour" : "/Admin/EditTour")"><input type="hidden" asp-for="Id" /><input type="hidden" asp-for="Slug" /><input type="hidden" name="SelectedMainImageId" id="SelectedMainImageId" value="@(Model.ExistingImages?.FirstOrDefault(i => i.IsMain)?.Id)" />
 <!-- Top Action Title Bar with Quick Breadcrumbs -->
 <div class="max-w-7xl mx-auto space-y-6">
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-outline-variant/60">
@@ -11,10 +11,10 @@
 <div class="flex items-center gap-2 text-label-sm font-label-sm text-secondary mb-1">
 <span class="">Catálogo de Rutas</span>
 <span class="material-symbols-outlined text-xs">chevron_right</span>
-<span class="text-primary font-bold">Circuito Nuevo</span>
+<span class="text-primary font-bold">@(Model.Id == Guid.Empty ? "Circuito Nuevo" : Model.Title)</span>
 </div>
 <h1 class="text-headline-md font-headline-md text-on-surface flex items-center gap-2.5">
-<span class="material-symbols-outlined text-primary text-28px">add_location_alt</span>
+<span class="material-symbols-outlined text-primary text-28px">@(Model.Id == Guid.Empty ? "add_location_alt" : "edit_location_alt")</span>
               @(Model.Id == Guid.Empty ? "Registrar Nuevo Circuito" : "Editar Circuito")
             </h1>
 </div>
