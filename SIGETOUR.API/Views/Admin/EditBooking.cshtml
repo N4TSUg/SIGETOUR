@@ -237,12 +237,12 @@
 
             <!-- Email Input Field -->
             <div class="space-y-1.5 mb-4">
-                <label class="block text-xs font-bold text-on-surface uppercase tracking-wider">
+                <label for="modalBookingEmailInputEdit" class="block text-xs font-bold text-on-surface uppercase tracking-wider">
                     Correo Electrónico de Destino *
                 </label>
                 <div class="relative">
-                    <span class="material-symbols-outlined absolute left-3 top-3 text-outline text-[20px]">mail</span>
-                    <input type="email" id="modalBookingEmailInputEdit" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-sm text-on-surface bg-white font-medium" placeholder="correo@ejemplo.com" required />
+                    <span class="material-symbols-outlined absolute left-3 top-3 text-outline text-[20px]" aria-hidden="true">mail</span>
+                    <input type="email" id="modalBookingEmailInputEdit" name="modalBookingEmailInputEdit" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-sm text-on-surface bg-white font-medium" placeholder="correo@ejemplo.com" required />
                 </div>
                 <p class="text-[11px] text-on-surface-variant">Se enviará desde el correo oficial <strong class="text-primary">enriquearana1402@gmail.com</strong>.</p>
             </div>
@@ -322,13 +322,13 @@
 
             <!-- Phone Input -->
             <div class="space-y-1.5 mb-4">
-                <label class="block text-xs font-bold text-on-surface uppercase tracking-wider flex items-center justify-between">
+                <label for="waModalPhoneInputEdit" class="block text-xs font-bold text-on-surface uppercase tracking-wider flex items-center justify-between">
                     <span>Número de WhatsApp del Cliente *</span>
                     <span class="text-[11px] text-outline font-normal">Perú (+51)</span>
                 </label>
                 <div class="relative">
-                    <span class="absolute left-3.5 top-2.5 text-xs font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">🇵🇪 +51</span>
-                    <input type="tel" id="waModalPhoneInputEdit" oninput="updateWaMessagePreviewEdit()" class="w-full pl-20 pr-4 py-2.5 rounded-xl border border-outline-variant focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] text-sm text-on-surface bg-white font-mono font-bold" placeholder="987654321" required />
+                    <span class="absolute left-3.5 top-2.5 text-xs font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded" aria-hidden="true">🇵🇪 +51</span>
+                    <input type="tel" id="waModalPhoneInputEdit" name="waModalPhoneInputEdit" oninput="updateWaMessagePreviewEdit()" class="w-full pl-20 pr-4 py-2.5 rounded-xl border border-outline-variant focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] text-sm text-on-surface bg-white font-mono font-bold" placeholder="987654321" required />
                 </div>
             </div>
 
@@ -363,14 +363,14 @@
             <!-- Preview of WhatsApp Message -->
             <div class="space-y-1.5 mb-4">
                 <div class="flex items-center justify-between">
-                    <label class="block text-xs font-bold text-on-surface uppercase tracking-wider">
+                    <label for="waModalMessagePreviewEdit" class="block text-xs font-bold text-on-surface uppercase tracking-wider">
                         Mensaje a Enviar por WhatsApp
                     </label>
                     <button type="button" onclick="copyWaMessageToClipboardEdit()" class="text-xs text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer">
                         <span class="material-symbols-outlined text-[14px]">content_copy</span> Copiar texto
                     </button>
                 </div>
-                <textarea id="waModalMessagePreviewEdit" rows="4" class="w-full text-xs font-mono p-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface resize-none focus:outline-none" readonly></textarea>
+                <textarea id="waModalMessagePreviewEdit" name="waModalMessagePreviewEdit" rows="4" class="w-full text-xs font-mono p-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface resize-none focus:outline-none" readonly></textarea>
             </div>
 
             <!-- Notice / Status Area -->
