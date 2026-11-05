@@ -222,7 +222,7 @@
                       <span>Ver Ficha Técnica y Fotos</span>
                     </a>
                     
-                    <a href="https://wa.me/51944746364?text=Hola%20Turismo%20Chil%C3%B3n,%20deseo%20cotizar%20el%20alquiler%20o%20servicio%20privado%20de%20la%20unidad%20@Uri.EscapeDataString(vehicle.Model)%20(Placa%20@Uri.EscapeDataString(vehicle.LicensePlate))%20con%20capacidad%20de%20@vehicle.SeatCapacity%20pasajeros"
+                    <a href="@ContactService.GetWhatsAppUrl($"Hola Turismo Chilón, deseo cotizar el alquiler o servicio privado de la unidad {vehicle.Model} (Placa {vehicle.LicensePlate}) con capacidad de {vehicle.SeatCapacity} pasajeros", true)"
                        target="_blank" rel="noopener noreferrer"
                        class="w-full sm:w-auto py-3 px-6 rounded-xl bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold text-xs sm:text-sm transition-all duration-150 shadow-md flex items-center justify-center gap-2"
                        title="Cotizar alquiler por WhatsApp">
@@ -283,7 +283,7 @@
           <p class="text-xs text-on-surface-variant leading-relaxed">
             Unidad completa para tu familia o grupo privado. Salidas a tu propio ritmo, recojo puerta a puerta en tu hotel y paradas fotográficas libres.
           </p>
-          <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chil%C3%B3n,%20solicito%20cotizaci%C3%B3n%20para%20un%20servicio%20privado" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline pt-2">
+          <a href="@ContactService.GetWhatsAppUrl("Hola Turismo Chilón, solicito cotización para un servicio privado")" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline pt-2">
             Cotizar por WhatsApp <span class="material-symbols-outlined text-[15px]">arrow_forward</span>
           </a>
         </div>
@@ -297,8 +297,8 @@
           <p class="text-xs text-on-surface-variant leading-relaxed">
             Puntualidad garantizada para vuelos comerciales LATAM y SKY. Chofer en sala de llegadas con asistencia de maletas y traslado directo.
           </p>
-          <a href="tel:+51901195392" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline pt-2">
-            Llamar al +51 901 195 392 <span class="material-symbols-outlined text-[15px]">call</span>
+          <a href="tel:@ContactService.PhoneCall" class="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline pt-2">
+            Llamar al @ContactService.PhoneFormatted <span class="material-symbols-outlined text-[15px]">call</span>
           </a>
         </div>
       </div>

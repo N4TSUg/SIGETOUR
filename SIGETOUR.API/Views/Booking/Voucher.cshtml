@@ -182,7 +182,7 @@
           </a>
         }
 
-        <a class="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs active:scale-95" href="https://wa.me/51901195392?text=Hola,%20adjunto%20mi%20código%20de%20reserva%20@Model.ReferenceCode%20para%20el%20Tour%20@(Uri.EscapeDataString(tour?.Title ?? "Cajamarca"))" target="_blank" rel="noopener noreferrer">
+        <a class="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs active:scale-95" href="@ContactService.GetWhatsAppUrl($"Hola, adjunto mi código de reserva {Model.ReferenceCode} para el Tour {tour?.Title ?? "Cajamarca"}")" target="_blank" rel="noopener noreferrer">
           <span class="material-symbols-outlined text-[18px]">chat</span>
           <span>WhatsApp</span>
         </a>

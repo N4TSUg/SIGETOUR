@@ -340,8 +340,8 @@
 <!-- Agency Direct Contact Block -->
 <div class="my-space-sm p-3 bg-surface-container/60 rounded-xl border border-outline-variant/30 text-body-sm">
 <div class="text-label-sm font-label-sm text-primary font-bold mb-1">CENTRAL TELEFÓNICA</div>
-<div class="text-body-sm font-body-sm font-semibold text-on-surface">+51 901 195 392</div>
-<div class="text-body-sm font-body-sm text-on-surface-variant">+51 944 746 364</div>
+<div class="text-body-sm font-body-sm font-semibold text-on-surface">@ContactService.WhatsAppFormatted</div>
+<div class="text-body-sm font-body-sm text-on-surface-variant">@ContactService.PhoneCallFormatted</div>
 </div>
 <!-- Footer Navigation Items -->
 <div class="border-t border-outline-variant/50 pt-2 space-y-1">
@@ -624,11 +624,11 @@ document.addEventListener('DOMContentLoaded', function() {
         </h4>
         <p class="text-xs text-on-surface-variant mb-3">Atención operativa de lunes a domingo de 07:00 AM a 08:00 PM.</p>
         <div class="flex flex-wrap gap-3 text-xs font-semibold">
-          <a href="https://wa.me/51901195392" target="_blank" class="flex items-center gap-1 text-emerald-700 hover:underline bg-white px-3 py-1.5 rounded-lg border border-emerald-300">
-            <span class="material-symbols-outlined text-[16px]">chat</span> WhatsApp: +51 901 195 392
+          <a href="@ContactService.GetWhatsAppUrl()" target="_blank" class="flex items-center gap-1 text-emerald-700 hover:underline bg-white px-3 py-1.5 rounded-lg border border-emerald-300">
+            <span class="material-symbols-outlined text-[16px]">chat</span> WhatsApp: @ContactService.WhatsAppFormatted
           </a>
-          <a href="tel:+51944746364" class="flex items-center gap-1 text-primary hover:underline bg-white px-3 py-1.5 rounded-lg border border-primary/30">
-            <span class="material-symbols-outlined text-[16px]">call</span> Fijo: +51 944 746 364
+          <a href="tel:@ContactService.PhoneCall" class="flex items-center gap-1 text-primary hover:underline bg-white px-3 py-1.5 rounded-lg border border-primary/30">
+            <span class="material-symbols-outlined text-[16px]">call</span> Fijo: @ContactService.PhoneCallFormatted
           </a>
           <span class="flex items-center gap-1 text-outline bg-white px-3 py-1.5 rounded-lg border border-outline-variant/60">
             <span class="material-symbols-outlined text-[16px]">location_on</span> Jr. 2 de Mayo 569, Cajamarca

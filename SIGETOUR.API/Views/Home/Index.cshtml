@@ -19,9 +19,9 @@
 <span class="material-symbols-outlined text-[20px]" data-icon="search">search</span>
             Ver Salidas Disponibles
           </a>
-<a class="bg-white border-2 border-secondary/20 hover:border-primary text-secondary hover:text-primary px-5 py-3 rounded-xl font-bold transition-all flex items-center gap-2 text-sm shadow-xs" href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20información%20de%20tours" rel="noopener noreferrer" target="_blank">
+<a class="bg-white border-2 border-secondary/20 hover:border-primary text-secondary hover:text-primary px-5 py-3 rounded-xl font-bold transition-all flex items-center gap-2 text-sm shadow-xs" href="@ContactService.GetWhatsAppUrl("Hola Turismo Chilón, deseo información de tours")" rel="noopener noreferrer" target="_blank">
 <span class="material-symbols-outlined text-[20px] text-[#25D366]" data-icon="chat">chat</span>
-            WhatsApp: 901 195 392
+            WhatsApp: @ContactService.WhatsAppFormatted
           </a>
 </div>
 <div class="grid grid-cols-3 gap-4 pt-6 border-t border-outline-variant">
@@ -404,7 +404,7 @@ else
                 <a asp-controller="Vehicle" asp-action="Details" asp-route-id="@v.Id" class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
                   Ver Ficha y Fotos <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
                 </a>
-                <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chil%C3%B3n,%20deseo%20cotizar%20el%20veh%C3%ADculo%20@Uri.EscapeDataString(v.Model)%20(Placa%20@Uri.EscapeDataString(v.LicensePlate))%20para%20un%20servicio%20privado"
+                <a href="@ContactService.GetWhatsAppUrl($"Hola Turismo Chilón, deseo cotizar el vehículo {v.Model} (Placa {v.LicensePlate}) para un servicio privado")"
                    target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-1 text-xs font-bold text-[#25D366] hover:underline">
                   <span class="material-symbols-outlined text-[15px]">chat</span> Cotizar Privado
@@ -512,13 +512,13 @@ else
 </div>
 </div>
 <div class="lg:col-span-4 flex flex-col gap-3">
-<a class="w-full bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm active:scale-98" href="https://wa.me/51901195392?text=Hola,%20deseo%20cotizar%20un%20servicio%20turistico" rel="noopener noreferrer" target="_blank">
+<a class="w-full bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm active:scale-98" href="@ContactService.GetWhatsAppUrl("Hola, deseo cotizar un servicio turistico")" rel="noopener noreferrer" target="_blank">
 <span class="material-symbols-outlined text-[20px]" data-icon="chat">chat</span>
-          WhatsApp: 901 195 392
+          WhatsApp: @ContactService.WhatsAppFormatted
         </a>
-<a class="w-full bg-white/15 hover:bg-white/25 text-white font-bold py-3 px-6 rounded-xl transition-colors border border-white/20 flex items-center justify-center gap-2 text-sm" href="tel:+51944746364">
+<a class="w-full bg-white/15 hover:bg-white/25 text-white font-bold py-3 px-6 rounded-xl transition-colors border border-white/20 flex items-center justify-center gap-2 text-sm" href="tel:@ContactService.PhoneCall">
 <span class="material-symbols-outlined text-[19px] text-primary-light" data-icon="call">call</span>
-          Llamar: +51 944 746 364
+          Llamar: @ContactService.PhoneFormatted
         </a>
 </div>
 </div>
@@ -575,8 +575,8 @@ else
 </div>
 <div>
 <strong class="text-secondary block text-xs font-bold uppercase tracking-wider">Teléfonos / WhatsApp:</strong>
-<span class="text-xs text-on-surface-variant font-medium block">+51 901 195 392</span>
-<span class="text-xs text-on-surface-variant font-medium block">+51 944 746 364</span>
+<span class="text-xs text-on-surface-variant font-medium block">@ContactService.WhatsAppFormatted</span>
+<span class="text-xs text-on-surface-variant font-medium block">@ContactService.WhatsAppSecondaryFormatted</span>
 </div>
 </div>
 <div class="flex items-start gap-3.5 bg-white p-3.5 rounded-xl border border-outline-variant shadow-xs">
@@ -585,7 +585,7 @@ else
 </div>
 <div>
 <strong class="text-secondary block text-xs font-bold uppercase tracking-wider">Correo Electrónico:</strong>
-<a class="text-xs text-primary hover:underline font-semibold" href="mailto:informes.chilon@gmail.com">informes.chilon@gmail.com</a>
+<a class="text-xs text-primary hover:underline font-semibold" href="mailto:@ContactService.EmailSecondary">@ContactService.EmailSecondary</a>
 </div>
 </div>
 

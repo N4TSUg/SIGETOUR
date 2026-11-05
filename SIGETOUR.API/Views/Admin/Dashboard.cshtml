@@ -336,7 +336,7 @@
                                         <a asp-controller="Admin" asp-action="Bookings" asp-route-tourId="@dep.TourId" class="p-1.5 rounded-lg hover:bg-surface-container text-primary" title="Ver Manifiesto y Pasajeros">
                                             <span class="material-symbols-outlined text-[18px]">assignment</span>
                                         </a>
-                                        <a href="https://wa.me/51901195392" target="_blank" class="p-1.5 rounded-lg hover:bg-surface-container text-secondary" title="Contacto con la Unidad / Chofer">
+                                        <a href="@ContactService.GetWhatsAppUrl()" target="_blank" class="p-1.5 rounded-lg hover:bg-surface-container text-secondary" title="Contacto con la Unidad / Chofer">
                                             <span class="material-symbols-outlined text-[18px]">chat</span>
                                         </a>
                                     </div>

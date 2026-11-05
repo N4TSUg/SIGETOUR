@@ -35,7 +35,7 @@ builder.Services.AddControllersWithViews();
 // Cargar variables de entorno desde .env.local o .env si existen (soporte nativo Neon Postgres)
 foreach (var searchDir in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory, Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..")), Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..")) })
 {
-    foreach (var envName in new[] { ".env.local", ".env" })
+    foreach (var envName in new[] { ".env.local", ".env", "sigetour_variables_entorno.env" })
     {
         var filePath = Path.Combine(searchDir, envName);
         if (File.Exists(filePath))
@@ -167,6 +167,7 @@ builder.Services.AddSingleton<CheckoutAccess>();
 builder.Services.AddHttpClient<CulqiApiClient>();
 builder.Services.AddHttpClient<SIGETOUR.API.Application.Invoicing.IElectronicReceiptService, SIGETOUR.API.Application.Invoicing.NubefactInvoiceService>();
 builder.Services.AddSingleton<SIGETOUR.API.Application.Interfaces.IVisitorCounterService, SIGETOUR.API.Application.Services.VisitorCounterService>();
+builder.Services.AddSingleton<SIGETOUR.API.Application.Interfaces.ICompanyContactService, SIGETOUR.API.Application.Services.CompanyContactService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
