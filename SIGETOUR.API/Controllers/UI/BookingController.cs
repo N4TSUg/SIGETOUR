@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Net.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SIGETOUR.API.Application.Invoicing;
 using SIGETOUR.API.Application.Payments;
+using SIGETOUR.API.Application.Services;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
 using SIGETOUR.API.Models;
@@ -332,6 +334,99 @@ namespace SIGETOUR.API.Controllers.UI
 
             ViewBag.Receipt = receipt;
             return View(booking);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadVoucherPdf(Guid id, string? token = null)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
+                .ThenInclude(t => t.Category)
+                .Include(b => b.AssignedVehicle)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null) return NotFound("Reserva no encontrada.");
+
+            bool hasContext = HttpContext != null && User != null;
+            bool isStaff = User?.Identity?.IsAuthenticated == true;
+            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
+
+            string? sessionBookingId = null;
+            try { sessionBookingId = HttpContext?.Session?.GetString("LastBookingId"); } catch { }
+
+            string? cookieBookingId = null;
+            try { Request?.Cookies.TryGetValue("sigetour_last_booking", out cookieBookingId); } catch { }
+
+            bool isSessionOwner = !string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString();
+            bool isCookieOwner = !string.IsNullOrWhiteSpace(cookieBookingId) && cookieBookingId == booking.Id.ToString();
+
+            if (hasContext && !isStaff && !isValidToken && !isSessionOwner && !isCookieOwner)
+            {
+                return Unauthorized("Se requiere autorización o token válido para acceder al boleto de viaje.");
+            }
+
+            var receipt = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == id)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            var tour = booking.Items?.FirstOrDefault()?.TourPackage;
+            var receiptLabel = receipt != null ? $"{receipt.Series}-{receipt.Number}" : null;
+
+            var pdfBytes = VoucherPdfGenerator.GenerateVoucherPdf(booking, tour, receiptLabel);
+            return File(pdfBytes, "application/pdf", $"Boleto_Oficial_{booking.ReferenceCode}.pdf");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadReceiptPdf(Guid id, string? token = null)
+        {
+            var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
+            if (booking == null) return NotFound("Reserva no encontrada.");
+
+            bool hasContext = HttpContext != null && User != null;
+            bool isStaff = User?.Identity?.IsAuthenticated == true;
+            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
+
+            string? sessionBookingId = null;
+            try { sessionBookingId = HttpContext?.Session?.GetString("LastBookingId"); } catch { }
+
+            string? cookieBookingId = null;
+            try { Request?.Cookies.TryGetValue("sigetour_last_booking", out cookieBookingId); } catch { }
+
+            bool isSessionOwner = !string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString();
+            bool isCookieOwner = !string.IsNullOrWhiteSpace(cookieBookingId) && cookieBookingId == booking.Id.ToString();
+
+            if (hasContext && !isStaff && !isValidToken && !isSessionOwner && !isCookieOwner)
+            {
+                return Unauthorized("Se requiere autorización o token válido.");
+            }
+
+            var receipt = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == id)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            if (receipt == null || string.IsNullOrWhiteSpace(receipt.PdfUrl))
+            {
+                return NotFound("El comprobante electrónico aún no cuenta con archivo PDF disponible.");
+            }
+
+            if (receipt.PdfUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                    var bytes = await httpClient.GetByteArrayAsync(receipt.PdfUrl);
+                    return File(bytes, "application/pdf", $"Boleta_{receipt.Series}-{receipt.Number}.pdf");
+                }
+                catch
+                {
+                    return Redirect(receipt.PdfUrl);
+                }
+            }
+
+            return Redirect(receipt.PdfUrl);
         }
 
         [HttpGet]

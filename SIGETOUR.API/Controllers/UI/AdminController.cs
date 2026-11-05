@@ -14,6 +14,9 @@ using System.Threading.Tasks;
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Net.Http;
+using SIGETOUR.API.Application.Services;
+using SIGETOUR.API.Application.Payments;
 
 namespace SIGETOUR.API.Controllers.UI
 {
@@ -2513,6 +2516,116 @@ namespace SIGETOUR.API.Controllers.UI
                 attachedCount = result.AttachedCount,
                 referenceCode = booking.ReferenceCode
             });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetBookingWhatsAppShareData(Guid id, [FromServices] CheckoutAccess checkoutAccess)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Items).ThenInclude(i => i.TourPackage)
+                .Include(b => b.AssignedVehicle)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null)
+            {
+                return Json(new { success = false, message = "La reserva solicitada no existe." });
+            }
+
+            var receipt = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == id)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var token = checkoutAccess.Create(booking.Id, TimeSpan.FromDays(30));
+            var voucherPdfUrl = $"{baseUrl}/Booking/DownloadVoucherPdf/{booking.Id}?token={token}";
+            var tourTitle = booking.Items?.FirstOrDefault()?.TourPackage?.Title ?? "Tour Turístico Cajamarca";
+
+            string? receiptPdfUrl = null;
+            string? receiptSeriesNumber = null;
+            if (receipt != null)
+            {
+                receiptSeriesNumber = $"{receipt.Series}-{receipt.Number}";
+                if (!string.IsNullOrWhiteSpace(receipt.PdfUrl) && receipt.PdfUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                {
+                    receiptPdfUrl = receipt.PdfUrl;
+                }
+                else
+                {
+                    receiptPdfUrl = $"{baseUrl}/Booking/DownloadReceiptPdf/{booking.Id}?token={token}";
+                }
+            }
+
+            return Json(new
+            {
+                success = true,
+                id = booking.Id,
+                referenceCode = booking.ReferenceCode,
+                customerName = booking.CustomerName,
+                customerPhone = booking.CustomerPhone ?? "",
+                tourTitle = tourTitle,
+                travelDate = booking.TravelDate.ToString("dd/MM/yyyy"),
+                voucherPdfUrl = voucherPdfUrl,
+                receiptPdfUrl = receiptPdfUrl,
+                hasReceipt = receipt != null,
+                receiptSeriesNumber = receiptSeriesNumber,
+                downloadVoucherUrl = Url.Action(nameof(DownloadVoucherPdf), new { id = booking.Id }),
+                downloadReceiptUrl = receipt != null ? Url.Action(nameof(DownloadReceiptPdf), new { id = booking.Id }) : null
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadVoucherPdf(Guid id)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Items).ThenInclude(i => i.TourPackage)
+                .Include(b => b.AssignedVehicle)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null) return NotFound("Reserva no encontrada.");
+
+            var receipt = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == id)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            var tour = booking.Items?.FirstOrDefault()?.TourPackage;
+            var receiptLabel = receipt != null ? $"{receipt.Series}-{receipt.Number}" : null;
+
+            var pdfBytes = VoucherPdfGenerator.GenerateVoucherPdf(booking, tour, receiptLabel);
+            return File(pdfBytes, "application/pdf", $"Boleto_Oficial_{booking.ReferenceCode}.pdf");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> DownloadReceiptPdf(Guid id)
+        {
+            var receipt = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == id)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            if (receipt == null) return NotFound("No se encontró comprobante electrónico para esta reserva.");
+
+            if (!string.IsNullOrWhiteSpace(receipt.PdfUrl) && receipt.PdfUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                    var bytes = await httpClient.GetByteArrayAsync(receipt.PdfUrl);
+                    return File(bytes, "application/pdf", $"Boleta_{receipt.Series}-{receipt.Number}.pdf");
+                }
+                catch
+                {
+                    return Redirect(receipt.PdfUrl);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(receipt.PdfUrl))
+            {
+                return Redirect(receipt.PdfUrl);
+            }
+
+            return NotFound("El comprobante electrónico aún no cuenta con archivo PDF disponible.");
         }
 
         [HttpPost]

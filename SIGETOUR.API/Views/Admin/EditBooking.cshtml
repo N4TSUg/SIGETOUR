@@ -70,9 +70,9 @@
           Enviar Correo
         </button>
         <button type="button" 
-                onclick="sendWhatsappFromEdit()" 
+                onclick="openSendWhatsAppModalEdit()" 
                 class="bg-emerald-50 border border-[#25D366]/40 hover:bg-emerald-100 text-emerald-950 transition-colors font-label-md px-3.5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm font-semibold cursor-pointer" 
-                title="Enviar Confirmación y Boleto por WhatsApp">
+                title="Enviar Boleto y Boleta (PDF) por WhatsApp">
           <span class="material-symbols-outlined text-[18px] text-[#25D366]">chat</span>
           WhatsApp
         </button>
@@ -280,6 +280,127 @@
     </div>
 </div>
 
+<!-- ======================================================== -->
+<!-- MODAL: COMPARTIR BOLETO Y BOLETA (PDF) POR WHATSAPP      -->
+<!-- ======================================================== -->
+<div id="sendWhatsAppModalEdit" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-all duration-200 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-lg border border-outline-variant shadow-2xl overflow-hidden transform transition-all duration-200">
+        <div class="h-2 w-full bg-gradient-to-r from-[#128C7E] to-[#25D366]"></div>
+        <div class="p-6">
+            <div class="flex items-center justify-between pb-3 border-b border-outline-variant/60">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 text-[#128C7E] flex items-center justify-center font-bold">
+                        <span class="material-symbols-outlined text-[24px]">chat</span>
+                    </div>
+                    <div>
+                        <h3 class="text-title-md font-bold text-on-surface">Compartir por WhatsApp</h3>
+                        <p class="text-xs text-on-surface-variant">Boleto Oficial de Viaje y Boleta Electrónica en PDF</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeSendWhatsAppModalEdit()" class="text-outline hover:text-on-surface p-1 rounded-lg cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+
+            <!-- Booking Summary Pill -->
+            <div class="my-4 p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs flex items-center justify-between">
+                <div>
+                    <span class="text-emerald-800 font-semibold block text-[11px] uppercase">Pasajero Titular:</span>
+                    <strong class="text-emerald-950 text-sm font-bold block" id="waModalPassengerNameEdit">@Model.CustomerName</strong>
+                    <div class="text-xs text-emerald-800 flex items-center gap-2 mt-0.5">
+                        <span class="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">@Model.ReferenceCode</span>
+                        <span>•</span>
+                        <span>@Model.TourName</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-300">
+                        <span class="material-symbols-outlined text-[14px]">picture_as_pdf</span> 2 PDFs Listos
+                    </span>
+                </div>
+            </div>
+
+            <!-- Phone Input -->
+            <div class="space-y-1.5 mb-4">
+                <label class="block text-xs font-bold text-on-surface uppercase tracking-wider flex items-center justify-between">
+                    <span>Número de WhatsApp del Cliente *</span>
+                    <span class="text-[11px] text-outline font-normal">Perú (+51)</span>
+                </label>
+                <div class="relative">
+                    <span class="absolute left-3.5 top-2.5 text-xs font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">🇵🇪 +51</span>
+                    <input type="tel" id="waModalPhoneInputEdit" oninput="updateWaMessagePreviewEdit()" class="w-full pl-20 pr-4 py-2.5 rounded-xl border border-outline-variant focus:border-[#25D366] focus:ring-1 focus:ring-[#25D366] text-sm text-on-surface bg-white font-mono font-bold" placeholder="987654321" required />
+                </div>
+            </div>
+
+            <!-- PDFs Included Checklist & Download Links -->
+            <div class="p-3 bg-surface-container-low rounded-xl border border-outline-variant/60 space-y-2 mb-4 text-xs">
+                <div class="font-bold text-on-surface flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-primary text-[18px]">attach_file</span>
+                    Archivos PDF incluidos para la reserva:
+                </div>
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-outline-variant/50">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-red-600 text-[18px]">picture_as_pdf</span>
+                            <span class="font-medium text-on-surface">Boleto_Oficial_@(Model.ReferenceCode).pdf</span>
+                        </div>
+                        <a href="/Admin/DownloadVoucherPdf/@Model.Id" target="_blank" class="text-primary hover:underline font-bold text-[11px] flex items-center gap-0.5 cursor-pointer">
+                            <span class="material-symbols-outlined text-[14px]">download</span> Descargar
+                        </a>
+                    </div>
+                    <div class="flex items-center justify-between bg-white p-2 rounded-lg border border-outline-variant/50">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-blue-600 text-[18px]">receipt_long</span>
+                            <span class="font-medium text-on-surface" id="waModalReceiptPdfLabelEdit">Boleta_Electronica_SUNAT.pdf</span>
+                        </div>
+                        <a id="waModalDownloadReceiptBtnEdit" href="/Admin/DownloadReceiptPdf/@Model.Id" target="_blank" class="text-blue-700 hover:underline font-bold text-[11px] flex items-center gap-0.5 cursor-pointer">
+                            <span class="material-symbols-outlined text-[14px]">download</span> Descargar
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview of WhatsApp Message -->
+            <div class="space-y-1.5 mb-4">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-bold text-on-surface uppercase tracking-wider">
+                        Mensaje a Enviar por WhatsApp
+                    </label>
+                    <button type="button" onclick="copyWaMessageToClipboardEdit()" class="text-xs text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer">
+                        <span class="material-symbols-outlined text-[14px]">content_copy</span> Copiar texto
+                    </button>
+                </div>
+                <textarea id="waModalMessagePreviewEdit" rows="4" class="w-full text-xs font-mono p-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface resize-none focus:outline-none" readonly></textarea>
+            </div>
+
+            <!-- Notice / Status Area -->
+            <div id="waModalStatusNoticeEdit" class="hidden mb-4 p-3 rounded-xl text-xs font-semibold"></div>
+
+            <!-- Actions Buttons -->
+            <div class="flex flex-col gap-2 pt-1 border-t border-outline-variant/40">
+                <button type="button" id="btnWaDownloadAndOpenEdit" onclick="executeWaDownloadAndOpenEdit()" class="w-full py-3 px-4 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">cloud_download</span>
+                    <span>Descargar 2 PDFs y Abrir WhatsApp</span>
+                </button>
+                
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btnWaShareDirectEdit" onclick="executeWaShareDirectEdit()" class="flex-1 py-2.5 px-3 bg-surface-container-high hover:bg-surface-container text-on-surface border border-outline-variant rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer" title="Compartir archivos PDF directamente">
+                        <span class="material-symbols-outlined text-[17px] text-primary">share</span>
+                        <span>Compartir Archivos</span>
+                    </button>
+                    <button type="button" onclick="executeWaOpenOnlyEdit()" class="flex-1 py-2.5 px-3 bg-surface-container-high hover:bg-surface-container text-on-surface border border-outline-variant rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer" title="Abrir WhatsApp con mensaje de enlaces directos">
+                        <span class="material-symbols-outlined text-[17px] text-[#25D366]">chat</span>
+                        <span>Solo Chat con Enlaces</span>
+                    </button>
+                    <button type="button" onclick="closeSendWhatsAppModalEdit()" class="px-4 py-2.5 rounded-xl border border-outline-variant hover:bg-surface-container text-xs font-bold text-secondary transition-all cursor-pointer">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- FORMULARIO OCULTO PARA REACTIVAR -->
 <form asp-action="ReactivateBooking" method="post" id="reactivateForm" class="hidden">
     @Html.AntiForgeryToken()
@@ -402,35 +523,183 @@
         });
     }
 
-    function sendWhatsappFromEdit() {
-        const phoneInput = document.getElementById('CustomerPhone') || document.querySelector('input[name="CustomerPhone"]');
-        let rawPhone = phoneInput ? phoneInput.value.trim() : '@Model.CustomerPhone';
-        if (!rawPhone) {
-            rawPhone = prompt('Ingrese el teléfono / WhatsApp del cliente:', '');
-            if (!rawPhone) return;
+    let currentWaDataEdit = {
+        bookingId: '@Model.Id',
+        rawPhone: '@(Model.CustomerPhone ?? "")',
+        customerName: '@(Model.CustomerName?.Replace("'", "\\'") ?? "Estimado(a) Cliente")',
+        refCode: '@Model.ReferenceCode',
+        tourTitle: '@(Model.TourName?.Replace("'", "\\'") ?? "Tour")',
+        travelDate: '@Model.TravelDate.ToString("dd/MM/yyyy")',
+        voucherPdfUrl: '',
+        receiptPdfUrl: '',
+        hasReceipt: false,
+        receiptSeriesNumber: ''
+    };
+
+    function openSendWhatsAppModalEdit() {
+        const phoneInputForm = document.getElementById('CustomerPhone') || document.querySelector('input[name="CustomerPhone"]');
+        let currentPhone = phoneInputForm ? phoneInputForm.value.trim() : currentWaDataEdit.rawPhone;
+
+        let digits = currentPhone.replace(/\D/g, '');
+        if (digits.startsWith('51') && digits.length === 11) {
+            digits = digits.substring(2);
+        }
+        const modalPhoneInput = document.getElementById('waModalPhoneInputEdit');
+        if (modalPhoneInput) modalPhoneInput.value = digits;
+
+        const statusDiv = document.getElementById('waModalStatusNoticeEdit');
+        if (statusDiv) {
+            statusDiv.className = 'hidden';
+            statusDiv.innerHTML = '';
         }
 
-        let digits = rawPhone.replace(/\D/g, '');
+        updateWaMessagePreviewEdit();
+        document.getElementById('sendWhatsAppModalEdit')?.classList.remove('hidden');
+
+        fetch('/Admin/GetBookingWhatsAppShareData/@Model.Id')
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.success) {
+                    currentWaDataEdit.voucherPdfUrl = data.voucherPdfUrl;
+                    currentWaDataEdit.receiptPdfUrl = data.receiptPdfUrl;
+                    currentWaDataEdit.hasReceipt = data.hasReceipt;
+                    currentWaDataEdit.receiptSeriesNumber = data.receiptSeriesNumber;
+
+                    if (data.receiptSeriesNumber) {
+                        const lbl = document.getElementById('waModalReceiptPdfLabelEdit');
+                        if (lbl) lbl.innerText = `Boleta_${data.receiptSeriesNumber}.pdf`;
+                    }
+                    updateWaMessagePreviewEdit();
+                }
+            })
+            .catch(() => {});
+    }
+
+    function updateWaMessagePreviewEdit() {
+        const voucherUrl = currentWaDataEdit.voucherPdfUrl || `${window.location.origin}/Booking/DownloadVoucherPdf/@Model.Id`;
+        const receiptLine = currentWaDataEdit.hasReceipt && currentWaDataEdit.receiptPdfUrl
+            ? `\n• *Boleta de Venta Electrónica (PDF):* ${currentWaDataEdit.receiptPdfUrl}`
+            : '';
+
+        const msg = `¡Hola *${currentWaDataEdit.customerName}*! Le saluda Turismo Chilón.\n\n` +
+                    `Le confirmamos que su reserva para el tour *${currentWaDataEdit.tourTitle}* programada para el *${currentWaDataEdit.travelDate}* se encuentra CONFIRMADA.\n\n` +
+                    `• *Código de Reserva:* ${currentWaDataEdit.refCode}\n\n` +
+                    `*Descarga de Comprobantes Oficiales en PDF:*\n` +
+                    `• *Boleto Oficial de Viaje (PDF):* ${voucherUrl}` +
+                    receiptLine + `\n\n` +
+                    `Punto de salida: Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI físico).\n` +
+                    `¡Gracias por confiar en Turismo Chilón!`;
+
+        const previewArea = document.getElementById('waModalMessagePreviewEdit');
+        if (previewArea) previewArea.value = msg;
+    }
+
+    function closeSendWhatsAppModalEdit() {
+        document.getElementById('sendWhatsAppModalEdit')?.classList.add('hidden');
+    }
+
+    function executeWaDownloadAndOpenEdit() {
+        const phoneInput = document.getElementById('waModalPhoneInputEdit');
+        let digits = (phoneInput ? phoneInput.value.trim() : '').replace(/\D/g, '');
+        if (!digits) {
+            alert('Por favor ingrese el número de teléfono o WhatsApp del cliente.');
+            if (phoneInput) phoneInput.focus();
+            return;
+        }
         if (digits.length === 9 && digits.startsWith('9')) {
             digits = '51' + digits;
         }
 
-        const name = '@Model.CustomerName' || 'Estimado(a) Cliente';
-        const refCode = '@Model.ReferenceCode';
-        const tour = '@Model.TourName';
-        const travelDate = '@Model.TravelDate.ToString("dd/MM/yyyy")';
-        const voucherUrl = '@Url.Action("Voucher", "Booking", new { id = Model.Id }, Context.Request.Scheme)';
-        const iconPin = String.fromCodePoint(0x1F4CC);
-        const iconTicket = String.fromCodePoint(0x1F39F);
+        const previewArea = document.getElementById('waModalMessagePreviewEdit');
+        const msg = previewArea ? previewArea.value : '';
 
-        const message = `¡Hola *${name}*! Le saluda Turismo Chilón.\n\n` +
-                        `Le confirmamos que su reserva para el tour *${tour}* programada para el *${travelDate}* se encuentra CONFIRMADA.\n\n` +
-                        `${iconPin} *Código de Reserva:* ${refCode}\n` +
-                        `${iconTicket} *Ver y Descargar Boleto Oficial:* ${voucherUrl}\n\n` +
-                        `Punto de salida: Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI).\n` +
-                        `¡Gracias por confiar en Turismo Chilón!`;
+        downloadFileUrlEdit('/Admin/DownloadVoucherPdf/@Model.Id', 'Boleto_Oficial_@(Model.ReferenceCode).pdf');
 
-        window.open(`https://wa.me/${digits}?text=${encodeURIComponent(message)}`, '_blank');
+        if (currentWaDataEdit.hasReceipt) {
+            const receiptName = currentWaDataEdit.receiptSeriesNumber ? `Boleta_${currentWaDataEdit.receiptSeriesNumber}.pdf` : 'Boleta_Venta_SUNAT.pdf';
+            setTimeout(() => {
+                downloadFileUrlEdit('/Admin/DownloadReceiptPdf/@Model.Id', receiptName);
+            }, 400);
+        }
+
+        const statusDiv = document.getElementById('waModalStatusNoticeEdit');
+        if (statusDiv) {
+            statusDiv.className = 'mb-4 p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-300 block';
+            statusDiv.innerHTML = '<span class="material-symbols-outlined text-[18px] text-emerald-600 align-middle">check_circle</span> ¡2 PDFs descargados! Abriendo WhatsApp... Envíe el mensaje y adjunte (📎) los PDFs.';
+        }
+
+        setTimeout(() => {
+            window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, '_blank');
+        }, 700);
+    }
+
+    function downloadFileUrlEdit(url, filename) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 300);
+    }
+
+    async function executeWaShareDirectEdit() {
+        const previewArea = document.getElementById('waModalMessagePreviewEdit');
+        const msg = previewArea ? previewArea.value : '';
+
+        try {
+            const filesToShare = [];
+            const voucherRes = await fetch('/Admin/DownloadVoucherPdf/@Model.Id');
+            const voucherBlob = await voucherRes.blob();
+            filesToShare.push(new File([voucherBlob], 'Boleto_Oficial_@(Model.ReferenceCode).pdf', { type: 'application/pdf' }));
+
+            if (currentWaDataEdit.hasReceipt) {
+                try {
+                    const receiptRes = await fetch('/Admin/DownloadReceiptPdf/@Model.Id');
+                    const receiptBlob = await receiptRes.blob();
+                    const rName = currentWaDataEdit.receiptSeriesNumber ? `Boleta_${currentWaDataEdit.receiptSeriesNumber}.pdf` : 'Boleta_Venta_SUNAT.pdf';
+                    filesToShare.push(new File([receiptBlob], rName, { type: 'application/pdf' }));
+                } catch {}
+            }
+
+            if (navigator.canShare && navigator.canShare({ files: filesToShare })) {
+                await navigator.share({
+                    title: 'Boleto y Boleta @(Model.ReferenceCode) - Turismo Chilón',
+                    text: msg,
+                    files: filesToShare
+                });
+                closeSendWhatsAppModalEdit();
+                return;
+            }
+        } catch (e) {
+            console.log('WebShare not supported or cancelled', e);
+        }
+
+        executeWaDownloadAndOpenEdit();
+    }
+
+    function executeWaOpenOnlyEdit() {
+        const phoneInput = document.getElementById('waModalPhoneInputEdit');
+        let digits = (phoneInput ? phoneInput.value.trim() : '').replace(/\D/g, '');
+        if (!digits) {
+            alert('Por favor ingrese el número de teléfono o WhatsApp del cliente.');
+            if (phoneInput) phoneInput.focus();
+            return;
+        }
+        if (digits.length === 9 && digits.startsWith('9')) {
+            digits = '51' + digits;
+        }
+
+        const previewArea = document.getElementById('waModalMessagePreviewEdit');
+        const msg = previewArea ? previewArea.value : '';
+        window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+
+    function copyWaMessageToClipboardEdit() {
+        const previewArea = document.getElementById('waModalMessagePreviewEdit');
+        if (!previewArea) return;
+        navigator.clipboard.writeText(previewArea.value).then(() => {
+            showEditToast('Mensaje copiado al portapapeles.', 'success');
+        });
     }
 
     function showEditToast(message, type) {
