@@ -15,7 +15,7 @@
 <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-secondary tracking-tight leading-[1.15]">Descubre la magia de <span class="text-primary underline decoration-accent-red decoration-4 underline-offset-6">Cajamarca</span> con transporte turístico seguro y confortable</h1>
 <p class="text-on-surface-variant text-base sm:text-lg leading-relaxed max-w-2xl">En <strong class="text-secondary font-bold">TURISMO CHILON</strong> te llevamos a Cumbemayo, Granja Porcón, Baños del Inca y Ventanillas de Otuzco en modernas unidades con SOAT y aire acondicionado.</p>
 <div class="flex flex-wrap items-center gap-3 pt-2">
-<a class="bg-primary hover:bg-primary-dark text-white px-6 py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm" href="#buscador">
+<a class="bg-primary hover:bg-primary-dark text-white px-6 py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 text-sm cursor-pointer" href="#buscador" onclick="if (typeof toggleHomeSearchAccordion === 'function') toggleHomeSearchAccordion(true);">
 <span class="material-symbols-outlined text-[20px]" data-icon="search">search</span>
             Ver Salidas Disponibles
           </a>
@@ -86,8 +86,22 @@ else
 </section>
 <!-- Search Bar Strip -->
 <section class="relative -mt-10 z-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto" id="buscador">
-<div class="bg-white rounded-2xl shadow-xl border border-outline-variant p-5 md:p-6">
-<form method="get" action="@Url.Action("Catalog", "Tour")" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+<div class="bg-white rounded-2xl shadow-xl border border-outline-variant p-4 sm:p-5 md:p-6 transition-all">
+<!-- Mobile Accordion Toggle Header (VISIBLE ONLY ON MOBILE) -->
+<button type="button" onclick="toggleHomeSearchAccordion()" class="md:hidden w-full flex items-center justify-between text-left py-1 text-secondary font-bold active:scale-[0.99] transition-all cursor-pointer">
+  <div class="flex items-center gap-2.5">
+    <div class="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+      <span class="material-symbols-outlined text-[20px]" data-icon="search">search</span>
+    </div>
+    <div>
+      <span class="text-sm font-bold text-secondary block leading-tight">Buscar Salidas y Circuitos</span>
+      <span class="text-[11px] font-normal text-on-surface-variant">Destino, fecha y pasajeros</span>
+    </div>
+  </div>
+  <span id="home-search-chevron" class="material-symbols-outlined text-primary text-2xl transition-transform duration-300">expand_more</span>
+</button>
+
+<form id="home-search-form" method="get" action="@Url.Action("Catalog", "Tour")" class="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end pt-3 md:pt-0">
 <div class="space-y-1.5">
 <label class="text-xs font-semibold text-secondary flex items-center gap-1">
 <span class="material-symbols-outlined text-[17px] text-primary" data-icon="location_on">location_on</span>
@@ -570,6 +584,22 @@ else
 </div>
 </section>
 </main>
+
+<script>
+function toggleHomeSearchAccordion(forceOpen) {
+    const form = document.getElementById('home-search-form');
+    const chevron = document.getElementById('home-search-chevron');
+    if (!form) return;
+    const isHidden = form.classList.contains('hidden');
+    if (forceOpen === true || isHidden) {
+        form.classList.remove('hidden');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+    } else {
+        form.classList.add('hidden');
+        if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
+}
+</script>
 <!-- Footer -->
 
 
