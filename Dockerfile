@@ -30,7 +30,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 # Copiar artefactos compilados desde el stage anterior
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 # Crear directorios para subida de fotos (tours y vehículos) con permisos para el usuario app
 RUN mkdir -p /app/wwwroot/images/tours /app/wwwroot/images/vehicles \
