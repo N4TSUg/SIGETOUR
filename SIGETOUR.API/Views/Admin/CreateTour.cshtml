@@ -361,6 +361,7 @@ function formatShiftInput(input) {
 
 function addShift(name, start, end) {
     shiftCount++;
+    const shiftId = 'shift_' + shiftCount;
     const container = document.getElementById('shifts-container');
     const div = document.createElement('div');
     div.className = 'shift-row p-3.5 rounded-lg border border-outline-variant bg-surface-bright/30 space-y-3';
@@ -775,10 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   
     <!-- Drag and Drop Upload Zone -->
-    <button type="button" class="w-full border-2 border-dashed border-primary/40 hover:border-primary rounded-xl p-6 bg-surface-bright/30 hover:bg-surface-container-low/40 transition-colors duration-150 flex flex-col items-center justify-center text-center cursor-pointer mb-5 group" 
-            onclick="document.getElementById('TourImagesInput').click()"
-            aria-label="Arrastra y suelta fotografías del circuito aquí o haz clic">
-        <label for="TourImagesInput" class="sr-only">Image Files</label>
+    <label for="TourImagesInput" class="w-full border-2 border-dashed border-primary/40 hover:border-primary rounded-xl p-6 bg-surface-bright/30 hover:bg-surface-container-low/40 transition-colors duration-150 flex flex-col items-center justify-center text-center cursor-pointer mb-5 group">
         <input type="file" name="ImageFiles" id="TourImagesInput" multiple accept="image/*" class="hidden" onchange="previewImages(event)" />
         <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-150 mb-3">
             <span class="material-symbols-outlined text-28px" aria-hidden="true">cloud_upload</span>
@@ -789,11 +787,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <p class="text-body-sm font-body-sm text-on-surface-variant max-w-md mb-3">
             Formatos JPG, PNG o WebP (Recomendado 1200x800px). <strong>Sin límite de imágenes.</strong>
         </p>
-        <button type="button" class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-md shadow-sm transition-all duration-150 active:scale-95 flex items-center gap-2">
+        <span class="px-4 py-2 rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-md shadow-sm transition-all duration-150 active:scale-95 flex items-center gap-2 pointer-events-none">
             <span class="material-symbols-outlined text-base">file_upload</span>
             <span>Examinar Archivos / Subir Fotos</span>
-        </button>
-    </div>
+        </span>
+    </label>
   
     <!-- Photo Preview & Management Grid -->
     <div>
@@ -886,6 +884,8 @@ document.addEventListener('DOMContentLoaded', () => {
     </button>
 </div>
 </div> <!-- End of left column space-y-6 -->
+</div> <!-- End of grid-cols-12 -->
+</div> <!-- End of max-w-7xl -->
     <div asp-validation-summary="All" class="text-error text-label-sm font-bold bg-error-container/50 p-3 rounded-lg mt-6 empty:hidden"></div>
 </form><!-- MODAL DE CONFIRMACIÓN: ELIMINAR IMAGEN -->
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="deleteImageModal">
