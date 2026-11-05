@@ -1,26 +1,40 @@
-# Multi-stage Dockerfile for SIGETOUR (ASP.NET Core .NET 10.0)
+# ==============================================================================
+# Multi-stage Dockerfile para SIGETOUR (ASP.NET Core .NET 10.0)
+# Optimizado para Render, Railway, AWS ECS y Docker local
+# ==============================================================================
+
+# STAGE 1: Build & Restore
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy project file and restore dependencies
+# Copiar csproj y restaurar dependencias (aprovechando caché de capas Docker)
 COPY ["SIGETOUR.API/SIGETOUR.API.csproj", "SIGETOUR.API/"]
 RUN dotnet restore "SIGETOUR.API/SIGETOUR.API.csproj"
 
-# Copy full source and build
+# Copiar todo el código fuente y publicar en modo Release
 COPY . .
 WORKDIR "/src/SIGETOUR.API"
-RUN dotnet build "SIGETOUR.API.csproj" -c Release -o /app/build
-
-# Publish release artifact
-FROM build AS publish
 RUN dotnet publish "SIGETOUR.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# Runtime image
+# STAGE 2: Runtime Image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+
+# Puerto por defecto (8080 para Docker local / overridden por PORT en Render)
+ENV PORT=8080
 EXPOSE 8080
-EXPOSE 8081
-ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 10000
+
+# Variables de entorno base para ASP.NET Core en producción
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
+# Copiar artefactos compilados desde el stage anterior
 COPY --from=publish /app/publish .
 
+# Crear directorios para subida de fotos (tours y vehículos) con permisos de escritura
+RUN mkdir -p /app/wwwroot/images/tours /app/wwwroot/images/vehicles \
+    && chmod -R 777 /app/wwwroot/images
+
+# Punto de entrada de la aplicación
 ENTRYPOINT ["dotnet", "SIGETOUR.API.dll"]

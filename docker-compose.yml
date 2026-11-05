@@ -4,15 +4,15 @@ services:
     container_name: sigetour-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: sigetour_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 3nriqueA1402#
+      POSTGRES_DB: ${POSTGRES_DB:-sigetour_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-3nriqueA1402#}
     ports:
       - "5432:5432"
     volumes:
       - sigetour_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d sigetour_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-sigetour_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,7 +29,15 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=sigetour_db;Username=postgres;Password=3nriqueA1402#"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-sigetour_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-3nriqueA1402#}"
+      Payments__CheckoutSigningKey: "${Payments__CheckoutSigningKey:-c2lnZXRvdXJfc3VwZXJfc2VjcmV0X2NoZWNrb3V0X3NpZ25pbmdfa2V5XzIwMjZfMzJieXRlcw==}"
+      Culqi__PublicKey: "${Culqi__PublicKey:-pk_test_RjhHSEHl06v0j0oC}"
+      Culqi__SecretKey: "${Culqi__SecretKey:-sk_test_knGcQerO8dPYQgFl}"
+      Culqi__WebhookUser: "${Culqi__WebhookUser:-webhook_culqi}"
+      Culqi__WebhookPassword: "${Culqi__WebhookPassword:-CulqiSecure2026!}"
+      Nubefact__Mode: "Demo"
+      Nubefact__Ruta: "${Nubefact__Ruta:-https://api.nubefact.com/api/v1/dc63a961-18f3-4a55-aa40-26cca8c03138}"
+      Nubefact__Token: "${Nubefact__Token:-354c60cce9884cffb74d0f50eb247905f4488a3ecc5f48ea9c5b9f0a7a03474f}"
     ports:
       - "5000:8080"
     volumes:

@@ -6,3 +6,9 @@
 **/*.user
 **/*.suo
 **/TestResults
+.env
+.env.*
+*.env
+credenciales*
+*.local
+tmp*
