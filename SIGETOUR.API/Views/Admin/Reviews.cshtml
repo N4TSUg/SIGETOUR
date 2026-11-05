@@ -126,8 +126,9 @@
             <input type="hidden" name="status" value="@currentStatus" />
 
             <div class="md:col-span-6 relative">
+                <label for="reviewsSearchInput" class="sr-only">Buscar testimonios por autor, ciudad o texto</label>
                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
-                <input type="text" name="search" value="@currentSearch" placeholder="Buscar por autor, ciudad o texto del testimonio..."
+                <input type="text" id="reviewsSearchInput" name="search" value="@currentSearch" aria-label="Buscar testimonios por autor, ciudad o texto" placeholder="Buscar por autor, ciudad o texto del testimonio..."
                        class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
                 @if (!string.IsNullOrWhiteSpace(currentSearch))
                 {
@@ -136,7 +137,8 @@
             </div>
 
             <div class="md:col-span-4">
-                <select name="tourId" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                <label for="tourId_2" class="sr-only">tour Id</label>
+                <select id="tourId_2" name="tourId" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
                     <option value="" selected="@(!currentTourId.HasValue || currentTourId.Value == Guid.Empty)">Todos los Circuitos</option>
                     @foreach (var t in tours)
                     {
@@ -321,8 +323,8 @@
 
             <div class="p-6 space-y-4">
                 <div>
-                    <label class="block text-label-md font-bold text-on-surface mb-1.5">Circuito Turístico Relacionado *</label>
-                    <select name="tourId" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" required>
+                    <label for="tourId" class="block text-label-md font-bold text-on-surface mb-1.5">Circuito Turístico Relacionado *</label>
+                    <select id="tourId" name="tourId" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" required>
                         <option value="">-- Seleccionar Tour --</option>
                         @foreach (var t in tours)
                         {
@@ -332,18 +334,18 @@
                 </div>
 
                 <div>
-                    <label class="block text-label-md font-bold text-on-surface mb-1.5">Nombre del Pasajero / Autor *</label>
-                    <input type="text" name="authorName" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Ej: Mariana Gutiérrez" required />
+                    <label for="authorName" class="block text-label-md font-bold text-on-surface mb-1.5">Nombre del Pasajero / Autor *</label>
+                    <input id="authorName" type="text" name="authorName" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Ej: Mariana Gutiérrez" required />
                 </div>
 
                 <div>
-                    <label class="block text-label-md font-bold text-on-surface mb-1.5">Descripción de la Experiencia / Testimonio *</label>
-                    <textarea name="comment" rows="4" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Escribe aquí la experiencia y opinión del viajero respecto al circuito turístico..." required></textarea>
+                    <label for="comment" class="block text-label-md font-bold text-on-surface mb-1.5">Descripción de la Experiencia / Testimonio *</label>
+                    <textarea id="comment" name="comment" rows="4" class="w-full px-3.5 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Escribe aquí la experiencia y opinión del viajero respecto al circuito turístico..." required></textarea>
                 </div>
 
                 <div class="pt-2">
-                    <label class="flex items-center gap-3 p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors">
-                        <input type="checkbox" name="isVisibleOnHome" value="true" class="rounded text-primary focus:ring-primary h-5 w-5" checked />
+                    <label for="isVisibleOnHome" class="flex items-center gap-3 p-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors">
+                        <input id="isVisibleOnHome" type="checkbox" name="isVisibleOnHome" value="true" class="rounded text-primary focus:ring-primary h-5 w-5" checked />
                         <div>
                             <span class="block text-label-md font-bold text-primary">Exhibir en la Portada Principal</span>
                             <span class="block text-label-sm text-on-surface-variant">Aparecerá en el carrusel de 'Viajeros que recomiendan Turismo Chilón' del Home.</span>

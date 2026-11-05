@@ -59,8 +59,8 @@
               Detalles Operativos de la Salida
             </h2>
             <div class="flex items-center gap-2">
-              <label class="text-label-sm font-bold text-on-surface-variant">Estado Inicial:</label>
-              <select asp-for="Status" class="py-1 px-3 rounded-lg border border-outline-variant font-bold text-label-sm bg-green-50 text-green-800 border-green-300 focus:outline-none focus:ring-2 focus:ring-primary">
+              <label for="Status" class="text-label-sm font-bold text-on-surface-variant">Estado Inicial:</label>
+              <select id="Status" asp-for="Status" class="py-1 px-3 rounded-lg border border-outline-variant font-bold text-label-sm bg-green-50 text-green-800 border-green-300 focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="Confirmed">Confirmada</option>
                 <option value="Pending">Pendiente</option>
               </select>
@@ -72,7 +72,7 @@
               <!-- SELECTOR DE TOUR / CIRCUITO -->
               <div class="col-span-1 md:col-span-3 pb-4 border-b border-outline-variant/60">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1.5">
-                  <label class="block text-label-md font-label-md text-on-surface font-bold flex items-center gap-2">
+                  <label for="tourPackageSelect" class="block text-label-md font-label-md text-on-surface font-bold flex items-center gap-2">
                     <span class="material-symbols-outlined text-primary text-[20px]">tour</span>
                     Seleccionar Tour / Circuito Turístico <span class="text-tertiary">*</span>
                   </label>
@@ -93,28 +93,28 @@
 
               <!-- FECHA DE RECORRIDO -->
               <div>
-                <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Fecha de Recorrido <span class="text-tertiary">*</span></label>
-                <input asp-for="TravelDate" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" class="w-full pl-3 pr-3 py-2 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" required />
+                <label for="TravelDate" class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Fecha de Recorrido <span class="text-tertiary">*</span></label>
+                <input id="TravelDate" asp-for="TravelDate" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" class="w-full pl-3 pr-3 py-2 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" required />
               </div>
               
               <!-- TURNO OPERATIVO -->
               <div>
-                <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Turno Operativo</label>
+                <label for="ShiftName" class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Turno Operativo</label>
                 <div class="grid grid-cols-2 gap-3" id="shiftsContainer">
                   @if (Model.AvailableShifts.Any())
                   {
                       foreach (var shift in Model.AvailableShifts)
                       {
-                          <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == shift ? "border-primary bg-primary/5" : "border-outline-variant")">
-                            <input type="radio" asp-for="ShiftName" value="@shift" class="sr-only" onchange="onShiftRadioChanged(this)" />
+                          <label for="ShiftName" class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low @(Model.ShiftName == shift ? "border-primary bg-primary/5" : "border-outline-variant")">
+                            <input id="ShiftName" type="radio" asp-for="ShiftName" value="@shift" class="sr-only" onchange="onShiftRadioChanged(this)" />
                             <span class="text-label-md font-label-md font-bold text-center">@shift</span>
                           </label>
                       }
                   }
                   else
                   {
-                      <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-primary bg-primary/5">
-                        <input type="radio" asp-for="ShiftName" value="Turno Único" class="sr-only" checked onchange="onShiftRadioChanged(this)" />
+                      <label for="Turno__nico" class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-primary bg-primary/5">
+                        <input id="Turno__nico" type="radio" asp-for="ShiftName" value="Turno Único" class="sr-only" checked onchange="onShiftRadioChanged(this)" />
                         <span class="text-label-md font-label-md font-bold text-center">Turno Único</span>
                       </label>
                   }
@@ -123,8 +123,8 @@
 
               <!-- PUNTO DE EMBARQUE -->
               <div>
-                <label class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Punto de Embarque</label>
-                <select asp-for="BoardingPoint" class="w-full py-2 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+                <label for="BoardingPoint" class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Punto de Embarque</label>
+                <select id="BoardingPoint" asp-for="BoardingPoint" class="w-full py-2 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
                   <option value="Agencia Central">Agencia Central (Jr. 2 de Mayo 569)</option>
                   <option value="Hotel Centro Histórico">Hotel (Recojo coordinado)</option>
                   <option value="Plaza de Armas">Plaza de Armas</option>
@@ -162,16 +162,16 @@
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-2">
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo <span class="text-tertiary">*</span></label>
-                  <input asp-for="CustomerName" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. Juan Pérez" required />
+                  <label for="CustomerName" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo <span class="text-tertiary">*</span></label>
+                  <input id="CustomerName" asp-for="CustomerName" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. Juan Pérez" required />
                 </div>
                 <div>
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte <span class="text-tertiary">*</span></label>
-                  <input asp-for="CustomerDni" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 dígitos" required />
+                  <label for="CustomerDni" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte <span class="text-tertiary">*</span></label>
+                  <input id="CustomerDni" asp-for="CustomerDni" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 dígitos" required />
                 </div>
                 <div class="md:col-span-1">
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono <span class="text-tertiary">*</span></label>
-                  <input asp-for="CustomerPhone" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. 987654321" required />
+                  <label for="CustomerPhone" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono <span class="text-tertiary">*</span></label>
+                  <input id="CustomerPhone" asp-for="CustomerPhone" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. 987654321" required />
                 </div>
               </div>
             </div>
@@ -199,6 +199,7 @@
                 <span class="block text-label-sm font-label-sm text-outline">Tarifa Total Calculada</span>
                 <div class="flex items-center gap-2">
                   <span class="text-headline-sm font-headline-sm font-extrabold text-on-surface">S/</span>
+                  <label for="TotalAmountHidden" class="sr-only">Total Amount</label>
                   <input type="number" step="0.50" asp-for="TotalAmount" id="TotalAmountHidden" class="w-32 py-1 px-2 text-headline-sm font-headline-sm font-extrabold text-on-surface bg-transparent border-b-2 border-outline-variant focus:border-primary focus:outline-none" oninput="updateDisplayTotal(this.value)" />
                 </div>
                 <span class="hidden" id="display-total-tariff"></span>
@@ -211,6 +212,7 @@
                 <span class="text-body-md font-body-md text-on-surface-variant font-medium">Abono Inicial</span>
                 <div class="flex items-center gap-2">
                   <span class="text-body-md text-outline">S/</span>
+                  <label for="input-paid-amount" class="sr-only">Paid Amount</label>
                   <input asp-for="PaidAmount" id="input-paid-amount" type="number" step="0.50" oninput="recalcBalance()" class="w-24 text-right py-1 px-2 rounded border border-outline-variant bg-surface-container-lowest font-bold text-title-sm text-primary focus:ring-1 focus:ring-primary" />
                 </div>
               </div>
@@ -224,8 +226,8 @@
             </div>
 
             <div class="mt-6 pt-5 border-t border-outline-variant">
-              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Método de Pago</label>
-              <select asp-for="PaymentMethod" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary mb-3">
+              <label for="PaymentMethod" class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Método de Pago</label>
+              <select id="PaymentMethod" asp-for="PaymentMethod" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary mb-3">
                 <option value="Efectivo">Efectivo (Caja Agencia)</option>
                 <option value="Yape / Plin">Yape / Plin Interbancario</option>
                 <option value="Transferencia BCP / BBVA">Transferencia BCP / BBVA</option>
@@ -233,9 +235,9 @@
                 <option value="Culqi QR">Culqi QR (Billetera Digital)</option>
               </select>
 
-              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">N° de Operación (Voucher)</label>
+              <label for="OperationNumber" class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">N° de Operación (Voucher)</label>
               <div class="relative">
-                <input asp-for="OperationNumber" placeholder="Opcional para efectivo" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono" />
+                <input id="OperationNumber" asp-for="OperationNumber" placeholder="Opcional para efectivo" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono" />
               </div>
             </div>
           </div>
@@ -251,8 +253,8 @@
           </div>
           <div class="p-6 space-y-4">
             <div>
-              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Tipo de Comprobante</label>
-              <select asp-for="InvoiceType" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary">
+              <label for="InvoiceType" class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Tipo de Comprobante</label>
+              <select id="InvoiceType" asp-for="InvoiceType" class="w-full py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="boleta">Boleta de Venta Electrónica</option>
                 <option value="factura">Factura Electrónica (RUC)</option>
                 <option value="nota">Nota de Venta (Interno)</option>
@@ -260,9 +262,9 @@
             </div>
             
             <div>
-              <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Serie y Correlativo</label>
+              <label for="InvoiceNumber" class="block text-label-sm font-label-sm text-outline font-semibold mb-1.5">Serie y Correlativo</label>
               <div class="flex gap-2">
-                <input asp-for="InvoiceNumber" placeholder="Ej. B001-000428" class="flex-1 py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono font-bold" />
+                <input id="InvoiceNumber" asp-for="InvoiceNumber" placeholder="Ej. B001-000428" class="flex-1 py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono font-bold" />
               </div>
             </div>
           </div>
@@ -303,15 +305,16 @@
                     const label = document.createElement('label');
                     label.className = `relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low ${idx === 0 ? 'border-primary bg-primary/5' : 'border-outline-variant'}`;
                     label.innerHTML = `
-                        <input type="radio" name="ShiftName" value="${shift}" class="sr-only" ${idx === 0 ? 'checked' : ''} onchange="onShiftRadioChanged(this)" />
+                        <label for="ShiftName_3" class="sr-only">Shift Name</label>
+                        <input id="ShiftName_3" type="radio" name="ShiftName" value="${shift}" class="sr-only" ${idx === 0 ? 'checked' : ''} onchange="onShiftRadioChanged(this)" />
                         <span class="text-label-md font-label-md font-bold text-center">${shift}</span>
                     `;
                     shiftsContainer.appendChild(label);
                 });
             } else {
                 shiftsContainer.innerHTML = `
-                    <label class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-primary bg-primary/5">
-                        <input type="radio" name="ShiftName" value="Turno Único" class="sr-only" checked onchange="onShiftRadioChanged(this)" />
+                    <label for="ShiftName_2" class="relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-all hover:bg-surface-container-low border-primary bg-primary/5">
+                        <input id="ShiftName_2" type="radio" name="ShiftName" value="Turno Único" class="sr-only" checked onchange="onShiftRadioChanged(this)" />
                         <span class="text-label-md font-label-md font-bold text-center">Turno Único</span>
                     </label>
                 `;
@@ -389,16 +392,16 @@
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-2">
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
-                  <input type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nombre del acompañante" />
+                  <label for="Nombre_Completo" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
+                  <input id="Nombre_Completo" type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nombre del acompañante" />
                 </div>
                 <div>
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
-                  <input type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 dígitos" />
+                  <label for="DNI___Pasaporte" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
+                  <input id="DNI___Pasaporte" type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 dígitos" />
                 </div>
                 <div class="md:col-span-1">
-                  <label class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
-                  <input type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Opcional" />
+                  <label for="Tel_fono" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
+                  <input id="Tel_fono" type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Opcional" />
                 </div>
             </div>
         `;

@@ -52,18 +52,18 @@
                     </div>
                     <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div class="sm:col-span-2">
-                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Nombre Completo y Apellidos <span class="text-tertiary">*</span></label>
-                            <input asp-for="FullName" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. Carlos Mendoza Silva" required />
+                            <label for="FullName" class="block text-label-sm font-bold text-on-surface-variant mb-1">Nombre Completo y Apellidos <span class="text-tertiary">*</span></label>
+                            <input id="FullName" asp-for="FullName" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. Carlos Mendoza Silva" required />
                         </div>
                         <div>
-                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">N° de DNI <span class="text-tertiary">*</span></label>
-                            <input asp-for="Dni" maxlength="8" class="w-full bg-surface-container-low text-on-surface font-mono py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. 42910834" required />
+                            <label for="Dni" class="block text-label-sm font-bold text-on-surface-variant mb-1">N° de DNI <span class="text-tertiary">*</span></label>
+                            <input id="Dni" asp-for="Dni" maxlength="8" class="w-full bg-surface-container-low text-on-surface font-mono py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. 42910834" required />
                         </div>
                         <div>
-                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Teléfono Móvil / WhatsApp</label>
+                            <label for="Phone" class="block text-label-sm font-bold text-on-surface-variant mb-1">Teléfono Móvil / WhatsApp</label>
                             <div class="relative">
                                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">phone</span>
-                                <input asp-for="Phone" class="w-full bg-surface-container-low text-on-surface pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. 976 123 456" />
+                                <input id="Phone" asp-for="Phone" class="w-full bg-surface-container-low text-on-surface pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej. 976 123 456" />
                             </div>
                         </div>
                     </div>
@@ -77,15 +77,15 @@
                     </div>
                     <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
-                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">N° Brevete / Licencia MTC <span class="text-tertiary">*</span></label>
+                            <label for="LicenseNumber" class="block text-label-sm font-bold text-on-surface-variant mb-1">N° Brevete / Licencia MTC <span class="text-tertiary">*</span></label>
                             <div class="relative">
                                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">pin</span>
-                                <input asp-for="LicenseNumber" class="w-full bg-surface-container-low text-on-surface font-mono font-bold tracking-widest pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 uppercase outline-none text-body-md" placeholder="Ej. Q-42910834" required />
+                                <input id="LicenseNumber" asp-for="LicenseNumber" class="w-full bg-surface-container-low text-on-surface font-mono font-bold tracking-widest pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 uppercase outline-none text-body-md" placeholder="Ej. Q-42910834" required />
                             </div>
                         </div>
                         <div>
-                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Categoría Oficial MTC</label>
-                            <select asp-for="LicenseCategory" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md font-medium">
+                            <label for="LicenseCategory" class="block text-label-sm font-bold text-on-surface-variant mb-1">Categoría Oficial MTC</label>
+                            <select id="LicenseCategory" asp-for="LicenseCategory" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md font-medium">
                                 <option value="A-IIIa (Especial Transporte Turístico)">A-IIIa (Especial Transporte Turístico)</option>
                                 <option value="A-IIIc (Profesional Superior Interprovincial)">A-IIIc (Profesional Superior Interprovincial)</option>
                                 <option value="A-IIIb (Vehículos de Carga / Pesados)">A-IIIb (Vehículos de Carga / Pesados)</option>
@@ -93,18 +93,18 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Fecha de Revalidación / Vencimiento</label>
-                            <input asp-for="LicenseExpiryDate" type="date" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md" />
+                            <label for="LicenseExpiryDate" class="block text-label-sm font-bold text-on-surface-variant mb-1">Fecha de Revalidación / Vencimiento</label>
+                            <input id="LicenseExpiryDate" asp-for="LicenseExpiryDate" type="date" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md" />
                         </div>
                         <div>
-                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Estado Operativo</label>
+                            <label for="IsActive" class="block text-label-sm font-bold text-on-surface-variant mb-1">Estado Operativo</label>
                             <div class="flex items-center gap-4 mt-2">
-                                <label class="inline-flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" asp-for="IsActive" value="true" class="text-primary focus:ring-primary" />
+                                <label for="IsActive" class="inline-flex items-center gap-2 cursor-pointer">
+                                    <input id="IsActive" type="radio" asp-for="IsActive" value="true" class="text-primary focus:ring-primary" />
                                     <span class="text-body-sm font-bold text-emerald-800">Habilitado</span>
                                 </label>
-                                <label class="inline-flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" asp-for="IsActive" value="false" class="text-primary focus:ring-primary" />
+                                <label for="Inactivo" class="inline-flex items-center gap-2 cursor-pointer">
+                                    <input id="Inactivo" type="radio" asp-for="IsActive" value="false" class="text-primary focus:ring-primary" />
                                     <span class="text-body-sm text-outline">Inactivo</span>
                                 </label>
                             </div>
@@ -125,8 +125,8 @@
                             Puedes vincular la unidad vehicular que este conductor conduce habitualmente. Al generar el Manifiesto de viaje se preseleccionará automáticamente.
                         </p>
                         <div>
-                            <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Vehículo de la Flota</label>
-                            <select asp-for="AssignedVehicleId" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md font-medium">
+                            <label for="AssignedVehicleId" class="block text-label-sm font-bold text-on-surface-variant mb-1">Vehículo de la Flota</label>
+                            <select id="AssignedVehicleId" asp-for="AssignedVehicleId" class="w-full bg-surface-container-low text-on-surface py-2.5 px-3 rounded-lg border border-outline-variant focus:border-primary outline-none text-body-md font-medium">
                                 <option value="">-- Sin unidad fija (Rotativo) --</option>
                                 @foreach (var v in vehicles)
                                 {

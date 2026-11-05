@@ -191,16 +191,16 @@
             <input type="hidden" name="id" id="modal-incident-id" />
 
             <div>
-                <label class="block text-xs font-bold text-secondary mb-1">Acción / Estado</label>
-                <select name="status" class="w-full px-3 py-2 rounded-lg border border-outline-variant text-xs font-medium">
+                <label for="status" class="block text-xs font-bold text-secondary mb-1">Acción / Estado</label>
+                <select id="status" name="status" class="w-full px-3 py-2 rounded-lg border border-outline-variant text-xs font-medium">
                     <option value="Resolved">Marcar como Resuelta (Revisada y auditada)</option>
                     <option value="Dismissed">Descartar (Falsa alarma / Regularizada externamente)</option>
                 </select>
             </div>
 
             <div>
-                <label class="block text-xs font-bold text-secondary mb-1">Notas de Resolución y Justificación</label>
-                <textarea name="resolutionNotes" rows="3" required placeholder="Detalla la acción correctiva realizada, reprogramación de tour o devolución..." class="w-full px-3 py-2 rounded-lg border border-outline-variant text-xs"></textarea>
+                <label for="resolutionNotes" class="block text-xs font-bold text-secondary mb-1">Notas de Resolución y Justificación</label>
+                <textarea id="resolutionNotes" name="resolutionNotes" rows="3" required placeholder="Detalla la acción correctiva realizada, reprogramación de tour o devolución..." class="w-full px-3 py-2 rounded-lg border border-outline-variant text-xs"></textarea>
             </div>
 
             <div class="flex items-center justify-end gap-2 pt-2">

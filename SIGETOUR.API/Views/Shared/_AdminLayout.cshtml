@@ -159,7 +159,8 @@
 <form method="get" action="@Url.Action("Bookings", "Admin")" id="globalAdminSearchForm" class="relative hidden lg:block w-80 xl:w-96">
 <div class="relative flex items-center">
 <span class="material-symbols-outlined absolute left-3 text-outline text-[18px]">search</span>
-<input id="globalAdminSearchInput" name="search" autocomplete="off" class="w-full pl-9 pr-9 py-1.5 bg-surface/50 border border-outline-variant/60 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Buscar pasajero, DNI, tour, reserva..." type="text">
+<label for="globalAdminSearchInput" class="sr-only">Buscar pasajero, DNI, tour, reserva</label>
+<input id="globalAdminSearchInput" name="search" autocomplete="off" aria-label="Buscar pasajero, DNI, tour o reserva" class="w-full pl-9 pr-9 py-1.5 bg-surface/50 border border-outline-variant/60 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Buscar pasajero, DNI, tour, reserva..." type="text">
 <button type="button" id="clearGlobalSearchBtn" class="material-symbols-outlined absolute right-2.5 text-outline hover:text-on-surface text-[16px] hidden cursor-pointer">close</button>
 </div>
 <div id="globalSearchResults" class="absolute left-0 right-0 top-full mt-2 bg-surface-container-lowest rounded-xl shadow-2xl border border-outline-variant hidden z-50 max-h-[420px] overflow-y-auto divide-y divide-outline-variant/50">

@@ -241,7 +241,7 @@
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <!-- Option A: Total 100% -->
-            <label id="card-modality-full" class="relative flex flex-col p-4 rounded-xl border-2 border-primary bg-[#f4fffa] cursor-pointer transition-all duration-150 hover:shadow-sm">
+            <label id="card-modality-full" for="radio-modality-full" class="relative flex flex-col p-4 rounded-xl border-2 border-primary bg-[#f4fffa] cursor-pointer transition-all duration-150 hover:shadow-sm">
               <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2">
                   <input id="radio-modality-full" checked class="h-4 w-4 text-primary focus:ring-primary border-outline" name="payment_modality" type="radio" value="full" onchange="seleccionarModalidad('full')"/>
@@ -257,7 +257,7 @@
               </p>
             </label>
             <!-- Option B: Seña (Porcentaje configurado por tour) -->
-            <label id="card-modality-deposit" class="relative flex flex-col p-4 rounded-xl border border-outline-variant bg-surface-container-lowest cursor-pointer transition-all duration-150 hover:border-primary/50">
+            <label id="card-modality-deposit" for="radio-modality-deposit" class="relative flex flex-col p-4 rounded-xl border border-outline-variant bg-surface-container-lowest cursor-pointer transition-all duration-150 hover:border-primary/50">
               <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2">
                   <input id="radio-modality-deposit" class="h-4 w-4 text-primary focus:ring-primary border-outline" name="payment_modality" type="radio" value="deposit" onchange="seleccionarModalidad('deposit')"/>
@@ -479,23 +479,23 @@
           </h2>
           <div class="space-y-4">
             <div class="flex items-center gap-6">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input checked class="text-primary focus:ring-primary h-4 w-4" name="billing_type" type="radio" value="boleta"/>
+              <label for="billing_type" class="flex items-center gap-2 cursor-pointer">
+                <input id="billing_type" checked class="text-primary focus:ring-primary h-4 w-4" name="billing_type" type="radio" value="boleta"/>
                 <span class="text-label-md font-label-md text-on-surface font-semibold">Boleta de Venta</span>
               </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input class="text-primary focus:ring-primary h-4 w-4" name="billing_type" type="radio" value="factura"/>
+              <label for="billing_type_2" class="flex items-center gap-2 cursor-pointer">
+                <input id="billing_type_2" class="text-primary focus:ring-primary h-4 w-4" name="billing_type" type="radio" value="factura"/>
                 <span class="text-label-md font-label-md text-on-surface font-semibold">Factura Comercial (RUC)</span>
               </label>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-label-sm font-label-sm text-secondary mb-1">Documento de Identidad (DNI / CE)</label>
-                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface font-mono" readonly type="text" value="@Model.CustomerDni"/>
+                <label for="Documento_de_Identidad__DNI___CE_" class="block text-label-sm font-label-sm text-secondary mb-1">Documento de Identidad (DNI / CE)</label>
+                <input id="Documento_de_Identidad__DNI___CE_" class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface font-mono" readonly type="text" value="@Model.CustomerDni"/>
               </div>
               <div>
-                <label class="block text-label-sm font-label-sm text-secondary mb-1">Nombre o Razón Social</label>
-                <input class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface uppercase" readonly type="text" value="@Model.CustomerName"/>
+                <label for="Nombre_o_Raz_n_Social" class="block text-label-sm font-label-sm text-secondary mb-1">Nombre o Razón Social</label>
+                <input id="Nombre_o_Raz_n_Social" class="w-full px-3 py-2 bg-[#f8fafc] border border-[#cbd5e1] rounded-lg text-body-md font-body-md text-inverse-surface uppercase" readonly type="text" value="@Model.CustomerName"/>
               </div>
             </div>
           </div>

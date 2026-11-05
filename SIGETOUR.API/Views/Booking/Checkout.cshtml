@@ -103,13 +103,13 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Date Picker -->
                         <div>
-                            <label class="block font-label-md text-label-md text-on-surface mb-2 font-bold">Fecha del Recorrido</label>
+                            <label for="input-date" class="block font-label-md text-label-md text-on-surface mb-2 font-bold">Fecha del Recorrido</label>
                             <input name="TravelDate" id="input-date" type="date" required class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-on-surface font-body-md focus:ring-2 focus:ring-primary focus:border-primary outline-none" min="@DateTime.Now.ToString("yyyy-MM-dd")" />
                         </div>
                         
                         <!-- Shift Selection -->
                         <div>
-                            <label class="block font-label-md text-label-md text-on-surface mb-2 font-bold">Turno</label>
+                            <span class="block font-label-md text-label-md text-on-surface mb-2 font-bold">Turno</span>
                             <div class="grid grid-cols-2 gap-3">
                                 @if (Model.Shifts != null && Model.Shifts.Any())
                                 {
@@ -122,12 +122,12 @@
                                         var bgClass = first ? "bg-primary/5" : "bg-surface-container-lowest";
                                         var textClass = first ? "text-primary" : "text-on-surface";
                                         
-                                        <label class="relative flex items-center justify-between p-3 border @borderClass rounded-lg @bgClass cursor-pointer hover:bg-surface-container-low transition-colors js-shift-label">
+                                        <label for="Shift" class="relative flex items-center justify-between p-3 border @borderClass rounded-lg @bgClass cursor-pointer hover:bg-surface-container-low transition-colors js-shift-label">
                                             <div>
                                                 <span class="block font-label-md text-label-md @textClass font-bold js-shift-name">@shift.ShiftName</span>
                                                 <span class="block font-label-sm text-label-sm text-secondary">@startTime</span>
                                             </div>
-                                            <input type="radio" name="Shift" value="@shift.ShiftName" @isChecked class="text-primary focus:ring-primary h-4 w-4 js-shift-radio" />
+                                            <input id="Shift" type="radio" name="Shift" value="@shift.ShiftName" @isChecked class="text-primary focus:ring-primary h-4 w-4 js-shift-radio" />
                                         </label>
                                         first = false;
                                     }
@@ -153,9 +153,9 @@
 
                     <div class="space-y-4">
                         <!-- Option A: Agencia -->
-                        <label class="block p-4 border border-primary rounded-lg bg-primary/5 cursor-pointer relative transition-all" id="label-agencia">
+                        <label for="BoardingPoint" class="block p-4 border border-primary rounded-lg bg-primary/5 cursor-pointer relative transition-all" id="label-agencia">
                             <div class="flex items-start">
-                                <input type="radio" name="BoardingPoint" value="agencia" checked class="mt-1 text-primary focus:ring-primary h-4 w-4" />
+                                <input id="BoardingPoint" type="radio" name="BoardingPoint" value="agencia" checked class="mt-1 text-primary focus:ring-primary h-4 w-4" />
                                 <div class="ml-3 flex-1">
                                     <div class="flex items-center justify-between">
                                         <span class="font-label-md text-label-md font-bold text-primary">Agencia Central Turismo Chilón</span>
@@ -167,9 +167,9 @@
                         </label>
                         
                         <!-- Option B: Hotel -->
-                        <label class="block p-4 border border-outline-variant rounded-lg bg-surface-container-lowest cursor-pointer relative hover:border-primary/50 transition-all" id="label-hotel">
+                        <label for="BoardingPoint_2" class="block p-4 border border-outline-variant rounded-lg bg-surface-container-lowest cursor-pointer relative hover:border-primary/50 transition-all" id="label-hotel">
                             <div class="flex items-start">
-                                <input type="radio" name="BoardingPoint" value="hotel" class="mt-1 text-primary focus:ring-primary h-4 w-4" />
+                                <input id="BoardingPoint_2" type="radio" name="BoardingPoint" value="hotel" class="mt-1 text-primary focus:ring-primary h-4 w-4" />
                                 <div class="ml-3 flex-1">
                                     <div class="flex items-center justify-between">
                                         <span class="font-label-md text-label-md font-bold text-on-surface">Recojo en Hotel</span>
@@ -178,7 +178,8 @@
                                     
                                     <div class="mt-4 hidden" id="hotel-form">
                                         <div class="mb-3">
-                                            <label class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Ubicación del Hotel</label>
+                                            <label for="input-hotelzone" class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Ubicación del Hotel</label>
+                                            <label for="input-hotelzone" class="sr-only">Hotel Zone</label>
                                             <select name="HotelZone" id="input-hotelzone" class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm outline-none">
                                                 <option value="centro">Centro Histórico de Cajamarca (Gratis)</option>
                                                 <option value="afueras">Afueras de la ciudad (Baños del Inca, etc.)</option>
@@ -186,11 +187,11 @@
                                         </div>
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
-                                                <label class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Nombre del Hotel</label>
+                                                <label for="input-hotelname" class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Nombre del Hotel</label>
                                                 <input type="text" name="HotelName" id="input-hotelname" placeholder="Ej: Hotel Laguna Seca" class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm outline-none focus:ring-1 focus:ring-primary" />
                                             </div>
                                             <div>
-                                                <label class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Dirección</label>
+                                                <label for="input-hoteladdress" class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Dirección</label>
                                                 <input type="text" name="HotelAddress" id="input-hoteladdress" placeholder="Ej: Jr. Cruz de Piedra 600" class="w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm outline-none focus:ring-1 focus:ring-primary" />
                                             </div>
                                         </div>
@@ -225,7 +226,7 @@
                     <!-- Control de Cantidad de Pasajeros con botones + y - -->
                     <div class="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                         <div>
-                            <label class="block font-label-md text-label-md text-on-surface mb-2 font-bold flex items-center gap-1.5">
+                            <label for="input-passengers" class="block font-label-md text-label-md text-on-surface mb-2 font-bold flex items-center gap-1.5">
                                 <span class="material-symbols-outlined text-primary text-[20px]">group</span>
                                 Número de Pasajeros
                             </label>
@@ -258,19 +259,19 @@
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="md:col-span-2">
-                                <label class="block font-label-md text-label-md text-on-surface mb-1 font-semibold">Nombres y Apellidos Completos</label>
+                                <label for="input-name" class="block font-label-md text-label-md text-on-surface mb-1 font-semibold">Nombres y Apellidos Completos</label>
                                 <input type="text" name="CustomerName" id="input-name" required class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2.5 text-on-surface font-body-md focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: Juan Carlos Pérez Quispe" />
                             </div>
                             <div>
-                                <label class="block font-label-md text-label-md text-on-surface mb-1 font-semibold">DNI / CE del Titular</label>
+                                <label for="input-dni" class="block font-label-md text-label-md text-on-surface mb-1 font-semibold">DNI / CE del Titular</label>
                                 <input type="text" name="CustomerDni" id="input-dni" required maxlength="12" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2.5 text-on-surface font-body-md focus:ring-2 focus:ring-primary outline-none" placeholder="Ej: 12345678" />
                             </div>
                             <div>
-                                <label class="block font-label-md text-label-md text-on-surface mb-1 font-semibold">Celular / WhatsApp</label>
+                                <label for="input-phone" class="block font-label-md text-label-md text-on-surface mb-1 font-semibold">Celular / WhatsApp</label>
                                 <input type="tel" name="CustomerPhone" id="input-phone" required class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2.5 text-on-surface font-body-md focus:ring-2 focus:ring-primary outline-none" placeholder="+51 999 999 999" />
                             </div>
                             <div class="md:col-span-2">
-                                <label class="block font-label-md text-label-md text-on-surface mb-1 font-semibold">Correo Electrónico</label>
+                                <label for="input-email" class="block font-label-md text-label-md text-on-surface mb-1 font-semibold">Correo Electrónico</label>
                                 <input type="email" name="CustomerEmail" id="input-email" required class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2.5 text-on-surface font-body-md focus:ring-2 focus:ring-primary outline-none" placeholder="correo@ejemplo.com" />
                             </div>
                         </div>
@@ -614,20 +615,20 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="md:col-span-2">
-                            <label class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Nombres y Apellidos <span class="text-red-500">*</span></label>
-                            <input type="text" name="PassengerNames" required class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="Nombre completo del pasajero ${i}" />
+                            <label for="PassengerNames" class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Nombres y Apellidos <span class="text-red-500">*</span></label>
+                            <input id="PassengerNames" type="text" name="PassengerNames" required class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="Nombre completo del pasajero ${i}" />
                         </div>
                         <div>
-                            <label class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">DNI / CE <span class="text-red-500">*</span></label>
-                            <input type="text" name="PassengerDnis" required maxlength="12" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="Documento de identidad" />
+                            <label for="PassengerDnis" class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">DNI / CE <span class="text-red-500">*</span></label>
+                            <input id="PassengerDnis" type="text" name="PassengerDnis" required maxlength="12" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="Documento de identidad" />
                         </div>
                         <div>
-                            <label class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Celular / WhatsApp <span class="text-on-surface-variant text-xs">(Opcional)</span></label>
-                            <input type="tel" name="PassengerPhones" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="+51 999 999 999" />
+                            <label for="PassengerPhones" class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Celular / WhatsApp <span class="text-on-surface-variant text-xs">(Opcional)</span></label>
+                            <input id="PassengerPhones" type="tel" name="PassengerPhones" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="+51 999 999 999" />
                         </div>
                         <div>
-                            <label class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Correo Electrónico <span class="text-on-surface-variant text-xs">(Opcional)</span></label>
-                            <input type="email" name="PassengerEmails" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="correo@ejemplo.com" />
+                            <label for="PassengerEmails" class="block font-label-sm text-label-sm text-on-surface mb-1 font-semibold">Correo Electrónico <span class="text-on-surface-variant text-xs">(Opcional)</span></label>
+                            <input id="PassengerEmails" type="email" name="PassengerEmails" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-on-surface font-body-sm focus:ring-2 focus:ring-primary outline-none" placeholder="correo@ejemplo.com" />
                         </div>
                     </div>
                 `;

@@ -65,7 +65,8 @@
                         </label>
                         <div class="relative">
                             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">label</span>
-                            <input asp-for="Name" class="w-full bg-surface-container-low text-on-surface pl-10 pr-4 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej: Arqueología y Petroglifos" required maxlength="100" />
+                            <label for="Name" class="sr-only">Ej: Arqueología y Petroglifos</label>
+                            <input id="Name" asp-for="Name" class="w-full bg-surface-container-low text-on-surface pl-10 pr-4 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Ej: Arqueología y Petroglifos" required maxlength="100" />
                         </div>
                         <span asp-validation-for="Name" class="text-error text-label-sm mt-1 block"></span>
                     </div>
@@ -76,7 +77,8 @@
                         </label>
                         <div class="relative">
                             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">sort</span>
-                            <input asp-for="DisplayOrder" type="number" min="1" max="999" class="w-full bg-surface-container-low text-on-surface pl-10 pr-4 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md font-bold" required />
+                            <label for="DisplayOrder" class="sr-only">Display Order</label>
+                            <input id="DisplayOrder" asp-for="DisplayOrder" type="number" min="1" max="999" class="w-full bg-surface-container-low text-on-surface pl-10 pr-4 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md font-bold" required />
                         </div>
                         <span class="text-label-sm text-outline mt-1 block">Posición en listados y filtros</span>
                         <span asp-validation-for="DisplayOrder" class="text-error text-label-sm mt-1 block"></span>
@@ -93,6 +95,7 @@
                             <span class="material-symbols-outlined text-[32px]" id="iconPreview">@(string.IsNullOrWhiteSpace(Model.Icon) ? "landscape" : Model.Icon)</span>
                         </div>
                         <div class="flex-1">
+                            <label for="iconInput" class="sr-only">Ej: landscape, history_edu, hot_tub...</label>
                             <input asp-for="Icon" id="iconInput" class="w-full bg-surface-container-low text-on-surface px-4 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md font-mono" placeholder="Ej: landscape, history_edu, hot_tub..." oninput="updateIconPreview(this.value)" />
                             <span class="text-label-sm text-outline mt-1 block">Escribe el nombre de un icono de Google Material Symbols o selecciona uno rápido:</span>
                         </div>
@@ -126,7 +129,8 @@
                     <label class="block text-label-md font-bold text-on-surface mb-1.5" asp-for="Description">
                         Descripción Resumida
                     </label>
-                    <textarea asp-for="Description" rows="3" class="w-full bg-surface-container-low text-on-surface px-4 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Describe brevemente las actividades o destinos comprendidos en esta categoría temática..." maxlength="300"></textarea>
+                    <label for="Description" class="sr-only">Describe brevemente las actividades o destinos comprendidos en esta categoría temática...</label>
+                    <textarea id="Description" asp-for="Description" rows="3" class="w-full bg-surface-container-low text-on-surface px-4 py-2.5 rounded-lg border border-outline-variant focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-body-md" placeholder="Describe brevemente las actividades o destinos comprendidos en esta categoría temática..." maxlength="300"></textarea>
                     <div class="flex justify-between items-center text-label-sm text-outline mt-1">
                         <span>Visible como ayuda explicativa en catálogos y paneles de gestión.</span>
                         <span id="descCharCount">0 / 300 caracteres</span>
@@ -137,13 +141,13 @@
                 <!-- Row 4: Estado Activo / Inactivo -->
                 <div class="p-4 rounded-xl bg-surface-container-low border border-outline-variant flex items-center justify-between">
                     <div>
-                        <label class="font-bold text-on-surface text-body-md block">Estado Operativo de la Categoría</label>
+                        <label for="IsActive" class="font-bold text-on-surface text-body-md block">Estado Operativo de la Categoría</label>
                         <p class="text-body-sm text-on-surface-variant mt-0.5">
                             Si está activa, se mostrará en los filtros públicos y estará disponible para asociar nuevos tours.
                         </p>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" asp-for="IsActive" class="sr-only peer">
+                    <label for="IsActive" class="relative inline-flex items-center cursor-pointer">
+                        <input id="IsActive" type="checkbox" asp-for="IsActive" class="sr-only peer">
                         <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                         <span class="ml-3 text-label-md font-bold text-on-surface peer-checked:text-primary">
                             @(Model.IsActive ? "Activa" : "Inactiva")
@@ -215,7 +219,7 @@
                         Estás a punto de eliminar definitivamente la categoría <strong>@Model.Name</strong>.
                     </p>
                     <div class="p-4 rounded-xl bg-red-50 border border-red-200">
-                        <label class="block text-label-md font-label-md text-on-surface mb-2 font-bold">
+                        <label for="confirmEditDeleteInput" class="block text-label-md font-label-md text-on-surface mb-2 font-bold">
                             Para confirmar, escribe la palabra <span class="text-red-600 font-mono font-bold">ELIMINAR</span>:
                         </label>
                         <input class="w-full uppercase font-mono tracking-wider text-body-md rounded-lg border-outline-variant focus:border-red-600 focus:ring-red-600 bg-surface-container-lowest text-on-surface px-3 py-2" id="confirmEditDeleteInput" placeholder="Escribe 'ELIMINAR'" type="text" autocomplete="off"/>

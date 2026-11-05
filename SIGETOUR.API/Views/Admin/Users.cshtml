@@ -54,6 +54,7 @@
     <form method="get" asp-action="Users" id="userFilterForm" class="flex flex-col sm:flex-row items-center gap-3">
         <div class="relative flex-1 w-full">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
+            <label for="userSearchInput" class="sr-only">Buscar nombre, apellido, correo electrónico o usuario...</label>
             <input type="text" id="userSearchInput" name="search" value="@currentSearch" placeholder="Buscar por nombre, apellido, correo electrónico o usuario..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
             @if (hasFilters)
             {
@@ -270,34 +271,34 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Nombres <span class="text-red-500">*</span></label>
-                    <input type="text" name="FirstName" required placeholder="Ej. Carlos" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                    <label for="FirstName" class="block text-label-sm font-bold text-on-surface mb-1">Nombres <span class="text-red-500">*</span></label>
+                    <input id="FirstName" type="text" name="FirstName" required placeholder="Ej. Carlos" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
                 </div>
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Apellidos <span class="text-red-500">*</span></label>
-                    <input type="text" name="LastName" required placeholder="Ej. Mendoza Sánchez" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Nombre de Usuario <span class="text-red-500">*</span></label>
-                    <input type="text" name="UserName" required placeholder="Ej. cmendoza" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
-                </div>
-                <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Correo Electrónico <span class="text-red-500">*</span></label>
-                    <input type="email" name="Email" required placeholder="usuario@sigetour.com" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                    <label for="LastName" class="block text-label-sm font-bold text-on-surface mb-1">Apellidos <span class="text-red-500">*</span></label>
+                    <input id="LastName" type="text" name="LastName" required placeholder="Ej. Mendoza Sánchez" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Teléfono / WhatsApp</label>
-                    <input type="tel" name="PhoneNumber" placeholder="+51 987 654 321" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                    <label for="UserName" class="block text-label-sm font-bold text-on-surface mb-1">Nombre de Usuario <span class="text-red-500">*</span></label>
+                    <input id="UserName" type="text" name="UserName" required placeholder="Ej. cmendoza" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
                 </div>
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
-                    <select name="Role" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
+                    <label for="Email" class="block text-label-sm font-bold text-on-surface mb-1">Correo Electrónico <span class="text-red-500">*</span></label>
+                    <input id="Email" type="email" name="Email" required placeholder="usuario@sigetour.com" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label for="PhoneNumber" class="block text-label-sm font-bold text-on-surface mb-1">Teléfono / WhatsApp</label>
+                    <input id="PhoneNumber" type="tel" name="PhoneNumber" placeholder="+51 987 654 321" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
+                </div>
+                <div>
+                    <label for="Role" class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
+                    <select id="Role" name="Role" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
                         <option value="Operador" selected>Operador</option>
                         <option value="Admin">Admin</option>
                         @if (isLoggedAsSuperAdmin)
@@ -309,7 +310,7 @@
             </div>
 
             <div>
-                <label class="block text-label-sm font-bold text-on-surface mb-1">Contraseña Inicial <span class="text-red-500">*</span></label>
+                <label for="createPasswordInput" class="block text-label-sm font-bold text-on-surface mb-1">Contraseña Inicial <span class="text-red-500">*</span></label>
                 <div class="flex gap-2">
                     <input type="text" name="Password" id="createPasswordInput" required value="Chilon2026!" class="flex-1 py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
                     <button type="button" onclick="generateRandomPassword('createPasswordInput')" class="px-3 py-2 bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs rounded-lg border border-outline-variant transition-colors cursor-pointer shrink-0">
@@ -320,8 +321,8 @@
             </div>
 
             <div>
-                <label class="block text-label-sm font-bold text-on-surface mb-1">Estado de la Cuenta</label>
-                <select name="IsActive" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
+                <label for="IsActive" class="block text-label-sm font-bold text-on-surface mb-1">Estado de la Cuenta</label>
+                <select id="IsActive" name="IsActive" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
                     <option value="true" selected>Activo (Permite acceso al sistema)</option>
                     <option value="false">Inactivo (Acceso suspendido)</option>
                 </select>
@@ -362,33 +363,33 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Nombres <span class="text-red-500">*</span></label>
+                    <label for="editUserFirstName" class="block text-label-sm font-bold text-on-surface mb-1">Nombres <span class="text-red-500">*</span></label>
                     <input type="text" name="FirstName" id="editUserFirstName" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
                 </div>
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Apellidos <span class="text-red-500">*</span></label>
+                    <label for="editUserLastName" class="block text-label-sm font-bold text-on-surface mb-1">Apellidos <span class="text-red-500">*</span></label>
                     <input type="text" name="LastName" id="editUserLastName" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Nombre de Usuario <span class="text-red-500">*</span></label>
+                    <label for="editUserUserName" class="block text-label-sm font-bold text-on-surface mb-1">Nombre de Usuario <span class="text-red-500">*</span></label>
                     <input type="text" name="UserName" id="editUserUserName" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
                 </div>
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Correo Electrónico <span class="text-red-500">*</span></label>
+                    <label for="editUserEmail" class="block text-label-sm font-bold text-on-surface mb-1">Correo Electrónico <span class="text-red-500">*</span></label>
                     <input type="email" name="Email" id="editUserEmail" required class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Teléfono / WhatsApp</label>
+                    <label for="editUserPhone" class="block text-label-sm font-bold text-on-surface mb-1">Teléfono / WhatsApp</label>
                     <input type="tel" name="PhoneNumber" id="editUserPhone" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
                 </div>
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
+                    <label for="editUserRole" class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
                     <select name="Role" id="editUserRole" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
                         <option value="Operador">Operador</option>
                         <option value="Admin">Admin</option>
@@ -407,7 +408,7 @@
             </div>
 
             <div>
-                <label class="block text-label-sm font-bold text-on-surface mb-1">Restablecer Contraseña (Opcional)</label>
+                <label for="editUserNewPassword" class="block text-label-sm font-bold text-on-surface mb-1">Restablecer Contraseña (Opcional)</label>
                 <div class="flex gap-2">
                     <input type="text" name="NewPassword" id="editUserNewPassword" placeholder="Dejar en blanco para mantener la clave actual" class="flex-1 py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-mono text-on-surface focus:outline-none focus:border-primary" />
                     <button type="button" onclick="generateRandomPassword('editUserNewPassword')" class="px-3 py-2 bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs rounded-lg border border-outline-variant transition-colors cursor-pointer shrink-0">
@@ -418,7 +419,7 @@
             </div>
 
             <div>
-                <label class="block text-label-sm font-bold text-on-surface mb-1">Estado de la Cuenta</label>
+                <label for="editUserIsActive" class="block text-label-sm font-bold text-on-surface mb-1">Estado de la Cuenta</label>
                 <select name="IsActive" id="editUserIsActive" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary">
                     <option value="true">Activo (Permite acceso al sistema)</option>
                     <option value="false">Inactivo (Acceso suspendido)</option>
