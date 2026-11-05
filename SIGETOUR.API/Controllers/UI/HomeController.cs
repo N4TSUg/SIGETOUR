@@ -110,6 +110,25 @@ namespace SIGETOUR.API.Controllers.UI
             return View();
         }
 
+        [HttpGet]
+        public IActionResult Contacto()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public IActionResult Contacto(string nombre, string? apellidos, string email, string whatsapp, string? servicio, string? mensaje)
+        {
+            if (string.IsNullOrWhiteSpace(nombre) || string.IsNullOrWhiteSpace(whatsapp))
+            {
+                ViewBag.ErrorMessage = "Por favor completa tu nombre y número de WhatsApp para poder contactarte.";
+                return View();
+            }
+
+            TempData["SuccessMessage"] = $"¡Muchas gracias {nombre}! Tu mensaje ha sido recibido exitosamente. Un asesor de Turismo Chilón te responderá a la brevedad.";
+            return RedirectToAction(nameof(Contacto));
+        }
+
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {

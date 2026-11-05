@@ -147,6 +147,8 @@
     var homeClass = isHome ? activeClass : inactiveClass;
     var fleetClass = isFleet ? activeClass : inactiveClass;
     var aboutClass = isAbout ? activeClass : inactiveClass;
+    var isContact = controller == "Home" && action == "Contacto";
+    var contactClass = isContact ? activeClass : inactiveClass;
 }
   <!-- Desktop Nav Links -->
   <nav class="hidden md:flex items-center space-x-7">
@@ -154,7 +156,7 @@
       <a class="@catalogClass" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
       <a class="@fleetClass" asp-controller="Vehicle" asp-action="Catalog">Flota Turística</a>
       <a class="@aboutClass" asp-controller="Home" asp-action="Nosotros">Nosotros</a>
-      <a class="@inactiveClass" href="@(isHome ? "#contacto" : "/#contacto")">Contacto</a>
+      <a class="@contactClass" asp-controller="Home" asp-action="Contacto">Contacto</a>
   </nav>
 <!-- CTA Action Header -->
 <div class="hidden sm:flex items-center gap-3">
@@ -174,7 +176,7 @@
       <a class="block py-2 @(isCatalog ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Tour" asp-action="Catalog">Tours y Circuitos</a>
       <a class="block py-2 @(isFleet ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Vehicle" asp-action="Catalog">Flota Turística</a>
       <a class="block py-2 @(isAbout ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Home" asp-action="Nosotros">Nosotros</a>
-      <a class="block py-2 text-on-surface-variant hover:text-primary font-medium text-sm" href="@(isHome ? "#contacto" : "/#contacto")">Contacto</a>
+      <a class="block py-2 @(isContact ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary font-medium") text-sm" asp-controller="Home" asp-action="Contacto">Contacto</a>
       <div class="pt-2 border-t border-outline-variant/60">
         <a class="w-full bg-primary hover:bg-primary-dark text-white font-bold py-2.5 rounded-xl shadow-xs text-center text-sm flex items-center justify-center gap-2" asp-controller="Tour" asp-action="Catalog">
           <span class="material-symbols-outlined text-[18px]">book_online</span>

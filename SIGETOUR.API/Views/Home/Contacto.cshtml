@@ -1,0 +1,256 @@
+@{
+    ViewData["Title"] = "Contáctanos | Turismo Chilón Cajamarca";
+    ViewData["Description"] = "Comunícate con Turismo Chilón para reservas de tours, transporte de personal y alquiler de movilidades en Cajamarca.";
+    Layout = "_Layout";
+}
+
+<!-- HERO BANNER -->
+<section class="relative bg-gradient-to-br from-secondary via-[#19302b] to-primary-dark text-white pt-28 pb-16 lg:pt-36 lg:pb-20 overflow-hidden">
+    <!-- Decor Elements -->
+    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none"></div>
+    <div class="absolute -right-20 -top-20 w-96 h-96 bg-primary/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -left-20 -bottom-20 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+        <!-- Breadcrumb Pill -->
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-emerald-300 mb-6">
+            <span class="material-symbols-outlined text-[16px]">support_agent</span>
+            <span>Atención Personalizada • Lunes a Domingo</span>
+        </div>
+
+        <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white max-w-4xl mx-auto leading-tight uppercase">
+            Contáctanos
+        </h1>
+
+        <p class="mt-6 text-lg sm:text-xl text-emerald-50/90 max-w-2xl mx-auto font-medium leading-relaxed">
+            Estamos a tu disposición para cotizaciones, reservas inmediatas de tours, transporte de personal o alquiler de movilidades.
+        </p>
+    </div>
+</section>
+
+<!-- MAIN CONTENT SECTION: 2 COLUMNS -->
+<section class="py-16 sm:py-20 bg-surface-container-lowest relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="mb-10 p-5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-900 flex items-start sm:items-center gap-3.5 shadow-sm">
+                <span class="material-symbols-outlined text-emerald-600 text-2xl shrink-0">check_circle</span>
+                <div class="flex-1 text-sm font-semibold">
+                    @TempData["SuccessMessage"]
+                </div>
+            </div>
+        }
+
+        @if (ViewBag.ErrorMessage != null)
+        {
+            <div class="mb-10 p-5 rounded-2xl bg-red-50 border border-red-300 text-red-900 flex items-start sm:items-center gap-3.5 shadow-sm">
+                <span class="material-symbols-outlined text-red-600 text-2xl shrink-0">error</span>
+                <div class="flex-1 text-sm font-semibold">
+                    @ViewBag.ErrorMessage
+                </div>
+            </div>
+        }
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+            
+            <!-- LEFT COLUMN: INFORMES Y RESERVAS -->
+            <div class="lg:col-span-5 bg-gradient-to-br from-secondary to-[#162724] text-white rounded-3xl p-8 sm:p-10 shadow-xl border border-white/10 space-y-8 relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-primary/20 rounded-full blur-2xl pointer-events-none"></div>
+
+                <div>
+                    <span class="text-xs font-bold text-emerald-400 uppercase tracking-[0.2em] block mb-1">Central de Atención</span>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">INFORMES Y RESERVAS</h2>
+                    <p class="text-xs sm:text-sm text-emerald-100/80 mt-2 leading-relaxed">
+                        Elige tu canal preferido para comunicarte con nuestro equipo en Cajamarca.
+                    </p>
+                </div>
+
+                <!-- EMAIL -->
+                <div class="space-y-2">
+                    <span class="text-[11px] font-bold text-white/60 uppercase tracking-widest block">EMAIL OFICIAL</span>
+                    <div class="flex items-center gap-3 p-3.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                        <span class="material-symbols-outlined text-emerald-400 text-[22px]">mail</span>
+                        <div class="truncate">
+                            <a href="mailto:informes@turismochilon.com" class="text-sm sm:text-base font-bold text-white hover:text-emerald-300 transition-colors block truncate">
+                                informes@turismochilon.com
+                            </a>
+                            <span class="text-[11px] text-white/60 block">informes.chilon@gmail.com</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WHATSAPP BUTTONS -->
+                <div class="space-y-4">
+                    <span class="text-[11px] font-bold text-white/60 uppercase tracking-widest block">CANALES DE WHATSAPP DIRECTOS</span>
+                    
+                    <!-- WhatsApp 1 -->
+                    <div class="space-y-1.5">
+                        <span class="text-xs font-semibold text-emerald-200">Línea 01: Reservas & Circuitos Turísticos</span>
+                        <a href="https://wa.me/51901195392?text=Hola%20Turismo%20Chilón,%20deseo%20información%20sobre%20los%20tours" target="_blank" class="w-full py-3.5 px-5 rounded-2xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-extrabold text-sm flex items-center justify-center gap-2.5 shadow-lg transition-transform duration-150 active:scale-98">
+                            <span class="material-symbols-outlined text-2xl">chat</span>
+                            <span>WhatsApp: +51 901 195 392</span>
+                        </a>
+                    </div>
+
+                    <!-- WhatsApp 2 -->
+                    <div class="space-y-1.5 pt-2">
+                        <span class="text-xs font-semibold text-emerald-200">Línea 02: Flota, Alquiler & Personal</span>
+                        <a href="https://wa.me/51944746364?text=Hola%20Turismo%20Chilón,%20deseo%20cotizar%20alquiler%20de%20van%20o%20transporte%20corporativo" target="_blank" class="w-full py-3.5 px-5 rounded-2xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-extrabold text-sm flex items-center justify-center gap-2.5 shadow-lg transition-transform duration-150 active:scale-98">
+                            <span class="material-symbols-outlined text-2xl">chat</span>
+                            <span>WhatsApp: +51 944 746 364</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- OFICINA Y HORARIOS -->
+                <div class="pt-4 border-t border-white/10 space-y-4 text-xs sm:text-sm">
+                    <div class="flex items-start gap-3">
+                        <span class="material-symbols-outlined text-emerald-400 text-[20px] shrink-0 mt-0.5">location_on</span>
+                        <div>
+                            <strong class="text-white block">Sede Comercial & Despacho:</strong>
+                            <span class="text-emerald-100/80">Jr. 2 de Mayo 569, Cajamarca (A 3 cuadras de la Plaza de Armas)</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-3">
+                        <span class="material-symbols-outlined text-emerald-400 text-[20px] shrink-0 mt-0.5">schedule</span>
+                        <div>
+                            <strong class="text-white block">Horario Continuo:</strong>
+                            <span class="text-emerald-100/80">Lunes a Domingo: 07:00 AM – 08:00 PM</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: ESCRÍBENOS (FORMULARIO) -->
+            <div class="lg:col-span-7 bg-white rounded-3xl p-8 sm:p-10 border border-outline-variant shadow-md">
+                <div class="mb-8 pb-4 border-b border-outline-variant/60">
+                    <span class="text-xs font-bold text-primary uppercase tracking-[0.2em] block mb-1">Mensaje en Línea</span>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">Escríbenos</h2>
+                    <p class="text-body-sm text-on-surface-variant mt-1.5 leading-relaxed">
+                        Completa tus datos a continuación y nos contactaremos contigo de forma inmediata.
+                    </p>
+                </div>
+
+                <form asp-action="Contacto" method="post" id="contactForm" class="space-y-6">
+                    <!-- TUS DATOS: Nombre y Apellidos -->
+                    <div>
+                        <span class="block text-label-md font-bold text-on-surface mb-2">TUS DATOS *</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="Nombre" class="block text-xs font-semibold text-outline mb-1">Nombre *</label>
+                                <input id="Nombre" name="nombre" type="text" class="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-low/40 text-body-md text-on-surface focus:ring-2 focus:ring-primary focus:bg-white focus:outline-none transition-all" placeholder="Ej. Juan Carlos" required />
+                            </div>
+                            <div>
+                                <label for="Apellidos" class="block text-xs font-semibold text-outline mb-1">Apellidos</label>
+                                <input id="Apellidos" name="apellidos" type="text" class="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-low/40 text-body-md text-on-surface focus:ring-2 focus:ring-primary focus:bg-white focus:outline-none transition-all" placeholder="Ej. Pérez Quispe" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CORREO ELECTRÓNICO -->
+                    <div>
+                        <label for="Email" class="block text-label-md font-bold text-on-surface mb-1">Correo electrónico *</label>
+                        <input id="Email" name="email" type="email" class="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-low/40 text-body-md text-on-surface focus:ring-2 focus:ring-primary focus:bg-white focus:outline-none transition-all" placeholder="correo@ejemplo.com" required />
+                    </div>
+
+                    <!-- NÚMERO DE WHATSAPP -->
+                    <div>
+                        <label for="Whatsapp" class="block text-label-md font-bold text-on-surface mb-1">Número de WhatsApp *</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-xs font-bold text-outline">
+                                +51
+                            </span>
+                            <input id="Whatsapp" name="whatsapp" type="tel" class="w-full pl-12 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-low/40 text-body-md text-on-surface focus:ring-2 focus:ring-primary focus:bg-white focus:outline-none transition-all" placeholder="987 654 321" required />
+                        </div>
+                        <span class="text-[11px] text-outline mt-1 block">Te enviaremos los detalles o cotización directamente a este número.</span>
+                    </div>
+
+                    <!-- SERVICIO DE INTERÉS -->
+                    <div>
+                        <label for="Servicio" class="block text-label-md font-bold text-on-surface mb-1">Servicio de Interés</label>
+                        <select id="Servicio" name="servicio" class="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-low/40 text-body-md text-on-surface focus:ring-2 focus:ring-primary focus:bg-white focus:outline-none transition-all cursor-pointer">
+                            <option value="Tours Diarios y Circuitos">Tours Diarios y Circuitos (Cumbemayo, Porcón, Otuzco, Namora)</option>
+                            <option value="Alquiler de Vans / Movilidad Privada">Alquiler de Vans / Movilidad Privada (Sprinter / HiAce)</option>
+                            <option value="Transporte de Personal Corporativo">Transporte de Personal Corporativo e Institucional</option>
+                            <option value="Traslado Aeropuerto / Terminal">Traslado Aeropuerto / Terminal Cajamarca</option>
+                            <option value="Consulta General">Otra Consulta General</option>
+                        </select>
+                    </div>
+
+                    <!-- MENSAJE O CONSULTA -->
+                    <div>
+                        <label for="Mensaje" class="block text-label-md font-bold text-on-surface mb-1">Mensaje o Consulta (Opcional)</label>
+                        <textarea id="Mensaje" name="mensaje" rows="4" class="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-low/40 text-body-md text-on-surface focus:ring-2 focus:ring-primary focus:bg-white focus:outline-none transition-all resize-y" placeholder="Indícanos fechas estimadas, número de personas o detalles de tu viaje..."></textarea>
+                    </div>
+
+                    <!-- BOTONES DE ACCIÓN -->
+                    <div class="pt-2 flex flex-col sm:flex-row items-center gap-3.5">
+                        <button type="submit" class="w-full sm:w-auto flex-1 py-3 px-6 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-sm shadow-md transition-all duration-150 active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
+                            <span class="material-symbols-outlined text-[18px]">send</span>
+                            <span>Enviar Mensaje</span>
+                        </button>
+                        
+                        <button type="button" onclick="sendViaWhatsapp()" class="w-full sm:w-auto py-3 px-6 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold text-sm shadow-md transition-all duration-150 active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
+                            <span class="material-symbols-outlined text-[18px]">chat</span>
+                            <span>Enviar por WhatsApp</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- SECTION: UBICACIÓN Y MAPA -->
+<section class="py-16 bg-surface-container-low/50 border-t border-outline-variant/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-2xl mx-auto mb-10">
+            <span class="text-xs font-bold text-primary uppercase tracking-[0.2em] block mb-1">Visítanos en Persona</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">Oficina Comercial en el Centro Histórico</h2>
+            <p class="text-sm text-on-surface-variant mt-2">Jr. 2 de Mayo 569 • A 3 cuadras de la Plaza Mayor de Cajamarca</p>
+        </div>
+
+        <div class="rounded-3xl overflow-hidden border border-outline-variant shadow-lg h-80 sm:h-96 w-full">
+            <iframe 
+                title="Ubicación de Turismo Chilón en Cajamarca"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3957.994640986701!2d-78.521852!3d-7.160911!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x91b25af1cb66a1ef%3A0x8e826b647ec87b92!2sJr.%20Dos%20de%20Mayo%20569%2C%20Cajamarca%2006001!5e0!3m2!1ses!2spe!4v1700000000000!5m2!1ses!2spe" 
+                width="100%" 
+                height="100%" 
+                style="border:0;" 
+                allowfullscreen="" 
+                loading="lazy" 
+                referrerpolicy="no-referrer-when-downgrade">
+            </iframe>
+        </div>
+    </div>
+</section>
+
+<script>
+function sendViaWhatsapp() {
+    const nombre = document.getElementById('Nombre').value.trim();
+    const apellidos = document.getElementById('Apellidos').value.trim();
+    const email = document.getElementById('Email').value.trim();
+    const whatsapp = document.getElementById('Whatsapp').value.trim();
+    const servicio = document.getElementById('Servicio').value;
+    const mensaje = document.getElementById('Mensaje').value.trim();
+
+    if (!nombre) {
+        alert('Por favor ingresa tu nombre antes de enviar por WhatsApp.');
+        document.getElementById('Nombre').focus();
+        return;
+    }
+
+    const fullName = apellidos ? `${nombre} ${apellidos}` : nombre;
+    let text = `¡Hola Turismo Chilón! Mi nombre es *${fullName}*.\n`;
+    if (whatsapp) text += `📱 Teléfono: ${whatsapp}\n`;
+    if (email) text += `📧 Email: ${email}\n`;
+    text += `🗺️ Servicio de Interés: *${servicio}*\n`;
+    if (mensaje) text += `💬 Consulta: ${mensaje}\n`;
+
+    const encoded = encodeURIComponent(text);
+    window.open(`https://wa.me/51901195392?text=${encoded}`, '_blank');
+}
+</script>
