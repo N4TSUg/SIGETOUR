@@ -32,9 +32,13 @@ ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 # Copiar artefactos compilados desde el stage anterior
 COPY --from=publish /app/publish .
 
-# Crear directorios para subida de fotos (tours y vehículos) con permisos de escritura
+# Crear directorios para subida de fotos (tours y vehículos) con permisos para el usuario app
 RUN mkdir -p /app/wwwroot/images/tours /app/wwwroot/images/vehicles \
-    && chmod -R 777 /app/wwwroot/images
+    && chown -R app:app /app \
+    && chmod -R 775 /app/wwwroot/images
+
+# Ejecutar el contenedor bajo el usuario seguro no privilegiado 'app' (Regla SonarQube docker:S6471)
+USER app
 
 # Punto de entrada de la aplicación
 ENTRYPOINT ["dotnet", "SIGETOUR.API.dll"]

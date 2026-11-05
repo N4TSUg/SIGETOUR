@@ -54,9 +54,8 @@ function iniciarCuentaRegresivaQr(segundosRestantes, onTick, onExpired) {
 
 // Escuchador global de respuestas de autenticación 3D Secure del banco emisor
 window.addEventListener("message", async function (event) {
-  // Validación estricta del origen del evento (solo Culqi 3DS oficial)
-  const origin = event.origin || "";
-  if (origin !== "https://3ds.culqi.com" && !origin.endsWith(".culqi.com")) {
+  // Validación estricta del origen del mensaje cross-origin (Regla SonarQube S2819)
+  if (event.origin !== "https://3ds.culqi.com" && event.origin !== "https://checkout.culqi.com") {
     return;
   }
 

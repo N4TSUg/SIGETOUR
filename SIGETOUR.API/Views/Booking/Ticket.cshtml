@@ -64,11 +64,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ticket POS - @fullNumber - @tradeName</title>
     <!-- Tailwind CSS para vista previa -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
-    <!-- QRCode JS ligero -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- QRCode JS ligero con validación de integridad SRI (Regla SonarQube Web:S5725) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1Pg4NcWhwcFlC36PUDazeC5DRv36lPHv80Pvs9K47Z84hPN4Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         @@page {
             size: @(is58 ? "58mm" : "80mm") auto;
