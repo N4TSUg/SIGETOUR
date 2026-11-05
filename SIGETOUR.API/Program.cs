@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -11,6 +12,21 @@ using System.Text;
 using System;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Soporte de enlace dinámico de puerto para Render / Cloud Containers
+var renderPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(renderPort))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{renderPort}");
+}
+
+// Configuración de Forwarded Headers para Render y Proxies Inversos (HTTPS)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -67,7 +83,9 @@ if (effectiveConn.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase
             Database = string.IsNullOrEmpty(database) ? "neondb" : database,
             Username = username,
             Password = password,
-            SslMode = Npgsql.SslMode.Require
+            SslMode = (uri.Host == "localhost" || uri.Host == "127.0.0.1")
+                ? Npgsql.SslMode.Prefer
+                : Npgsql.SslMode.Require
         };
         effectiveConn = npgsqlBuilder.ConnectionString;
     }
@@ -680,10 +698,27 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+app.UseForwardedHeaders();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+}
+else
 {
     app.MapOpenApi();
 }
+
+// Middleware de Cabeceras de Seguridad para Producción
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("X-Frame-Options", "SAMEORIGIN");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+    await next();
+});
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -693,6 +728,9 @@ app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Endpoint de verificación de salud para Render / Cloud Monitors
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "SIGETOUR", timestamp = DateTime.UtcNow }));
 
 app.MapControllers(); // For API
 app.MapControllerRoute(

@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: sigetour
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: ohio
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: DATABASE_URL
+        sync: false
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Payments__CheckoutSigningKey
+        sync: false
+      - key: Culqi__PublicKey
+        sync: false
+      - key: Culqi__SecretKey
+        sync: false
+      - key: Culqi__WebhookUser
+        sync: false
+      - key: Culqi__WebhookPassword
+        sync: false
+      - key: Nubefact__Mode
+        value: Demo
+      - key: Nubefact__Ruta
+        sync: false
+      - key: Nubefact__Token
+        sync: false
+      - key: Nubefact__BoletaSeries
+        value: BBB1
+      - key: Nubefact__FacturaSeries
+        value: FFF1
+      - key: Nubefact__OperationType
+        value: gravada
+      - key: Nubefact__DefaultIgvRate
+        value: "0.18"
+      - key: Nubefact__SendToSunat
+        value: "false"
+      - key: Jwt__Key
+        sync: false
+      - key: Company__TradeName
+        value: "TURISMO CHILÓN"
+      - key: Company__LegalName
+        value: "TRANSPORTE & TURISMO CAJAMARCA S.A.C."
+      - key: Company__Ruc
+        value: "20601234567"
+      - key: Company__FiscalAddress
+        value: "Jr. 2 de Mayo 569, Cajamarca - Perú"
+      - key: Company__Phone
+        value: "+51 901 195 392 / +51 944 746 364"

@@ -1,0 +1,36 @@
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Página no disponible - Turismo Chilón";
+}
+
+<main class="min-h-[70vh] flex items-center justify-center px-4 py-16 bg-surface">
+  <div class="max-w-md w-full text-center space-y-6 bg-white p-8 sm:p-10 rounded-3xl border border-outline-variant shadow-xl">
+    <div class="w-20 h-20 mx-auto rounded-3xl bg-primary/10 text-primary flex items-center justify-center">
+      <span class="material-symbols-outlined text-4xl">travel_explore</span>
+    </div>
+    
+    <div class="space-y-2">
+      <span class="text-xs font-bold text-accent-red uppercase tracking-wider block">Atención al Pasajero</span>
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-secondary tracking-tight">Ocurrió un contratiempo</h1>
+      <p class="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+        No se pudo completar la solicitud en este momento. Por favor, intenta nuevamente en unos instantes o vuelve a nuestra página de inicio.
+      </p>
+    </div>
+
+    <div class="pt-4 border-t border-outline-variant/60 flex flex-col sm:flex-row gap-3 justify-center">
+      <a href="/" class="px-5 py-3 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all active:scale-95 flex items-center justify-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">home</span>
+        <span>Ir al Inicio</span>
+      </a>
+      <a href="/Tour/Catalog" class="px-5 py-3 rounded-xl bg-surface-container-low hover:bg-surface-container text-secondary font-bold text-xs uppercase tracking-wider border border-outline-variant transition-all flex items-center justify-center gap-2">
+        <span class="material-symbols-outlined text-[18px]">explore</span>
+        <span>Ver Catálogo</span>
+      </a>
+    </div>
+
+    <div class="pt-2 text-[11px] text-on-surface-variant">
+      <span>¿Necesitas asistencia inmediata? Escríbenos a </span>
+      <a href="https://wa.me/51901195392" target="_blank" class="text-primary font-bold hover:underline">+51 901 195 392</a>
+    </div>
+  </div>
+</main>
