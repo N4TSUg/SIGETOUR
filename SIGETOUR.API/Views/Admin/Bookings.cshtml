@@ -797,19 +797,15 @@
 
             <!-- Actions Buttons -->
             <div class="flex flex-col gap-2 pt-1 border-t border-outline-variant/40">
-                <button type="button" id="btnWaDownloadAndOpen" onclick="executeWaDownloadAndOpen()" class="w-full py-3 px-4 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer">
-                    <span class="material-symbols-outlined text-[20px]">cloud_download</span>
-                    <span>Descargar 2 PDFs y Abrir WhatsApp</span>
+                <button type="button" id="btnWaOpenDirect" onclick="executeWaOpenOnly()" class="w-full py-3 px-4 bg-[#25D366] hover:bg-[#1EBE5D] text-white rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">chat</span>
+                    <span>Abrir WhatsApp con Enlaces Directos</span>
                 </button>
                 
                 <div class="flex items-center gap-2">
-                    <button type="button" id="btnWaShareDirect" onclick="executeWaShareDirect()" class="flex-1 py-2.5 px-3 bg-surface-container-high hover:bg-surface-container text-on-surface border border-outline-variant rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer" title="Compartir archivos PDF directamente">
-                        <span class="material-symbols-outlined text-[17px] text-primary">share</span>
-                        <span>Compartir Archivos</span>
-                    </button>
-                    <button type="button" onclick="executeWaOpenOnly()" class="flex-1 py-2.5 px-3 bg-surface-container-high hover:bg-surface-container text-on-surface border border-outline-variant rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer" title="Abrir WhatsApp con mensaje de enlaces directos">
-                        <span class="material-symbols-outlined text-[17px] text-[#25D366]">chat</span>
-                        <span>Solo Chat con Enlaces</span>
+                    <button type="button" id="btnWaDownloadAndOpen" onclick="executeWaDownloadAndOpen()" class="flex-1 py-2.5 px-3 bg-surface-container-high hover:bg-surface-container text-on-surface border border-outline-variant rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer" title="Descargar ambos archivos PDF a la computadora y abrir WhatsApp">
+                        <span class="material-symbols-outlined text-[17px] text-primary">cloud_download</span>
+                        <span>Descargar PDFs y Abrir</span>
                     </button>
                     <button type="button" onclick="closeSendWhatsAppModal()" class="px-4 py-2.5 rounded-xl border border-outline-variant hover:bg-surface-container text-xs font-bold text-secondary transition-all cursor-pointer">
                         Cerrar
@@ -1225,16 +1221,16 @@ function openSendWhatsAppModal(bookingId, rawPhone, customerName, refCode, tourT
 
 function updateWaMessagePreview() {
     if (!currentWaData) return;
-    const voucherUrl = currentWaData.voucherPdfUrl || `${window.location.origin}/Booking/DownloadVoucherPdf/${currentWaData.bookingId}`;
+    const voucherUrl = currentWaData.voucherPdfUrl || `${window.location.origin}/b/${currentWaData.refCode}`;
     const receiptLine = currentWaData.hasReceipt && currentWaData.receiptPdfUrl
-        ? `\n• *Boleta de Venta Electrónica (PDF):* ${currentWaData.receiptPdfUrl}`
+        ? `\n• *Boleta Electrónica:* ${currentWaData.receiptPdfUrl}`
         : '';
 
     const msg = `¡Hola *${currentWaData.customerName}*! Le saluda Turismo Chilón.\n\n` +
                 `Le confirmamos que su reserva para el tour *${currentWaData.tourTitle}* programada para el *${currentWaData.travelDate}* se encuentra CONFIRMADA.\n\n` +
                 `• *Código de Reserva:* ${currentWaData.refCode}\n\n` +
-                `*Descarga de Comprobantes Oficiales en PDF:*\n` +
-                `• *Boleto Oficial de Viaje (PDF):* ${voucherUrl}` +
+                `*Comprobantes Oficiales en PDF:*\n` +
+                `• *Boleto de Viaje:* ${voucherUrl}` +
                 receiptLine + `\n\n` +
                 `Punto de salida: Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI físico).\n` +
                 `¡Gracias por confiar en Turismo Chilón!`;

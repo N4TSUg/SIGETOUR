@@ -429,6 +429,90 @@ namespace SIGETOUR.API.Controllers.UI
             return Redirect(receipt.PdfUrl);
         }
 
+        [HttpGet("b/{code}")]
+        public async Task<IActionResult> ShortVoucherPdf(string code)
+        {
+            if (string.IsNullOrWhiteSpace(code)) return NotFound("Código de reserva no válido.");
+
+            var cleanCode = code.Trim().ToUpperInvariant();
+            var booking = await _context.Bookings
+                .Include(b => b.Items).ThenInclude(i => i.TourPackage).ThenInclude(t => t.Category)
+                .Include(b => b.AssignedVehicle)
+                .FirstOrDefaultAsync(b => b.ReferenceCode == cleanCode || b.ReferenceCode == $"RES-{cleanCode}");
+
+            if (booking == null) return NotFound($"No se encontró la reserva con código {code}.");
+
+            var receipt = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == booking.Id)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            var tour = booking.Items?.FirstOrDefault()?.TourPackage;
+            var receiptLabel = receipt != null ? $"{receipt.Series}-{receipt.Number}" : null;
+
+            var pdfBytes = VoucherPdfGenerator.GenerateVoucherPdf(booking, tour, receiptLabel);
+            Response.Headers["Content-Disposition"] = $"inline; filename=Boleto_Oficial_{booking.ReferenceCode}.pdf";
+            return File(pdfBytes, "application/pdf");
+        }
+
+        [HttpGet("b/{code}/boleta")]
+        public async Task<IActionResult> ShortReceiptPdf(string code)
+        {
+            if (string.IsNullOrWhiteSpace(code)) return NotFound("Código de reserva no válido.");
+
+            var cleanCode = code.Trim().ToUpperInvariant();
+            var booking = await _context.Bookings
+                .FirstOrDefaultAsync(b => b.ReferenceCode == cleanCode || b.ReferenceCode == $"RES-{cleanCode}");
+
+            if (booking == null) return NotFound($"No se encontró la reserva con código {code}.");
+
+            var receipt = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == booking.Id)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            if (receipt == null) return NotFound("Esta reserva aún no tiene un comprobante electrónico emitido.");
+
+            if (!string.IsNullOrWhiteSpace(receipt.PdfUrl) && receipt.PdfUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                    var bytes = await httpClient.GetByteArrayAsync(receipt.PdfUrl);
+                    Response.Headers["Content-Disposition"] = $"inline; filename=Boleta_{receipt.Series}-{receipt.Number}.pdf";
+                    return File(bytes, "application/pdf");
+                }
+                catch
+                {
+                    return Redirect(receipt.PdfUrl);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(receipt.PdfUrl))
+            {
+                return Redirect(receipt.PdfUrl);
+            }
+
+            return NotFound("El comprobante electrónico aún no cuenta con archivo PDF disponible.");
+        }
+
+        [HttpGet("b/{code}/ver")]
+        public async Task<IActionResult> ShortVoucherHtml(string code)
+        {
+            if (string.IsNullOrWhiteSpace(code)) return NotFound("Código de reserva no válido.");
+
+            var cleanCode = code.Trim().ToUpperInvariant();
+            var booking = await _context.Bookings
+                .Include(b => b.Items).ThenInclude(i => i.TourPackage).ThenInclude(t => t.Category)
+                .Include(b => b.AssignedVehicle)
+                .FirstOrDefaultAsync(b => b.ReferenceCode == cleanCode || b.ReferenceCode == $"RES-{cleanCode}");
+
+            if (booking == null) return NotFound($"No se encontró la reserva con código {code}.");
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromDays(30));
+            return RedirectToAction("Voucher", new { id = booking.Id, token = token });
+        }
+
         [HttpGet]
         public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null, string? token = null)
         {
