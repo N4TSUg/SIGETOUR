@@ -247,9 +247,13 @@ namespace SIGETOUR.API.Controllers.UI
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ConfirmPayment(Guid bookingId, string? manualPaymentMethod = null)
+        public async Task<IActionResult> ConfirmPayment(Guid bookingId, string? manualPaymentMethod = null, [FromServices] SIGETOUR.API.Application.Interfaces.IEmailService? emailService = null)
         {
-            var booking = await _context.Bookings.FindAsync(bookingId);
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                .Include(b => b.AssignedVehicle)
+                .FirstOrDefaultAsync(b => b.Id == bookingId);
             if (booking == null) return NotFound();
 
             // Medida de seguridad: los pagos manuales (Counter / Transferencia bancaria)
@@ -263,6 +267,16 @@ namespace SIGETOUR.API.Controllers.UI
                     ? "Pago en Counter / Agencia"
                     : manualPaymentMethod;
                 await _context.SaveChangesAsync();
+            }
+
+            if (emailService != null && !string.IsNullOrWhiteSpace(booking.CustomerEmail) && !booking.CustomerEmail.EndsWith("@agencia.com", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                    await emailService.SendBookingConfirmationEmailAsync(booking, baseUrl);
+                }
+                catch { }
             }
 
             var voucherToken = _checkoutAccess.Create(booking.Id, TimeSpan.FromHours(2));

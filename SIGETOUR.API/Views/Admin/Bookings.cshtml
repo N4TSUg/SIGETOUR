@@ -353,6 +353,24 @@
                                         <span class="material-symbols-outlined text-[20px]">receipt_long</span>
                                     </a>
                                 }
+                                @{
+                                    var bRawPhone = booking.CustomerPhone ?? "";
+                                    var bVoucherUrl = Url.Action("Voucher", "Booking", new { id = booking.Id }, Context.Request.Scheme);
+                                    var bTourTitle = tour?.Title ?? "Circuito Cajamarca";
+                                    var bTravelDateStr = booking.TravelDate.ToString("dd/MM/yyyy");
+                                }
+                                <button type="button" 
+                                        onclick="promptAndSendEmail('@booking.Id', '@(booking.CustomerEmail?.Replace("'", "\\'") ?? "")', '@booking.ReferenceCode')" 
+                                        class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer" 
+                                        title="Enviar Boleto por Correo al Cliente">
+                                    <span class="material-symbols-outlined text-[20px]">forward_to_inbox</span>
+                                </button>
+                                <button type="button" 
+                                        onclick="sendWhatsappTicket('@bRawPhone', '@(booking.CustomerName?.Replace("'", "\\'") ?? "")', '@booking.ReferenceCode', '@(bTourTitle.Replace("'", "\\'"))', '@bTravelDateStr', '@bVoucherUrl')" 
+                                        class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-[#25D366] hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer" 
+                                        title="Enviar Confirmación y Boleto por WhatsApp">
+                                    <span class="material-symbols-outlined text-[20px] text-[#25D366]">chat</span>
+                                </button>
                                 <button type="button" onclick="openManifestForBooking('@booking.TravelDate.ToString("yyyy-MM-dd")', '@tour?.Id', '@booking.ShiftName', '@tour?.DefaultVehicleId')" class="inline-flex items-center justify-center p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors cursor-pointer" title="Exportar Manifiesto de esta Salida en Excel">
                                     <span class="material-symbols-outlined text-[20px]">table_view</span>
                                 </button>
@@ -835,5 +853,84 @@ function openDeleteBookingModal(id, code, customer) {
 function closeDeleteBookingModal() {
     const modal = document.getElementById('deleteBookingModal');
     if (modal) modal.classList.add('hidden');
+}
+
+function promptAndSendEmail(bookingId, currentEmail, refCode) {
+    let email = currentEmail;
+    if (!email || email === 'manual@agencia.com') {
+        email = prompt(`La reserva ${refCode} no tiene un correo registrado o es temporal.\nIngrese el correo del cliente para enviarle su boleto:`, '');
+        if (!email) return;
+    } else {
+        const confirmSend = confirm(`¿Enviar el boleto oficial y confirmación de la reserva ${refCode} al correo:\n${email}?`);
+        if (!confirmSend) return;
+    }
+
+    showToastNotification('Enviando correo con boleto...', 'info');
+
+    const formData = new FormData();
+    formData.append('id', bookingId);
+    formData.append('email', email);
+
+    fetch('/Admin/ResendBookingEmail', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showToastNotification(`✓ ${data.message}`, 'success');
+        } else {
+            showToastNotification(`✗ ${data.message}`, 'error');
+        }
+    })
+    .catch(err => {
+        showToastNotification('Error de conexión al enviar correo.', 'error');
+    });
+}
+
+function sendWhatsappTicket(rawPhone, customerName, refCode, tourTitle, travelDate, voucherUrl) {
+    if (!rawPhone) {
+        rawPhone = prompt(`La reserva ${refCode} no tiene teléfono registrado.\nIngrese el número de WhatsApp del cliente (ej. 987654321):`, '');
+        if (!rawPhone) return;
+    }
+
+    let digits = rawPhone.replace(/\D/g, '');
+    if (digits.length === 9 && digits.startsWith('9')) {
+        digits = '51' + digits;
+    }
+
+    const name = customerName ? customerName.trim() : 'Estimado(a) Cliente';
+    const message = `¡Hola *${name}*! Le saluda Turismo Chilón.\n\n` +
+                    `Le confirmamos que su reserva para el tour *${tourTitle}* programada para el *${travelDate}* se encuentra CONFIRMADA.\n\n` +
+                    `📌 *Código de Reserva:* ${refCode}\n` +
+                    `🎟️ *Ver y Descargar Boleto Oficial:* ${voucherUrl}\n\n` +
+                    `Punto de salida: Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI).\n` +
+                    `¡Gracias por confiar en Turismo Chilón!`;
+
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/${digits}?text=${encoded}`, '_blank');
+}
+
+function showToastNotification(message, type) {
+    let container = document.getElementById('sigetourToastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'sigetourToastContainer';
+        container.className = 'fixed bottom-5 right-5 z-[100] flex flex-col gap-2 max-w-md';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    const bgClass = type === 'success' ? 'bg-emerald-700 text-white border-emerald-800' :
+                    type === 'error' ? 'bg-red-700 text-white border-red-800' : 'bg-secondary text-white border-secondary-dark';
+    toast.className = `${bgClass} p-4 rounded-xl shadow-2xl border text-sm font-semibold flex items-center gap-2 transition-all duration-300 transform translate-y-2 opacity-0`;
+    toast.innerHTML = `<span class="material-symbols-outlined text-[20px]">${type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'mail'}</span> <span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+    }, 10);
+    setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 400);
+    }, 4500);
 }
 </script>

@@ -2094,7 +2094,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateBooking(SIGETOUR.API.Models.EditBookingViewModel model)
+        public async Task<IActionResult> CreateBooking(SIGETOUR.API.Models.EditBookingViewModel model, [FromServices] IEmailService? emailService = null)
         {
             var activeFeatured = await _context.FeaturedPackages
                 .Where(f => f.IsActive)
@@ -2196,6 +2196,16 @@ namespace SIGETOUR.API.Controllers.UI
                     });
                     await _context.SaveChangesAsync();
                 }
+            }
+
+            if (emailService != null && !string.IsNullOrWhiteSpace(booking.CustomerEmail) && !booking.CustomerEmail.EndsWith("@agencia.com", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                    await emailService.SendBookingConfirmationEmailAsync(booking, baseUrl);
+                }
+                catch { }
             }
 
             TempData["SuccessMessage"] = $"Reserva {booking.ReferenceCode} creada exitosamente.";
@@ -2457,6 +2467,51 @@ namespace SIGETOUR.API.Controllers.UI
 
             TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} ha sido reactivada con éxito.";
             return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ResendBookingEmail(Guid id, [FromForm] string? email = null, [FromServices] IEmailService? emailService = null)
+        {
+            if (emailService == null)
+            {
+                return Json(new { success = false, message = "El servicio de correo no está registrado en el sistema." });
+            }
+
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                .Include(b => b.AssignedVehicle)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null)
+            {
+                return Json(new { success = false, message = "La reserva solicitada no existe." });
+            }
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                var clean = email.Trim();
+                if (clean != booking.CustomerEmail)
+                {
+                    booking.CustomerEmail = clean;
+                    await _context.SaveChangesAsync();
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(booking.CustomerEmail) || !booking.CustomerEmail.Contains("@"))
+            {
+                return Json(new { success = false, message = "La reserva no tiene un correo electrónico válido registrado." });
+            }
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var result = await emailService.SendBookingConfirmationEmailAsync(booking, baseUrl);
+
+            return Json(new { 
+                success = result.Success, 
+                message = result.Message, 
+                email = booking.CustomerEmail,
+                referenceCode = booking.ReferenceCode
+            });
         }
 
         [HttpPost]

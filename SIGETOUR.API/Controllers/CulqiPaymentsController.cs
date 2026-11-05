@@ -1107,6 +1107,21 @@ public sealed class CulqiPaymentsController : ControllerBase
             // Falla en emisión no anula el cobro verificado
         }
 
+        // Enviar correo de confirmación de reserva y boleto oficial
+        try
+        {
+            var emailService = HttpContext.RequestServices.GetService<SIGETOUR.API.Application.Interfaces.IEmailService>();
+            if (emailService != null && !string.IsNullOrWhiteSpace(booking.CustomerEmail))
+            {
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                _ = Task.Run(async () =>
+                {
+                    try { await emailService.SendBookingConfirmationEmailAsync(booking, baseUrl); } catch { }
+                });
+            }
+        }
+        catch { }
+
         return true;
     }
 }
