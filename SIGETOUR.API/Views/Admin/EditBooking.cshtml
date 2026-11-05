@@ -574,16 +574,16 @@
     function updateWaMessagePreviewEdit() {
         const voucherUrl = currentWaDataEdit.voucherPdfUrl || `${window.location.origin}/b/@Model.ReferenceCode`;
         const receiptLine = currentWaDataEdit.hasReceipt && currentWaDataEdit.receiptPdfUrl
-            ? `\n• *Boleta Electrónica:* ${currentWaDataEdit.receiptPdfUrl}`
+            ? `\n• *Boleta de Venta SUNAT:* ${currentWaDataEdit.receiptPdfUrl}`
             : '';
 
         const msg = `¡Hola *${currentWaDataEdit.customerName}*! Le saluda Turismo Chilón.\n\n` +
                     `Le confirmamos que su reserva para el tour *${currentWaDataEdit.tourTitle}* programada para el *${currentWaDataEdit.travelDate}* se encuentra CONFIRMADA.\n\n` +
                     `• *Código de Reserva:* ${currentWaDataEdit.refCode}\n\n` +
                     `*Comprobantes Oficiales en PDF:*\n` +
-                    `• *Boleto de Viaje:* ${voucherUrl}` +
+                    `• *Boleto Oficial de Viaje:* ${voucherUrl}` +
                     receiptLine + `\n\n` +
-                    `Punto de salida: Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI físico).\n` +
+                    `• *Punto de salida:* Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI físico).\n` +
                     `¡Gracias por confiar en Turismo Chilón!`;
 
         const previewArea = document.getElementById('waModalMessagePreviewEdit');

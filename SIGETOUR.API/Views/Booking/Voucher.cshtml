@@ -37,11 +37,11 @@
 
     var waMessage = $"¡Hola *{Model.CustomerName}*! Le saluda Turismo Chilón.\n\n" +
                     $"Le confirmamos que su reserva para el tour *{tourTitle}* programada para el *{Model.TravelDate:dd/MM/yyyy}* se encuentra CONFIRMADA.\n\n" +
-                    $"🎟️ *Código de Reserva:* {Model.ReferenceCode}\n\n" +
-                    $"📄 *Comprobantes Oficiales en PDF:*\n" +
+                    $"• *Código de Reserva:* {Model.ReferenceCode}\n\n" +
+                    $"*Comprobantes Oficiales en PDF:*\n" +
                     $"• *Boleto Oficial de Viaje:* {shortVoucherUrl}\n" +
                     (hasValidReceipt ? $"• *Boleta de Venta SUNAT:* {shortReceiptUrl}\n\n" : "\n") +
-                    $"📍 Punto de salida: Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI físico).\n" +
+                    $"• *Punto de salida:* Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI físico).\n" +
                     $"¡Gracias por confiar en Turismo Chilón!";
 
     var customerPhoneDigits = (Model.CustomerPhone ?? "").Trim();
