@@ -192,12 +192,12 @@ function handleQrStateInit(data, onQrState) {
 }
 
 async function trigger3DSAuthentication(tokenId, onStatus) {
-  if (onStatus) onStatus("Validando identidad con el banco (3D Secure)...", "info");
+  onStatus?.("Validando identidad con el banco (3D Secure)...", "info");
   if (typeof Culqi3DS !== "undefined" && typeof Culqi3DS.initAuthentication === "function") {
     Culqi3DS.options = { showModal: true, showLoading: true };
     await Culqi3DS.initAuthentication(tokenId);
-  } else if (onStatus) {
-    onStatus("Autenticación 3DS requerida. Actualiza tu navegador.", "warning");
+  } else {
+    onStatus?.("Autenticación 3DS requerida. Actualiza tu navegador.", "warning");
   }
 }
 
@@ -250,12 +250,12 @@ function createCheckoutHandler(checkout, attemptId, checkoutToken, bookingId, on
         await processCulqiToken(checkout, attemptId, checkoutToken, bookingId, onStatus);
       } else if (checkout.order) {
         // En Culqi Checkout Custom, cuando el usuario ve el QR de la orden generada
-        if (onStatus) onStatus("Código QR Culqi en pantalla. Escanéalo desde tu app Yape o Plin. El pago se confirmará automáticamente.", "info");
+        onStatus?.("Código QR Culqi en pantalla. Escanéalo desde tu app Yape o Plin. El pago se confirmará automáticamente.", "info");
       } else {
-        if (onStatus) onStatus("Ventana de pago cerrada o cancelada por el usuario.", "info");
+        onStatus?.("Ventana de pago cerrada o cancelada por el usuario.", "info");
       }
     } catch (err) {
-      if (onStatus) onStatus("Error al procesar cargo: " + err.message, "error");
+      onStatus?.("Error al procesar cargo: " + err.message, "error");
     }
   };
 }
