@@ -149,7 +149,7 @@
 <header class="bg-surface-container-lowest dark:bg-inverse-surface border-b border-outline-variant dark:border-outline shadow-sm flex justify-between items-center w-full px-space-lg py-space-sm shrink-0 z-30">
 <div class="flex items-center gap-2 sm:gap-space-md">
 <button type="button" id="admin-sidebar-toggle" onclick="toggleAdminSidebar()" class="lg:hidden p-2 rounded-xl text-primary hover:bg-surface-container active:scale-95 transition-all" aria-label="Abrir Menú">
-<span class="material-symbols-outlined text-2xl">menu</span>
+<span class="material-symbols-outlined text-2xl" aria-hidden="true">menu</span>
 </button>
 <a asp-controller="Home" asp-action="Index" class="flex items-center gap-space-sm bg-white p-1 rounded-lg border border-outline-variant/30 hover:bg-surface-container-lowest cursor-pointer transition-colors" title="Volver a la página principal">
 <img alt="Foto de perfil del Administrador de Turismo Chilón" class="h-10 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA418HlYgLM2V8ufbicRSZe3WiwFD80IhK7kjiUezcwFF9F_CeRFGUIPTJulkVhUOhEN5cmAaj3ta3_l3-UkTwCEYXMYTeor7kI8L2fQHDEo5sOt_FV8VWsQDU612MgYBMHH9AsPAWdl4YuPE8m8w_ZE42u43C21Iom_xU0OiAnStcNdpefRgQCdz1gi1QqB5ZI08SrQT6KVzYGfxDLj-5UPh5CbtpJ-wE1Fwr_bXVdjKYEqmFEgkTRksJJuWe00M9grak">
@@ -160,7 +160,7 @@
 <div class="relative flex items-center">
 <span class="material-symbols-outlined absolute left-3 text-outline text-[18px]">search</span>
 <label for="globalAdminSearchInput" class="sr-only">Buscar pasajero, DNI, tour, reserva</label>
-<input id="globalAdminSearchInput" name="search" autocomplete="off" aria-label="Buscar pasajero, DNI, tour o reserva" class="w-full pl-9 pr-9 py-1.5 bg-surface/50 border border-outline-variant/60 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Buscar pasajero, DNI, tour, reserva..." type="text">
+<input id="globalAdminSearchInput" name="search" autocomplete="off" class="w-full pl-9 pr-9 py-1.5 bg-surface/50 border border-outline-variant/60 rounded-lg text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="Buscar pasajero, DNI, tour, reserva..." type="text">
 <button type="button" id="clearGlobalSearchBtn" class="material-symbols-outlined absolute right-2.5 text-outline hover:text-on-surface text-[16px] hidden cursor-pointer">close</button>
 </div>
 <div id="globalSearchResults" class="absolute left-0 right-0 top-full mt-2 bg-surface-container-lowest rounded-xl shadow-2xl border border-outline-variant hidden z-50 max-h-[420px] overflow-y-auto divide-y divide-outline-variant/50">
@@ -228,7 +228,7 @@
 </div>
 </div>
 <button type="button" class="lg:hidden p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container" onclick="toggleAdminSidebar()" aria-label="Cerrar Menú">
-<span class="material-symbols-outlined text-xl">close</span>
+<span class="material-symbols-outlined text-xl" aria-hidden="true">close</span>
 </button>
 </div>
 @{

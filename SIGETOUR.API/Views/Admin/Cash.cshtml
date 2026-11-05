@@ -237,13 +237,13 @@
             <div class="md:col-span-5 relative">
                 <label for="cashTxSearchInput" class="sr-only">Buscar por referencia, cliente, concepto o método</label>
                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
-                <input type="text" id="cashTxSearchInput" name="search" value="@Model.SearchTerm" aria-label="Buscar por referencia, cliente, concepto o método" placeholder="Buscar por referencia, cliente, concepto o método..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+                <input type="text" id="cashTxSearchInput" name="search" value="@Model.SearchTerm" placeholder="Buscar por referencia, cliente, concepto o método..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
             </div>
 
             <!-- Filtro por Tipo / Método -->
             <div class="md:col-span-4">
                 <label for="cashTxFilterType" class="sr-only">Filtrar por Tipo o Método de Pago</label>
-                <select name="filterType" id="cashTxFilterType" aria-label="Filtrar por Tipo o Método de Pago" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                <select name="filterType" id="cashTxFilterType" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
                     <option value="" selected="@(string.IsNullOrEmpty(Model.FilterType) || Model.FilterType == "Todos")">Todos los Tipos y Métodos</option>
                     <option value="Ingreso" selected="@(Model.FilterType == "Ingreso")">Solo Ingresos (+)</option>
                     <option value="Egreso" selected="@(Model.FilterType == "Egreso")">Solo Egresos (-)</option>
@@ -538,12 +538,12 @@
             <div class="md:col-span-5 relative">
                 <label for="cashPettySearchInput" class="sr-only">Buscar en caja chica por concepto, proveedor o comprobante</label>
                 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
-                <input type="text" id="cashPettySearchInput" name="search" value="@Model.SearchTerm" aria-label="Buscar en caja chica" placeholder="Buscar por concepto, proveedor, N° comprobante o responsable..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+                <input type="text" id="cashPettySearchInput" name="search" value="@Model.SearchTerm" placeholder="Buscar por concepto, proveedor, N° comprobante o responsable..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
             </div>
 
             <div class="md:col-span-4">
                 <label for="cashPettyFilterType" class="sr-only">Filtrar por Categoría de Gasto en Caja Chica</label>
-                <select name="filterType" id="cashPettyFilterType" aria-label="Filtrar por Categoría de Gasto en Caja Chica" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                <select name="filterType" id="cashPettyFilterType" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
                     <option value="" selected="@(string.IsNullOrEmpty(Model.FilterType) || Model.FilterType == "Todos")">Todas las Categorías de Gasto</option>
                     <option value="Combustible" selected="@(Model.FilterType == "Combustible")">Combustible (Diésel / Gasolina)</option>
                     <option value="Peajes" selected="@(Model.FilterType == "Peajes")">Peajes Viales</option>
@@ -851,12 +851,12 @@
                     <span class="block text-label-sm font-bold text-on-surface-variant mb-1">Tipo de Movimiento <span class="text-tertiary">*</span></span>
                     <div class="grid grid-cols-2 gap-3">
                         <label for="addTxTypeIngreso" class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-outline-variant cursor-pointer hover:bg-surface-container has-[:checked]:bg-green-100 has-[:checked]:border-green-500 has-[:checked]:text-green-900 font-bold text-body-sm">
-                            <input type="radio" id="addTxTypeIngreso" name="type" value="Ingreso" checked aria-label="Ingreso de caja" class="sr-only" />
+                            <input type="radio" id="addTxTypeIngreso" name="type" value="Ingreso" checked class="sr-only" />
                             <span class="material-symbols-outlined text-lg">arrow_downward</span>
                             Ingreso (+)
                         </label>
                         <label for="addTxTypeEgreso" class="flex items-center justify-center gap-2 p-2.5 rounded-lg border border-outline-variant cursor-pointer hover:bg-surface-container has-[:checked]:bg-red-100 has-[:checked]:border-red-500 has-[:checked]:text-red-900 font-bold text-body-sm">
-                            <input type="radio" id="addTxTypeEgreso" name="type" value="Egreso" aria-label="Egreso de caja" class="sr-only" />
+                            <input type="radio" id="addTxTypeEgreso" name="type" value="Egreso" class="sr-only" />
                             <span class="material-symbols-outlined text-lg">arrow_upward</span>
                             Egreso (-)
                         </label>

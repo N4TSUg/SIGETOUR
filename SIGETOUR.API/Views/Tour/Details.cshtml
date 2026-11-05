@@ -47,11 +47,11 @@ else if (allImages.Count == 1)
              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(0);}"
              role="button"
              tabindex="0"
-             aria-label="Ver imagen completa del circuito">
+             aria-label="Ver imagen completa">
         <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage!.ImageUrl" alt="@Model.Title" />
         <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
             <span class="text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 bg-black/60 px-3.5 py-1.5 rounded-xl backdrop-blur-sm">
-                <span class="material-symbols-outlined text-[18px]">zoom_in</span> Ver imagen completa
+                <span class="material-symbols-outlined text-[18px]" aria-hidden="true">zoom_in</span> Ver imagen completa
             </span>
         </div>
     </section>
@@ -67,11 +67,11 @@ else
                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(0);}"
                  role="button"
                  tabindex="0"
-                 aria-label="Ver imagen de portada en pantalla completa">
+                 aria-label="Ver Completa">
                 <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage!.ImageUrl" alt="@Model.Title" />
                 <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span class="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 backdrop-blur-sm shadow-md">
-                        <span class="material-symbols-outlined text-base">zoom_in</span> Ver Completa
+                        <span class="material-symbols-outlined text-base" aria-hidden="true">zoom_in</span> Ver Completa
                     </span>
                 </div>
             </div>
@@ -83,11 +83,11 @@ else
                      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(1);}"
                      role="button"
                      tabindex="0"
-                     aria-label="Ver segunda imagen en pantalla completa">
+                     aria-label="Ver Completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 backdrop-blur-sm shadow-md">
-                            <span class="material-symbols-outlined text-base">zoom_in</span> Ver Completa
+                            <span class="material-symbols-outlined text-base" aria-hidden="true">zoom_in</span> Ver Completa
                         </span>
                     </div>
                 </div>
@@ -102,7 +102,7 @@ else
                      aria-label="Ver segunda imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
                 </div>
                 <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
@@ -113,7 +113,7 @@ else
                      aria-label="Ver tercera imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
                 </div>
             }
@@ -127,7 +127,7 @@ else
                      aria-label="Ver segunda imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
                 </div>
                 <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
@@ -138,7 +138,7 @@ else
                      aria-label="Ver tercera imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
                 </div>
                 <div class="col-span-1 row-span-2 relative group overflow-hidden cursor-pointer" 
@@ -149,7 +149,7 @@ else
                      aria-label="Ver cuarta imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[2].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
                 </div>
             }
@@ -164,7 +164,7 @@ else
                      aria-label="Ver segunda imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
                 </div>
                 <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
@@ -175,7 +175,7 @@ else
                      aria-label="Ver tercera imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
                 </div>
                 <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
@@ -186,7 +186,7 @@ else
                      aria-label="Ver cuarta imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[2].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
                 </div>
                 <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
@@ -194,12 +194,12 @@ else
                      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(4);}"
                      role="button"
                      tabindex="0"
-                     aria-label="Ver galería completa de fotos">
+                     >
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[3].ImageUrl" alt="@Model.Title" />
                     @if (allImages.Count > 5)
                     {
                         <div class="absolute inset-0 bg-black/60 group-hover:bg-black/75 flex flex-col items-center justify-center text-white p-2 transition-all">
-                            <span class="material-symbols-outlined text-2xl sm:text-3xl mb-0.5">photo_library</span>
+                            <span class="material-symbols-outlined text-2xl sm:text-3xl mb-0.5" aria-hidden="true">photo_library</span>
                             <span class="text-sm font-bold leading-tight">+@(allImages.Count - 4) fotos</span>
                             <span class="text-[10px] text-white/80">Ver galería</span>
                         </div>
@@ -207,7 +207,7 @@ else
                     else
                     {
                         <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                            <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                         </div>
                     }
                 </div>
@@ -221,13 +221,13 @@ else
                  onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(0);}"
                  role="button"
                  tabindex="0"
-                 aria-label="Ampliar imagen de portada en pantalla completa">
+                 aria-label="Tocar para ampliar">
                 <img class="w-full h-full object-cover" src="@mainImage!.ImageUrl" alt="@Model.Title" />
                 <span class="absolute bottom-3 left-3 bg-black/60 text-white text-xs font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[15px]">photo_camera</span> 1 / @allImages.Count
+                    <span class="material-symbols-outlined text-[15px]" aria-hidden="true">photo_camera</span> 1 / @allImages.Count
                 </span>
                 <span class="absolute bottom-3 right-3 bg-white/95 text-secondary text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[15px]">zoom_in</span> Tocar para ampliar
+                    <span class="material-symbols-outlined text-[15px]" aria-hidden="true">zoom_in</span> Tocar para ampliar
                 </span>
             </div>
             

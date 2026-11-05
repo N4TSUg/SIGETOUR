@@ -203,7 +203,7 @@
                 <span class="material-symbols-outlined text-[20px]">person</span>
             </div>
             <label for="loginEmailOrUsername" class="sr-only">Usuario o correo electrónico</label>
-                        <input asp-for="EmailOrUsername" id="loginEmailOrUsername" aria-label="Usuario o correo electrónico" class="w-full pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="admin@sigetour.com o admin" required />
+                        <input asp-for="EmailOrUsername" id="loginEmailOrUsername" class="w-full pl-10 pr-3 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="admin@sigetour.com o admin" required />
             <span asp-validation-for="EmailOrUsername" class="text-error text-[11px] block mt-1"></span>
         </div>
     </div>
@@ -220,9 +220,9 @@
                 <span class="material-symbols-outlined text-[20px]">lock</span>
             </div>
             <label for="loginPassword" class="sr-only">Contraseña</label>
-                        <input asp-for="Password" id="loginPassword" aria-label="Contraseña" class="w-full pl-10 pr-10 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="" required />
+                        <input asp-for="Password" id="loginPassword" class="w-full pl-10 pr-10 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="" required />
             <button aria-label="Mostrar u ocultar Contraseña" class="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface focus:outline-none transition-colors" id="togglePasswordBtn" onclick="togglePasswordVisibility()" type="button">
-                <span class="material-symbols-outlined text-[20px]" id="passwordIcon">visibility</span>
+                <span class="material-symbols-outlined text-[20px]" id="passwordIcon" aria-hidden="true">visibility</span>
             </button>
             <span asp-validation-for="Password" class="text-error text-[11px] block mt-1"></span>
         </div>

@@ -52,63 +52,220 @@ function iniciarCuentaRegresivaQr(segundosRestantes, onTick, onExpired) {
   }, 1000);
 }
 
+function isValid3DSOrigin(origin) {
+  return origin === "https://3ds.culqi.com" || origin === "https://checkout.culqi.com";
+}
+
+function handle3DSChargeResult(isOk, result, bookingId, onStatus) {
+  if (isOk && result.status === "paid") {
+    if (onStatus) onStatus("¡Pago 3D Secure exitoso! Redirigiendo a tu voucher...", "success");
+    setTimeout(() => {
+      window.location.href = `/Booking/Voucher/${bookingId}`;
+    }, 800);
+    return;
+  }
+  const msg = result.message || "El pago no pudo confirmarse tras la validación 3DS.";
+  if (onStatus) onStatus(msg, "warning");
+}
+
+async function execute3DSCharge(parameters3DS) {
+  const { attemptId, checkoutToken, bookingId, onStatus, sourceId } = currentBookingContext;
+  if (onStatus) onStatus("Autenticación 3D Secure aprobada por el banco. Finalizando cobro...", "info");
+
+  try {
+    const res = await fetch("/api/culqi/charge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        attemptId,
+        checkoutToken,
+        sourceId,
+        parameters3DS,
+        deviceFingerPrintId: currentDeviceFingerprint
+      })
+    });
+
+    const result = await res.json();
+    handle3DSChargeResult(res.ok, result, bookingId, onStatus);
+  } catch (err) {
+    if (onStatus) onStatus("Error enviando autenticación 3DS: " + err.message, "error");
+  }
+}
+
+function handle3DSError(errorData) {
+  if (!currentBookingContext || !currentBookingContext.onStatus) return;
+  const msg = errorData.user_message || errorData;
+  currentBookingContext.onStatus("Validación 3D Secure cancelada o rechazada: " + msg, "error");
+}
+
 // Escuchador global de respuestas de autenticación 3D Secure del banco emisor
 window.addEventListener("message", async function (event) {
   // Validación estricta del origen del mensaje cross-origin (Regla SonarQube S2819)
-  if (event.origin !== "https://3ds.culqi.com" && event.origin !== "https://checkout.culqi.com") {
-    return;
-  }
-
+  if (!isValid3DSOrigin(event.origin)) return;
   if (!currentBookingContext || !currentBookingContext.attemptId) return;
 
   const data = event.data;
   if (data && data.parameters3DS) {
-    const { attemptId, checkoutToken, bookingId, onStatus, sourceId } = currentBookingContext;
-    if (onStatus) onStatus("Autenticación 3D Secure aprobada por el banco. Finalizando cobro...", "info");
-
-    try {
-      const res = await fetch("/api/culqi/charge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          attemptId,
-          checkoutToken,
-          sourceId,
-          parameters3DS: data.parameters3DS,
-          deviceFingerPrintId: currentDeviceFingerprint
-        })
-      });
-
-      const result = await res.json();
-      if (res.ok && result.status === "paid") {
-        if (onStatus) onStatus("¡Pago 3D Secure exitoso! Redirigiendo a tu voucher...", "success");
-        setTimeout(() => {
-          window.location.href = `/Booking/Voucher/${bookingId}`;
-        }, 800);
-      } else {
-        const msg = result.message || "El pago no pudo confirmarse tras la validación 3DS.";
-        if (onStatus) onStatus(msg, "warning");
-      }
-    } catch (err) {
-      if (onStatus) onStatus("Error enviando autenticación 3DS: " + err.message, "error");
-    }
+    await execute3DSCharge(data.parameters3DS);
   } else if (data && data.error) {
-    if (currentBookingContext.onStatus) {
-      currentBookingContext.onStatus("Validación 3D Secure cancelada o rechazada: " + (data.error.user_message || data.error), "error");
-    }
+    handle3DSError(data.error);
   }
 }, false);
 
-async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full", channel = "charge", onStatus = null, onQrState = null }) {
+function handleQrPollResponse(checkData, bookingId, checkout, onStatus, onQrState) {
+  if (checkData.status === "paid") {
+    detenerSondeoQr();
+    try { checkout.close(); } catch (e) {}
+    if (onStatus) onStatus("¡Pago QR con Yape/Plin verificado exitosamente! Redirigiendo...", "success");
+    if (onQrState) onQrState({ state: "paid" });
+    setTimeout(() => {
+      window.location.href = `/Booking/Voucher/${bookingId}`;
+    }, 900);
+    return;
+  }
+
+  if (checkData.status === "expired" || checkData.status === "failed") {
+    detenerSondeoQr();
+    try { checkout.close(); } catch (e) {}
+    if (onStatus) onStatus("La orden QR expiró o fue cancelada en Culqi. Genera un nuevo código para pagar.", "warning");
+    if (onQrState) onQrState({ state: "expired" });
+  }
+}
+
+async function checkQrStatus(data, bookingId, checkoutToken, checkout, onStatus, onQrState) {
+  try {
+    const checkRes = await fetch("/api/culqi/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        attemptId: data.attemptId,
+        bookingId,
+        checkoutToken
+      })
+    });
+    const checkData = await checkRes.json();
+    if (checkRes.ok) {
+      handleQrPollResponse(checkData, bookingId, checkout, onStatus, onQrState);
+    }
+  } catch (pollErr) {
+    // Red transitoria: el sondeo continuará en el siguiente intervalo
+  }
+}
+
+function startQrPolling(data, bookingId, checkoutToken, checkout, onStatus, onQrState) {
+  const remainingSeconds = typeof data.expiresInSeconds === "number" && data.expiresInSeconds > 0
+    ? data.expiresInSeconds
+    : (data.expirationDateUnix ? Math.max(0, Math.floor(data.expirationDateUnix - (Date.now() / 1000))) : 24 * 60);
+
+  iniciarCuentaRegresivaQr(remainingSeconds, (timerFmt) => {
+    if (onQrState) onQrState({ state: "tick", timer: timerFmt });
+  }, () => {
+    detenerSondeoQr();
+    if (onStatus) onStatus("La orden QR de Culqi ha expirado. Por favor, genera un nuevo código QR.", "warning");
+    if (onQrState) onQrState({ state: "expired" });
+  });
+
+  qrPollingTimer = setInterval(() => {
+    checkQrStatus(data, bookingId, checkoutToken, checkout, onStatus, onQrState);
+  }, 3500);
+}
+
+function handleQrStateInit(data, onQrState) {
+  if (!onQrState) return;
+  onQrState({
+    state: "waiting",
+    orderId: data.orderId,
+    amount: data.amountCents / 100,
+    reused: !!data.reused,
+    qrCodeUrl: data.qrCodeUrl || null,
+    paymentCode: data.paymentCode || null,
+    urlPe: data.urlPe || null,
+    message: data.reused ? "Orden QR activa recuperada" : "Orden QR creada"
+  });
+}
+
+async function trigger3DSAuthentication(tokenId, onStatus) {
+  if (onStatus) onStatus("Validando identidad con el banco (3D Secure)...", "info");
+  if (typeof Culqi3DS !== "undefined" && typeof Culqi3DS.initAuthentication === "function") {
+    Culqi3DS.options = { showModal: true, showLoading: true };
+    await Culqi3DS.initAuthentication(tokenId);
+  } else if (onStatus) {
+    onStatus("Autenticación 3DS requerida. Actualiza tu navegador.", "warning");
+  }
+}
+
+async function handleTokenChargeResponse(res, statusData, tokenId, bookingId, onStatus) {
+  if (res.ok && statusData.status === "3ds_required") {
+    await trigger3DSAuthentication(tokenId, onStatus);
+    return;
+  }
+  if (res.ok && statusData.status === "paid") {
+    if (onStatus) onStatus("¡Pago exitoso verificado! Redirigiendo a tu voucher...", "success");
+    setTimeout(() => {
+      window.location.href = `/Booking/Voucher/${bookingId}`;
+    }, 800);
+    return;
+  }
+  if (!res.ok && statusData.status === "failed") {
+    // Rechazo definitivo (fondos insuficientes, tarjeta rechazada)
+    if (onStatus) onStatus(statusData.message || "Tarjeta rechazada. Puedes intentar con otra tarjeta inmediatamente.", "error");
+    return;
+  }
+  if (onStatus) onStatus(statusData.message || "Pago en verificación. Consulta el estado antes de intentar nuevamente.", "warning");
+}
+
+async function processCulqiToken(checkout, attemptId, checkoutToken, bookingId, onStatus) {
+  checkout.close();
+  if (onStatus) onStatus("Procesando cobro seguro en Culqi...", "info");
+
+  currentBookingContext.sourceId = checkout.token.id;
+  const deviceId = await getDeviceFingerprint();
+
+  const res = await fetch("/api/culqi/charge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      attemptId,
+      checkoutToken,
+      sourceId: checkout.token.id,
+      deviceFingerPrintId: deviceId
+    })
+  });
+
+  const statusData = await res.json();
+  await handleTokenChargeResponse(res, statusData, checkout.token.id, bookingId, onStatus);
+}
+
+function createCheckoutHandler(checkout, attemptId, checkoutToken, bookingId, onStatus) {
+  return async () => {
+    try {
+      if (checkout.token) {
+        await processCulqiToken(checkout, attemptId, checkoutToken, bookingId, onStatus);
+      } else if (checkout.order) {
+        // En Culqi Checkout Custom, cuando el usuario ve el QR de la orden generada
+        if (onStatus) onStatus("Código QR Culqi en pantalla. Escanéalo desde tu app Yape o Plin. El pago se confirmará automáticamente.", "info");
+      } else {
+        if (onStatus) onStatus("Ventana de pago cerrada o cancelada por el usuario.", "info");
+      }
+    } catch (err) {
+      if (onStatus) onStatus("Error al procesar cargo: " + err.message, "error");
+    }
+  };
+}
+
+async function prepararCobroCulqi(bookingId, checkoutToken, mode, channel, onStatus) {
   detenerSondeoQr();
-  if (onStatus) onStatus(channel === "wallet_qr" ? "Generando orden QR dinámica con Culqi Sandbox..." : "Preparando pago seguro con Culqi...", "info");
-  
+  if (onStatus) {
+    const msg = channel === "wallet_qr" ? "Generando orden QR dinámica con Culqi Sandbox..." : "Preparando pago seguro con Culqi...";
+    onStatus(msg, "info");
+  }
+
   const prepareRes = await fetch("/api/culqi/prepare", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ bookingId, checkoutToken, mode, channel })
   });
-  
+
   const data = await prepareRes.json();
   if (!prepareRes.ok) {
     const errorMsg = data.message || "No se pudo preparar el cobro en Culqi";
@@ -123,6 +280,20 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
     console.warn("Storage not available", e);
   }
 
+  return data;
+}
+
+function inicializarCulqi3DS(publicKey) {
+  // Pre-generar fingerprint de dispositivo y configurar Culqi3DS
+  if (typeof Culqi3DS !== "undefined") {
+    Culqi3DS.publicKey = publicKey;
+    Culqi3DS.options = { showModal: true, showLoading: true, showDirect: true };
+  }
+}
+
+async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full", channel = "charge", onStatus = null, onQrState = null }) {
+  const data = await prepararCobroCulqi(bookingId, checkoutToken, mode, channel, onStatus);
+
   // Idempotencia: si ya estaba acreditado previamente
   if (data.status === "paid") {
     if (onStatus) onStatus("La reserva ya cuenta con un pago verificado. Redirigiendo al voucher...", "success");
@@ -132,24 +303,13 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
     return { attemptId: data.attemptId, status: "paid" };
   }
 
-  const methods = channel === "wallet_qr"
-    ? { tarjeta: false, yape: true, billetera: true, bancaMovil: false, agente: false, cuotealo: false }
-    : { tarjeta: true, yape: true, billetera: false, bancaMovil: false, agente: false, cuotealo: false };
-
-  const settings = { title: "Turismo Chilón - SIGETOUR", currency: "PEN", amount: data.amountCents };
-  if (data.orderId) settings.order = data.orderId;
-
   if (typeof CulqiCheckout === "undefined") {
     const msg = "La pasarela de pago Culqi no pudo cargarse. Verifica tu conexión a internet y recarga la página.";
     if (onStatus) onStatus(msg, "error");
     throw new Error(msg);
   }
 
-  // Pre-generar fingerprint de dispositivo y configurar Culqi3DS
-  if (typeof Culqi3DS !== "undefined") {
-    Culqi3DS.publicKey = data.publicKey;
-    Culqi3DS.options = { showModal: true, showLoading: true, showDirect: true };
-  }
+  inicializarCulqi3DS(data.publicKey);
   await getDeviceFingerprint();
 
   currentBookingContext = {
@@ -158,6 +318,13 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
     checkoutToken,
     onStatus
   };
+
+  const methods = channel === "wallet_qr"
+    ? { tarjeta: false, yape: true, billetera: true, bancaMovil: false, agente: false, cuotealo: false }
+    : { tarjeta: true, yape: true, billetera: false, bancaMovil: false, agente: false, cuotealo: false };
+
+  const settings = { title: "Turismo Chilón - SIGETOUR", currency: "PEN", amount: data.amountCents };
+  if (data.orderId) settings.order = data.orderId;
 
   const checkout = new CulqiCheckout(data.publicKey, {
     settings,
@@ -172,130 +339,46 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
 
   // Si es canal wallet_qr, iniciar sondeo automático cada 3.5 segundos en paralelo
   if (channel === "wallet_qr") {
-    if (onQrState) {
-      onQrState({
-        state: "waiting",
-        orderId: data.orderId,
-        amount: data.amountCents / 100,
-        reused: !!data.reused,
-        qrCodeUrl: data.qrCodeUrl || null,
-        paymentCode: data.paymentCode || null,
-        urlPe: data.urlPe || null,
-        message: data.reused ? "Orden QR activa recuperada" : "Orden QR creada"
-      });
-    }
-
-    const remainingSeconds = typeof data.expiresInSeconds === "number" && data.expiresInSeconds > 0
-      ? data.expiresInSeconds
-      : (data.expirationDateUnix ? Math.max(0, Math.floor(data.expirationDateUnix - (Date.now() / 1000))) : 24 * 60);
-
-    iniciarCuentaRegresivaQr(remainingSeconds, (timerFmt) => {
-      if (onQrState) onQrState({ state: "tick", timer: timerFmt });
-    }, () => {
-      detenerSondeoQr();
-      if (onStatus) onStatus("La orden QR de Culqi ha expirado. Por favor, genera un nuevo código QR.", "warning");
-      if (onQrState) onQrState({ state: "expired" });
-    });
-
-    qrPollingTimer = setInterval(async () => {
-      try {
-        const checkRes = await fetch("/api/culqi/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            attemptId: data.attemptId,
-            bookingId,
-            checkoutToken
-          })
-        });
-        const checkData = await checkRes.json();
-        if (checkRes.ok && checkData.status === "paid") {
-          detenerSondeoQr();
-          try { checkout.close(); } catch (e) {}
-          if (onStatus) onStatus("¡Pago QR con Yape/Plin verificado exitosamente! Redirigiendo...", "success");
-          if (onQrState) onQrState({ state: "paid" });
-          setTimeout(() => {
-            window.location.href = `/Booking/Voucher/${bookingId}`;
-          }, 900);
-        } else if (checkRes.ok && (checkData.status === "expired" || checkData.status === "failed")) {
-          detenerSondeoQr();
-          try { checkout.close(); } catch (e) {}
-          if (onStatus) onStatus("La orden QR expiró o fue cancelada en Culqi. Genera un nuevo código para pagar.", "warning");
-          if (onQrState) onQrState({ state: "expired" });
-        }
-      } catch (pollErr) {
-        // Red transitoria: el sondeo continuará en el siguiente intervalo
-      }
-    }, 3500);
+    handleQrStateInit(data, onQrState);
+    startQrPolling(data, bookingId, checkoutToken, checkout, onStatus, onQrState);
   }
 
-  checkout.culqi = async () => {
-    try {
-      if (checkout.token) {
-        checkout.close();
-        if (onStatus) onStatus("Procesando cobro seguro en Culqi...", "info");
-        
-        currentBookingContext.sourceId = checkout.token.id;
-        const deviceId = await getDeviceFingerprint();
-
-        const res = await fetch("/api/culqi/charge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            attemptId: data.attemptId,
-            checkoutToken,
-            sourceId: checkout.token.id,
-            deviceFingerPrintId: deviceId
-          })
-        });
-
-        const statusData = await res.json();
-
-        // Si requiere autenticación 3DS
-        if (res.ok && statusData.status === "3ds_required") {
-          if (onStatus) onStatus("Validando identidad con el banco (3D Secure)...", "info");
-          if (typeof Culqi3DS !== "undefined" && typeof Culqi3DS.initAuthentication === "function") {
-            Culqi3DS.options = { showModal: true, showLoading: true };
-            await Culqi3DS.initAuthentication(checkout.token.id);
-          } else {
-            if (onStatus) onStatus("Autenticación 3DS requerida. Actualiza tu navegador.", "warning");
-          }
-          return;
-        }
-
-        if (res.ok && statusData.status === "paid") {
-          if (onStatus) onStatus("¡Pago exitoso verificado! Redirigiendo a tu voucher...", "success");
-          setTimeout(() => {
-            window.location.href = `/Booking/Voucher/${bookingId}`;
-          }, 800);
-        } else if (!res.ok && statusData.status === "failed") {
-          // Rechazo definitivo (fondos insuficientes, tarjeta rechazada)
-          if (onStatus) onStatus(statusData.message || "Tarjeta rechazada. Puedes intentar con otra tarjeta inmediatamente.", "error");
-        } else {
-          if (onStatus) onStatus(statusData.message || "Pago en verificación. Consulta el estado antes de intentar nuevamente.", "warning");
-        }
-      } else if (checkout.order) {
-        // En Culqi Checkout Custom, cuando el usuario ve el QR de la orden generada
-        if (onStatus) onStatus("Código QR Culqi en pantalla. Escanéalo desde tu app Yape o Plin. El pago se confirmará automáticamente.", "info");
-      } else {
-        if (onStatus) onStatus("Ventana de pago cerrada o cancelada por el usuario.", "info");
-      }
-    } catch (err) {
-      if (onStatus) onStatus("Error al procesar cargo: " + err.message, "error");
-    }
-  };
-
+  checkout.culqi = createCheckoutHandler(checkout, data.attemptId, checkoutToken, bookingId, onStatus);
   checkout.open();
+
   return { attemptId: data.attemptId, orderId: data.orderId };
+}
+
+function handleRevisarStatus(data, bookingId, onStatus) {
+  if (data.status === "paid") {
+    if (onStatus) onStatus("¡Pago confirmado y acreditado! Redirigiendo al voucher...", "success");
+    const targetBookingId = data.bookingId || bookingId;
+    if (targetBookingId) {
+      setTimeout(() => {
+        window.location.href = `/Booking/Voucher/${targetBookingId}`;
+      }, 800);
+    }
+    return;
+  }
+  if (data.status === "verification" || data.status === "processing") {
+    if (onStatus) onStatus(`El pago está en proceso de verificación ("${data.status}"). Si ya abonó en Yape o banco, espere unos segundos y vuelva a pulsar consultar.`, "warning");
+    return;
+  }
+  if (data.status === "failed") {
+    if (onStatus) onStatus("El último intento fue rechazado o caducó. Puedes realizar un nuevo intento con total seguridad.", "info");
+    return;
+  }
+  if (onStatus) onStatus(`Estado del intento: ${data.status}.`, "info");
 }
 
 // Para verificar sin generar cargos nuevamente (recuperación de estado al recargar)
 async function revisarPagoSigetour({ attemptId = null, checkoutToken, bookingId = null, onStatus = null }) {
-  if (!attemptId && bookingId) {
+  let resolvedAttempt = attemptId;
+  if (!resolvedAttempt && bookingId) {
     try {
-      attemptId = sessionStorage.getItem("culqi_attempt_" + bookingId) || lastCulqiAttempt;
+      resolvedAttempt = sessionStorage.getItem("culqi_attempt_" + bookingId) || lastCulqiAttempt;
     } catch (e) {
-      attemptId = lastCulqiAttempt;
+      resolvedAttempt = lastCulqiAttempt;
     }
   }
 
@@ -304,7 +387,7 @@ async function revisarPagoSigetour({ attemptId = null, checkoutToken, bookingId 
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      attemptId: attemptId || "00000000-0000-0000-0000-000000000000",
+      attemptId: resolvedAttempt || "00000000-0000-0000-0000-000000000000",
       bookingId: bookingId || null,
       checkoutToken
     })
@@ -317,21 +400,6 @@ async function revisarPagoSigetour({ attemptId = null, checkoutToken, bookingId 
     throw new Error(errorMsg);
   }
 
-  if (data.status === "paid") {
-    if (onStatus) onStatus("¡Pago confirmado y acreditado! Redirigiendo al voucher...", "success");
-    const targetBookingId = data.bookingId || bookingId;
-    if (targetBookingId) {
-      setTimeout(() => {
-        window.location.href = `/Booking/Voucher/${targetBookingId}`;
-      }, 800);
-    }
-  } else if (data.status === "verification" || data.status === "processing") {
-    if (onStatus) onStatus(`El pago está en proceso de verificación ("${data.status}"). Si ya abonó en Yape o banco, espere unos segundos y vuelva a pulsar consultar.`, "warning");
-  } else if (data.status === "failed") {
-    if (onStatus) onStatus("El último intento fue rechazado o caducó. Puedes realizar un nuevo intento con total seguridad.", "info");
-  } else {
-    if (onStatus) onStatus(`Estado del intento: ${data.status}.`, "info");
-  }
-
+  handleRevisarStatus(data, bookingId, onStatus);
   return data;
 }
