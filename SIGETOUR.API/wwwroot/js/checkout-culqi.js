@@ -93,7 +93,7 @@ async function execute3DSCharge(parameters3DS) {
 }
 
 function handle3DSError(errorData) {
-  if (!currentBookingContext || !currentBookingContext.onStatus) return;
+  if (!currentBookingContext?.onStatus) return;
   const msg = errorData.user_message || errorData;
   currentBookingContext.onStatus("Validación 3D Secure cancelada o rechazada: " + msg, "error");
 }
@@ -102,12 +102,12 @@ function handle3DSError(errorData) {
 window.addEventListener("message", async function (event) {
   // Validación estricta del origen del mensaje cross-origin (Regla SonarQube S2819)
   if (!isValid3DSOrigin(event.origin)) return;
-  if (!currentBookingContext || !currentBookingContext.attemptId) return;
+  if (!currentBookingContext?.attemptId) return;
 
   const data = event.data;
-  if (data && data.parameters3DS) {
+  if (data?.parameters3DS) {
     await execute3DSCharge(data.parameters3DS);
-  } else if (data && data.error) {
+  } else if (data?.error) {
     handle3DSError(data.error);
   }
 }, false);
@@ -143,19 +143,26 @@ async function checkQrStatus(data, bookingId, checkoutToken, checkout, onStatus,
         checkoutToken
       })
     });
+    if (!checkRes.ok) return;
     const checkData = await checkRes.json();
-    if (checkRes.ok) {
-      handleQrPollResponse(checkData, bookingId, checkout, onStatus, onQrState);
-    }
+    handleQrPollResponse(checkData, bookingId, checkout, onStatus, onQrState);
   } catch (pollErr) {
     // Red transitoria: el sondeo continuará en el siguiente intervalo
   }
 }
 
+function calcularSegundosRestantes(data) {
+  if (typeof data.expiresInSeconds === "number" && data.expiresInSeconds > 0) {
+    return data.expiresInSeconds;
+  }
+  if (data.expirationDateUnix) {
+    return Math.max(0, Math.floor(data.expirationDateUnix - (Date.now() / 1000)));
+  }
+  return 24 * 60;
+}
+
 function startQrPolling(data, bookingId, checkoutToken, checkout, onStatus, onQrState) {
-  const remainingSeconds = typeof data.expiresInSeconds === "number" && data.expiresInSeconds > 0
-    ? data.expiresInSeconds
-    : (data.expirationDateUnix ? Math.max(0, Math.floor(data.expirationDateUnix - (Date.now() / 1000))) : 24 * 60);
+  const remainingSeconds = calcularSegundosRestantes(data);
 
   iniciarCuentaRegresivaQr(remainingSeconds, (timerFmt) => {
     if (onQrState) onQrState({ state: "tick", timer: timerFmt });
@@ -166,7 +173,7 @@ function startQrPolling(data, bookingId, checkoutToken, checkout, onStatus, onQr
   });
 
   qrPollingTimer = setInterval(() => {
-    checkQrStatus(data, bookingId, checkoutToken, checkout, onStatus, onQrState);
+    void checkQrStatus(data, bookingId, checkoutToken, checkout, onStatus, onQrState);
   }, 3500);
 }
 
@@ -352,7 +359,7 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
 function handleRevisarStatus(data, bookingId, onStatus) {
   if (data.status === "paid") {
     if (onStatus) onStatus("¡Pago confirmado y acreditado! Redirigiendo al voucher...", "success");
-    const targetBookingId = data.bookingId || bookingId;
+    const targetBookingId = data?.bookingId || bookingId;
     if (targetBookingId) {
       setTimeout(() => {
         window.location.href = `/Booking/Voucher/${targetBookingId}`;

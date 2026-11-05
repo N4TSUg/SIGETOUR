@@ -42,19 +42,16 @@
 }
 else if (allImages.Count == 1)
 {
-    <section class="relative rounded-2xl overflow-hidden shadow-md group cursor-pointer h-[320px] sm:h-[420px] md:h-[480px] bg-black/5" 
-             onclick="openLightbox(0)"
-             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(0);}"
-             role="button"
-             tabindex="0"
-             aria-label="Ver imagen completa">
+    <button type="button" class="w-full border-0 p-0 text-left relative rounded-2xl overflow-hidden shadow-md group cursor-pointer h-[320px] sm:h-[420px] md:h-[480px] bg-black/5 block" 
+            onclick="openLightbox(0)"
+            aria-label="Ver imagen completa">
         <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage!.ImageUrl" alt="@Model.Title" />
         <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
             <span class="text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 bg-black/60 px-3.5 py-1.5 rounded-xl backdrop-blur-sm">
                 <span class="material-symbols-outlined text-[18px]" aria-hidden="true">zoom_in</span> Ver imagen completa
             </span>
         </div>
-    </section>
+    </button>
 }
 else
 {
@@ -62,139 +59,105 @@ else
         <!-- Desktop / Tablet Mosaic Grid (Visible on >= md) -->
         <div class="hidden md:grid @(allImages.Count == 2 ? "grid-cols-2" : (allImages.Count == 3 ? "grid-cols-3" : "grid-cols-4")) grid-rows-2 gap-2 sm:gap-2.5 h-[420px] lg:h-[480px]">
             <!-- Main Cover Photo -->
-            <div class="@(allImages.Count == 2 ? "col-span-1 row-span-2" : "col-span-2 row-span-2") relative group overflow-hidden cursor-pointer" 
-                 onclick="openLightbox(0)"
-                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(0);}"
-                 role="button"
-                 tabindex="0"
-                 aria-label="Ver Completa">
+            <button type="button" class="@(allImages.Count == 2 ? "col-span-1 row-span-2" : "col-span-2 row-span-2") relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                    onclick="openLightbox(0)"
+                    aria-label="Ver Completa">
                 <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage!.ImageUrl" alt="@Model.Title" />
                 <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span class="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 backdrop-blur-sm shadow-md">
                         <span class="material-symbols-outlined text-base" aria-hidden="true">zoom_in</span> Ver Completa
                     </span>
                 </div>
-            </div>
+            </button>
 
             @if (allImages.Count == 2)
             {
-                <div class="col-span-1 row-span-2 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(1)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(1);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver Completa">
+                <button type="button" class="col-span-1 row-span-2 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(1)"
+                        aria-label="Ver Completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 backdrop-blur-sm shadow-md">
                             <span class="material-symbols-outlined text-base" aria-hidden="true">zoom_in</span> Ver Completa
                         </span>
                     </div>
-                </div>
+                </button>
             }
             else if (allImages.Count == 3)
             {
-                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(1)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(1);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver segunda imagen en pantalla completa">
+                <button type="button" class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(1)"
+                        aria-label="Ver segunda imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
-                </div>
-                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(2)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(2);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver tercera imagen en pantalla completa">
+                </button>
+                <button type="button" class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(2)"
+                        aria-label="Ver tercera imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
-                </div>
+                </button>
             }
             else if (allImages.Count == 4)
             {
-                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(1)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(1);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver segunda imagen en pantalla completa">
+                <button type="button" class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(1)"
+                        aria-label="Ver segunda imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
-                </div>
-                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(2)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(2);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver tercera imagen en pantalla completa">
+                </button>
+                <button type="button" class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(2)"
+                        aria-label="Ver tercera imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
-                </div>
-                <div class="col-span-1 row-span-2 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(3)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(3);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver cuarta imagen en pantalla completa">
+                </button>
+                <button type="button" class="col-span-1 row-span-2 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(3)"
+                        aria-label="Ver cuarta imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[2].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
-                </div>
+                </button>
             }
             else
             {
                 <!-- 5 o más fotos (Mosaico clásico de 5 slots con proporciones perfectas) -->
-                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(1)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(1);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver segunda imagen en pantalla completa">
+                <button type="button" class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(1)"
+                        aria-label="Ver segunda imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
-                </div>
-                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(2)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(2);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver tercera imagen en pantalla completa">
+                </button>
+                <button type="button" class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(2)"
+                        aria-label="Ver tercera imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
-                </div>
-                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(3)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(3);}"
-                     role="button"
-                     tabindex="0"
-                     aria-label="Ver cuarta imagen en pantalla completa">
+                </button>
+                <button type="button" class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(3)"
+                        aria-label="Ver cuarta imagen en pantalla completa">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[2].ImageUrl" alt="@Model.Title" />
                     <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                     </div>
-                </div>
-                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" 
-                     onclick="openLightbox(4)"
-                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(4);}"
-                     role="button"
-                     tabindex="0"
-                     >
+                </button>
+                <button type="button" class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer w-full h-full p-0 border-0 bg-transparent block" 
+                        onclick="openLightbox(4)">
                     <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[3].ImageUrl" alt="@Model.Title" />
                     @if (allImages.Count > 5)
                     {
@@ -210,18 +173,15 @@ else
                             <span class="material-symbols-outlined text-white text-xl" aria-hidden="true">zoom_in</span>
                         </div>
                     }
-                </div>
+                </button>
             }
         </div>
 
         <!-- Mobile View (Visible on < md) -->
         <div class="md:hidden flex flex-col gap-2 p-1.5">
-            <div class="relative h-64 sm:h-72 w-full overflow-hidden rounded-xl cursor-pointer" 
-                 onclick="openLightbox(0)"
-                 onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(0);}"
-                 role="button"
-                 tabindex="0"
-                 aria-label="Tocar para ampliar">
+            <button type="button" class="relative h-64 sm:h-72 w-full overflow-hidden rounded-xl cursor-pointer border-0 p-0 text-left block" 
+                    onclick="openLightbox(0)"
+                    aria-label="Tocar para ampliar">
                 <img class="w-full h-full object-cover" src="@mainImage!.ImageUrl" alt="@Model.Title" />
                 <span class="absolute bottom-3 left-3 bg-black/60 text-white text-xs font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm flex items-center gap-1">
                     <span class="material-symbols-outlined text-[15px]" aria-hidden="true">photo_camera</span> 1 / @allImages.Count
@@ -229,7 +189,7 @@ else
                 <span class="absolute bottom-3 right-3 bg-white/95 text-secondary text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1">
                     <span class="material-symbols-outlined text-[15px]" aria-hidden="true">zoom_in</span> Tocar para ampliar
                 </span>
-            </div>
+            </button>
             
             @if (allImages.Count > 1)
             {
@@ -237,14 +197,11 @@ else
                     @for (int idx = 0; idx < allImages.Count; idx++)
                     {
                         var thumb = allImages[idx];
-                        <div onclick="openLightbox(@idx)" 
-                             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(@idx);}"
-                             role="button"
-                             tabindex="0"
-                             aria-label="Ver miniatura @(idx + 1) en pantalla completa"
-                             class="w-20 h-16 shrink-0 rounded-xl overflow-hidden border-2 @(idx == 0 ? "border-primary" : "border-transparent") relative cursor-pointer active:scale-95 transition-all shadow-xs">
+                        <button type="button" onclick="openLightbox(@idx)" 
+                                aria-label="Ver miniatura @(idx + 1) en pantalla completa"
+                                class="w-20 h-16 shrink-0 rounded-xl overflow-hidden border-2 @(idx == 0 ? "border-primary" : "border-transparent") relative cursor-pointer active:scale-95 transition-all shadow-xs p-0 border-0 bg-transparent block">
                             <img src="@thumb.ImageUrl" class="w-full h-full object-cover" alt="Foto @(idx+1)" />
-                        </div>
+                        </button>
                     }
                 </div>
             }

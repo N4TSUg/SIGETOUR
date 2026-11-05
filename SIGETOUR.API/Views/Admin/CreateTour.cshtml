@@ -775,12 +775,9 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   
     <!-- Drag and Drop Upload Zone -->
-    <div class="border-2 border-dashed border-primary/40 hover:border-primary rounded-xl p-6 bg-surface-bright/30 hover:bg-surface-container-low/40 transition-colors duration-150 flex flex-col items-center justify-center text-center cursor-pointer mb-5 group" 
-         onclick="document.getElementById('TourImagesInput').click()"
-         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('TourImagesInput').click();}"
-         role="button"
-         tabindex="0"
-         aria-label="Arrastra y suelta fotografías del circuito aquí o haz clic">
+    <button type="button" class="w-full border-2 border-dashed border-primary/40 hover:border-primary rounded-xl p-6 bg-surface-bright/30 hover:bg-surface-container-low/40 transition-colors duration-150 flex flex-col items-center justify-center text-center cursor-pointer mb-5 group" 
+            onclick="document.getElementById('TourImagesInput').click()"
+            aria-label="Arrastra y suelta fotografías del circuito aquí o haz clic">
         <label for="TourImagesInput" class="sr-only">Image Files</label>
         <input type="file" name="ImageFiles" id="TourImagesInput" multiple accept="image/*" class="hidden" onchange="previewImages(event)" />
         <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-150 mb-3">
