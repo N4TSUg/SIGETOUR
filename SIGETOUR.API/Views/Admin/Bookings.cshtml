@@ -57,8 +57,9 @@
     <form method="get" asp-action="Bookings" id="bookingFilterForm" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
         <!-- Input de Búsqueda General -->
         <div class="md:col-span-4 relative">
+            <label for="bookingSearchInput" class="sr-only">Buscar por código, cliente, DNI, tour o punto</label>
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">search</span>
-            <input type="text" id="bookingSearchInput" name="search" value="@currentSearch" placeholder="Buscar por código, cliente, DNI, tour o punto..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
+            <input type="text" id="bookingSearchInput" name="search" value="@currentSearch" aria-label="Buscar reservas por código, cliente, DNI o tour" placeholder="Buscar por código, cliente, DNI, tour o punto..." class="w-full pl-10 pr-9 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" />
             @if (!string.IsNullOrWhiteSpace(currentSearch))
             {
                 <a href="@Url.Action("Bookings", "Admin", new { status = currentStatus, date = currentDate, tourId = currentTourId })" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface material-symbols-outlined text-[16px]">close</a>
@@ -67,7 +68,8 @@
 
         <!-- Filtro por Circuito / Salida -->
         <div class="md:col-span-3">
-            <select name="tourId" id="bookingTourSelect" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+            <label for="bookingTourSelect" class="sr-only">Filtrar por Circuito o Tour</label>
+            <select name="tourId" id="bookingTourSelect" aria-label="Filtrar por Circuito o Tour" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
                 <option value="" selected="@(!currentTourId.HasValue || currentTourId.Value == Guid.Empty)">Todos los Circuitos / Tours</option>
                 @foreach (var tour in availableTours)
                 {
@@ -78,7 +80,8 @@
 
         <!-- Filtro por Estado -->
         <div class="md:col-span-2">
-            <select name="status" id="bookingStatusSelect" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+            <label for="bookingStatusSelect" class="sr-only">Filtrar por Estado de Reserva</label>
+            <select name="status" id="bookingStatusSelect" aria-label="Filtrar por Estado de Reserva" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
                 <option value="Todos" selected="@(string.IsNullOrEmpty(currentStatus) || currentStatus == "Todos")">Todos los Estados</option>
                 <option value="Confirmed" selected="@(currentStatus == "Confirmed")">Confirmados</option>
                 <option value="Pending" selected="@(currentStatus == "Pending")">Pendientes</option>
@@ -88,7 +91,8 @@
 
         <!-- Filtro por Fecha de Salida -->
         <div class="md:col-span-2">
-            <input type="date" name="date" id="bookingDateInput" value="@currentDate" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" title="Filtrar por fecha de salida" />
+            <label for="bookingDateInput" class="sr-only">Filtrar por Fecha de Salida</label>
+            <input type="date" name="date" id="bookingDateInput" value="@currentDate" aria-label="Filtrar por fecha de salida" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" title="Filtrar por fecha de salida" />
         </div>
 
         <!-- Botones de Acción -->
@@ -416,13 +420,13 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <!-- Fecha de Recorrido -->
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Fecha de la Salida <span class="text-tertiary">*</span></label>
+                    <label for="manifestDate" class="block text-label-sm font-bold text-on-surface-variant mb-1">Fecha de la Salida <span class="text-tertiary">*</span></label>
                     <input type="date" name="Date" id="manifestDate" value="@(currentDate ?? DateTime.Today.ToString("yyyy-MM-dd"))" onchange="fetchManifestPreview()" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none" required />
                 </div>
 
                 <!-- Circuito / Tour -->
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Circuito Turístico <span class="text-tertiary">*</span></label>
+                    <label for="manifestTour" class="block text-label-sm font-bold text-on-surface-variant mb-1">Circuito Turístico <span class="text-tertiary">*</span></label>
                     <select name="TourPackageId" id="manifestTour" onchange="onTourChangedManifest()" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none" required>
                         @foreach (var tour in availableTours)
                         {
@@ -435,7 +439,7 @@
 
                 <!-- Turno de Salida -->
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Turno Operativo</label>
+                    <label for="manifestShift" class="block text-label-sm font-bold text-on-surface-variant mb-1">Turno Operativo</label>
                     <select name="ShiftName" id="manifestShift" onchange="fetchManifestPreview()" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
                         <option value="">Todos los turnos de la jornada</option>
                         <option value="Mañana (09:00 AM)">Mañana (09:00 AM)</option>
@@ -446,7 +450,7 @@
 
                 <!-- Vehículo Elegido (Determina la cantidad de asientos de la tabla Excel) -->
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1 flex items-center justify-between">
+                    <label for="manifestVehicle" class="block text-label-sm font-bold text-on-surface-variant mb-1 flex items-center justify-between">
                         <span>Vehículo Asignado a la Salida <span class="text-tertiary">*</span></span>
                         <span class="text-[11px] text-primary font-bold" id="previewTotalSeatsBadge">-- Asientos</span>
                     </label>
@@ -474,7 +478,7 @@
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-body-sm">
                     <div>
-                        <label class="block text-[11px] font-semibold text-outline mb-1">Conductor Habilitado MTC <span class="text-tertiary">*</span></label>
+                        <label for="manifestDriverSelect" class="block text-[11px] font-semibold text-outline mb-1">Conductor Habilitado MTC <span class="text-tertiary">*</span></label>
                         <select name="DriverId" id="manifestDriverSelect" onchange="onDriverSelected(this)" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm font-semibold focus:border-primary outline-none">
                             <option value="" data-name="Conductor Oficial Chilón" data-license="Q-42910834" data-vehicle="">-- Seleccionar Conductor Oficial --</option>
                             @foreach (var d in driversList)
@@ -487,19 +491,19 @@
                         <input type="hidden" name="DriverName" id="manifestDriver" value="Conductor Oficial Chilón" />
                     </div>
                     <div>
-                        <label class="block text-[11px] font-semibold text-outline mb-1">N° Licencia de Conducir / DNI</label>
+                        <label for="manifestDriverLicense" class="block text-[11px] font-semibold text-outline mb-1">N° Licencia de Conducir / DNI</label>
                         <input type="text" name="DriverLicense" id="manifestDriverLicense" value="Q-42910834" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
                     </div>
                     <div>
-                        <label class="block text-[11px] font-semibold text-outline mb-1">Guía Oficial de Turismo (Opcional)</label>
+                        <label for="manifestGuide" class="block text-[11px] font-semibold text-outline mb-1">Guía Oficial de Turismo (Opcional)</label>
                         <input type="text" name="GuideName" id="manifestGuide" value="" placeholder="Sin guía contratado" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
                     </div>
                     <div>
-                        <label class="block text-[11px] font-semibold text-outline mb-1">Carnet DIRCETUR / DNI Guía</label>
+                        <label for="manifestGuideCarnet" class="block text-[11px] font-semibold text-outline mb-1">Carnet DIRCETUR / DNI Guía</label>
                         <input type="text" name="GuideCarnet" id="manifestGuideCarnet" value="" placeholder="Opcional" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
                     </div>
                     <div class="md:col-span-2">
-                        <label class="block text-[11px] font-semibold text-outline mb-1">Punto de Concentración / Salida General</label>
+                        <label for="manifestDeparturePoint" class="block text-[11px] font-semibold text-outline mb-1">Punto de Concentración / Salida General</label>
                         <input type="text" name="DeparturePoint" id="manifestDeparturePoint" value="Oficina Principal - Jr. 2 de Mayo 569, Cajamarca" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface text-body-sm focus:border-primary outline-none" />
                     </div>
                 </div>
