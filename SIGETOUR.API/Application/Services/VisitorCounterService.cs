@@ -11,8 +11,8 @@ namespace SIGETOUR.API.Application.Services
     {
         private readonly object _lock = new();
         private readonly string _storagePath;
-        private long _totalVisits = 1428;
-        private long _todayVisits = 36;
+        private long _totalVisits = 0;
+        private long _todayVisits = 0;
         private string _lastDateString;
 
         private class VisitorData
@@ -49,7 +49,7 @@ namespace SIGETOUR.API.Application.Services
                         var data = JsonSerializer.Deserialize<VisitorData>(json);
                         if (data != null)
                         {
-                            _totalVisits = Math.Max(data.TotalVisits, _totalVisits);
+                            _totalVisits = data.TotalVisits;
                             var peruNow = DateTime.UtcNow.AddHours(-5).ToString("yyyy-MM-dd");
                             if (data.LastDateString == peruNow)
                             {
@@ -57,7 +57,7 @@ namespace SIGETOUR.API.Application.Services
                             }
                             else
                             {
-                                _todayVisits = 1;
+                                _todayVisits = 0;
                                 _lastDateString = peruNow;
                             }
                         }

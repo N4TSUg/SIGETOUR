@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 .env.*.local
 .neon
 node_modules/
+
+# Local persistent application data
+[Aa]pp_[Dd]ata/
