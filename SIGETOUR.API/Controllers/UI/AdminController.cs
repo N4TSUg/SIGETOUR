@@ -2946,64 +2946,104 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpGet]
         public async Task<IActionResult> GetNotifications()
         {
-            var peruNow = DateTime.UtcNow.AddHours(-5);
-            var todayPeru = peruNow.Date;
-
-            // 1. Reservas recientes (últimas 5)
-            var recentBookings = await _context.Bookings
-                .Include(b => b.Items).ThenInclude(i => i.TourPackage)
-                .OrderByDescending(b => b.BookingDate)
-                .Take(5)
-                .Select(b => new {
-                    id = b.Id,
-                    type = "booking",
-                    title = $"Reserva {b.ReferenceCode}",
-                    detail = $"{b.CustomerName} • {b.TotalPassengers} pax • S/ {b.TotalAmount:F2}",
-                    date = b.BookingDate.ToString("dd/MM/yyyy HH:mm"),
-                    url = $"/Admin/EditBooking/{b.Id}",
-                    badge = b.Status.ToString()
-                })
-                .ToListAsync();
-
-            // 2. Alertas de salidas próximas sin asignación
-            var unassignedDepartures = await _context.Bookings
-                .Include(b => b.Items).ThenInclude(i => i.TourPackage)
-                .Where(b => b.Status != BookingStatus.Cancelled && b.TravelDate.Date >= todayPeru && b.TravelDate.Date <= todayPeru.AddDays(2))
-                .Where(b => b.AssignedVehicleId == null || b.AssignedDriverId == null)
-                .Take(3)
-                .Select(b => new {
-                    id = b.Id,
-                    type = "alert",
-                    title = $"Salida sin asignación: {b.ReferenceCode}",
-                    detail = $"{b.ShiftName} • {b.TravelDate:dd MMM} • {(b.Items.FirstOrDefault() != null && b.Items.FirstOrDefault()!.TourPackage != null ? b.Items.FirstOrDefault()!.TourPackage!.Title : "Circuito")}",
-                    date = "Pendiente de asignar van o conductor",
-                    url = "/Admin/Despacho",
-                    badge = "Despacho"
-                })
-                .ToListAsync();
-
-            // 3. Alertas de SOAT / CITV a 30 días
-            var nowUtc = DateTime.UtcNow;
-            var fleetAlerts = await _context.Vehicles
-                .Where(v => v.IsActive && ((v.SoatExpiryDate != null && v.SoatExpiryDate <= nowUtc.AddDays(30)) || (v.CitvExpiryDate != null && v.CitvExpiryDate <= nowUtc.AddDays(30))))
-                .Take(2)
-                .Select(v => new {
-                    id = v.Id,
-                    type = "fleet",
-                    title = $"Documentación: {v.LicensePlate}",
-                    detail = $"{v.Model} • Revisar póliza SOAT / CITV",
-                    date = "Revisión preventiva SUTRAN",
-                    url = "/Admin/Fleet",
-                    badge = "MTC"
-                })
-                .ToListAsync();
-
             var allNotifs = new List<object>();
-            allNotifs.AddRange(unassignedDepartures);
-            allNotifs.AddRange(fleetAlerts);
-            allNotifs.AddRange(recentBookings);
+            try
+            {
+                var peruNow = DateTime.UtcNow.AddHours(-5);
+                var startDate = DateTime.SpecifyKind(peruNow.Date, DateTimeKind.Utc);
+                var endDate = DateTime.SpecifyKind(peruNow.Date.AddDays(3), DateTimeKind.Utc);
 
-            return Json(new { count = allNotifs.Count, notifications = allNotifs });
+                // 1. Alertas de salidas próximas sin asignación
+                try
+                {
+                    var rawUnassigned = await _context.Bookings
+                        .AsNoTracking()
+                        .Include(b => b.Items).ThenInclude(i => i.TourPackage)
+                        .Where(b => b.Status != BookingStatus.Cancelled && b.TravelDate >= startDate && b.TravelDate < endDate)
+                        .Where(b => b.AssignedVehicleId == null || b.AssignedDriverId == null)
+                        .OrderBy(b => b.TravelDate)
+                        .Take(3)
+                        .ToListAsync();
+
+                    var unassignedDepartures = rawUnassigned.Select(b => new {
+                        id = b.Id,
+                        type = "alert",
+                        title = $"Salida sin asignación: {b.ReferenceCode}",
+                        detail = $"{b.ShiftName} • {b.TravelDate:dd MMM} • {(b.Items.FirstOrDefault()?.TourPackage?.Title ?? "Circuito")}",
+                        date = "Pendiente de asignar van o conductor",
+                        url = "/Admin/Bookings",
+                        badge = "Despacho"
+                    });
+                    allNotifs.AddRange(unassignedDepartures);
+                }
+                catch { }
+
+                // 2. Alertas de SOAT / CITV a 30 días
+                try
+                {
+                    var nowUtc = DateTime.UtcNow;
+                    var thirtyDaysUtc = nowUtc.AddDays(30);
+                    var rawFleet = await _context.Vehicles
+                        .AsNoTracking()
+                        .Where(v => v.IsActive && ((v.SoatExpiryDate != null && v.SoatExpiryDate <= thirtyDaysUtc) || (v.CitvExpiryDate != null && v.CitvExpiryDate <= thirtyDaysUtc)))
+                        .Take(2)
+                        .Select(v => new {
+                            v.Id,
+                            v.LicensePlate,
+                            v.Model
+                        })
+                        .ToListAsync();
+
+                    var fleetAlerts = rawFleet.Select(v => new {
+                        id = v.Id,
+                        type = "fleet",
+                        title = $"Documentación: {v.LicensePlate}",
+                        detail = $"{v.Model} • Revisar póliza SOAT / CITV",
+                        date = "Revisión preventiva SUTRAN",
+                        url = "/Admin/Vehicles",
+                        badge = "MTC"
+                    });
+                    allNotifs.AddRange(fleetAlerts);
+                }
+                catch { }
+
+                // 3. Reservas recientes (últimas 5)
+                try
+                {
+                    var rawBookings = await _context.Bookings
+                        .AsNoTracking()
+                        .OrderByDescending(b => b.BookingDate)
+                        .Take(5)
+                        .Select(b => new {
+                            b.Id,
+                            b.ReferenceCode,
+                            b.CustomerName,
+                            b.TotalPassengers,
+                            b.TotalAmount,
+                            b.BookingDate,
+                            b.Status
+                        })
+                        .ToListAsync();
+
+                    var recentBookings = rawBookings.Select(b => new {
+                        id = b.Id,
+                        type = "booking",
+                        title = $"Reserva {b.ReferenceCode}",
+                        detail = $"{b.CustomerName} • {b.TotalPassengers} pax • S/ {b.TotalAmount:F2}",
+                        date = b.BookingDate.ToString("dd/MM/yyyy HH:mm"),
+                        url = $"/Admin/EditBooking/{b.Id}",
+                        badge = b.Status.ToString()
+                    });
+                    allNotifs.AddRange(recentBookings);
+                }
+                catch { }
+
+                return Json(new { count = allNotifs.Count, notifications = allNotifs });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { count = allNotifs.Count, notifications = allNotifs, error = ex.Message });
+            }
         }
 
         [HttpGet]

@@ -22,19 +22,25 @@ public sealed class CulqiPaymentsController : ControllerBase
     private readonly CheckoutAccess _access;
     private readonly IConfiguration _config;
     private readonly IElectronicReceiptService _receiptService;
+    private readonly SIGETOUR.API.Application.Interfaces.IEmailService? _emailService;
+    private readonly ILogger<CulqiPaymentsController>? _logger;
 
     public CulqiPaymentsController(
         AppDbContext db,
         CulqiApiClient culqi,
         CheckoutAccess access,
         IConfiguration config,
-        IElectronicReceiptService receiptService)
+        IElectronicReceiptService receiptService,
+        SIGETOUR.API.Application.Interfaces.IEmailService? emailService = null,
+        ILogger<CulqiPaymentsController>? logger = null)
     {
         _db = db;
         _culqi = culqi;
         _access = access;
         _config = config;
         _receiptService = receiptService;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     private static DateTime GetPeruLocalDateTime()
@@ -1107,20 +1113,27 @@ public sealed class CulqiPaymentsController : ControllerBase
             // Falla en emisión no anula el cobro verificado
         }
 
-        // Enviar correo de confirmación de reserva y boleto oficial
+        // Enviar correo de confirmación de reserva y boleto oficial con archivos adjuntos PDF
         try
         {
-            var emailService = HttpContext.RequestServices.GetService<SIGETOUR.API.Application.Interfaces.IEmailService>();
+            var emailService = _emailService ?? HttpContext?.RequestServices?.GetService<SIGETOUR.API.Application.Interfaces.IEmailService>();
             if (emailService != null && !string.IsNullOrWhiteSpace(booking.CustomerEmail))
             {
-                var baseUrl = $"{Request.Scheme}://{Request.Host}";
-                _ = Task.Run(async () =>
-                {
-                    try { await emailService.SendBookingConfirmationEmailAsync(booking, baseUrl); } catch { }
-                });
+                var baseUrl = (Request != null && Request.Host.HasValue)
+                    ? $"{Request.Scheme}://{Request.Host}"
+                    : (_config["App:BaseUrl"] ?? "https://localhost:7103");
+
+                var mailResult = await emailService.SendBookingConfirmationEmailAsync(booking, baseUrl, cancellationToken: safeCt);
+                _logger?.LogInformation("[CulqiPayments] Correo de confirmación enviado a {Email} para reserva {Code}: Result={Success}",
+                    booking.CustomerEmail, booking.ReferenceCode, mailResult.Success);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "[CulqiPayments] Error al enviar correo de confirmación a {Email} para reserva {Code}",
+                booking.CustomerEmail, booking.ReferenceCode);
+            // Falla en envío de correo no anula el cobro verificado
+        }
 
         return true;
     }

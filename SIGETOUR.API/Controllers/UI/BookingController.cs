@@ -275,7 +275,9 @@ namespace SIGETOUR.API.Controllers.UI
             {
                 try
                 {
-                    var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                    var baseUrl = (Request != null && Request.Host.HasValue)
+                ? $"{Request.Scheme}://{Request.Host}"
+                : "https://localhost:7103";
                     await emailService.SendBookingConfirmationEmailAsync(booking, baseUrl);
                 }
                 catch { }
@@ -334,6 +336,39 @@ namespace SIGETOUR.API.Controllers.UI
 
             ViewBag.Receipt = receipt;
             return View(booking);
+        }
+
+        [HttpPost("Booking/ResendConfirmationEmail/{id}")]
+        public async Task<IActionResult> ResendConfirmationEmail(Guid id, [FromServices] SIGETOUR.API.Application.Interfaces.IEmailService emailService, string? token = null)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Items).ThenInclude(i => i.TourPackage)
+                .Include(b => b.AssignedVehicle)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null) return NotFound(new { success = false, message = "Reserva no encontrada." });
+
+            bool isStaff = User?.Identity?.IsAuthenticated == true;
+            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
+            string? sessionBookingId = null;
+            try { sessionBookingId = HttpContext?.Session?.GetString("LastBookingId"); } catch { }
+            string? cookieBookingId = null;
+            try { Request?.Cookies.TryGetValue("sigetour_last_booking", out cookieBookingId); } catch { }
+
+            bool isOwner = isStaff || isValidToken || (sessionBookingId == booking.Id.ToString()) || (cookieBookingId == booking.Id.ToString());
+            if (!isOwner) return Unauthorized(new { success = false, message = "No autorizado." });
+
+            if (string.IsNullOrWhiteSpace(booking.CustomerEmail))
+            {
+                return BadRequest(new { success = false, message = "La reserva no tiene un correo electrónico registrado." });
+            }
+
+            var baseUrl = (Request != null && Request.Host.HasValue)
+                ? $"{Request.Scheme}://{Request.Host}"
+                : "https://localhost:7103";
+            var result = await emailService.SendBookingConfirmationEmailAsync(booking, baseUrl);
+
+            return Json(new { success = result.Success, message = result.Message, email = booking.CustomerEmail });
         }
 
         [HttpGet]

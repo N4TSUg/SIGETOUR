@@ -29,6 +29,28 @@
     var receipt = ViewBag.Receipt as SIGETOUR.API.Core.Entities.ElectronicReceipt;
     var hasValidReceipt = receipt != null && (receipt.Status == "Accepted" || receipt.Status == "Demo" || receipt.Status == "Simulation");
     var hasExternalPdf = !string.IsNullOrWhiteSpace(receipt?.PdfUrl) && receipt.PdfUrl.StartsWith("http");
+
+    var tourTitle = tour?.Title ?? "Tour Turístico Cajamarca";
+    var hostUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+    var shortVoucherUrl = $"{hostUrl}/b/{Model.ReferenceCode}";
+    var shortReceiptUrl = $"{hostUrl}/b/{Model.ReferenceCode}/boleta";
+
+    var waMessage = $"¡Hola *{Model.CustomerName}*! Le saluda Turismo Chilón.\n\n" +
+                    $"Le confirmamos que su reserva para el tour *{tourTitle}* programada para el *{Model.TravelDate:dd/MM/yyyy}* se encuentra CONFIRMADA.\n\n" +
+                    $"🎟️ *Código de Reserva:* {Model.ReferenceCode}\n\n" +
+                    $"📄 *Comprobantes Oficiales en PDF:*\n" +
+                    $"• *Boleto Oficial de Viaje:* {shortVoucherUrl}\n" +
+                    (hasValidReceipt ? $"• *Boleta de Venta SUNAT:* {shortReceiptUrl}\n\n" : "\n") +
+                    $"📍 Punto de salida: Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI físico).\n" +
+                    $"¡Gracias por confiar en Turismo Chilón!";
+
+    var customerPhoneDigits = (Model.CustomerPhone ?? "").Trim();
+    var cleanPhone = System.Text.RegularExpressions.Regex.Replace(customerPhoneDigits, @"\D", "");
+    if (cleanPhone.Length == 9) cleanPhone = "51" + cleanPhone;
+
+    var waCustomerUrl = !string.IsNullOrWhiteSpace(cleanPhone)
+        ? $"https://wa.me/{cleanPhone}?text={Uri.EscapeDataString(waMessage)}"
+        : $"https://wa.me/?text={Uri.EscapeDataString(waMessage)}";
 }
 
 <style>
@@ -182,7 +204,7 @@
           </a>
         }
 
-        <a class="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs active:scale-95" href="@ContactService.GetWhatsAppUrl($"Hola, adjunto mi código de reserva {Model.ReferenceCode} para el Tour {tour?.Title ?? "Cajamarca"}")" target="_blank" rel="noopener noreferrer">
+        <a class="inline-flex items-center justify-center gap-1.5 bg-[#25D366] hover:bg-[#1EBE5D] text-white px-4 py-2.5 rounded-xl text-label-md font-bold transition-all shadow-xs active:scale-95" href="@waCustomerUrl" target="_blank" rel="noopener noreferrer" title="Recibir o compartir confirmación y PDFs por WhatsApp">
           <span class="material-symbols-outlined text-[18px]">chat</span>
           <span>WhatsApp</span>
         </a>
@@ -193,6 +215,43 @@
         </a>
       </div>
     </div>
+
+    <!-- BANNER DE CONFIRMACIÓN Y ENTREGA AUTOMÁTICA DE COMPROBANTES (NO-PRINT) -->
+    @if (Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed)
+    {
+      <div class="no-print bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-400/40 rounded-2xl p-4 sm:p-5 mb-6 shadow-sm">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">✓</span>
+              <h2 class="text-base font-extrabold text-emerald-950">¡Pago y Reserva Confirmados Exitosamente!</h2>
+            </div>
+            <p class="text-xs text-gray-700 flex items-center gap-1.5 flex-wrap">
+              <span class="material-symbols-outlined text-[16px] text-emerald-700 shrink-0">mark_email_read</span>
+              <span>Comprobantes oficiales (PDF) enviados a: <strong>@(string.IsNullOrWhiteSpace(Model.CustomerEmail) ? "tu correo" : Model.CustomerEmail)</strong></span>
+              @if (!string.IsNullOrWhiteSpace(Model.CustomerEmail))
+              {
+                <button type="button" onclick="resendConfirmationEmail('@Model.Id')" id="btnResendEmail" class="text-[11px] font-bold text-primary hover:underline ml-1 cursor-pointer">
+                  (Reenviar Correo)
+                </button>
+                <span id="resendEmailStatus" class="text-[11px] font-semibold text-emerald-700 hidden"></span>
+              }
+            </p>
+            <p class="text-xs text-gray-700 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-emerald-700 shrink-0">chat</span>
+              <span>Recibe tus comprobantes oficiales con enlaces cortos directos en tu propio WhatsApp.</span>
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
+            <a href="@waCustomerUrl" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1EBE5D] text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all active:scale-95">
+              <span class="material-symbols-outlined text-[18px]">chat</span>
+              <span>Enviar a mi WhatsApp @(!string.IsNullOrWhiteSpace(Model.CustomerPhone) ? $"({Model.CustomerPhone})" : "")</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    }
 
     <!-- BOLETO / TICKET OFICIAL DE VIAJE (EXACTAMENTE EL FORMATO DE 2 COLUMNAS DE LA IMAGEN) -->
     <div class="bg-white rounded-2xl shadow-md border-2 border-primary/30 overflow-hidden mb-6" id="print-voucher-area">
@@ -458,3 +517,39 @@
 
   </div>
 </div>
+
+<script>
+function resendConfirmationEmail(bookingId) {
+    const btn = document.getElementById('btnResendEmail');
+    const status = document.getElementById('resendEmailStatus');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = '(Enviando...)';
+    }
+    fetch(`/Booking/ResendConfirmationEmail/${bookingId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = '(Reenviado ✓)';
+        }
+        if (status) {
+            status.textContent = data.message || 'Correo reenviado con éxito.';
+            status.classList.remove('hidden');
+        }
+    })
+    .catch(() => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = '(Reintentar)';
+        }
+        if (status) {
+            status.textContent = 'Error al conectar con el servidor de correo.';
+            status.classList.remove('hidden');
+        }
+    });
+}
+</script>
