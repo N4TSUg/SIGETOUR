@@ -27,29 +27,169 @@
     </div>
   </section>
 
-  <section class="grid grid-cols-1 md:grid-cols-4 gap-2 sm:gap-3 rounded-2xl overflow-hidden shadow-sm">
-    @if (Model.Images != null && Model.Images.Any())
-    {
-        var mainImage = Model.Images.FirstOrDefault(i => i.IsMain) ?? Model.Images.First();
-        <div class="md:col-span-2 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[220px] sm:min-h-[280px]">
-          <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage.ImageUrl" alt="@Model.Title"/>
+@{
+    var allImages = Model.Images?.OrderByDescending(i => i.IsMain).ToList() ?? new List<SIGETOUR.API.Core.Entities.TourImage>();
+    var mainImage = allImages.FirstOrDefault(i => i.IsMain) ?? allImages.FirstOrDefault();
+    var sideImages = allImages.Where(i => mainImage == null || i.Id != mainImage.Id).ToList();
+}
+
+@if (allImages.Count == 0)
+{
+    <section class="rounded-2xl overflow-hidden shadow-sm bg-surface-variant min-h-[220px] flex flex-col items-center justify-center text-on-surface-variant p-8 border border-outline-variant">
+        <span class="material-symbols-outlined text-5xl mb-2 text-outline">landscape</span>
+        <span class="text-title-md font-bold">Sin fotografías referenciales</span>
+    </section>
+}
+else if (allImages.Count == 1)
+{
+    <section class="relative rounded-2xl overflow-hidden shadow-md group cursor-pointer h-[320px] sm:h-[420px] md:h-[480px] bg-black/5" onclick="openLightbox(0)">
+        <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage!.ImageUrl" alt="@Model.Title" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+            <span class="text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 bg-black/60 px-3.5 py-1.5 rounded-xl backdrop-blur-sm">
+                <span class="material-symbols-outlined text-[18px]">zoom_in</span> Ver imagen completa
+            </span>
         </div>
-        <div class="grid grid-cols-3 md:contents gap-2">
-        @foreach (var img in Model.Images.Where(i => i.Id != mainImage.Id).Take(3))
+    </section>
+}
+else
+{
+    <section class="relative rounded-2xl overflow-hidden shadow-md bg-surface-container-low border border-outline-variant/60">
+        <!-- Desktop / Tablet Mosaic Grid (Visible on >= md) -->
+        <div class="hidden md:grid @(allImages.Count == 2 ? "grid-cols-2" : (allImages.Count == 3 ? "grid-cols-3" : "grid-cols-4")) grid-rows-2 gap-2 sm:gap-2.5 h-[420px] lg:h-[480px]">
+            <!-- Main Cover Photo -->
+            <div class="@(allImages.Count == 2 ? "col-span-1 row-span-2" : "col-span-2 row-span-2") relative group overflow-hidden cursor-pointer" onclick="openLightbox(0)">
+                <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@mainImage!.ImageUrl" alt="@Model.Title" />
+                <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span class="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 backdrop-blur-sm shadow-md">
+                        <span class="material-symbols-outlined text-base">zoom_in</span> Ver Completa
+                    </span>
+                </div>
+            </div>
+
+            @if (allImages.Count == 2)
+            {
+                <div class="col-span-1 row-span-2 relative group overflow-hidden cursor-pointer" onclick="openLightbox(1)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="bg-black/60 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 backdrop-blur-sm shadow-md">
+                            <span class="material-symbols-outlined text-base">zoom_in</span> Ver Completa
+                        </span>
+                    </div>
+                </div>
+            }
+            else if (allImages.Count == 3)
+            {
+                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" onclick="openLightbox(1)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                    </div>
+                </div>
+                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" onclick="openLightbox(2)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                    </div>
+                </div>
+            }
+            else if (allImages.Count == 4)
+            {
+                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" onclick="openLightbox(1)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                    </div>
+                </div>
+                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" onclick="openLightbox(2)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                    </div>
+                </div>
+                <div class="col-span-1 row-span-2 relative group overflow-hidden cursor-pointer" onclick="openLightbox(3)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[2].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- 5 o más fotos (Mosaico clásico de 5 slots con proporciones perfectas) -->
+                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" onclick="openLightbox(1)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[0].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                    </div>
+                </div>
+                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" onclick="openLightbox(2)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[1].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                    </div>
+                </div>
+                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" onclick="openLightbox(3)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[2].ImageUrl" alt="@Model.Title" />
+                    <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                    </div>
+                </div>
+                <div class="col-span-1 row-span-1 relative group overflow-hidden cursor-pointer" onclick="openLightbox(4)">
+                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@sideImages[3].ImageUrl" alt="@Model.Title" />
+                    @if (allImages.Count > 5)
+                    {
+                        <div class="absolute inset-0 bg-black/60 group-hover:bg-black/75 flex flex-col items-center justify-center text-white p-2 transition-all">
+                            <span class="material-symbols-outlined text-2xl sm:text-3xl mb-0.5">photo_library</span>
+                            <span class="text-sm font-bold leading-tight">+@(allImages.Count - 4) fotos</span>
+                            <span class="text-[10px] text-white/80">Ver galería</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span class="material-symbols-outlined text-white text-xl">zoom_in</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Mobile View (Visible on < md) -->
+        <div class="md:hidden flex flex-col gap-2 p-1.5">
+            <div class="relative h-64 sm:h-72 w-full overflow-hidden rounded-xl cursor-pointer" onclick="openLightbox(0)">
+                <img class="w-full h-full object-cover" src="@mainImage!.ImageUrl" alt="@Model.Title" />
+                <span class="absolute bottom-3 left-3 bg-black/60 text-white text-xs font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[15px]">photo_camera</span> 1 / @allImages.Count
+                </span>
+                <span class="absolute bottom-3 right-3 bg-white/95 text-secondary text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[15px]">zoom_in</span> Tocar para ampliar
+                </span>
+            </div>
+            
+            @if (allImages.Count > 1)
+            {
+                <div class="flex items-center gap-2 overflow-x-auto py-1 no-scrollbar">
+                    @for (int idx = 0; idx < allImages.Count; idx++)
+                    {
+                        var thumb = allImages[idx];
+                        <div onclick="openLightbox(@idx)" class="w-20 h-16 shrink-0 rounded-xl overflow-hidden border-2 @(idx == 0 ? "border-primary" : "border-transparent") relative cursor-pointer active:scale-95 transition-all shadow-xs">
+                            <img src="@thumb.ImageUrl" class="w-full h-full object-cover" alt="Foto @(idx+1)" />
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Floating Button "Ver todas las fotos" on Desktop -->
+        @if (allImages.Count > 1)
         {
-          <div class="relative group overflow-hidden bg-surface-variant h-20 sm:h-28 md:min-h-[160px] rounded-lg md:rounded-none">
-            <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@img.ImageUrl" alt="Foto adicional"/>
-          </div>
+            <button type="button" onclick="openLightbox(0)" class="hidden md:flex absolute bottom-3.5 right-3.5 bg-white/95 hover:bg-white text-secondary font-bold text-xs sm:text-sm px-3.5 py-2 rounded-xl shadow-lg border border-outline-variant items-center gap-1.5 transition-all active:scale-95 z-20 backdrop-blur-sm cursor-pointer hover:shadow-xl hover:text-primary">
+                <span class="material-symbols-outlined text-[18px] text-primary">photo_library</span>
+                <span>Ver todas las fotos (@allImages.Count)</span>
+            </button>
         }
-        </div>
-    }
-    else
-    {
-        <div class="md:col-span-4 md:row-span-2 relative group overflow-hidden bg-surface-variant min-h-[220px] flex items-center justify-center text-on-surface-variant">
-            <span class="text-headline-md font-bold">Sin imágenes referenciales</span>
-        </div>
-    }
-  </section>
+    </section>
+}
 
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
     <div class="lg:col-span-8 space-y-8">
@@ -304,6 +444,161 @@
       <span>Reservar</span>
     </a>
   </div>
+
+  <!-- LIGHTBOX MODAL (VISOR DE FOTOS EN PANTALLA COMPLETA) -->
+  <div id="tour-lightbox-modal" class="fixed inset-0 z-[120] bg-black/95 backdrop-blur-md hidden flex flex-col justify-between p-3 sm:p-5 select-none transition-all duration-300">
+    <!-- Top Bar -->
+    <div class="flex items-center justify-between text-white pb-3 border-b border-white/10 z-20">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center">
+          <span class="material-symbols-outlined text-[20px]">photo_camera</span>
+        </div>
+        <div>
+          <h3 class="text-sm sm:text-base font-bold text-white truncate max-w-[200px] sm:max-w-md">@Model.Title</h3>
+          <span class="text-[11px] text-white/60">Galería fotográfica oficial</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="lightbox-counter" class="text-xs sm:text-sm font-semibold text-white/80 bg-white/10 px-3 py-1 rounded-full border border-white/10">Foto 1 de @allImages.Count</span>
+        <button type="button" onclick="closeLightbox()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer" title="Cerrar (Esc)">
+          <span class="material-symbols-outlined text-2xl">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Center Image Viewing Area -->
+    <div class="relative flex-1 flex items-center justify-center my-auto overflow-hidden py-3" onclick="onLightboxBackdropClick(event)">
+      <!-- Prev Button -->
+      <button type="button" onclick="prevLightboxImage(event)" class="absolute left-2 sm:left-6 z-20 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-xl backdrop-blur-sm" title="Foto anterior (Flecha Izquierda)">
+        <span class="material-symbols-outlined text-2xl sm:text-3xl">chevron_left</span>
+      </button>
+
+      <!-- Main Active Full Image -->
+      <img id="lightbox-main-img" src="" alt="@Model.Title" class="max-h-[68vh] sm:max-h-[74vh] max-w-[90vw] object-contain rounded-xl shadow-2xl transition-all duration-200" />
+
+      <!-- Next Button -->
+      <button type="button" onclick="nextLightboxImage(event)" class="absolute right-2 sm:right-6 z-20 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-xl backdrop-blur-sm" title="Siguiente foto (Flecha Derecha)">
+        <span class="material-symbols-outlined text-2xl sm:text-3xl">chevron_right</span>
+      </button>
+    </div>
+
+    <!-- Bottom Thumbnails Strip -->
+    <div class="pt-3 border-t border-white/10 flex items-center justify-center gap-2 overflow-x-auto max-w-4xl mx-auto px-2 py-1 no-scrollbar z-20" id="lightbox-thumbnails">
+      @for (int idx = 0; idx < allImages.Count; idx++)
+      {
+        var thumb = allImages[idx];
+        <button type="button" onclick="setLightboxIndex(@idx)" class="lightbox-thumb-btn w-14 h-11 sm:w-16 sm:h-12 shrink-0 rounded-lg overflow-hidden border-2 transition-all opacity-60 hover:opacity-100 cursor-pointer" data-thumb-index="@idx">
+          <img src="@thumb.ImageUrl" class="w-full h-full object-cover" alt="Miniatura @(idx+1)" />
+        </button>
+      }
+    </div>
+  </div>
+
+  <script>
+    const lightboxImages = [
+      @foreach(var img in allImages)
+      {
+        <text>'@img.ImageUrl',</text>
+      }
+    ];
+
+    let currentLightboxIdx = 0;
+
+    function openLightbox(index = 0) {
+      if (!lightboxImages || lightboxImages.length === 0) return;
+      currentLightboxIdx = (index >= 0 && index < lightboxImages.length) ? index : 0;
+      
+      const modal = document.getElementById('tour-lightbox-modal');
+      if (!modal) return;
+      
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      updateLightboxView();
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('tour-lightbox-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    function onLightboxBackdropClick(event) {
+      if (event.target.id === 'lightbox-main-img' || event.target.closest('button')) {
+        return;
+      }
+      closeLightbox();
+    }
+
+    function setLightboxIndex(index) {
+      if (index >= 0 && index < lightboxImages.length) {
+        currentLightboxIdx = index;
+        updateLightboxView();
+      }
+    }
+
+    function nextLightboxImage(event) {
+      if (event) event.stopPropagation();
+      currentLightboxIdx = (currentLightboxIdx + 1) % lightboxImages.length;
+      updateLightboxView();
+    }
+
+    function prevLightboxImage(event) {
+      if (event) event.stopPropagation();
+      currentLightboxIdx = (currentLightboxIdx - 1 + lightboxImages.length) % lightboxImages.length;
+      updateLightboxView();
+    }
+
+    function updateLightboxView() {
+      const mainImg = document.getElementById('lightbox-main-img');
+      const counter = document.getElementById('lightbox-counter');
+      if (mainImg) {
+        mainImg.src = lightboxImages[currentLightboxIdx];
+      }
+      if (counter) {
+        counter.innerText = `Foto ${currentLightboxIdx + 1} de ${lightboxImages.length}`;
+      }
+      
+      const thumbBtns = document.querySelectorAll('.lightbox-thumb-btn');
+      thumbBtns.forEach((btn, idx) => {
+        if (idx === currentLightboxIdx) {
+          btn.classList.add('border-primary', 'opacity-100', 'scale-105');
+          btn.classList.remove('border-transparent', 'opacity-60');
+          btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        } else {
+          btn.classList.remove('border-primary', 'opacity-100', 'scale-105');
+          btn.classList.add('border-transparent', 'opacity-60');
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('tour-lightbox-modal');
+      if (!modal || modal.classList.contains('hidden')) return;
+
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowRight') nextLightboxImage();
+      else if (e.key === 'ArrowLeft') prevLightboxImage();
+    });
+
+    let touchStartX = 0;
+    let touchEndX = 0;
+    const lightboxModal = document.getElementById('tour-lightbox-modal');
+    if (lightboxModal) {
+      lightboxModal.addEventListener('touchstart', e => {
+        touchStartX = e.changedTouches[0].screenX;
+      }, { passive: true });
+
+      lightboxModal.addEventListener('touchend', e => {
+        touchEndX = e.changedTouches[0].screenX;
+        const swipeDistance = touchEndX - touchStartX;
+        if (Math.abs(swipeDistance) > 50) {
+          if (swipeDistance < 0) nextLightboxImage();
+          else prevLightboxImage();
+        }
+      }, { passive: true });
+    }
+  </script>
 </main>
 
 

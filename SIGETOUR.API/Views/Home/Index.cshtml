@@ -47,7 +47,8 @@
 <div class="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white group">
 @if (flagship != null && flagship.Images != null && flagship.Images.Any())
 {
-    <img class="w-full h-[410px] object-cover group-hover:scale-105 transition-transform duration-500" alt="@flagship.Title" src="@flagship.Images.First().ImageUrl">
+    var fMain = flagship.Images.FirstOrDefault(i => i.IsMain) ?? flagship.Images.First();
+    <img class="w-full h-[410px] object-cover group-hover:scale-105 transition-transform duration-500" alt="@flagship.Title" src="@fMain.ImageUrl">
 }
 else
 {
@@ -181,7 +182,8 @@ else
                     <div class="relative h-48 overflow-hidden bg-surface-container">
                         @if (tour.Images != null && tour.Images.Any())
                         {
-                            <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@tour.Images.First().ImageUrl" alt="@tour.Title">
+                            var tMain = tour.Images.FirstOrDefault(i => i.IsMain) ?? tour.Images.First();
+                            <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@tMain.ImageUrl" alt="@tour.Title">
                         }
                         else
                         {
@@ -256,7 +258,8 @@ else
                             <div class="relative h-48 overflow-hidden">
                                 @if (t.Images != null && t.Images.Any())
                                 {
-                                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@t.Images.First().ImageUrl" alt="@t.Title">
+                                    var featMain = t.Images.FirstOrDefault(i => i.IsMain) ?? t.Images.First();
+                                    <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src="@featMain.ImageUrl" alt="@t.Title">
                                 }
                                 else
                                 {

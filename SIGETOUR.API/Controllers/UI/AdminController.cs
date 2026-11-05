@@ -1548,7 +1548,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditTour(SIGETOUR.API.Models.TourPackageDto dto, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
+        public async Task<IActionResult> EditTour(SIGETOUR.API.Models.TourPackageDto dto, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds, Guid? SelectedMainImageId = null)
         {
             if (!ModelState.IsValid)
             {
@@ -1689,6 +1689,19 @@ namespace SIGETOUR.API.Controllers.UI
 
             await ProcessImages(tour, ImageFiles);
 
+            if (SelectedMainImageId.HasValue && SelectedMainImageId.Value != Guid.Empty)
+            {
+                foreach (var img in tour.Images)
+                {
+                    img.IsMain = (img.Id == SelectedMainImageId.Value);
+                }
+            }
+
+            if (tour.Images.Any() && !tour.Images.Any(i => i.IsMain))
+            {
+                tour.Images.First().IsMain = true;
+            }
+
             try
             {
                 await _context.SaveChangesAsync();
@@ -1723,8 +1736,21 @@ namespace SIGETOUR.API.Controllers.UI
             var image = await _context.Set<TourImage>().FindAsync(id);
             if (image != null)
             {
+                var tourId = image.TourPackageId;
+                var wasMain = image.IsMain;
+
                 _context.Set<TourImage>().Remove(image);
                 await _context.SaveChangesAsync();
+
+                if (wasMain)
+                {
+                    var nextImage = await _context.TourImages.FirstOrDefaultAsync(i => i.TourPackageId == tourId);
+                    if (nextImage != null)
+                    {
+                        nextImage.IsMain = true;
+                        await _context.SaveChangesAsync();
+                    }
+                }
                 
                 try {
                     var filePath = Path.Combine(_env.WebRootPath, image.ImageUrl.TrimStart('/').Replace('/', '\\'));
@@ -1733,6 +1759,33 @@ namespace SIGETOUR.API.Controllers.UI
                 } catch { } // ignore file delete errors
             }
             return Ok();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SetMainTourImage(Guid tourId, Guid imageId)
+        {
+            var tour = await _context.TourPackages
+                .Include(t => t.Images)
+                .FirstOrDefaultAsync(t => t.Id == tourId);
+
+            if (tour == null)
+            {
+                return NotFound(new { success = false, message = "Circuito turístico no encontrado." });
+            }
+
+            var targetImage = tour.Images.FirstOrDefault(i => i.Id == imageId);
+            if (targetImage == null)
+            {
+                return NotFound(new { success = false, message = "Imagen no encontrada en este circuito." });
+            }
+
+            foreach (var img in tour.Images)
+            {
+                img.IsMain = (img.Id == imageId);
+            }
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true, imageId = imageId });
         }
 
         [HttpPost]
