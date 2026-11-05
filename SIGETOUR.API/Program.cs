@@ -33,7 +33,21 @@ builder.Services.AddControllers();
 builder.Services.AddControllersWithViews();
 
 // Cargar variables de entorno desde .env.local o .env si existen (soporte nativo Neon Postgres)
-foreach (var searchDir in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory, Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..")), Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..")) })
+var candidateDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+void AddDirAndParents(string? dir)
+{
+    while (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+    {
+        candidateDirs.Add(dir);
+        var parent = Directory.GetParent(dir);
+        if (parent == null || parent.FullName == dir) break;
+        dir = parent.FullName;
+    }
+}
+AddDirAndParents(Directory.GetCurrentDirectory());
+AddDirAndParents(AppContext.BaseDirectory);
+
+foreach (var searchDir in candidateDirs)
 {
     foreach (var envName in new[] { ".env.local", ".env", "sigetour_variables_entorno.env" })
     {
@@ -53,6 +67,7 @@ foreach (var searchDir in new[] { Directory.GetCurrentDirectory(), AppContext.Ba
                     {
                         Environment.SetEnvironmentVariable(k, v);
                     }
+                    builder.Configuration[k] = Environment.GetEnvironmentVariable(k) ?? v;
                 }
             }
         }

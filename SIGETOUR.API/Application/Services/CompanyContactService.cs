@@ -18,8 +18,12 @@ namespace SIGETOUR.API.Application.Services
         {
             get
             {
-                var val = _config["SIGETOUR_CONTACT_WHATSAPP"]
+                var val = Environment.GetEnvironmentVariable("SIGETOUR_CONTACT_WHATSAPP")
+                       ?? Environment.GetEnvironmentVariable("CONTACT_WHATSAPP")
+                       ?? _config["SIGETOUR_CONTACT_WHATSAPP"]
                        ?? _config["CONTACT_WHATSAPP"]
+                       ?? Environment.GetEnvironmentVariable("Company:WhatsApp")
+                       ?? Environment.GetEnvironmentVariable("Company__WhatsApp")
                        ?? _config["Company:WhatsApp"]
                        ?? _config["Company__WhatsApp"]
                        ?? "928876259";
@@ -31,8 +35,12 @@ namespace SIGETOUR.API.Application.Services
         {
             get
             {
-                var val = _config["SIGETOUR_CONTACT_WHATSAPP_SECONDARY"]
+                var val = Environment.GetEnvironmentVariable("SIGETOUR_CONTACT_WHATSAPP_SECONDARY")
+                       ?? Environment.GetEnvironmentVariable("CONTACT_WHATSAPP_SECONDARY")
+                       ?? _config["SIGETOUR_CONTACT_WHATSAPP_SECONDARY"]
                        ?? _config["CONTACT_WHATSAPP_SECONDARY"]
+                       ?? Environment.GetEnvironmentVariable("Company:WhatsAppSecondary")
+                       ?? Environment.GetEnvironmentVariable("Company__WhatsAppSecondary")
                        ?? _config["Company:WhatsAppSecondary"]
                        ?? _config["Company__WhatsAppSecondary"]
                        ?? "944746364";
@@ -48,8 +56,12 @@ namespace SIGETOUR.API.Application.Services
         {
             get
             {
-                var val = _config["SIGETOUR_CONTACT_PHONE"]
+                var val = Environment.GetEnvironmentVariable("SIGETOUR_CONTACT_PHONE")
+                       ?? Environment.GetEnvironmentVariable("CONTACT_PHONE")
+                       ?? _config["SIGETOUR_CONTACT_PHONE"]
                        ?? _config["CONTACT_PHONE"]
+                       ?? Environment.GetEnvironmentVariable("Company:PhoneCall")
+                       ?? Environment.GetEnvironmentVariable("Company__PhoneCall")
                        ?? _config["Company:PhoneCall"]
                        ?? _config["Company__PhoneCall"]
                        ?? WhatsAppSecondaryNumber;
@@ -65,8 +77,12 @@ namespace SIGETOUR.API.Application.Services
         {
             get
             {
-                return _config["SIGETOUR_CONTACT_EMAIL"]
+                return Environment.GetEnvironmentVariable("SIGETOUR_CONTACT_EMAIL")
+                    ?? Environment.GetEnvironmentVariable("CONTACT_EMAIL")
+                    ?? _config["SIGETOUR_CONTACT_EMAIL"]
                     ?? _config["CONTACT_EMAIL"]
+                    ?? Environment.GetEnvironmentVariable("Company:Email")
+                    ?? Environment.GetEnvironmentVariable("Company__Email")
                     ?? _config["Company:Email"]
                     ?? _config["Company__Email"]
                     ?? "informes@turismochilon.com";
@@ -77,8 +93,12 @@ namespace SIGETOUR.API.Application.Services
         {
             get
             {
-                return _config["SIGETOUR_CONTACT_EMAIL_SECONDARY"]
+                return Environment.GetEnvironmentVariable("SIGETOUR_CONTACT_EMAIL_SECONDARY")
+                    ?? Environment.GetEnvironmentVariable("CONTACT_EMAIL_SECONDARY")
+                    ?? _config["SIGETOUR_CONTACT_EMAIL_SECONDARY"]
                     ?? _config["CONTACT_EMAIL_SECONDARY"]
+                    ?? Environment.GetEnvironmentVariable("Company:EmailSecondary")
+                    ?? Environment.GetEnvironmentVariable("Company__EmailSecondary")
                     ?? _config["Company:EmailSecondary"]
                     ?? _config["Company__EmailSecondary"]
                     ?? "informes.chilon@gmail.com";
@@ -89,8 +109,12 @@ namespace SIGETOUR.API.Application.Services
         {
             get
             {
-                return _config["SIGETOUR_CONTACT_ADDRESS"]
+                return Environment.GetEnvironmentVariable("SIGETOUR_CONTACT_ADDRESS")
+                    ?? Environment.GetEnvironmentVariable("CONTACT_ADDRESS")
+                    ?? _config["SIGETOUR_CONTACT_ADDRESS"]
                     ?? _config["CONTACT_ADDRESS"]
+                    ?? Environment.GetEnvironmentVariable("Company:FiscalAddress")
+                    ?? Environment.GetEnvironmentVariable("Company__FiscalAddress")
                     ?? _config["Company:FiscalAddress"]
                     ?? _config["Company__FiscalAddress"]
                     ?? "Jr. 2 de Mayo 569, Cajamarca - Perú";
