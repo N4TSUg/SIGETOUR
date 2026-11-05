@@ -390,6 +390,14 @@
 </div>
 
 <script>
+window.escapeHtml = function(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+};
+function escapeHtml(str) {
+    return window.escapeHtml(str);
+}
+
 function toggleAdminSidebar() {
     const sidebar = document.getElementById('admin-sidebar');
     const backdrop = document.getElementById('admin-sidebar-backdrop');
@@ -663,6 +671,7 @@ function toggleNotificationsDropdown() {
 }
 
 function fetchNotifications() {
+    const list = document.getElementById('notificationsList');
     fetch('/Admin/GetNotifications')
     .then(r => {
         if (!r.ok) throw new Error("HTTP error " + r.status);
@@ -670,9 +679,8 @@ function fetchNotifications() {
     })
     .then(data => {
         notifsLoaded = true;
-        const list = document.getElementById('notificationsList');
         if (!list) return;
-        if (!data.notifications || data.notifications.length === 0) {
+        if (!data || !data.notifications || data.notifications.length === 0) {
             list.innerHTML = '<div class="p-6 text-center text-xs text-outline">No hay notificaciones pendientes en este momento.</div>';
             return;
         }
@@ -690,26 +698,32 @@ function fetchNotifications() {
                 icon = 'confirmation_number';
                 iconColor = 'text-emerald-700 bg-emerald-100';
             }
+            const safeTitle = (typeof window.escapeHtml === 'function') ? window.escapeHtml(n.title) : (n.title || '');
+            const safeBadge = (typeof window.escapeHtml === 'function') ? window.escapeHtml(n.badge) : (n.badge || '');
+            const safeDetail = (typeof window.escapeHtml === 'function') ? window.escapeHtml(n.detail) : (n.detail || '');
+            const safeDate = (typeof window.escapeHtml === 'function') ? window.escapeHtml(n.date) : (n.date || '');
+            const safeUrl = n.url || '#';
+
             html += `
-                <a href="${n.url}" class="p-3.5 hover:bg-surface-container transition-colors flex items-start gap-3 block">
+                <a href="${safeUrl}" class="p-3.5 hover:bg-surface-container transition-colors flex items-start gap-3 block">
                     <div class="w-8 h-8 rounded-lg ${iconColor} flex items-center justify-center shrink-0 mt-0.5">
                         <span class="material-symbols-outlined text-[18px]">${icon}</span>
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-1">
-                            <span class="font-bold text-xs text-on-surface truncate">${escapeHtml(n.title)}</span>
-                            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant shrink-0">${escapeHtml(n.badge)}</span>
+                            <span class="font-bold text-xs text-on-surface truncate">${safeTitle}</span>
+                            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant shrink-0">${safeBadge}</span>
                         </div>
-                        <p class="text-xs text-on-surface-variant truncate mt-0.5">${escapeHtml(n.detail)}</p>
-                        <span class="text-[10px] text-outline block mt-1">${escapeHtml(n.date)}</span>
+                        <p class="text-xs text-on-surface-variant truncate mt-0.5">${safeDetail}</p>
+                        <span class="text-[10px] text-outline block mt-1">${safeDate}</span>
                     </div>
                 </a>
             `;
         });
         list.innerHTML = html;
     })
-    .catch(() => {
-        const list = document.getElementById('notificationsList');
+    .catch(err => {
+        console.error('Error al cargar notificaciones:', err);
         if (list) list.innerHTML = '<div class="p-6 text-center text-xs text-red-600">No se pudieron cargar las notificaciones.</div>';
     });
 }
