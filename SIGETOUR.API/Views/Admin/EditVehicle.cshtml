@@ -119,6 +119,53 @@
                 </div>
             </div>
 
+            <!-- SECCIÓN: Equipamiento y Comodidades a Bordo -->
+            <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
+                    <div>
+                        <h2 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary">airport_shuttle</span> Equipamiento y Comodidades a Bordo
+                        </h2>
+                        <p class="text-xs text-on-surface-variant mt-0.5">Selecciona los servicios y comodidades activas para esta unidad vehicular.</p>
+                    </div>
+                    <span class="text-label-sm bg-primary-container text-on-primary-container px-2.5 py-1 rounded-lg font-bold">Visible en Catálogo</span>
+                </div>
+                <div class="p-6">
+                    @{
+                        var standardAmenities = new List<(string Name, string Icon, string Desc)>
+                        {
+                            ("Aire Acondicionado / Climatizador", "ac_unit", "Control de temperatura para rutas de altura"),
+                            ("Asientos Reclinables Confort", "airline_seat_recline_extra", "Butacas reclinables ergonómicas con cabecera"),
+                            ("Puertos de Carga USB", "usb", "Conectores individuales para celulares"),
+                            ("Botiquín de Primeros Auxilios", "medical_services", "Botiquín normativo MTC para asistencia a bordo"),
+                            ("Extintor de Incendios Reglamentario", "fire_extinguisher", "Extintor PQS certificado y vigente"),
+                            ("Micrófono & Audio para Guía", "volume_up", "Sistema de audio para explicaciones turísticas"),
+                            ("Maletero Amplio para Equipaje", "luggage", "Compartimiento para mochilas y maletas"),
+                            ("Cinturones de Seguridad en Todas las Plazas", "health_and_safety", "Cinturones certificados de 2 y 3 puntos"),
+                            ("Suspensión Reforzada para Rutas Andinas", "car_repair", "Adaptado para caminos rurales y curvas"),
+                            ("Cortinas de Privacidad / Protección Solar", "curtains", "Protección UV en ventanas laterales")
+                        };
+                        var currentSelected = Model.SelectedEquipment ?? new List<string>();
+                    }
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        @foreach (var amenity in standardAmenities)
+                        {
+                            var isChecked = currentSelected.Any(s => s.Equals(amenity.Name, StringComparison.OrdinalIgnoreCase) || s.Contains(amenity.Name.Split('/')[0].Trim(), StringComparison.OrdinalIgnoreCase));
+                            <label class="flex items-start gap-3 p-3.5 rounded-xl border border-outline-variant/70 hover:border-primary/50 hover:bg-surface-container-low/40 transition-colors cursor-pointer group @(isChecked ? "bg-surface-container-low/60 border-primary/40" : "bg-surface-bright/20")">
+                                <input type="checkbox" name="SelectedEquipment" value="@amenity.Name" @(isChecked ? "checked" : "") class="mt-1 rounded text-primary focus:ring-primary h-4 w-4 shrink-0" />
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-1.5 font-bold text-xs text-on-surface group-hover:text-primary transition-colors">
+                                        <span class="material-symbols-outlined text-[17px] text-primary shrink-0">@amenity.Icon</span>
+                                        <span>@amenity.Name</span>
+                                    </div>
+                                    <p class="text-[11px] text-on-surface-variant mt-0.5 leading-tight">@amenity.Desc</p>
+                                </div>
+                            </label>
+                        }
+                    </div>
+                </div>
+            </div>
+
             <!-- SECCIÓN 3: Galería Fotográfica -->
             <div class="bg-surface-container-lowest rounded-2xl border border-outline-variant shadow-sm overflow-hidden">
                 <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex justify-between items-center">

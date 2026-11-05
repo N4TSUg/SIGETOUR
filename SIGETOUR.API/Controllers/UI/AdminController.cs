@@ -658,7 +658,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditVehicle(SIGETOUR.API.Models.VehicleDto dto, List<IFormFile> VehicleImages)
+        public async Task<IActionResult> EditVehicle(SIGETOUR.API.Models.VehicleDto dto, List<IFormFile> VehicleImages, string[]? SelectedEquipment = null)
         {
             ModelState.Remove("ExistingImages");
             if (string.IsNullOrWhiteSpace(dto.LicensePlate))
@@ -672,6 +672,19 @@ namespace SIGETOUR.API.Controllers.UI
             if (dto.SeatCapacity <= 0)
             {
                 ModelState.AddModelError("SeatCapacity", "La capacidad debe ser mayor a 0.");
+            }
+
+            if (SelectedEquipment != null && SelectedEquipment.Length > 0)
+            {
+                var cleanEquipment = SelectedEquipment
+                    .Where(e => !e.Contains("oxígeno", StringComparison.OrdinalIgnoreCase) && !e.Contains("oxigeno", StringComparison.OrdinalIgnoreCase))
+                    .Distinct()
+                    .ToList();
+                dto.EquipmentJson = System.Text.Json.JsonSerializer.Serialize(cleanEquipment);
+            }
+            else if (string.IsNullOrWhiteSpace(dto.EquipmentJson))
+            {
+                dto.EquipmentJson = "[]";
             }
             if (!ModelState.IsValid)
             {

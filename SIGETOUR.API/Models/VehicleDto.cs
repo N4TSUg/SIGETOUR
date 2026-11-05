@@ -42,6 +42,48 @@ namespace SIGETOUR.API.Models
 
         public string? EquipmentJson { get; set; } = "[]";
 
+        public List<string> SelectedEquipment
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(EquipmentJson) || EquipmentJson == "[]")
+                {
+                    return new List<string>
+                    {
+                        "Aire Acondicionado / Climatizador",
+                        "Asientos Reclinables Confort",
+                        "Puertos de Carga USB",
+                        "Botiquín de Primeros Auxilios"
+                    };
+                }
+                try
+                {
+                    var list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(EquipmentJson);
+                    if (list == null || list.Count == 0)
+                    {
+                        return new List<string>
+                        {
+                            "Aire Acondicionado / Climatizador",
+                            "Asientos Reclinables Confort",
+                            "Puertos de Carga USB",
+                            "Botiquín de Primeros Auxilios"
+                        };
+                    }
+                    return list.Where(item => !item.Contains("oxígeno", StringComparison.OrdinalIgnoreCase) && !item.Contains("oxigeno", StringComparison.OrdinalIgnoreCase)).ToList();
+                }
+                catch
+                {
+                    return new List<string>
+                    {
+                        "Aire Acondicionado / Climatizador",
+                        "Asientos Reclinables Confort",
+                        "Puertos de Carga USB",
+                        "Botiquín de Primeros Auxilios"
+                    };
+                }
+            }
+        }
+
         public string? Status { get; set; } = "Operativo en Ruta (En Servicio)";
 
         // Read-only property for the view to render existing images
