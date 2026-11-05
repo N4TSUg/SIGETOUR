@@ -2094,16 +2094,22 @@ namespace SIGETOUR.API.Controllers.UI
                 refCode = $"RES-{Random.Shared.Next(1000, 9999)}";
             } while (await _context.Bookings.AnyAsync(b => b.ReferenceCode == refCode));
 
+            string pickupLocation = model.BoardingPoint ?? "Agencia Central";
+            if (!string.IsNullOrWhiteSpace(model.HotelDetails) && (pickupLocation.Contains("Hotel") || pickupLocation == "Otro"))
+            {
+                pickupLocation = $"Hotel: {model.HotelDetails.Trim()}";
+            }
+
             var booking = new SIGETOUR.API.Core.Entities.Booking
             {
                 ReferenceCode = refCode,
                 CustomerName = model.CustomerName ?? "",
                 CustomerDni = model.CustomerDni ?? "",
                 CustomerPhone = model.CustomerPhone ?? "",
-                CustomerEmail = "manual@agencia.com",
+                CustomerEmail = !string.IsNullOrWhiteSpace(model.CustomerEmail) ? model.CustomerEmail.Trim() : "manual@agencia.com",
                 TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc),
                 ShiftName = model.ShiftName ?? "",
-                PickupLocation = model.BoardingPoint ?? "Agencia Central",
+                PickupLocation = pickupLocation,
                 PickupCost = 0,
                 TotalPassengers = model.TotalPassengers,
                 TotalAmount = model.TotalAmount,
@@ -2190,6 +2196,21 @@ namespace SIGETOUR.API.Controllers.UI
                 pMethod = "Efectivo";
             }
 
+            var boardingPoint = booking.PickupLocation ?? "Agencia Central";
+            string hotelDetails = string.Empty;
+            if (!string.IsNullOrWhiteSpace(booking.PickupLocation) && 
+                !booking.PickupLocation.Equals("Agencia Central (Jr. 2 de Mayo 569)", StringComparison.OrdinalIgnoreCase) &&
+                !booking.PickupLocation.Equals("Agencia Central", StringComparison.OrdinalIgnoreCase) &&
+                !booking.PickupLocation.Equals("Plaza de Armas", StringComparison.OrdinalIgnoreCase) &&
+                !booking.PickupLocation.Equals("Aeropuerto Mayor General FAP Armando Revoredo", StringComparison.OrdinalIgnoreCase) &&
+                !booking.PickupLocation.Equals("Aeropuerto", StringComparison.OrdinalIgnoreCase))
+            {
+                boardingPoint = "Hotel";
+                hotelDetails = booking.PickupLocation.StartsWith("Hotel: ", StringComparison.OrdinalIgnoreCase) 
+                    ? booking.PickupLocation[7..] 
+                    : booking.PickupLocation;
+            }
+
             var vm = new SIGETOUR.API.Models.EditBookingViewModel
             {
                 Id = booking.Id,
@@ -2197,9 +2218,11 @@ namespace SIGETOUR.API.Controllers.UI
                 CustomerName = booking.CustomerName,
                 CustomerDni = booking.CustomerDni,
                 CustomerPhone = booking.CustomerPhone,
+                CustomerEmail = booking.CustomerEmail,
                 TravelDate = booking.TravelDate,
                 ShiftName = booking.ShiftName,
-                BoardingPoint = booking.PickupLocation,
+                BoardingPoint = boardingPoint,
+                HotelDetails = hotelDetails,
                 TotalPassengers = booking.TotalPassengers,
                 TotalAmount = booking.TotalAmount,
                 PaidAmount = booking.PaidAmount,
@@ -2244,12 +2267,19 @@ namespace SIGETOUR.API.Controllers.UI
 
             var selectedTour = await _context.TourPackages.FindAsync(model.TourPackageId);
 
+            string pickupLocation = model.BoardingPoint ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(model.HotelDetails) && (pickupLocation.Contains("Hotel") || pickupLocation == "Otro"))
+            {
+                pickupLocation = $"Hotel: {model.HotelDetails.Trim()}";
+            }
+
             booking.CustomerName = model.CustomerName ?? string.Empty;
             booking.CustomerDni = model.CustomerDni ?? string.Empty;
             booking.CustomerPhone = model.CustomerPhone ?? string.Empty;
+            booking.CustomerEmail = !string.IsNullOrWhiteSpace(model.CustomerEmail) ? model.CustomerEmail.Trim() : (!string.IsNullOrWhiteSpace(booking.CustomerEmail) ? booking.CustomerEmail : "manual@agencia.com");
             booking.TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc);
             booking.ShiftName = model.ShiftName ?? string.Empty;
-            booking.PickupLocation = model.BoardingPoint ?? string.Empty;
+            booking.PickupLocation = pickupLocation;
             booking.TotalPassengers = model.TotalPassengers;
             booking.TotalAmount = model.TotalAmount;
             booking.PaidAmount = model.PaidAmount;

@@ -17,10 +17,14 @@ namespace SIGETOUR.API.Models
         [Required(ErrorMessage = "El teléfono del cliente es obligatorio")]
         public string CustomerPhone { get; set; } = string.Empty;
 
+        [EmailAddress(ErrorMessage = "Ingrese un correo electrónico válido")]
+        public string? CustomerEmail { get; set; } = string.Empty;
+
         public DateTime TravelDate { get; set; }
         
         public string? ShiftName { get; set; } = string.Empty;
         public string? BoardingPoint { get; set; } = string.Empty; // Using PickupLocation basically
+        public string? HotelDetails { get; set; } = string.Empty;
         public int TotalPassengers { get; set; }
         
         public decimal TotalAmount { get; set; }

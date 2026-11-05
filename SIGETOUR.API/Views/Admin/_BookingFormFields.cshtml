@@ -97,12 +97,17 @@
           <!-- PUNTO DE EMBARQUE -->
           <div>
             <label for="BoardingPoint" class="block text-label-md font-label-md text-on-surface font-semibold mb-1.5">Punto de Embarque</label>
-            <select id="BoardingPoint" asp-for="BoardingPoint" class="w-full py-2 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
+            <select id="BoardingPoint" asp-for="BoardingPoint" onchange="toggleHotelDetails(this.value)" class="w-full py-2 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
               <option value="Agencia Central">Agencia Central (Jr. 2 de Mayo 569)</option>
-              <option value="Hotel Centro Histórico">Hotel (Recojo coordinado)</option>
+              <option value="Hotel">Recojo en Hotel / Alojamiento</option>
               <option value="Plaza de Armas">Plaza de Armas</option>
-              <option value="Aeropuerto Mayor General FAP Armando Revoredo">Aeropuerto</option>
+              <option value="Aeropuerto">Aeropuerto</option>
+              <option value="Otro">Otro punto coordinado</option>
             </select>
+            <div id="hotelDetailsContainer" class="mt-2 @(string.IsNullOrWhiteSpace(Model.HotelDetails) && Model.BoardingPoint != "Hotel" && Model.BoardingPoint != "Otro" ? "hidden" : "")">
+              <label for="HotelDetails" class="block text-xs font-semibold text-outline mb-1">Nombre del Hotel / Dirección de Recojo</label>
+              <input id="HotelDetails" asp-for="HotelDetails" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-sm font-body-sm text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. Hotel Costa del Sol - Jr. Cruz de Piedra 250" />
+            </div>
           </div>
         </div>
       </div>
@@ -129,22 +134,26 @@
           <div class="flex items-center justify-between mb-3 border-b border-outline-variant/40 pb-2">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined text-primary">how_to_reg</span>
-              <span class="text-title-sm font-title-sm text-primary font-bold">Pasajero Titular (Contacto)</span>
+              <span class="text-title-sm font-title-sm text-primary font-bold">Pasajero Titular (Contacto Principal)</span>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="md:col-span-2">
-              <label for="CustomerName" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo <span class="text-tertiary">*</span></label>
-              <input id="CustomerName" asp-for="CustomerName" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. Juan Pérez" required />
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="CustomerName" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombres y Apellidos Completos <span class="text-tertiary">*</span></label>
+              <input id="CustomerName" asp-for="CustomerName" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. Juan Carlos Pérez Quispe" required />
             </div>
             <div>
-              <label for="CustomerDni" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte <span class="text-tertiary">*</span></label>
-              <input id="CustomerDni" asp-for="CustomerDni" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 dígitos" required />
+              <label for="CustomerDni" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / CE / Pasaporte <span class="text-tertiary">*</span></label>
+              <input id="CustomerDni" asp-for="CustomerDni" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 a 12 dígitos" required />
             </div>
-            <div class="md:col-span-1">
-              <label for="CustomerPhone" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono <span class="text-tertiary">*</span></label>
-              <input id="CustomerPhone" asp-for="CustomerPhone" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. 987654321" required />
+            <div>
+              <label for="CustomerPhone" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Celular / WhatsApp <span class="text-tertiary">*</span></label>
+              <input id="CustomerPhone" asp-for="CustomerPhone" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. +51 987654321" required />
+            </div>
+            <div>
+              <label for="CustomerEmail" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Correo Electrónico <span class="text-tertiary">*</span></label>
+              <input id="CustomerEmail" asp-for="CustomerEmail" type="email" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="correo@ejemplo.com" required />
             </div>
           </div>
         </div>
@@ -298,6 +307,16 @@
         }
     }
 
+    function toggleHotelDetails(val) {
+        const container = document.getElementById('hotelDetailsContainer');
+        if (!container) return;
+        if (val === 'Hotel' || val === 'Otro' || val === 'Hotel Centro Histórico') {
+            container.classList.remove('hidden');
+        } else {
+            container.classList.add('hidden');
+        }
+    }
+
     function onShiftRadioChanged(radio) {
         document.querySelectorAll('#shiftsContainer label').forEach(lbl => {
             lbl.classList.remove('border-primary', 'bg-primary/5');
@@ -332,7 +351,7 @@
                 const passengers = JSON.parse(jsonField.value);
                 if (Array.isArray(passengers)) {
                     passengers.forEach(p => {
-                        addPassengerRow(p.Name || '', p.Dni || '', p.Phone || '', false);
+                        addPassengerRow(p.Name || '', p.Dni || '', p.Phone || '', p.Email || '', false);
                         loadedCount++;
                     });
                 }
@@ -345,7 +364,7 @@
         const totalPax = parseInt(totalPaxHidden ? totalPaxHidden.value : '1', 10) || 1;
         const neededExtras = totalPax - 1;
         while (loadedCount < neededExtras) {
-            addPassengerRow('', '', '', false);
+            addPassengerRow('', '', '', '', false);
             loadedCount++;
         }
 
@@ -365,7 +384,7 @@
         updatePassengerCount(true);
     }
 
-    function addPassengerRow(name = '', dni = '', phone = '', recalculatePrice = true) {
+    function addPassengerRow(name = '', dni = '', phone = '', email = '', recalculatePrice = true) {
         const container = document.getElementById('passengers-container');
         const count = container.querySelectorAll('.extra-passenger-row').length + 2;
         
@@ -382,18 +401,22 @@
                   <span>Retirar</span>
                 </button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="md:col-span-2">
-                  <label for="Nombre_Completo" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
-                  <input id="Nombre_Completo" type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nombre del acompañante" />
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label for="p_name_${count}" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Nombre Completo</label>
+                  <input id="p_name_${count}" type="text" class="p-name w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Nombre del acompañante" />
                 </div>
                 <div>
-                  <label for="DNI___Pasaporte" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / Pasaporte</label>
-                  <input id="DNI___Pasaporte" type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 dígitos" />
+                  <label for="p_dni_${count}" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">DNI / CE / Pasaporte</label>
+                  <input id="p_dni_${count}" type="text" class="p-dni w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="8 a 12 dígitos" />
                 </div>
-                <div class="md:col-span-1">
-                  <label for="Tel_fono" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono</label>
-                  <input id="Tel_fono" type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Opcional" />
+                <div>
+                  <label for="p_phone_${count}" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Teléfono (Opcional)</label>
+                  <input id="p_phone_${count}" type="text" class="p-phone w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="Ej. 987654321" />
+                </div>
+                <div>
+                  <label for="p_email_${count}" class="block text-label-sm font-label-sm text-outline font-semibold mb-1">Correo Electrónico (Opcional)</label>
+                  <input id="p_email_${count}" type="email" class="p-email w-full py-1.5 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest text-body-md font-body-md text-on-surface focus:ring-2 focus:ring-primary focus:outline-none" placeholder="correo@ejemplo.com" />
                 </div>
             </div>
         `;
@@ -401,6 +424,7 @@
         div.querySelector('.p-name').value = name || '';
         div.querySelector('.p-dni').value = dni || '';
         div.querySelector('.p-phone').value = phone || '';
+        div.querySelector('.p-email').value = email || '';
 
         div.querySelector('.btn-remove-companion').addEventListener('click', function() {
             div.remove();
@@ -441,10 +465,12 @@
             const name = row.querySelector('.p-name')?.value?.trim() || '';
             const dni = row.querySelector('.p-dni')?.value?.trim() || '';
             const phone = row.querySelector('.p-phone')?.value?.trim() || '';
+            const email = row.querySelector('.p-email')?.value?.trim() || '';
             passengers.push({
                 Name: name,
                 Dni: dni,
-                Phone: phone
+                Phone: phone,
+                Email: email
             });
         });
         const hiddenInput = document.getElementById('AdditionalPassengersJson');
