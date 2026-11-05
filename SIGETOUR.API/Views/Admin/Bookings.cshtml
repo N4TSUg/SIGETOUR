@@ -1,4 +1,4 @@
-@using SIGETOUR.API.Core.Entities
+﻿@using SIGETOUR.API.Core.Entities
 @{
     ViewData["Title"] = "Despacho y Reservas";
     Layout = "~/Views/Shared/_AdminLayout.cshtml";
@@ -900,10 +900,13 @@ function sendWhatsappTicket(rawPhone, customerName, refCode, tourTitle, travelDa
     }
 
     const name = customerName ? customerName.trim() : 'Estimado(a) Cliente';
+    const iconPin = String.fromCodePoint(0x1F4CC);
+    const iconTicket = String.fromCodePoint(0x1F39F);
+
     const message = `¡Hola *${name}*! Le saluda Turismo Chilón.\n\n` +
                     `Le confirmamos que su reserva para el tour *${tourTitle}* programada para el *${travelDate}* se encuentra CONFIRMADA.\n\n` +
-                    `📌 *Código de Reserva:* ${refCode}\n` +
-                    `🎟️ *Ver y Descargar Boleto Oficial:* ${voucherUrl}\n\n` +
+                    `${iconPin} *Código de Reserva:* ${refCode}\n` +
+                    `${iconTicket} *Ver y Descargar Boleto Oficial:* ${voucherUrl}\n\n` +
                     `Punto de salida: Jr. 2 de Mayo 569, Cajamarca (presentarse 15 min antes con DNI).\n` +
                     `¡Gracias por confiar en Turismo Chilón!`;
 
