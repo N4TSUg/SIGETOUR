@@ -2041,10 +2041,18 @@ namespace SIGETOUR.API.Controllers.UI
         public async Task<IActionResult> CreateBooking()
         {
             var tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+            var activeFeatured = await _context.FeaturedPackages
+                .Where(f => f.IsActive)
+                .ToDictionaryAsync(f => f.TourPackageId, f => f);
+
             ViewBag.Tours = tours;
+            ViewBag.ActiveFeatured = activeFeatured;
             
             var firstTour = tours.FirstOrDefault();
             var shifts = firstTour?.Shifts?.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() ?? new List<string>();
+
+            var firstFeatured = firstTour != null && activeFeatured.TryGetValue(firstTour.Id, out var ff) ? ff : null;
+            var effectiveBasePrice = (firstFeatured?.PromoPrice.HasValue == true) ? firstFeatured.PromoPrice.Value : (firstTour?.BasePrice ?? 0);
 
             var vm = new SIGETOUR.API.Models.EditBookingViewModel
             {
@@ -2055,7 +2063,7 @@ namespace SIGETOUR.API.Controllers.UI
                 TravelDate = DateTime.Today,
                 ShiftName = shifts.FirstOrDefault() ?? "Turno Mañana",
                 TotalPassengers = 1,
-                TotalAmount = firstTour?.BasePrice ?? 0,
+                TotalAmount = effectiveBasePrice,
                 PaidAmount = 0,
                 AvailableShifts = shifts
             };
@@ -2065,6 +2073,10 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> CreateBooking(SIGETOUR.API.Models.EditBookingViewModel model)
         {
+            var activeFeatured = await _context.FeaturedPackages
+                .Where(f => f.IsActive)
+                .ToDictionaryAsync(f => f.TourPackageId, f => f);
+
             if (model.TourPackageId == Guid.Empty)
             {
                 ModelState.AddModelError("TourPackageId", "Debe seleccionar un tour.");
@@ -2073,6 +2085,7 @@ namespace SIGETOUR.API.Controllers.UI
             if (!ModelState.IsValid)
             {
                 ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+                ViewBag.ActiveFeatured = activeFeatured;
                 return View(model);
             }
 
@@ -2080,11 +2093,13 @@ namespace SIGETOUR.API.Controllers.UI
             if (tour == null) {
                 ModelState.AddModelError("TourPackageId", "El tour seleccionado no existe.");
                 ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+                ViewBag.ActiveFeatured = activeFeatured;
                 return View(model);
             }
             if (string.IsNullOrWhiteSpace(model.CustomerName)) {
                 ModelState.AddModelError(nameof(model.CustomerName), "El nombre del cliente es obligatorio.");
                 ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+                ViewBag.ActiveFeatured = activeFeatured;
                 return View(model);
             }
 
@@ -2122,11 +2137,15 @@ namespace SIGETOUR.API.Controllers.UI
                 AdditionalPassengersJson = model.AdditionalPassengersJson ?? "[]"
             };
 
+            var featured = activeFeatured.TryGetValue(tour.Id, out var fp) ? fp : null;
+            var expectedUnitPrice = (featured?.PromoPrice.HasValue == true) ? featured.PromoPrice.Value : tour.BasePrice;
+            var unitPrice = model.TotalPassengers > 0 ? (model.TotalAmount / model.TotalPassengers) : expectedUnitPrice;
+
             booking.Items.Add(new SIGETOUR.API.Core.Entities.BookingItem
             {
                 TourPackageId = tour.Id,
                 Passengers = model.TotalPassengers,
-                UnitPrice = tour.BasePrice,
+                UnitPrice = unitPrice,
                 SubTotal = model.TotalAmount
             });
 
@@ -2172,10 +2191,19 @@ namespace SIGETOUR.API.Controllers.UI
             if (booking == null) return NotFound();
 
             var tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+            var activeFeatured = await _context.FeaturedPackages
+                .Where(f => f.IsActive)
+                .ToDictionaryAsync(f => f.TourPackageId, f => f);
+
             ViewBag.Tours = tours;
+            ViewBag.ActiveFeatured = activeFeatured;
 
             var tour = booking.Items.FirstOrDefault()?.TourPackage;
             var currentTourShifts = tour?.Shifts?.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() ?? new List<string>();
+
+            var tourFeatured = tour != null && activeFeatured.TryGetValue(tour.Id, out var tf) ? tf : null;
+            var effectiveBasePrice = (tourFeatured?.PromoPrice.HasValue == true) ? tourFeatured.PromoPrice.Value : (tour?.BasePrice ?? 0);
+            var bookingUnitPrice = booking.Items.FirstOrDefault()?.UnitPrice;
 
             var pMethod = booking.PaymentMethod;
             if (string.Equals(pMethod, "tarjeta", StringComparison.OrdinalIgnoreCase) ||
@@ -2244,9 +2272,14 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> EditBooking(SIGETOUR.API.Models.EditBookingViewModel model)
         {
+            var activeFeatured = await _context.FeaturedPackages
+                .Where(f => f.IsActive)
+                .ToDictionaryAsync(f => f.TourPackageId, f => f);
+
             if (!ModelState.IsValid)
             {
                 ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+                ViewBag.ActiveFeatured = activeFeatured;
                 var selectedTourObj = await _context.TourPackages.Include(t => t.Shifts).FirstOrDefaultAsync(t => t.Id == model.TourPackageId);
                 if (selectedTourObj != null)
                 {
@@ -2293,11 +2326,15 @@ namespace SIGETOUR.API.Controllers.UI
             // Actualizar o reasignar el tour en BookingItem si cambió de tour
             if (selectedTour != null)
             {
+                var featured = activeFeatured.TryGetValue(selectedTour.Id, out var fp) ? fp : null;
+                var expectedUnitPrice = (featured?.PromoPrice.HasValue == true) ? featured.PromoPrice.Value : selectedTour.BasePrice;
+                var unitPrice = model.TotalPassengers > 0 ? (model.TotalAmount / model.TotalPassengers) : expectedUnitPrice;
+
                 var item = booking.Items.FirstOrDefault();
                 if (item != null)
                 {
                     item.TourPackageId = selectedTour.Id;
-                    item.UnitPrice = selectedTour.BasePrice;
+                    item.UnitPrice = unitPrice;
                     item.Passengers = model.TotalPassengers;
                     item.SubTotal = model.TotalAmount;
                     _context.Entry(item).State = EntityState.Modified;
@@ -2310,7 +2347,7 @@ namespace SIGETOUR.API.Controllers.UI
                         BookingId = booking.Id,
                         TourPackageId = selectedTour.Id,
                         Passengers = model.TotalPassengers,
-                        UnitPrice = selectedTour.BasePrice,
+                        UnitPrice = unitPrice,
                         SubTotal = model.TotalAmount
                     });
                 }

@@ -3,12 +3,24 @@
 @{
     bool isEdit = Model.Id != Guid.Empty;
     var tours = ViewBag.Tours as IEnumerable<TourPackage> ?? Enumerable.Empty<TourPackage>();
-    var toursJson = tours.Select(t => new {
-        id = t.Id.ToString(),
-        title = t.Title,
-        price = t.BasePrice,
-        duration = t.Duration ?? "Día completo",
-        shifts = t.Shifts != null ? t.Shifts.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() : new List<string>()
+    var activeFeatured = ViewBag.ActiveFeatured as Dictionary<Guid, FeaturedPackage> ?? new Dictionary<Guid, FeaturedPackage>();
+
+    var toursJson = tours.Select(t => {
+        var hasFp = activeFeatured.TryGetValue(t.Id, out var fp) && fp != null;
+        var promo = hasFp && fp!.PromoPrice.HasValue ? fp.PromoPrice.Value : (decimal?)null;
+        var commTitle = hasFp && !string.IsNullOrWhiteSpace(fp!.CommercialTitle) ? fp.CommercialTitle : null;
+        var promoBadge = hasFp && !string.IsNullOrWhiteSpace(fp!.PromoBadge) ? fp.PromoBadge : null;
+        return new {
+            id = t.Id.ToString(),
+            title = t.Title,
+            commercialTitle = commTitle,
+            promoBadge = promoBadge,
+            basePrice = t.BasePrice,
+            promoPrice = promo,
+            price = promo ?? t.BasePrice,
+            duration = t.Duration ?? "Día completo",
+            shifts = t.Shifts != null ? t.Shifts.Where(s => s.IsActive).Select(s => s.ShiftName).ToList() : new List<string>()
+        };
     });
 }
 
@@ -49,14 +61,45 @@
                 <span class="material-symbols-outlined text-primary text-[20px]">tour</span>
                 @(isEdit ? "Circuito / Paquete Turístico Asignado" : "Seleccionar Tour / Circuito Turístico") <span class="text-tertiary">*</span>
               </label>
-              <span class="text-xs text-outline" id="tourPriceBadge">Tarifa individual base: S/ @Model.TourBasePrice.ToString("F2")</span>
+              @{
+                var currentFp = activeFeatured.TryGetValue(Model.TourPackageId, out var cfp) ? cfp : null;
+                var isCurrentPromo = currentFp?.PromoPrice.HasValue == true;
+              }
+              <div id="tourPriceBadgeContainer" class="flex items-center gap-2">
+                @if (isCurrentPromo)
+                {
+                  <span id="tourPromoPill" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary text-white tracking-wide uppercase shadow-xs">
+                    @(currentFp!.PromoBadge ?? "OFERTA")
+                  </span>
+                }
+                <span class="text-xs text-outline" id="tourPriceBadge">
+                  @if (isCurrentPromo)
+                  {
+                    <span>Tarifa promocional: <strong class="text-primary font-bold">S/ @currentFp!.PromoPrice!.Value.ToString("F2")</strong> <span class="line-through text-on-surface-variant/70 ml-1">S/ @Model.TourBasePrice.ToString("F2")</span></span>
+                  }
+                  else
+                  {
+                    <span>Tarifa individual base: S/ @Model.TourBasePrice.ToString("F2")</span>
+                  }
+                </span>
+              </div>
             </div>
             <div>
               <select asp-for="TourPackageId" id="tourPackageSelect" onchange="onTourChanged(this)" class="w-full py-2.5 px-3 bg-surface-bright border border-outline-variant rounded-lg text-body-md font-bold text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer">
                 @foreach (var t in tours)
                 {
-                  <option value="@t.Id" data-price="@t.BasePrice" data-title="@t.Title" selected="@(t.Id == Model.TourPackageId)">
-                    @t.Title — S/ @t.BasePrice.ToString("F2") (@(t.Duration ?? "Día completo"))
+                  var hasFp = activeFeatured.TryGetValue(t.Id, out var fp) && fp != null;
+                  var promo = hasFp && fp!.PromoPrice.HasValue ? fp.PromoPrice.Value : (decimal?)null;
+                  var effectivePrice = promo ?? t.BasePrice;
+                  var commTitle = hasFp && !string.IsNullOrWhiteSpace(fp!.CommercialTitle) && !fp.CommercialTitle.Equals(t.Title, StringComparison.OrdinalIgnoreCase)
+                      ? $" ({fp.CommercialTitle})"
+                      : "";
+                  var promoTag = promo.HasValue
+                      ? $" [¡{fp!.PromoBadge?.ToUpper() ?? "OFERTA"}! S/ {promo.Value:F2} - Antes S/ {t.BasePrice:F2}]"
+                      : $" — S/ {t.BasePrice:F2}";
+
+                  <option value="@t.Id" data-price="@effectivePrice" data-base-price="@t.BasePrice" data-promo-price="@(promo?.ToString() ?? "")" data-promo-badge="@(fp?.PromoBadge ?? "")" data-title="@t.Title" selected="@(t.Id == Model.TourPackageId)">
+                    @t.Title@commTitle@promoTag (@(t.Duration ?? "Día completo"))
                   </option>
                 }
               </select>
@@ -268,9 +311,28 @@
         const modalEl = document.getElementById('modalTourName');
         if (modalEl) modalEl.innerText = selectedTour.title;
 
-        // Actualizar etiqueta de precio individual
-        const priceBadge = document.getElementById('tourPriceBadge');
-        if (priceBadge) priceBadge.innerText = `Tarifa individual base: S/ ${parseFloat(selectedTour.price).toFixed(2)}`;
+        // Actualizar etiqueta de precio individual y badge promocional
+        const priceContainer = document.getElementById('tourPriceBadgeContainer');
+        if (priceContainer) {
+            if (selectedTour.promoPrice) {
+                const badge = (selectedTour.promoBadge || 'OFERTA').toUpperCase();
+                priceContainer.innerHTML = `
+                    <span id="tourPromoPill" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary text-white tracking-wide uppercase shadow-xs">
+                        ${badge}
+                    </span>
+                    <span class="text-xs text-outline" id="tourPriceBadge">
+                        Tarifa promocional: <strong class="text-primary font-bold">S/ ${parseFloat(selectedTour.promoPrice).toFixed(2)}</strong> <span class="line-through text-on-surface-variant/70 ml-1">S/ ${parseFloat(selectedTour.basePrice).toFixed(2)}</span>
+                    </span>
+                `;
+            } else {
+                priceContainer.innerHTML = `
+                    <span class="text-xs text-outline" id="tourPriceBadge">Tarifa individual base: S/ ${parseFloat(selectedTour.price).toFixed(2)}</span>
+                `;
+            }
+        } else {
+            const priceBadge = document.getElementById('tourPriceBadge');
+            if (priceBadge) priceBadge.innerText = `Tarifa individual base: S/ ${parseFloat(selectedTour.price).toFixed(2)}`;
+        }
 
         // Recalcular Total según cantidad de pasajeros
         const totalPax = parseInt(document.getElementById('TotalPassengersHidden')?.value || '1', 10);
