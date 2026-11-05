@@ -46,40 +46,28 @@ namespace SIGETOUR.API.Models
         {
             get
             {
-                if (string.IsNullOrWhiteSpace(EquipmentJson) || EquipmentJson == "[]")
+                if (string.IsNullOrWhiteSpace(EquipmentJson))
                 {
                     return new List<string>
                     {
                         "Aire Acondicionado / Climatizador",
                         "Asientos Reclinables Confort",
-                        "Puertos de Carga USB",
                         "Botiquín de Primeros Auxilios"
                     };
+                }
+                if (EquipmentJson == "[]")
+                {
+                    return new List<string>();
                 }
                 try
                 {
                     var list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(EquipmentJson);
-                    if (list == null || list.Count == 0)
-                    {
-                        return new List<string>
-                        {
-                            "Aire Acondicionado / Climatizador",
-                            "Asientos Reclinables Confort",
-                            "Puertos de Carga USB",
-                            "Botiquín de Primeros Auxilios"
-                        };
-                    }
+                    if (list == null) return new List<string>();
                     return list.Where(item => !item.Contains("oxígeno", StringComparison.OrdinalIgnoreCase) && !item.Contains("oxigeno", StringComparison.OrdinalIgnoreCase)).ToList();
                 }
                 catch
                 {
-                    return new List<string>
-                    {
-                        "Aire Acondicionado / Climatizador",
-                        "Asientos Reclinables Confort",
-                        "Puertos de Carga USB",
-                        "Botiquín de Primeros Auxilios"
-                    };
+                    return new List<string>();
                 }
             }
         }

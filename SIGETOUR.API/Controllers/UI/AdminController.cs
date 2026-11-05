@@ -658,7 +658,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditVehicle(SIGETOUR.API.Models.VehicleDto dto, List<IFormFile> VehicleImages, string[]? SelectedEquipment = null)
+        public async Task<IActionResult> EditVehicle(SIGETOUR.API.Models.VehicleDto dto, List<IFormFile> VehicleImages, string[]? SelectedEquipment = null, string? SelectedEquipmentSubmitted = null)
         {
             ModelState.Remove("ExistingImages");
             if (string.IsNullOrWhiteSpace(dto.LicensePlate))
@@ -681,6 +681,10 @@ namespace SIGETOUR.API.Controllers.UI
                     .Distinct()
                     .ToList();
                 dto.EquipmentJson = System.Text.Json.JsonSerializer.Serialize(cleanEquipment);
+            }
+            else if (SelectedEquipmentSubmitted == "true")
+            {
+                dto.EquipmentJson = "[]";
             }
             else if (string.IsNullOrWhiteSpace(dto.EquipmentJson))
             {

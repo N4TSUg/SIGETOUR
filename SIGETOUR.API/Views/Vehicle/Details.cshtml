@@ -291,55 +291,54 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm text-on-surface-variant">
-          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
-            <span class="material-symbols-outlined text-primary text-xl shrink-0">ac_unit</span>
-            <div>
-              <strong class="text-secondary block font-bold">Aire Acondicionado & Calefacción</strong>
-              <span class="text-xs">Climatización integral para el frío de montaña en Cumbemayo o el sol de Baños del Inca.</span>
-            </div>
-          </div>
+        @{
+            var amenityDescriptions = new Dictionary<string, (string Icon, string Desc)>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Aire Acondicionado / Climatizador", ("ac_unit", "Climatización integral para el frío de montaña en Cumbemayo o el sol de Baños del Inca.") },
+                { "Asientos Reclinables Confort", ("airline_seat_recline_extra", "Butacas reclinables ergonómicas con soporte lumbar y cinturón de seguridad certificado.") },
+                { "Puertos de Carga USB", ("usb", "Conectores individuales para mantener cargados celulares y cámaras durante todo el recorrido.") },
+                { "Botiquín de Primeros Auxilios", ("medical_services", "Equipamiento de primeros auxilios reglamentario MTC para asistencia inmediata a bordo.") },
+                { "Extintor de Incendios Reglamentario", ("fire_extinguisher", "Extintor de polvo químico seco (PQS) vigente y certificado conforme a la normativa de transporte.") },
+                { "Micrófono & Audio para Guía", ("volume_up", "Sistema de audio estéreo y micrófono para relatos históricos y explicaciones del guía oficial.") },
+                { "Maletero Amplio para Equipaje", ("luggage", "Espacio generoso para maletas de mano, compras de artesanías y lácteos típicos.") },
+                { "Cinturones de Seguridad en Todas las Plazas", ("health_and_safety", "Cinturones de seguridad certificados en cada asiento para máxima protección de todos los pasajeros.") },
+                { "Suspensión Reforzada para Rutas Andinas", ("car_repair", "Chasis y suspensión optimizados para curvas, pendientes y caminos rurales de Cajamarca.") },
+                { "Cortinas de Privacidad / Protección Solar", ("curtains", "Cortinas laterales con filtro UV para mayor confort térmico y descanso durante el viaje.") }
+            };
 
-          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
-            <span class="material-symbols-outlined text-primary text-xl shrink-0">airline_seat_recline_extra</span>
-            <div>
-              <strong class="text-secondary block font-bold">Asientos Turísticos Reclinables</strong>
-              <span class="text-xs">Espaldar alto con soporte lumbar y cinturón de seguridad certificado en cada asiento.</span>
-            </div>
-          </div>
+            var activeEquipment = Model.Vehicle.SelectedEquipment;
+        }
 
-          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
-            <span class="material-symbols-outlined text-primary text-xl shrink-0">usb</span>
-            <div>
-              <strong class="text-secondary block font-bold">Puertos de Carga USB</strong>
-              <span class="text-xs">Carga tus celulares y cámaras durante todo el trayecto sin quedarte sin batería.</span>
-            </div>
-          </div>
+        @if (activeEquipment != null && activeEquipment.Any())
+        {
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm text-on-surface-variant">
+              @foreach (var item in activeEquipment)
+              {
+                  var match = amenityDescriptions.FirstOrDefault(d => 
+                      d.Key.Equals(item, StringComparison.OrdinalIgnoreCase) || 
+                      d.Key.Contains(item.Split('/')[0].Trim(), StringComparison.OrdinalIgnoreCase) ||
+                      item.Contains(d.Key.Split('/')[0].Trim(), StringComparison.OrdinalIgnoreCase));
 
-          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
-            <span class="material-symbols-outlined text-primary text-xl shrink-0">volume_up</span>
-            <div>
-              <strong class="text-secondary block font-bold">Micrófono & Audio para Guía</strong>
-              <span class="text-xs">Sistema de sonido estéreo para relatos y explicaciones históricas del guía oficial.</span>
-            </div>
-          </div>
+                  var icon = !string.IsNullOrEmpty(match.Value.Icon) ? match.Value.Icon : "check_circle";
+                  var desc = !string.IsNullOrEmpty(match.Value.Desc) ? match.Value.Desc : "Equipamiento verificado para el confort y seguridad del pasajero en ruta.";
 
-          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
-            <span class="material-symbols-outlined text-primary text-xl shrink-0">medical_services</span>
-            <div>
-              <strong class="text-secondary block font-bold">Botiquín de Primeros Auxilios</strong>
-              <span class="text-xs">Equipamiento de primeros auxilios normativo para asistencia inmediata a bordo.</span>
+                  <div class="flex items-start gap-3 p-3.5 rounded-xl bg-surface-bright border border-outline-variant/60 shadow-xs">
+                    <span class="material-symbols-outlined text-primary text-xl shrink-0 mt-0.5">@icon</span>
+                    <div>
+                      <strong class="text-secondary block font-bold text-sm">@item</strong>
+                      <span class="text-xs text-on-surface-variant block mt-0.5 leading-relaxed">@desc</span>
+                    </div>
+                  </div>
+              }
             </div>
-          </div>
-
-          <div class="flex items-start gap-3 p-3 rounded-xl bg-surface-bright border border-outline-variant/60">
-            <span class="material-symbols-outlined text-primary text-xl shrink-0">luggage</span>
-            <div>
-              <strong class="text-secondary block font-bold">Maletero Amplio</strong>
-              <span class="text-xs">Espacio generoso para maletas de mano y compras de lácteos y artesanías típicas.</span>
+        }
+        else
+        {
+            <div class="p-6 text-center bg-surface-bright rounded-xl border border-outline-variant/60">
+              <span class="material-symbols-outlined text-3xl text-primary/60 mb-1">directions_bus</span>
+              <p class="text-xs font-semibold text-secondary">Esta unidad cuenta con equipamiento estándar de transporte turístico certificado.</p>
             </div>
-          </div>
-        </div>
+        }
       </section>
 
       <!-- SECCIÓN 4: CIRCUITOS HABITUALES -->

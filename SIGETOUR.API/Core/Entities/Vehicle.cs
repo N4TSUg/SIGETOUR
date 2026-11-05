@@ -33,6 +33,37 @@ namespace SIGETOUR.API.Core.Entities
         // Equipamiento (JSON)
         public string EquipmentJson { get; set; } = "[]";
 
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public List<string> SelectedEquipment
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(EquipmentJson))
+                {
+                    return new List<string>
+                    {
+                        "Aire Acondicionado / Climatizador",
+                        "Asientos Reclinables Confort",
+                        "Botiquín de Primeros Auxilios"
+                    };
+                }
+                if (EquipmentJson == "[]")
+                {
+                    return new List<string>();
+                }
+                try
+                {
+                    var list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(EquipmentJson);
+                    if (list == null) return new List<string>();
+                    return list.Where(item => !item.Contains("oxígeno", StringComparison.OrdinalIgnoreCase) && !item.Contains("oxigeno", StringComparison.OrdinalIgnoreCase)).ToList();
+                }
+                catch
+                {
+                    return new List<string>();
+                }
+            }
+        }
+
         // Estado
         public bool IsActive { get; set; } = true; // Activo Operativamente
         public string Status { get; set; } = "Operativo en Ruta (En Servicio)";
