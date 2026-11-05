@@ -22,7 +22,7 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(t => t.Category)
                 .Where(t => t.IsActive)
                 .OrderBy(t => t.Title)
-                .Take(6)
+                .Take(4)
                 .ToListAsync();
                 
             var featured = await _context.FeaturedPackages
