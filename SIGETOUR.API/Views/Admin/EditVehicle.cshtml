@@ -334,7 +334,7 @@
                 reader.onload = e => {
                     const div = document.createElement('div');
                     div.className = 'relative rounded-xl overflow-hidden border border-outline-variant aspect-video bg-surface-container-low';
-                    div.innerHTML = `<img src="${e.target.result}" class="w-full h-full object-cover" /><span class="absolute bottom-1 left-1 bg-surface-container/80 text-label-sm text-on-surface px-1 rounded">${file.name}</span>`;
+                    div.innerHTML = `<img src="${e.target.result}" alt="${file.name}" class="w-full h-full object-cover" /><span class="absolute bottom-1 left-1 bg-surface-container/80 text-label-sm text-on-surface px-1 rounded">${file.name}</span>`;
                     container.appendChild(div);
                 };
                 reader.readAsDataURL(file);

@@ -206,7 +206,12 @@
 </header>
 <div class="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden">
 <!-- Mobile Backdrop Overlay -->
-<div id="admin-sidebar-backdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden backdrop-blur-xs transition-opacity duration-300" onclick="toggleAdminSidebar()"></div>
+<div id="admin-sidebar-backdrop" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden backdrop-blur-xs transition-opacity duration-300" 
+     onclick="toggleAdminSidebar()" 
+     onkeydown="if(event.key==='Enter'||event.key===' '||event.key==='Escape'){event.preventDefault();toggleAdminSidebar();}" 
+     role="button" 
+     tabindex="0" 
+     aria-label="Cerrar barra lateral de navegación"></div>
 <!-- SIDE NAV BAR (Off-canvas Drawer on mobile, static on lg+) -->
 <aside id="admin-sidebar" class="fixed inset-y-0 left-0 z-50 w-64 -translate-x-full lg:translate-x-0 lg:static lg:flex lg:shrink-0 bg-surface-container-low dark:bg-inverse-surface border-r border-outline-variant dark:border-outline h-full flex flex-col justify-between select-none overflow-y-auto custom-scrollbar transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none">
 <div class="flex flex-col h-full py-space-md px-space-sm shrink-0">

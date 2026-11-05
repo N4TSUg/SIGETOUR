@@ -544,7 +544,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 div.className = 'dynamic-preview relative rounded-lg border border-outline-variant overflow-hidden bg-surface-container-low group shadow-sm flex flex-col';
                 div.innerHTML = `
                     <div class="relative h-32 w-full overflow-hidden bg-surface-container">
-                        <img src="${e.target.result}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                        <img src="${e.target.result}" alt="${file.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
                     </div>
                     <div class="p-2.5 bg-surface-container-lowest flex-1 flex flex-col justify-between">
                         <span class="text-xs font-semibold text-on-surface truncate block mb-1.5">${file.name}</span>
@@ -768,7 +768,12 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   
     <!-- Drag and Drop Upload Zone -->
-    <div class="border-2 border-dashed border-primary/40 hover:border-primary rounded-xl p-6 bg-surface-bright/30 hover:bg-surface-container-low/40 transition-colors duration-150 flex flex-col items-center justify-center text-center cursor-pointer mb-5 group" onclick="document.getElementById('TourImagesInput').click()">
+    <div class="border-2 border-dashed border-primary/40 hover:border-primary rounded-xl p-6 bg-surface-bright/30 hover:bg-surface-container-low/40 transition-colors duration-150 flex flex-col items-center justify-center text-center cursor-pointer mb-5 group" 
+         onclick="document.getElementById('TourImagesInput').click()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('TourImagesInput').click();}"
+         role="button"
+         tabindex="0"
+         aria-label="Subir o arrastrar fotografías del circuito">
         <input type="file" name="ImageFiles" id="TourImagesInput" multiple accept="image/*" class="hidden" onchange="previewImages(event)" />
         <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:scale-105 transition-transform duration-150 mb-3">
             <span class="material-symbols-outlined text-28px">cloud_upload</span>
@@ -806,7 +811,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 {
                     <div class="tour-image-card relative rounded-xl border @(img.IsMain ? "border-primary ring-2 ring-primary/40 shadow-md" : "border-outline-variant") overflow-hidden bg-surface-container-low group shadow-sm flex flex-col transition-all duration-200" data-image-id="@img.Id">
                         <div class="relative h-36 w-full overflow-hidden bg-surface-container">
-                            <img src="@img.ImageUrl" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                            <img src="@img.ImageUrl" alt="Fotografía del circuito @Model.Title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
                             
                             <!-- Main Badge -->
                             <span class="main-badge @(img.IsMain ? "" : "hidden") absolute top-2 left-2 px-2.5 py-1 rounded-full bg-primary text-white text-xs font-bold shadow-md flex items-center gap-1 z-10 backdrop-blur-sm">
