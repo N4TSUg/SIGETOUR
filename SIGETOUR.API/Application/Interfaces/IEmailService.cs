@@ -1,5 +1,7 @@
 using SIGETOUR.API.Core.Entities;
 using System;
+using System.Collections.Generic;
+using System.Net.Mail;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -15,11 +17,14 @@ namespace SIGETOUR.API.Application.Interfaces
             string subject,
             string htmlBody,
             string? textBody = null,
+            IEnumerable<Attachment>? attachments = null,
             CancellationToken cancellationToken = default);
 
-        Task<(bool Success, string Message)> SendBookingConfirmationEmailAsync(
+        Task<(bool Success, string Message, int AttachedCount)> SendBookingConfirmationEmailAsync(
             Booking booking,
             string? baseUrl = null,
+            bool attachVoucherPdf = true,
+            bool attachReceiptPdf = true,
             CancellationToken cancellationToken = default);
     }
 }

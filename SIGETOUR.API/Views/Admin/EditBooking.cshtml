@@ -1,4 +1,4 @@
-﻿@model SIGETOUR.API.Models.EditBookingViewModel
+@model SIGETOUR.API.Models.EditBookingViewModel
 @using SIGETOUR.API.Core.Entities
 @{
     ViewData["Title"] = "Editar Reserva " + Model.ReferenceCode;
@@ -203,6 +203,83 @@
     </div>
 </div>
 
+<!-- MODAL DE ENVÍO DE CORREO CON LOS 2 PDFs (BOLETO Y BOLETA) -->
+<div id="sendEmailModalEdit" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-all duration-200 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-lg border border-outline-variant shadow-2xl overflow-hidden transform transition-all duration-200">
+        <div class="h-2 w-full bg-gradient-to-r from-primary to-primary-dark"></div>
+        <div class="p-6">
+            <div class="flex items-center justify-between pb-3 border-b border-outline-variant/60">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                        <span class="material-symbols-outlined text-[24px]">forward_to_inbox</span>
+                    </div>
+                    <div>
+                        <h3 class="text-title-md font-bold text-on-surface">Enviar Boleto y Boleta por Correo</h3>
+                        <p class="text-xs text-on-surface-variant">Confirmación oficial con los 2 PDFs adjuntos</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeSendEmailModalEdit()" class="text-outline hover:text-on-surface p-1 rounded-lg cursor-pointer">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+
+            <!-- Booking Summary Pill -->
+            <div class="my-4 p-3 bg-surface-container-low rounded-xl border border-outline-variant/50 text-xs flex items-center justify-between">
+                <div>
+                    <span class="text-outline font-semibold block">Reserva:</span>
+                    <strong class="text-primary font-mono text-sm">@Model.ReferenceCode</strong>
+                </div>
+                <div class="text-right">
+                    <span class="text-outline font-semibold block">Pasajero:</span>
+                    <strong class="text-on-surface">@Model.CustomerName</strong>
+                </div>
+            </div>
+
+            <!-- Email Input Field -->
+            <div class="space-y-1.5 mb-4">
+                <label class="block text-xs font-bold text-on-surface uppercase tracking-wider">
+                    Correo Electrónico de Destino *
+                </label>
+                <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-3 text-outline text-[20px]">mail</span>
+                    <input type="email" id="modalBookingEmailInputEdit" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary text-sm text-on-surface bg-white font-medium" placeholder="correo@ejemplo.com" required />
+                </div>
+                <p class="text-[11px] text-on-surface-variant">Se enviará desde el correo oficial <strong class="text-primary">enriquearana1402@gmail.com</strong>.</p>
+            </div>
+
+            <!-- PDFs Included Checklist -->
+            <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1.5 mb-5 text-xs">
+                <div class="font-bold text-emerald-900 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-emerald-700 text-[18px]">attach_file</span>
+                    Documentos Oficiales Adjuntos en PDF:
+                </div>
+                <div class="flex items-center gap-2 text-emerald-800">
+                    <span class="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                    <span><strong>1. Boleto Oficial de Viaje (Voucher PDF):</strong> Itinerario, datos de embarque y pasajeros.</span>
+                </div>
+                <div class="flex items-center gap-2 text-emerald-800">
+                    <span class="material-symbols-outlined text-[16px] text-emerald-600">check_circle</span>
+                    <span><strong>2. Boleta de Venta Electrónica SUNAT (PDF):</strong> Comprobante tributario oficial.</span>
+                </div>
+            </div>
+
+            <!-- Status Message Area -->
+            <div id="modalSendEmailStatusEdit" class="hidden mb-4 p-3 rounded-xl text-xs font-semibold"></div>
+
+            <!-- Actions Buttons -->
+            <div class="flex items-center justify-end gap-3 pt-2 border-t border-outline-variant/40">
+                <button type="button" onclick="closeSendEmailModalEdit()" class="px-4 py-2.5 rounded-xl border border-outline-variant hover:bg-surface-container text-xs font-bold text-secondary transition-all cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="button" id="btnConfirmSendEmailEdit" onclick="executeSendEmailFromModalEdit()" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">send</span>
+                    <span id="btnConfirmSendEmailTextEdit">Enviar Correo con los 2 PDFs</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- FORMULARIO OCULTO PARA REACTIVAR -->
 <form asp-action="ReactivateBooking" method="post" id="reactivateForm" class="hidden">
     @Html.AntiForgeryToken()
@@ -226,15 +303,55 @@
     function sendBookingEmailFromEdit() {
         const emailInput = document.getElementById('CustomerEmail') || document.querySelector('input[name="CustomerEmail"]');
         let email = emailInput ? emailInput.value.trim() : '@Model.CustomerEmail';
-        if (!email || email === 'manual@agencia.com') {
-            email = prompt('Ingrese el correo del cliente para enviarle el boleto de viaje:', '');
-            if (!email) return;
-            if (emailInput) emailInput.value = email;
-        } else {
-            if (!confirm(`¿Enviar el boleto oficial de la reserva @Model.ReferenceCode a:\n${email}?`)) return;
+        const modalInput = document.getElementById('modalBookingEmailInputEdit');
+        if (modalInput) {
+            modalInput.value = (email && email !== 'manual@agencia.com') ? email : '';
+        }
+        const statusDiv = document.getElementById('modalSendEmailStatusEdit');
+        if (statusDiv) {
+            statusDiv.className = 'hidden mb-4 p-3 rounded-xl text-xs font-semibold';
+            statusDiv.innerHTML = '';
+        }
+        const btn = document.getElementById('btnConfirmSendEmailEdit');
+        const btnText = document.getElementById('btnConfirmSendEmailTextEdit');
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+        if (btnText) btnText.innerText = 'Enviar Correo con los 2 PDFs';
+
+        document.getElementById('sendEmailModalEdit')?.classList.remove('hidden');
+        if (modalInput) setTimeout(() => modalInput.focus(), 50);
+    }
+
+    function closeSendEmailModalEdit() {
+        document.getElementById('sendEmailModalEdit')?.classList.add('hidden');
+    }
+
+    function executeSendEmailFromModalEdit() {
+        const modalInput = document.getElementById('modalBookingEmailInputEdit');
+        const email = modalInput ? modalInput.value.trim() : '';
+
+        if (!email || !email.includes('@@')) {
+            alert('Por favor ingrese un correo electrónico válido.');
+            if (modalInput) modalInput.focus();
+            return;
         }
 
-        showEditToast('Enviando correo...', 'info');
+        const btn = document.getElementById('btnConfirmSendEmailEdit');
+        const btnText = document.getElementById('btnConfirmSendEmailTextEdit');
+        const statusDiv = document.getElementById('modalSendEmailStatusEdit');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        if (btnText) btnText.innerText = 'Generando PDFs y enviando...';
+
+        if (statusDiv) {
+            statusDiv.className = 'mb-4 p-3 rounded-xl text-xs font-semibold bg-blue-50 text-blue-900 border border-blue-200 flex items-center gap-2';
+            statusDiv.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">progress_activity</span> Generando Boleto de Viaje PDF y adjuntando comprobante oficial...';
+        }
 
         const formData = new FormData();
         formData.append('id', '@Model.Id');
@@ -247,12 +364,40 @@
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                showEditToast(`✓ ${data.message}`, 'success');
+                if (statusDiv) {
+                    statusDiv.className = 'mb-4 p-3 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-900 border border-emerald-300 flex items-center gap-2';
+                    statusDiv.innerHTML = `<span class="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span> <span>${data.message}</span>`;
+                }
+                if (btnText) btnText.innerText = '✓ Enviado';
+                showEditToast(data.message, 'success');
+                const pageEmailInput = document.getElementById('CustomerEmail') || document.querySelector('input[name="CustomerEmail"]');
+                if (pageEmailInput) pageEmailInput.value = email;
+                setTimeout(() => {
+                    closeSendEmailModalEdit();
+                }, 1800);
             } else {
-                showEditToast(`✗ ${data.message}`, 'error');
+                if (statusDiv) {
+                    statusDiv.className = 'mb-4 p-3 rounded-xl text-xs font-semibold bg-red-50 text-red-900 border border-red-300 flex items-center gap-2';
+                    statusDiv.innerHTML = `<span class="material-symbols-outlined text-[18px] text-red-600">error</span> <span>${data.message}</span>`;
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+                if (btnText) btnText.innerText = 'Reintentar Envío';
+                showEditToast(data.message, 'error');
             }
         })
         .catch(err => {
+            if (statusDiv) {
+                statusDiv.className = 'mb-4 p-3 rounded-xl text-xs font-semibold bg-red-50 text-red-900 border border-red-300 flex items-center gap-2';
+                statusDiv.innerHTML = '<span class="material-symbols-outlined text-[18px] text-red-600">error</span> Error de conexión al servidor al enviar correo.';
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+            if (btnText) btnText.innerText = 'Reintentar Envío';
             showEditToast('Error de conexión al enviar correo.', 'error');
         });
     }

@@ -2510,6 +2510,7 @@ namespace SIGETOUR.API.Controllers.UI
                 success = result.Success, 
                 message = result.Message, 
                 email = booking.CustomerEmail,
+                attachedCount = result.AttachedCount,
                 referenceCode = booking.ReferenceCode
             });
         }

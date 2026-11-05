@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Application.Payments;
@@ -19,7 +20,7 @@ namespace SIGETOUR.Tests.Services
 {
     public class EmailServiceTests
     {
-        private EmailService CreateService(Dictionary<string, string?>? inMemory = null)
+        private EmailService CreateService(Dictionary<string, string?>? inMemory = null, AppDbContext? db = null)
         {
             var config = new ConfigurationBuilder()
                 .AddInMemoryCollection(inMemory ?? new Dictionary<string, string?>())
@@ -33,11 +34,19 @@ namespace SIGETOUR.Tests.Services
 
             var contactService = new CompanyContactService(config);
 
+            var services = new ServiceCollection();
+            if (db != null)
+            {
+                services.AddScoped(_ => db);
+            }
+            var sp = services.BuildServiceProvider();
+
             return new EmailService(
                 config,
                 NullLogger<EmailService>.Instance,
                 checkoutAccess,
-                contactService);
+                contactService,
+                sp);
         }
 
         [Fact]
@@ -77,9 +86,10 @@ namespace SIGETOUR.Tests.Services
                 Status = BookingStatus.Confirmed
             };
 
-            var (success, message) = await service.SendBookingConfirmationEmailAsync(booking, "https://turismochilon.com");
+            var (success, message, attachedCount) = await service.SendBookingConfirmationEmailAsync(booking, "https://turismochilon.com");
 
             Assert.True(success);
+            Assert.True(attachedCount >= 1);
             Assert.Contains("carlos.mendoza@gmail.com", message);
         }
 
@@ -108,7 +118,7 @@ namespace SIGETOUR.Tests.Services
             db.Bookings.Add(booking);
             await db.SaveChangesAsync();
 
-            var service = CreateService();
+            var service = CreateService(null, db);
 
             var controller = new AdminController(
                 db,
