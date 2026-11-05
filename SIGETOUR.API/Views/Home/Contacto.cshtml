@@ -213,17 +213,37 @@
             <p class="text-sm text-on-surface-variant mt-2">Jr. 2 de Mayo 569 • A 3 cuadras de la Plaza Mayor de Cajamarca</p>
         </div>
 
-        <div class="rounded-3xl overflow-hidden border border-outline-variant shadow-lg h-80 sm:h-96 w-full">
+        <div class="rounded-3xl overflow-hidden border border-outline-variant shadow-lg h-96 sm:h-[440px] w-full relative bg-surface-container">
+            <!-- Google Maps Interactivo con Ubicación Exacta (-7.156772, -78.516549) -->
             <iframe 
-                title="Ubicación de Turismo Chilón en Cajamarca"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3957.994640986701!2d-78.521852!3d-7.160911!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x91b25af1cb66a1ef%3A0x8e826b647ec87b92!2sJr.%20Dos%20de%20Mayo%20569%2C%20Cajamarca%2006001!5e0!3m2!1ses!2spe!4v1700000000000!5m2!1ses!2spe" 
-                width="100%" 
-                height="100%" 
-                style="border:0;" 
+                title="Ubicación oficial de Turismo Chilón en Google Maps"
+                src="https://maps.google.com/maps?q=-7.156772,-78.516549&amp;t=&amp;z=18&amp;ie=UTF8&amp;iwloc=&amp;output=embed" 
+                class="w-full h-full border-0" 
                 allowfullscreen="" 
                 loading="lazy" 
                 referrerpolicy="no-referrer-when-downgrade">
             </iframe>
+
+            <!-- Pin Flotante de Oficina -->
+            <div class="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-md border border-outline-variant flex items-center gap-2.5 pointer-events-none">
+                <div class="w-3 h-3 rounded-full bg-accent-red animate-ping"></div>
+                <div>
+                    <span class="text-xs font-extrabold text-secondary block">Oficina: Jr. 2 de Mayo 569</span>
+                    <span class="text-[11px] text-on-surface-variant block">A pocas cuadras de la Plaza de Armas</span>
+                </div>
+            </div>
+
+            <!-- Botones de Acción sobre el Mapa -->
+            <div class="absolute bottom-4 right-4 flex items-center gap-2">
+                <a href="https://maps.google.com/?q=-7.156772,-78.516549" target="_blank" rel="noopener noreferrer" class="bg-white/95 hover:bg-white text-secondary text-xs font-bold px-3.5 py-2 rounded-xl shadow-md border border-outline-variant flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px] text-primary">open_in_new</span>
+                    <span>Abrir en Maps</span>
+                </a>
+                <a href="https://www.google.com/maps/dir/?api=1&amp;destination=-7.156772,-78.516549" target="_blank" rel="noopener noreferrer" class="bg-primary hover:bg-primary-dark text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px]">directions</span>
+                    <span>Cómo llegar</span>
+                </a>
+            </div>
         </div>
     </div>
 </section>
