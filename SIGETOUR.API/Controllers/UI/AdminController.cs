@@ -396,6 +396,12 @@ namespace SIGETOUR.API.Controllers.UI
             return View(tours);
         }
 
+        [HttpGet]
+        public IActionResult Despacho()
+        {
+            return RedirectToAction(nameof(Bookings));
+        }
+
         public async Task<IActionResult> Bookings(string? search, string? status, DateTime? date, Guid? tourId, int page = 1)
         {
             var query = _context.Bookings
