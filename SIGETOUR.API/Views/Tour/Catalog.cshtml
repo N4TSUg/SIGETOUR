@@ -10,6 +10,19 @@
     var curQ = ViewBag.CurrentQ as string;
     var curDate = ViewBag.CurrentDate as string;
     var curModality = ViewBag.CurrentModality as string;
+
+    var featuredTour = Model?.FirstOrDefault(t => t.Images != null && t.Images.Any(i => i.IsMain)) 
+        ?? Model?.FirstOrDefault(t => t.Images != null && t.Images.Any())
+        ?? Model?.FirstOrDefault();
+    var featuredTourImg = featuredTour?.Images?.FirstOrDefault(i => i.IsMain)?.ImageUrl 
+        ?? featuredTour?.Images?.FirstOrDefault()?.ImageUrl
+        ?? "/images/tours/0fca1e9d-4750-4257-b311-1846dec19498_1787801341422.jpg";
+    var featuredTourTitle = featuredTour?.Title ?? "Cumbemayo & Bosque de Piedras";
+    var featuredTourCategory = featuredTour?.Category?.Name ?? "Arqueología y Naturaleza";
+    var featuredTourPrice = featuredTour != null ? featuredTour.BasePrice.ToString("0.00") : "40.00";
+    var featuredTourDuration = featuredTour?.Duration ?? "4 Horas (Medio Día)";
+    var featuredTourSlug = featuredTour?.Slug ?? "cumbemayo-bosque-de-piedras";
+    var totalTours = Model?.Count() ?? 0;
 }
 <main class="flex-1">
 <!-- HERO SECTION: Destinos y Circuitos Turísticos -->
@@ -25,28 +38,86 @@
 <span class="text-outline text-xs">/</span>
 <span class="text-on-surface font-semibold text-body-sm font-body-sm">Salidas Diarias Garantizadas</span>
 </div>
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
-<div class="lg:col-span-8">
-<h1 class="text-headline-lg md:text-display-lg font-display-lg text-inverse-surface tracking-tight leading-tight mb-4">
-  Explora los Mejores Destinos y Circuitos Turísticos de Cajamarca
-</h1>
-<p class="text-body-lg font-body-lg text-on-surface-variant max-w-3xl leading-relaxed">Viaja seguro con nuestra moderna flota de Mercedes-Benz Sprinter y Toyota HiAce, guías certificados y cobertura SOAT turística integral con asistencia permanente.</p>
-</div>
-<!-- Mini trust counters -->
-<div class="lg:col-span-4 flex lg:justify-end">
-<div class="bg-surface-container-lowest/90 backdrop-blur p-4 rounded-xl border border-outline-variant/70 shadow-sm flex items-center gap-4">
-<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-primary">
-<span class="material-symbols-outlined text-[28px]">verified_user</span>
-</div>
-<div>
-<div class="flex items-center gap-1 text-tertiary font-bold text-headline-sm">
-<span class="">100%</span>
-<span class="text-xs bg-tertiary-fixed text-on-tertiary-fixed px-1.5 py-0.5 rounded">Garantizado</span>
-</div>
-<p class="text-body-sm text-secondary font-medium">Cumplimiento de itinerario y protocolos</p>
-</div>
-</div>
-</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+  <!-- Left Column: Copy & Guarantees (7 cols) -->
+  <div class="lg:col-span-7 space-y-4">
+    <h1 class="text-headline-lg md:text-display-lg font-display-lg text-inverse-surface tracking-tight leading-tight">
+      Explora los Mejores Destinos y Circuitos Turísticos de Cajamarca
+    </h1>
+    <p class="text-body-lg font-body-lg text-on-surface-variant max-w-2xl leading-relaxed">
+      Viaja seguro con nuestra moderna flota de Mercedes-Benz Sprinter y Toyota HiAce, guías certificados y cobertura SOAT turística integral con asistencia permanente.
+    </p>
+
+    <!-- Trust Badges & Guarantees -->
+    <div class="flex flex-wrap items-center gap-2.5 pt-1 text-xs font-semibold text-secondary">
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/70 shadow-xs">
+        <span class="material-symbols-outlined text-[17px] text-primary">verified_user</span> 100% Salidas Diarias
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/70 shadow-xs">
+        <span class="material-symbols-outlined text-[17px] text-primary">badge</span> Guías Oficiales DIRCETUR
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/70 shadow-xs">
+        <span class="material-symbols-outlined text-[17px] text-primary">hotel</span> Recojo en Hotel Céntrico
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/70 shadow-xs">
+        <span class="material-symbols-outlined text-[17px] text-primary">directions_bus</span> Flota Sprinter Climatizada
+      </span>
+    </div>
+  </div>
+
+  <!-- Right Column: Tour Showcase Card Frame (5 cols) -->
+  <div class="lg:col-span-5 relative flex justify-center lg:justify-end">
+    <div class="relative w-full max-w-md lg:max-w-none group">
+      <!-- Ambient Glow -->
+      <div class="absolute -inset-1.5 bg-gradient-to-r from-primary/20 via-tertiary/20 to-secondary/20 rounded-3xl blur-xl opacity-70 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+      <!-- Tour Showcase Card Frame -->
+      <a href="/Tour/Details/@featuredTourSlug" class="block relative rounded-2xl overflow-hidden border border-outline-variant/80 bg-surface-container-lowest shadow-xl hover:shadow-2xl hover:border-primary/50 transition-all duration-300">
+        <div class="relative h-56 sm:h-64 lg:h-68 w-full overflow-hidden bg-surface-dim">
+          <img class="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-700" 
+               src="@featuredTourImg" 
+               alt="@featuredTourTitle" 
+               loading="eager" />
+          
+          <!-- Gradient Vignette -->
+          <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none"></div>
+
+          <!-- Top Floating Badges -->
+          <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md text-primary font-bold text-[11px] shadow-sm">
+              <span class="material-symbols-outlined text-[14px] text-amber-500">star</span>
+              <span>Circuito Recomendado</span>
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-xs font-semibold border border-white/20 shadow-sm flex items-center gap-1 font-mono">
+              <span class="material-symbols-outlined text-[14px] text-tertiary-fixed">schedule</span>
+              <span>@featuredTourDuration</span>
+            </span>
+          </div>
+
+          <!-- Bottom Tour Info Overlay -->
+          <div class="absolute bottom-3 left-3 right-3 flex items-end justify-between text-white pointer-events-none">
+            <div class="pr-2">
+              <span class="text-[10px] uppercase tracking-wider text-primary-fixed block font-bold">
+                @featuredTourCategory
+              </span>
+              <h3 class="text-sm sm:text-base font-extrabold text-white drop-shadow-sm leading-tight line-clamp-1">
+                @featuredTourTitle
+              </h3>
+              <span class="inline-flex items-center gap-1 text-[11px] text-emerald-300 font-medium mt-0.5">
+                <span class="material-symbols-outlined text-[13px]">check_circle</span> Salida diaria garantizada
+              </span>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-[9px] uppercase tracking-wider text-white/70 block">Desde</span>
+              <span class="text-base sm:text-lg font-extrabold text-tertiary-fixed drop-shadow-sm">
+                S/ @featuredTourPrice
+              </span>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+  </div>
 </div>
 <!-- FAST ROUTE SEARCH BAR -->
 <div class="mt-8 bg-surface-container-lowest rounded-2xl p-4 md:p-5 shadow-lg border border-outline-variant/80">
@@ -118,7 +189,7 @@
   <button type="button" onclick="const f = document.getElementById('catalog-filters-drawer'); f.classList.toggle('hidden'); const isH = f.classList.contains('hidden'); document.getElementById('filter-toggle-icon').textContent = isH ? 'expand_more' : 'expand_less';" class="w-full py-3 px-4 bg-surface-container-lowest border border-primary/30 rounded-xl shadow-xs text-primary font-bold text-sm flex items-center justify-between active:scale-[0.99] transition-all">
     <span class="flex items-center gap-2">
       <span class="material-symbols-outlined text-lg">tune</span>
-      <span id="mobile-filter-count">Filtrar Circuitos (@Model.Count() tours)</span>
+      <span id="mobile-filter-count">Filtrar Circuitos (@totalTours tours)</span>
     </span>
     <span class="material-symbols-outlined text-lg" id="filter-toggle-icon">expand_more</span>
   </button>
@@ -140,7 +211,7 @@
 <div>
 <h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-3 flex items-center justify-between">
 <span>Categoría</span>
-<span class="text-[11px] text-outline font-normal">@Model.Count() tours</span>
+<span class="text-[11px] text-outline font-normal">@totalTours tours</span>
 </h2>
 <div class="space-y-1.5 text-body-sm">
 <a href="@Url.Action("Catalog", "Tour", new { q = curQ, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = curSortBy })" class="flex items-center justify-between cursor-pointer group p-1.5 rounded-lg hover:bg-surface-container-low transition-colors @(!curCatId.HasValue ? "font-bold text-primary bg-surface-container-low" : "text-on-surface")">
@@ -148,7 +219,7 @@
 <span class="w-2 h-2 rounded-full @(!curCatId.HasValue ? "bg-primary" : "bg-outline-variant")"></span>
 <span class="group-hover:text-primary transition-colors font-medium">Todos los Circuitos</span>
 </div>
-<span class="text-xs bg-surface-container text-secondary px-2 py-0.5 rounded-full font-bold">@Model.Count()</span>
+<span class="text-xs bg-surface-container text-secondary px-2 py-0.5 rounded-full font-bold">@totalTours</span>
 </a>
 @if (ViewBag.Categories != null)
 {
@@ -259,7 +330,7 @@ Garantías de Viaje Chilón
 <div class="flex items-center gap-2">
 <span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shrink-0"></span>
 <p class="text-xs sm:text-body-md font-medium text-on-surface">
-    Mostrando <strong class="font-bold text-primary">@Model.Count() circuitos disponibles</strong>@(string.IsNullOrEmpty(curQ) ? "" : $" para \"{curQ}\"") en Cajamarca
+    Mostrando <strong class="font-bold text-primary">@totalTours circuitos disponibles</strong>@(string.IsNullOrEmpty(curQ) ? "" : $" para \"{curQ}\"") en Cajamarca
 </p>
 <span id="catalog-loading-badge" class="hidden inline-flex items-center gap-1.5 ml-2 text-xs font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
     <svg class="animate-spin h-3.5 w-3.5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true" role="presentation">
