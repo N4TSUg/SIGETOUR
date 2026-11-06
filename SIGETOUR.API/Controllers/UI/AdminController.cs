@@ -30,6 +30,7 @@ namespace SIGETOUR.API.Controllers.UI
         private readonly IManifestExportService _manifestService;
         private readonly ICashReportExportService _cashReportService;
         private readonly SIGETOUR.API.Application.Interfaces.IVisitorCounterService _visitorCounterService;
+        private readonly IImageStorageService? _imageStorageService;
 
         public AdminController(
             AppDbContext context, 
@@ -38,7 +39,8 @@ namespace SIGETOUR.API.Controllers.UI
             IWebHostEnvironment env, 
             IManifestExportService manifestService,
             ICashReportExportService cashReportService,
-            SIGETOUR.API.Application.Interfaces.IVisitorCounterService visitorCounterService)
+            SIGETOUR.API.Application.Interfaces.IVisitorCounterService visitorCounterService,
+            IImageStorageService? imageStorageService = null)
         {
             _context = context;
             _userManager = userManager;
@@ -47,6 +49,7 @@ namespace SIGETOUR.API.Controllers.UI
             _manifestService = manifestService;
             _cashReportService = cashReportService;
             _visitorCounterService = visitorCounterService;
+            _imageStorageService = imageStorageService;
         }
 
         public async Task<IActionResult> Dashboard()
@@ -826,24 +829,35 @@ namespace SIGETOUR.API.Controllers.UI
             // Handle image uploads
             if (VehicleImages != null && VehicleImages.Any())
             {
-                var uploadsFolder = Path.Combine(_env.WebRootPath, "images", "vehicles");
-                Directory.CreateDirectory(uploadsFolder);
                 bool isFirst = !_context.VehicleImages.Any(vi => vi.VehicleId == vehicle.Id);
 
                 foreach (var file in VehicleImages)
                 {
                     if (file.Length > 0)
                     {
-                        var ext = Path.GetExtension(file.FileName);
-                        var fileName = Guid.NewGuid().ToString("N") + ext;
-                        var filePath = Path.Combine(uploadsFolder, fileName);
-                        using var stream = new FileStream(filePath, FileMode.Create);
-                        await file.CopyToAsync(stream);
+                        string imageUrl;
+                        if (_imageStorageService != null)
+                        {
+                            imageUrl = await _imageStorageService.UploadImageAsync(file, "vehicles");
+                        }
+                        else
+                        {
+                            var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "images", "vehicles");
+                            Directory.CreateDirectory(uploadsFolder);
+                            var ext = Path.GetExtension(file.FileName);
+                            var fileName = Guid.NewGuid().ToString("N") + ext;
+                            var filePath = Path.Combine(uploadsFolder, fileName);
+                            using (var stream = new FileStream(filePath, FileMode.Create))
+                            {
+                                await file.CopyToAsync(stream);
+                            }
+                            imageUrl = "/images/vehicles/" + fileName;
+                        }
 
                         _context.VehicleImages.Add(new SIGETOUR.API.Core.Entities.VehicleImage
                         {
                             VehicleId = vehicle.Id,
-                            ImageUrl = "/images/vehicles/" + fileName,
+                            ImageUrl = imageUrl,
                             IsCover = isFirst
                         });
                         isFirst = false;
@@ -916,13 +930,20 @@ namespace SIGETOUR.API.Controllers.UI
             var image = await _context.VehicleImages.FindAsync(id);
             if (image != null)
             {
-                // Try to delete from disk
-                try
+                // Try to delete from storage (Cloudinary or local disk)
+                if (_imageStorageService != null)
                 {
-                    var path = Path.Combine(_env.WebRootPath, image.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                    if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                    await _imageStorageService.DeleteImageAsync(image.ImageUrl);
                 }
-                catch { }
+                else
+                {
+                    try
+                    {
+                        var path = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), image.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                        if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                    }
+                    catch { }
+                }
 
                 _context.VehicleImages.Remove(image);
 
@@ -1971,11 +1992,18 @@ namespace SIGETOUR.API.Controllers.UI
                     }
                 }
                 
-                try {
-                    var filePath = Path.Combine(_env.WebRootPath, image.ImageUrl.TrimStart('/').Replace('/', '\\'));
-                    if (System.IO.File.Exists(filePath))
-                        System.IO.File.Delete(filePath);
-                } catch { } // ignore file delete errors
+                if (_imageStorageService != null)
+                {
+                    await _imageStorageService.DeleteImageAsync(image.ImageUrl);
+                }
+                else
+                {
+                    try {
+                        var filePath = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), image.ImageUrl.TrimStart('/').Replace('/', '\\'));
+                        if (System.IO.File.Exists(filePath))
+                            System.IO.File.Delete(filePath);
+                    } catch { } // ignore file delete errors
+                }
             }
             return Ok();
         }
@@ -2184,29 +2212,33 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (files != null && files.Count > 0)
             {
-                var uploadsFolder = Path.Combine(_env.WebRootPath, "images", "tours");
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
-
                 foreach (var file in files)
                 {
                     if (file.Length > 0)
                     {
-                        var uniqueFileName = Guid.NewGuid().ToString() + "_" + file.FileName;
-                        var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-                        
-                        using (var fileStream = new FileStream(filePath, FileMode.Create))
+                        string imageUrl;
+                        if (_imageStorageService != null)
                         {
-                            await file.CopyToAsync(fileStream);
+                            imageUrl = await _imageStorageService.UploadImageAsync(file, "tours");
+                        }
+                        else
+                        {
+                            var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "images", "tours");
+                            if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+                            var uniqueFileName = Guid.NewGuid().ToString() + "_" + file.FileName;
+                            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+                            using (var fileStream = new FileStream(filePath, FileMode.Create))
+                            {
+                                await file.CopyToAsync(fileStream);
+                            }
+                            imageUrl = "/images/tours/" + uniqueFileName;
                         }
                         
                         var newImg = new TourImage 
                         { 
                             Id = Guid.NewGuid(),
                             TourPackageId = tour.Id,
-                            ImageUrl = "/images/tours/" + uniqueFileName,
+                            ImageUrl = imageUrl,
                             IsMain = tour.Images.Count == 0 
                         };
                         _context.TourImages.Add(newImg);

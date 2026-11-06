@@ -7,7 +7,8 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2B-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Render](https://img.shields.io/badge/Render-Production-46E3B7?logo=render&logoColor=white)](https://sigetour.onrender.com)
-[![Tests Passing](https://img.shields.io/badge/Tests-154%2F154%20Passing%20(100%25)-brightgreen?logo=xunit)]()
+[![Cloudinary](https://img.shields.io/badge/Cloudinary-Integrated-3448C5?logo=cloudinary&logoColor=white)](https://cloudinary.com/)
+[![Tests Passing](https://img.shields.io/badge/Tests-171%2F171%20Passing%20(100%25)-brightgreen?logo=xunit)]()
 [![SonarQube Quality Gate](https://img.shields.io/badge/SonarQube-Passed-4C9BD4?logo=sonarqube&logoColor=white)]()
 
 ---
@@ -148,13 +149,24 @@ El proyecto está configurado para despliegue continuo mediante Git en **Render*
 
 ---
 
-## 🖼️ Almacenamiento Multimedia (Imágenes)
+## 🖼️ Almacenamiento Multimedia en la Nube (Cloudinary)
 
-> [!IMPORTANT]
-> **Almacenamiento Local vs. Almacenamiento en la Nube:**
-> Los contenedores de aplicaciones web en Render operan con un **sistema de archivos efímero (ephemeral filesystem)**. Cada vez que el servicio se reinicia, se actualiza mediante un nuevo despliegue o despierta de inactividad, los archivos creados en el disco local (`wwwroot/images/...`) son eliminados.
-> 
-> Para garantizar la persistencia de las fotografías de tours, vehículos y comprobantes en producción, se recomienda integrar un proveedor de almacenamiento externo como **Cloudinary** o **S3-compatible Object Storage**.
+SIGETOUR integra **Cloudinary** para el almacenamiento permanente, compresión inteligente y distribución CDN de las fotos de tours y vehículos:
+
+### Opciones de Configuración
+
+El servicio admite cualquiera de las dos modalidades de credenciales:
+
+1. **Opción 1: Cadena de conexión única (Recomendada):**
+   * Variable de entorno: `CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>`
+
+2. **Opción 2: Variables individuales:**
+   * En `appsettings.json` o variables de entorno de Render:
+     * `Cloudinary__CloudName` (o `Cloudinary:CloudName`)
+     * `Cloudinary__ApiKey` (o `Cloudinary:ApiKey`)
+     * `Cloudinary__ApiSecret` (o `Cloudinary:ApiSecret`)
+
+> 💡 **Fallback Local Automático:** Si no se proporcionan credenciales de Cloudinary (por ejemplo, en desarrollo local sin conexión a internet), el sistema almacena automáticamente los archivos en `wwwroot/images/` para no bloquear el flujo de trabajo.
 
 ---
 

@@ -184,6 +184,8 @@ builder.Services.AddHttpClient<SIGETOUR.API.Application.Invoicing.IElectronicRec
 builder.Services.AddSingleton<SIGETOUR.API.Application.Interfaces.IVisitorCounterService, SIGETOUR.API.Application.Services.VisitorCounterService>();
 builder.Services.AddSingleton<SIGETOUR.API.Application.Interfaces.ICompanyContactService, SIGETOUR.API.Application.Services.CompanyContactService>();
 builder.Services.AddScoped<SIGETOUR.API.Application.Interfaces.IEmailService, SIGETOUR.API.Application.Services.EmailService>();
+builder.Services.Configure<SIGETOUR.API.Application.Options.CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
+builder.Services.AddScoped<SIGETOUR.API.Application.Services.IImageStorageService, SIGETOUR.API.Application.Services.CloudinaryStorageService>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
