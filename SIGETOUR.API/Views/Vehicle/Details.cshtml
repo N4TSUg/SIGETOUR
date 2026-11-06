@@ -4,6 +4,9 @@
     Layout = "_Layout";
     var images = Model.Vehicle.ExistingImages?.ToList() ?? new List<SIGETOUR.API.Core.Entities.VehicleImage>();
     var coverImage = images.FirstOrDefault(i => i.IsCover) ?? images.FirstOrDefault();
+    var initialIdx = coverImage != null ? images.IndexOf(coverImage) : 0;
+    if (initialIdx < 0) initialIdx = 0;
+    var hasImages = images.Count > 0 && coverImage != null && !string.IsNullOrEmpty(coverImage.ImageUrl);
 }
 
 <main class="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8 min-h-screen bg-background">
@@ -64,52 +67,74 @@
   <!-- PHOTO GALLERY -->
   <section class="space-y-3">
     <!-- Main Photo -->
-    <div class="w-full h-80 sm:h-96 md:h-[480px] rounded-2xl overflow-hidden shadow-md border border-outline-variant relative bg-surface-container-low group">
-      @if (coverImage != null && !string.IsNullOrEmpty(coverImage.ImageUrl))
-      {
+    @if (hasImages)
+    {
+        <div onclick="openLightbox(currentActiveIdx)" 
+             role="button" 
+             tabindex="0"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(currentActiveIdx);}"
+             class="w-full h-80 sm:h-96 md:h-[480px] rounded-2xl overflow-hidden shadow-md border border-outline-variant relative bg-surface-container-low group cursor-pointer select-none"
+             aria-label="Ver fotografía ampliada en pantalla completa">
           <img id="main-vehicle-photo" 
-               class="w-full h-full object-cover transition-all duration-300 group-hover:scale-102" 
-               src="@coverImage.ImageUrl" 
+               class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" 
+               src="@coverImage!.ImageUrl" 
                alt="Foto de @Model.Vehicle.Model" />
-      }
-      else
-      {
-          <div class="w-full h-full flex flex-col items-center justify-center text-outline bg-surface-container-low">
-            <span class="material-symbols-outlined text-7xl text-primary/40 mb-2">directions_bus</span>
-            <span class="text-lg font-bold text-secondary">Turismo Chilón • Ficha Vehicular</span>
-            <span class="text-xs text-on-surface-variant mt-1">Unidad @Model.Vehicle.LicensePlate</span>
+               
+          <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10 pointer-events-none"></div>
+
+          <!-- Hover Zoom Pill -->
+          <div class="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+            <span class="bg-black/65 text-white text-xs sm:text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-2 backdrop-blur-md shadow-lg transform group-hover:scale-105 transition-transform">
+              <span class="material-symbols-outlined text-[20px]" aria-hidden="true">zoom_in</span> Ver imagen completa
+            </span>
           </div>
-      }
-      
-      <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
-      
-      <!-- Photo overlay info -->
-      <div class="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white pointer-events-none">
-        <div>
-          <span class="text-sm sm:text-base font-bold block drop-shadow-md">@Model.Vehicle.Model</span>
-          <span class="text-xs text-white/90 drop-shadow-sm font-mono">Placa: @Model.Vehicle.LicensePlate • @Model.Vehicle.SeatCapacity Asientos</span>
+
+          <!-- Photo overlay info -->
+          <div class="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white pointer-events-none">
+            <div>
+              <span class="text-sm sm:text-base font-bold block drop-shadow-md">@Model.Vehicle.Model</span>
+              <span class="text-xs text-white/90 drop-shadow-sm font-mono">Placa: @Model.Vehicle.LicensePlate • @Model.Vehicle.SeatCapacity Asientos</span>
+            </div>
+            <button type="button" 
+                    onclick="event.stopPropagation(); openLightbox(currentActiveIdx);"
+                    class="bg-black/60 hover:bg-black/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-white/20 shadow-md pointer-events-auto cursor-pointer transition-all active:scale-95 text-white">
+              <span class="material-symbols-outlined text-[16px]">photo_camera</span>
+              <span>@(images.Count > 0 ? $"{images.Count} fotos • Ampliar" : "Oficial")</span>
+            </button>
+          </div>
         </div>
-        <span class="bg-black/50 backdrop-blur-md px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1">
-          <span class="material-symbols-outlined text-[15px]">photo_camera</span>
-          <span>@(images.Count > 0 ? $"{images.Count} fotos" : "Oficial")</span>
-        </span>
-      </div>
-    </div>
+    }
+    else
+    {
+        <div class="w-full h-80 sm:h-96 md:h-[480px] rounded-2xl overflow-hidden shadow-md border border-outline-variant relative bg-surface-container-low flex flex-col items-center justify-center text-outline">
+          <span class="material-symbols-outlined text-7xl text-primary/40 mb-2">directions_bus</span>
+          <span class="text-lg font-bold text-secondary">Turismo Chilón • Ficha Vehicular</span>
+          <span class="text-xs text-on-surface-variant mt-1">Unidad @Model.Vehicle.LicensePlate</span>
+        </div>
+    }
 
     <!-- Thumbnails row if multiple images -->
     @if (images.Count > 1)
     {
-        <div class="flex items-center gap-3 overflow-x-auto pb-2 pt-1">
-          @foreach (var img in images)
+        <div class="flex items-center gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar">
+          @for (int idx = 0; idx < images.Count; idx++)
           {
+              var img = images[idx];
+              var isInit = (idx == initialIdx);
               <button type="button" 
-                      onclick="changeMainPhoto('@img.ImageUrl')"
-                      class="relative w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden border-2 border-outline-variant hover:border-primary transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-primary shadow-xs">
-                <img src="@img.ImageUrl" alt="Foto adicional" class="w-full h-full object-cover" />
+                      onclick="openLightbox(@idx)"
+                      onmouseenter="previewVehiclePhoto(@idx)"
+                      data-thumb-index="@idx"
+                      class="page-thumb-btn relative w-24 h-16 sm:w-28 sm:h-20 rounded-xl overflow-hidden border-2 @(isInit ? "border-primary ring-2 ring-primary/40" : "border-outline-variant") hover:border-primary transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-primary shadow-xs cursor-pointer group/thumb"
+                      title="Ver foto @(idx + 1) en pantalla completa">
+                <img src="@img.ImageUrl" alt="Foto adicional de @Model.Vehicle.Model" class="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform" />
                 @if (img.IsCover)
                 {
-                    <span class="absolute bottom-1 left-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded">Portada</span>
+                    <span class="absolute bottom-1 left-1 bg-primary text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">Portada</span>
                 }
+                <div class="absolute inset-0 bg-black/25 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white">
+                  <span class="material-symbols-outlined text-[18px]">zoom_in</span>
+                </div>
               </button>
           }
         </div>
@@ -501,15 +526,207 @@
   }
 </main>
 
+<!-- LIGHTBOX MODAL (VISOR DE FOTOS EN PANTALLA COMPLETA) -->
+<div id="vehicle-lightbox-modal" 
+     class="fixed inset-0 z-[120] bg-black/95 backdrop-blur-md hidden flex flex-col justify-between p-3 sm:p-5 select-none transition-all duration-300"
+     style="display: none;">
+  <!-- Top Bar -->
+  <div class="flex items-center justify-between text-white pb-3 border-b border-white/10 z-20">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center">
+        <span class="material-symbols-outlined text-[20px]">directions_bus</span>
+      </div>
+      <div>
+        <h3 class="text-sm sm:text-base font-bold text-white truncate max-w-[200px] sm:max-w-md">@Model.Vehicle.Model</h3>
+        <span class="text-[11px] text-white/60">Placa: @Model.Vehicle.LicensePlate • Capacidad: @Model.Vehicle.SeatCapacity Pasajeros</span>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="vehicle-lightbox-counter" class="text-xs sm:text-sm font-semibold text-white/80 bg-white/10 px-3 py-1 rounded-full border border-white/10">Foto @(initialIdx + 1) de @images.Count</span>
+      <button type="button" onclick="closeLightbox()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all cursor-pointer" title="Cerrar (Esc)">
+        <span class="material-symbols-outlined text-2xl">close</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Center Image Viewing Area -->
+  <div class="relative flex-1 flex items-center justify-center my-auto overflow-hidden py-3" 
+       onclick="onLightboxBackdropClick(event)"
+       onkeydown="if(event.key==='Escape'){event.preventDefault();closeLightbox();}"
+       role="presentation">
+    <!-- Prev Button -->
+    <button type="button" onclick="prevLightboxImage(event)" class="absolute left-2 sm:left-6 z-20 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-xl backdrop-blur-sm" title="Foto anterior (Flecha Izquierda)">
+      <span class="material-symbols-outlined text-2xl sm:text-3xl">chevron_left</span>
+    </button>
+
+    <!-- Main Active Full Image -->
+    <img id="vehicle-lightbox-main-img" src="" alt="@Model.Vehicle.Model" class="max-h-[68vh] sm:max-h-[74vh] max-w-[90vw] object-contain rounded-xl shadow-2xl transition-all duration-200" />
+
+    <!-- Next Button -->
+    <button type="button" onclick="nextLightboxImage(event)" class="absolute right-2 sm:right-6 z-20 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/20 flex items-center justify-center transition-all active:scale-90 cursor-pointer shadow-xl backdrop-blur-sm" title="Siguiente foto (Flecha Derecha)">
+      <span class="material-symbols-outlined text-2xl sm:text-3xl">chevron_right</span>
+    </button>
+  </div>
+
+  <!-- Bottom Thumbnails Strip -->
+  @if (images.Count > 1)
+  {
+    <div class="pt-3 border-t border-white/10 flex items-center justify-center gap-2 overflow-x-auto max-w-4xl mx-auto px-2 py-1 no-scrollbar z-20" id="vehicle-lightbox-thumbnails">
+      @for (int idx = 0; idx < images.Count; idx++)
+      {
+        var thumb = images[idx];
+        <button type="button" onclick="setLightboxIndex(@idx)" class="vehicle-lightbox-thumb-btn w-14 h-11 sm:w-16 sm:h-12 shrink-0 rounded-lg overflow-hidden border-2 transition-all opacity-60 hover:opacity-100 cursor-pointer" data-thumb-index="@idx">
+          <img src="@thumb.ImageUrl" class="w-full h-full object-cover" alt="Miniatura @(idx+1)" />
+        </button>
+      }
+    </div>
+  }
+</div>
+
 <script>
+  const vehicleImages = [
+    @foreach(var img in images)
+    {
+      <text>'@img.ImageUrl',</text>
+    }
+  ];
+
+  let currentActiveIdx = @initialIdx;
+  let currentLightboxIdx = @initialIdx;
+
+  function previewVehiclePhoto(index) {
+    if (index >= 0 && index < vehicleImages.length) {
+      currentActiveIdx = index;
+      const mainPhoto = document.getElementById('main-vehicle-photo');
+      if (mainPhoto) {
+        mainPhoto.src = vehicleImages[index];
+      }
+      updatePageThumbnailStyles(index);
+    }
+  }
+
+  function updatePageThumbnailStyles(index) {
+    const pageThumbs = document.querySelectorAll('.page-thumb-btn');
+    pageThumbs.forEach((btn, i) => {
+      if (i === index) {
+        btn.classList.add('border-primary', 'ring-2', 'ring-primary/40');
+        btn.classList.remove('border-outline-variant');
+      } else {
+        btn.classList.remove('border-primary', 'ring-2', 'ring-primary/40');
+        btn.classList.add('border-outline-variant');
+      }
+    });
+  }
+
+  function openLightbox(index = -1) {
+    if (!vehicleImages || vehicleImages.length === 0) return;
+    currentLightboxIdx = (index >= 0 && index < vehicleImages.length) ? index : currentActiveIdx;
+    
+    const modal = document.getElementById('vehicle-lightbox-modal');
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    updateLightboxView();
+  }
+
+  function closeLightbox() {
+    const modal = document.getElementById('vehicle-lightbox-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+    
+    // Sync active photo on page with what user was looking at
+    previewVehiclePhoto(currentLightboxIdx);
+  }
+
+  function onLightboxBackdropClick(event) {
+    if (event.target.id === 'vehicle-lightbox-main-img' || event.target.closest('button')) {
+      return;
+    }
+    closeLightbox();
+  }
+
+  function setLightboxIndex(index) {
+    if (index >= 0 && index < vehicleImages.length) {
+      currentLightboxIdx = index;
+      updateLightboxView();
+    }
+  }
+
+  function nextLightboxImage(event) {
+    if (event) event.stopPropagation();
+    if (!vehicleImages || vehicleImages.length === 0) return;
+    currentLightboxIdx = (currentLightboxIdx + 1) % vehicleImages.length;
+    updateLightboxView();
+  }
+
+  function prevLightboxImage(event) {
+    if (event) event.stopPropagation();
+    if (!vehicleImages || vehicleImages.length === 0) return;
+    currentLightboxIdx = (currentLightboxIdx - 1 + vehicleImages.length) % vehicleImages.length;
+    updateLightboxView();
+  }
+
+  function updateLightboxView() {
+    const mainImg = document.getElementById('vehicle-lightbox-main-img');
+    const counter = document.getElementById('vehicle-lightbox-counter');
+    if (mainImg) {
+      mainImg.src = vehicleImages[currentLightboxIdx];
+    }
+    if (counter) {
+      counter.innerText = `Foto ${currentLightboxIdx + 1} de ${vehicleImages.length}`;
+    }
+    
+    const thumbBtns = document.querySelectorAll('.vehicle-lightbox-thumb-btn');
+    thumbBtns.forEach((btn, idx) => {
+      if (idx === currentLightboxIdx) {
+        btn.classList.add('border-primary', 'opacity-100', 'scale-105');
+        btn.classList.remove('border-transparent', 'opacity-60');
+        btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      } else {
+        btn.classList.remove('border-primary', 'opacity-100', 'scale-105');
+        btn.classList.add('border-transparent', 'opacity-60');
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('vehicle-lightbox-modal');
+    if (!modal || modal.classList.contains('hidden') || modal.style.display === 'none') return;
+
+    if (e.key === 'Escape') closeLightbox();
+    else if (e.key === 'ArrowRight') nextLightboxImage();
+    else if (e.key === 'ArrowLeft') prevLightboxImage();
+  });
+
+  let touchStartX = 0;
+  let touchEndX = 0;
+  const lightboxModal = document.getElementById('vehicle-lightbox-modal');
+  if (lightboxModal) {
+    lightboxModal.addEventListener('touchstart', e => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    lightboxModal.addEventListener('touchend', e => {
+      touchEndX = e.changedTouches[0].screenX;
+      const swipeDistance = touchEndX - touchStartX;
+      if (Math.abs(swipeDistance) > 50) {
+        if (swipeDistance < 0) nextLightboxImage();
+        else prevLightboxImage();
+      }
+    }, { passive: true });
+  }
+
   function changeMainPhoto(url) {
-    const mainPhoto = document.getElementById('main-vehicle-photo');
-    if (mainPhoto) {
-      mainPhoto.style.opacity = '0.5';
-      setTimeout(() => {
-        mainPhoto.src = url;
-        mainPhoto.style.opacity = '1';
-      }, 150);
+    const idx = vehicleImages.indexOf(url);
+    if (idx !== -1) {
+      previewVehiclePhoto(idx);
+    } else {
+      const mainPhoto = document.getElementById('main-vehicle-photo');
+      if (mainPhoto) mainPhoto.src = url;
     }
   }
 </script>
