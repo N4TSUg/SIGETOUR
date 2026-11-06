@@ -50,7 +50,7 @@
 </div>
 <!-- FAST ROUTE SEARCH BAR -->
 <div class="mt-8 bg-surface-container-lowest rounded-2xl p-4 md:p-5 shadow-lg border border-outline-variant/80">
-<form method="get" action="@Url.Action("Catalog", "Tour")" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 md:gap-4 items-center">
+<form id="catalog-search-form" method="get" action="@Url.Action("Catalog", "Tour")" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 md:gap-4 items-center">
 @if (curCatId.HasValue)
 {
     <input type="hidden" name="categoryId" value="@curCatId" />
@@ -118,7 +118,7 @@
   <button type="button" onclick="const f = document.getElementById('catalog-filters-drawer'); f.classList.toggle('hidden'); const isH = f.classList.contains('hidden'); document.getElementById('filter-toggle-icon').textContent = isH ? 'expand_more' : 'expand_less';" class="w-full py-3 px-4 bg-surface-container-lowest border border-primary/30 rounded-xl shadow-xs text-primary font-bold text-sm flex items-center justify-between active:scale-[0.99] transition-all">
     <span class="flex items-center gap-2">
       <span class="material-symbols-outlined text-lg">tune</span>
-      <span>Filtrar Circuitos (@Model.Count() tours)</span>
+      <span id="mobile-filter-count">Filtrar Circuitos (@Model.Count() tours)</span>
     </span>
     <span class="material-symbols-outlined text-lg" id="filter-toggle-icon">expand_more</span>
   </button>
@@ -253,7 +253,7 @@ Garantías de Viaje Chilón
 </div>
 </aside>
 <!-- RIGHT COLUMN: Tours Grid & Results Header -->
-<section class="lg:col-span-8 xl:col-span-9 space-y-6">
+<section id="catalog-results-section" class="lg:col-span-8 xl:col-span-9 space-y-6">
 <!-- Results Top Bar -->
 <div class="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
 <div class="flex items-center gap-2">
@@ -261,10 +261,17 @@ Garantías de Viaje Chilón
 <p class="text-xs sm:text-body-md font-medium text-on-surface">
     Mostrando <strong class="font-bold text-primary">@Model.Count() circuitos disponibles</strong>@(string.IsNullOrEmpty(curQ) ? "" : $" para \"{curQ}\"") en Cajamarca
 </p>
+<span id="catalog-loading-badge" class="hidden inline-flex items-center gap-1.5 ml-2 text-xs font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
+    <svg class="animate-spin h-3.5 w-3.5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+    </svg>
+    <span>Cargando...</span>
+</span>
 </div>
 <div class="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2.5 w-full sm:w-auto">
 <label for="Ordenar_por_" class="text-xs font-semibold text-secondary shrink-0">Ordenar por:</label>
-<select id="Ordenar_por_" onchange="window.location.href=this.value" class="w-full sm:w-auto py-2 px-3 bg-surface-bright border border-outline-variant rounded-xl text-xs sm:text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<select id="Ordenar_por_" onchange="loadCatalogAjax(this.value)" class="w-full sm:w-auto py-2 px-3 bg-surface-bright border border-outline-variant rounded-xl text-xs sm:text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
 <option value="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = "" })" selected="@(string.IsNullOrEmpty(curSortBy))">Más populares y recomendados</option>
 <option value="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = "price-asc" })" selected="@(curSortBy == "price-asc")">Precio: menor a mayor</option>
 <option value="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = "price-desc" })" selected="@(curSortBy == "price-desc")">Precio: mayor a menor</option>
@@ -353,7 +360,7 @@ else
         <span class="material-symbols-outlined text-5xl text-outline mb-3">search_off</span>
         <h3 class="text-title-md font-bold text-on-surface">No se encontraron circuitos para tu búsqueda</h3>
         <p class="text-body-md text-on-surface-variant mt-1">Prueba cambiando los términos o limpiando los filtros aplicados.</p>
-        <a href="@Url.Action("Catalog", "Tour")" class="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-lg bg-primary text-on-primary font-bold shadow-sm hover:bg-primary/90 transition-all">
+        <a href="@Url.Action("Catalog", "Tour")" onclick="event.preventDefault(); loadCatalogAjax(this.href);" class="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-lg bg-primary text-on-primary font-bold shadow-sm hover:bg-primary/90 transition-all cursor-pointer">
             <span class="material-symbols-outlined text-[18px]">refresh</span>
             <span>Ver todos los circuitos</span>
         </a>
@@ -501,6 +508,85 @@ else
 </main>
 
 <script>
+let catalogCurrentRequestId = 0;
+
+function loadCatalogAjax(url, push = true) {
+    const reqId = ++catalogCurrentRequestId;
+    const resultsContainer = document.getElementById('catalog-results-section');
+    const loadingBadge = document.getElementById('catalog-loading-badge');
+    const drawer = document.getElementById('catalog-filters-drawer');
+
+    if (resultsContainer) {
+        resultsContainer.classList.add('opacity-40', 'transition-opacity', 'duration-200', 'pointer-events-none');
+    }
+    if (loadingBadge) {
+        loadingBadge.classList.remove('hidden');
+    }
+
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(response => {
+            if (!response.ok) throw new Error('Error al conectar con el servidor: ' + response.status);
+            return response.text();
+        })
+        .then(html => {
+            if (reqId !== catalogCurrentRequestId) return; // Ignore stale request
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // 1. Update results section (cards + top bar)
+            const newResults = doc.getElementById('catalog-results-section');
+            if (newResults && resultsContainer) {
+                resultsContainer.innerHTML = newResults.innerHTML;
+            }
+
+            // 2. Update sidebar filters (categories, duration, checkboxes, difficulty)
+            const newDrawer = doc.getElementById('catalog-filters-drawer');
+            if (newDrawer && drawer) {
+                drawer.innerHTML = newDrawer.innerHTML;
+            }
+
+            // 3. Update mobile toggle count
+            const newMobileCount = doc.getElementById('mobile-filter-count');
+            const curMobileCount = document.getElementById('mobile-filter-count');
+            if (newMobileCount && curMobileCount) {
+                curMobileCount.innerHTML = newMobileCount.innerHTML;
+            }
+
+            // 4. Update top search form hidden inputs and values
+            const newSearchForm = doc.getElementById('catalog-search-form');
+            const curSearchForm = document.getElementById('catalog-search-form');
+            if (newSearchForm && curSearchForm) {
+                curSearchForm.innerHTML = newSearchForm.innerHTML;
+            }
+
+            // 5. Update browser history
+            if (push && window.location.href !== url) {
+                window.history.pushState({ catalogUrl: url }, '', url);
+            }
+
+            // 6. Re-init interactive slider
+            initPriceSlider();
+
+            // 7. Remove loading state
+            if (resultsContainer) {
+                resultsContainer.classList.remove('opacity-40', 'pointer-events-none');
+            }
+
+            // On mobile, if user changed a filter, scroll smoothly to the catalog start
+            if (window.innerWidth < 1024) {
+                const targetEl = document.getElementById('catalogo');
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        })
+        .catch(err => {
+            console.warn('Fallo AJAX parcial, redirigiendo normalmente:', err);
+            window.location.href = url;
+        });
+}
+
 function onCatalogShiftChange() {
     const manana = document.getElementById('catalog_shift_manana');
     const tarde = document.getElementById('catalog_shift_tarde');
@@ -518,28 +604,28 @@ function onCatalogShiftChange() {
     } else {
         url.searchParams.set('shift', newShift);
     }
-    window.location.href = url.toString();
+    loadCatalogAjax(url.toString());
 }
 
 function resetPriceFilter() {
     const url = new URL(window.location.href);
     url.searchParams.delete('maxPrice');
-    window.location.href = url.toString();
+    loadCatalogAjax(url.toString());
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+function initPriceSlider() {
     const slider = document.getElementById('priceRangeSlider');
     const priceLabel = document.getElementById('priceLabel');
     if (slider && priceLabel) {
-        slider.addEventListener('input', function() {
+        slider.oninput = function() {
             const val = parseInt(this.value);
             if (val >= 80) {
                 priceLabel.textContent = 'Todos los Precios';
             } else {
                 priceLabel.textContent = 'Hasta S/ ' + val;
             }
-        });
-        slider.addEventListener('change', function() {
+        };
+        slider.onchange = function() {
             const val = parseInt(this.value);
             const url = new URL(window.location.href);
             if (val >= 80) {
@@ -547,8 +633,48 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 url.searchParams.set('maxPrice', val);
             }
-            window.location.href = url.toString();
+            loadCatalogAjax(url.toString());
+        };
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initPriceSlider();
+
+    // Intercept clicks on any filter link inside sidebar drawer
+    const drawer = document.getElementById('catalog-filters-drawer');
+    if (drawer) {
+        drawer.addEventListener('click', function(e) {
+            const link = e.target.closest('a');
+            if (link && link.href) {
+                e.preventDefault();
+                loadCatalogAjax(link.href);
+            }
         });
     }
+
+    // Intercept top hero search form submit
+    const searchForm = document.getElementById('catalog-search-form');
+    if (searchForm) {
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(searchForm);
+            const url = new URL(searchForm.action, window.location.origin);
+            for (const [key, val] of formData.entries()) {
+                const sVal = (val || '').toString().trim();
+                if (sVal !== '' && sVal !== 'Todos' && sVal !== 'Cualquier Turno') {
+                    url.searchParams.set(key, sVal);
+                } else {
+                    url.searchParams.delete(key);
+                }
+            }
+            loadCatalogAjax(url.toString());
+        });
+    }
+
+    // Intercept browser back / forward
+    window.addEventListener('popstate', function(e) {
+        loadCatalogAjax(window.location.href, false);
+    });
 });
 </script>
