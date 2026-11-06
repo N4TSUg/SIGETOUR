@@ -246,12 +246,12 @@
                     </div>
 
                     <!-- Upload zone -->
-                    <div id="drop-zone" class="relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/40 hover:border-primary rounded-xl cursor-pointer hover:bg-surface-container-low/40 transition-colors bg-surface group text-center p-4 select-none" onclick="document.getElementById('VehicleImages').click()">
-                        <input id="VehicleImages" type="file" name="VehicleImages" multiple accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewImages(this)" />
+                    <label for="VehicleImages" id="drop-zone" class="relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/40 hover:border-primary rounded-xl cursor-pointer hover:bg-surface-container-low/40 transition-colors bg-surface group text-center p-4 select-none block">
+                        <input id="VehicleImages" type="file" name="VehicleImages" multiple accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewImages(this)" aria-label="Fotografías del vehículo" />
                         <span class="material-symbols-outlined text-3xl text-primary group-hover:scale-110 transition-transform">cloud_upload</span>
                         <span class="text-body-sm text-on-surface-variant mt-1 text-center">Arrastra fotos aquí o <span class="text-primary underline font-bold">haz clic para examinar</span></span>
                         <span class="text-label-sm text-outline mt-0.5">JPG, PNG, WebP – máx. 10 MB por foto</span>
-                    </div>
+                    </label>
 
                     <!-- Preview container -->
                     <div id="image-preview" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 hidden"></div>
