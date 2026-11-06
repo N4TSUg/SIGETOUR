@@ -90,6 +90,10 @@ namespace SIGETOUR.API.Application.Services
             }
         }
 
+        private string BrevoApiKey => Environment.GetEnvironmentVariable("BREVO_API_KEY")
+            ?? _config["EmailSettings:BrevoApiKey"]
+            ?? "";
+
         private bool EnableSsl
         {
             get
@@ -114,14 +118,28 @@ namespace SIGETOUR.API.Application.Services
 
             var attList = attachments != null ? attachments.ToList() : new List<Attachment>();
 
-            // Modo simulación si no hay contraseña SMTP
+            // 1. Envío prioritario mediante Brevo REST API (Puerto 443 HTTPS - no bloqueado por Render Free)
+            if (!string.IsNullOrWhiteSpace(BrevoApiKey))
+            {
+                try
+                {
+                    return await SendViaBrevoApiAsync(toEmail, subject, htmlBody, textBody, attList, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[EmailService Brevo API ERROR] Falló envío a {ToEmail}: {Error}", toEmail, ex.Message);
+                    return (false, $"Error al enviar vía Brevo HTTP: {ex.Message}");
+                }
+            }
+
+            // Modo simulación si no hay contraseña SMTP ni BrevoApiKey
             if (string.IsNullOrWhiteSpace(SmtpPassword))
             {
                 _logger.LogInformation(
-                    "[EmailService SIMULACIÓN] Correo preparado para {ToEmail} desde {SenderEmail} ({AttCount} adjuntos). Configure SMTP_PASSWORD para entrega real vía Gmail.",
+                    "[EmailService SIMULACIÓN] Correo preparado para {ToEmail} desde {SenderEmail} ({AttCount} adjuntos). Configure SMTP_PASSWORD o BREVO_API_KEY para entrega real.",
                     toEmail, SenderEmail, attList.Count);
 
-                return (true, $"Modo de prueba: Boleto digital preparado con éxito ({attList.Count} archivo(s) PDF adjuntos) para {toEmail}. (Ingrese su Contraseña de Aplicación en SMTP_PASSWORD para entrega real a Gmail).");
+                return (true, $"Modo de prueba: Boleto digital preparado con éxito ({attList.Count} archivo(s) PDF adjuntos) para {toEmail}. (Ingrese su Contraseña de Aplicación en SMTP_PASSWORD o clave en BREVO_API_KEY para entrega real).");
             }
 
             try
@@ -132,7 +150,7 @@ namespace SIGETOUR.API.Application.Services
                     DeliveryMethod = SmtpDeliveryMethod.Network,
                     UseDefaultCredentials = false,
                     Credentials = new NetworkCredential(SenderEmail, SmtpPassword),
-                    Timeout = 20000
+                    Timeout = 15000
                 };
 
                 using var mail = new MailMessage
@@ -167,8 +185,63 @@ namespace SIGETOUR.API.Application.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "[EmailService ERROR] Falló el envío de correo a {ToEmail}: {Error}", toEmail, ex.Message);
+                if (ex.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase) || ex.InnerException?.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    return (false, "Render (plan Free) bloquea los puertos SMTP salientes (587/465). Para enviar correos gratis en la nube, configure la variable 'BREVO_API_KEY' (funciona sobre HTTPS puerto 443).");
+                }
                 return (false, $"Error al conectar con el servidor de correo: {ex.Message}");
             }
+        }
+
+        private async Task<(bool Success, string Message)> SendViaBrevoApiAsync(
+            string toEmail,
+            string subject,
+            string htmlBody,
+            string? textBody,
+            List<Attachment> attList,
+            CancellationToken cancellationToken)
+        {
+            var brevoAttachments = new List<object>();
+            foreach (var att in attList)
+            {
+                using var ms = new MemoryStream();
+                att.ContentStream.Position = 0;
+                await att.ContentStream.CopyToAsync(ms, cancellationToken);
+                att.ContentStream.Position = 0;
+                brevoAttachments.Add(new
+                {
+                    name = att.Name ?? "documento.pdf",
+                    content = Convert.ToBase64String(ms.ToArray())
+                });
+            }
+
+            var payload = new
+            {
+                sender = new { name = SenderName, email = SenderEmail },
+                to = new[] { new { email = toEmail.Trim() } },
+                subject = subject,
+                htmlContent = htmlBody,
+                textContent = string.IsNullOrWhiteSpace(textBody) ? null : textBody,
+                attachment = brevoAttachments.Count > 0 ? brevoAttachments : null
+            };
+
+            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+            using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+            req.Headers.Add("api-key", BrevoApiKey);
+            req.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+            req.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+            var resp = await httpClient.SendAsync(req, cancellationToken);
+            var respBody = await resp.Content.ReadAsStringAsync(cancellationToken);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("[EmailService Brevo HTTP] Correo enviado exitosamente a {ToEmail} ({Count} adjuntos)", toEmail, attList.Count);
+                return (true, $"Correo y {attList.Count} archivo(s) PDF enviados exitosamente vía Brevo HTTP a {toEmail}.");
+            }
+
+            _logger.LogError("[EmailService Brevo API Rechazo {StatusCode}] Respuesta: {Body}", resp.StatusCode, respBody);
+            return (false, $"Brevo API rechazó el envío ({resp.StatusCode}): {respBody}");
         }
 
         public async Task<(bool Success, string Message, int AttachedCount)> SendBookingConfirmationEmailAsync(
