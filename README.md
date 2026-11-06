@@ -50,10 +50,10 @@ flowchart LR
 ### Credenciales de Acceso Sembradas por Defecto
 El sistema cuenta con un seeder criptográfico automático (`IdentitySeeder`) que inicializa los roles y credenciales administrativas si no existen en la base de datos:
 
-| Rol | Usuario | Correo Electrónico | Contraseña | Nivel de Privilegios |
+| Rol | Usuario | Correo Electrónico | Contraseña Inicial | Nivel de Privilegios |
 | :--- | :--- | :--- | :--- | :--- |
-| **SuperAdmin** | `superadmin` | `superadmin@sigetour.com` | `SuperAdmin123!` | Control maestro total: gestión de usuarios, roles, auditoría y configuración global. |
-| **Admin** | `admin` | `admin@sigetour.com` | `Admin123!` | Administración de tours, despacho operativo, control de flota, caja chica y reservas. |
+| **SuperAdmin** | `superadmin` | `superadmin@sigetour.com` | `[Definida en IdentitySeeder]` | Control maestro total: gestión de usuarios, roles, auditoría y configuración global. |
+| **Admin** | `admin` | `admin@sigetour.com` | `[Definida en IdentitySeeder]` | Administración de tours, despacho operativo, control de flota, caja chica y reservas. |
 
 ---
 
@@ -217,17 +217,17 @@ El servicio está configurado para integración y despliegue continuo (CI/CD) au
 | :--- | :--- | :--- |
 | `ASPNETCORE_ENVIRONMENT` | Modo de ejecución del framework | `Production` |
 | `PORT` | Puerto asignado dinámicamente por Render | `80` (o automático) |
-| `DATABASE_URL` | Cadena de conexión URI a PostgreSQL | `postgres://user:password@host:5432/sigetour_db` |
+| `DATABASE_URL` | Cadena de conexión URI a PostgreSQL | `postgres://<usuario>:<password>@<host>:5432/<nombre_db>` |
 | `CLOUDINARY_URL` | Cadena de conexión de Cloudinary | `cloudinary://<api_key>:<api_secret>@<cloud_name>` |
-| `Cloudinary__CloudName` | Nombre del Cloud en Cloudinary | `dbpt3vklj` |
-| `Cloudinary__ApiKey` | Clave API pública de Cloudinary | `538277629653922` |
-| `Cloudinary__ApiSecret` | Clave API secreta de Cloudinary | `DKuM8Ct8...` |
-| `Culqi__PublicKey` | Clave pública de pasarela Culqi | `pk_test_...` |
-| `Culqi__SecretKey` | Clave secreta de pasarela Culqi | `sk_test_...` |
+| `Cloudinary__CloudName` | Nombre del Cloud en Cloudinary | `<tu_cloud_name>` |
+| `Cloudinary__ApiKey` | Clave API pública de Cloudinary | `<tu_api_key>` |
+| `Cloudinary__ApiSecret` | Clave API secreta de Cloudinary | `<tu_api_secret>` |
+| `Culqi__PublicKey` | Clave pública de pasarela Culqi | `pk_test_<tu_public_key>` |
+| `Culqi__SecretKey` | Clave secreta de pasarela Culqi | `sk_test_<tu_secret_key>` |
 | `EmailSettings__Host` | Servidor SMTP para correos | `smtp.gmail.com` |
 | `EmailSettings__Port` | Puerto SMTP TLS | `587` |
-| `EmailSettings__SenderEmail` | Correo remitente oficial | `informes.chilon@gmail.com` |
-| `EmailSettings__Password` | Contraseña de aplicación SMTP | `xxxx xxxx xxxx xxxx` |
+| `EmailSettings__SenderEmail` | Correo remitente oficial | `contacto@tuempresa.com` |
+| `EmailSettings__Password` | Contraseña de aplicación SMTP | `<tu_password_smtp>` |
 
 ---
 
