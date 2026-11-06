@@ -93,6 +93,16 @@ namespace SIGETOUR.API.Controllers.UI
                 .ToDictionaryAsync(f => f.TourPackageId, f => f);
             ViewBag.ActiveFeatured = activeFeatured;
 
+            var topFeatured = await _context.FeaturedPackages
+                .Where(f => f.IsActive)
+                .OrderBy(f => f.DisplayOrder)
+                .Include(f => f.TourPackage)
+                    .ThenInclude(t => t!.Images)
+                .Include(f => f.TourPackage)
+                    .ThenInclude(t => t!.Category)
+                .FirstOrDefaultAsync();
+            ViewBag.TopFeatured = topFeatured;
+
             var tours = await query.ToListAsync();
 
             if (maxPrice.HasValue && maxPrice.Value > 0)

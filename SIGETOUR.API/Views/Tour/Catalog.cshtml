@@ -11,17 +11,22 @@
     var curDate = ViewBag.CurrentDate as string;
     var curModality = ViewBag.CurrentModality as string;
 
+    var topFeatured = ViewBag.TopFeatured as SIGETOUR.API.Core.Entities.FeaturedPackage;
     var activeFeatured = ViewBag.ActiveFeatured as Dictionary<Guid, SIGETOUR.API.Core.Entities.FeaturedPackage>;
-    var featuredTour = Model?.FirstOrDefault(t => t.Images != null && t.Images.Any(i => i.IsMain)) 
+
+    var featuredTour = topFeatured?.TourPackage 
+        ?? Model?.FirstOrDefault(t => t.Images != null && t.Images.Any(i => i.IsMain)) 
         ?? Model?.FirstOrDefault(t => t.Images != null && t.Images.Any())
         ?? Model?.FirstOrDefault();
     var featuredTourImg = featuredTour?.Images?.FirstOrDefault(i => i.IsMain)?.ImageUrl 
         ?? featuredTour?.Images?.FirstOrDefault()?.ImageUrl
         ?? "/images/tours/0fca1e9d-4750-4257-b311-1846dec19498_1787801341422.jpg";
-    var featuredTourTitle = featuredTour?.Title ?? "Cumbemayo & Bosque de Piedras";
+
+    var heroFp = topFeatured ?? ((featuredTour != null && activeFeatured != null && activeFeatured.TryGetValue(featuredTour.Id, out var hFp)) ? hFp : null);
+    var featuredTourTitle = !string.IsNullOrWhiteSpace(heroFp?.CommercialTitle) ? heroFp.CommercialTitle : (featuredTour?.Title ?? "Cumbemayo & Bosque de Piedras");
+    var featuredTourBadge = !string.IsNullOrWhiteSpace(heroFp?.PromoBadge) && heroFp.PromoBadge != "none" ? heroFp.PromoBadge : "Circuito Recomendado";
     var featuredTourCategory = featuredTour?.Category?.Name ?? "Arqueología y Naturaleza";
 
-    var heroFp = (featuredTour != null && activeFeatured != null && activeFeatured.TryGetValue(featuredTour.Id, out var hFp)) ? hFp : null;
     var heroEffectivePrice = (heroFp != null && heroFp.PromoPrice.HasValue) ? heroFp.PromoPrice.Value : (featuredTour?.BasePrice ?? 40.00m);
     var hasHeroPromo = heroFp != null && heroFp.PromoPrice.HasValue && heroFp.PromoPrice.Value < (featuredTour?.BasePrice ?? 0);
     var featuredTourPrice = heroEffectivePrice.ToString("0.00");
@@ -91,7 +96,7 @@
           <div class="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
             <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/95 backdrop-blur-md text-primary font-bold text-[11px] shadow-sm">
               <span class="material-symbols-outlined text-[14px] text-amber-500">star</span>
-              <span>Circuito Recomendado</span>
+              <span>@featuredTourBadge</span>
             </span>
             <span class="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-xs font-semibold border border-white/20 shadow-sm flex items-center gap-1 font-mono">
               <span class="material-symbols-outlined text-[14px] text-tertiary-fixed">schedule</span>
