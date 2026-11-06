@@ -1253,6 +1253,9 @@ namespace SIGETOUR.API.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsFlagship")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("LicensePlate")
                         .IsRequired()
                         .HasColumnType("text");
