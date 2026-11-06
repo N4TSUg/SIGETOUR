@@ -96,7 +96,7 @@ else
     </div>
     <div>
       <span class="text-sm font-bold text-secondary block leading-tight">Buscar Salidas y Circuitos</span>
-      <span class="text-[11px] font-normal text-on-surface-variant">Destino, fecha y pasajeros</span>
+      <span class="text-[11px] font-normal text-on-surface-variant">Destino, fecha y turno de salida</span>
     </div>
   </div>
   <span id="home-search-chevron" class="material-symbols-outlined text-primary text-2xl transition-transform duration-300">expand_more</span>
@@ -136,15 +136,14 @@ else
 <input id="date" name="date" class="w-full bg-[#f7fefc] border border-outline-variant rounded-lg px-3 py-2.5 text-sm font-medium text-secondary focus:border-primary focus:ring-1 focus:ring-primary outline-none" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@DateTime.Today.ToString("yyyy-MM-dd")">
 </div>
 <div class="space-y-1.5">
-<label for="pax" class="text-xs font-semibold text-secondary flex items-center gap-1">
-<span class="material-symbols-outlined text-[17px] text-primary" data-icon="group">group</span>
-          Pasajeros
+<label for="shift" class="text-xs font-semibold text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[17px] text-primary" data-icon="schedule">schedule</span>
+          Turno de Salida
         </label>
-<select id="pax" name="pax" class="w-full bg-[#f7fefc] border border-outline-variant rounded-lg px-3 py-2.5 text-sm font-medium text-secondary focus:border-primary focus:ring-1 focus:ring-primary outline-none">
-<option value="1">1 Pasajero</option>
-<option value="2" selected>2 Pasajeros</option>
-<option value="3">3 - 5 Pasajeros</option>
-<option value="6">Grupo Familiar (6+)</option>
+<select id="shift" name="shift" class="w-full bg-[#f7fefc] border border-outline-variant rounded-lg px-3 py-2.5 text-sm font-medium text-secondary focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+<option value="Todos" selected>Cualquier Turno</option>
+<option value="Mañana">Mañana (9:00 AM / 9:30 AM)</option>
+<option value="Tarde">Tarde (2:30 PM / 3:30 PM)</option>
 </select>
 </div>
 <div class="space-y-1.5">
