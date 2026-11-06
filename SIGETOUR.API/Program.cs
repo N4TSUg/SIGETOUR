@@ -226,9 +226,21 @@ using (var scope = app.Services.CreateScope())
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"ResolutionNumber\" text NOT NULL DEFAULT '';"); } catch { }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"EquipmentJson\" text NOT NULL DEFAULT '[]';"); } catch { }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"Status\" text NOT NULL DEFAULT 'Operativo en Ruta (En Servicio)';"); } catch { }
+    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"IsFlagship\" boolean NOT NULL DEFAULT false;"); } catch { }
     try { db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS \"VehicleImages\" (\"Id\" uuid NOT NULL PRIMARY KEY, \"VehicleId\" uuid NOT NULL REFERENCES \"Vehicles\"(\"Id\") ON DELETE CASCADE, \"ImageUrl\" text NOT NULL DEFAULT '', \"IsCover\" boolean NOT NULL DEFAULT false);"); } catch { }
     try { db.Database.ExecuteSqlRaw("UPDATE \"Vehicles\" SET \"IsActive\" = true WHERE \"Status\" != 'Baja Operativa';"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"UPDATE ""Vehicles"" SET ""EquipmentJson"" = '[""Aire Acondicionado / Climatizador"", ""Asientos Reclinables Confort"", ""Puertos de Carga USB"", ""Botiquín de Primeros Auxilios""]' WHERE ""EquipmentJson"" = '[]' OR ""EquipmentJson"" IS NULL OR ""EquipmentJson"" = '';"); } catch { }
+    try {
+        if (!db.Vehicles.Any(v => v.IsFlagship))
+        {
+            var defaultFlagship = db.Vehicles.OrderByDescending(v => v.SeatCapacity).FirstOrDefault(v => v.IsActive && v.Status != "Baja Operativa");
+            if (defaultFlagship != null)
+            {
+                defaultFlagship.IsFlagship = true;
+                db.SaveChanges();
+            }
+        }
+    } catch { }
     try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""FeaturedPackages"" (""Id"" uuid NOT NULL PRIMARY KEY, ""TourPackageId"" uuid NOT NULL REFERENCES ""TourPackages""(""Id"") ON DELETE CASCADE, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CommercialTitle"" text NOT NULL DEFAULT '', ""CommercialSubtitle"" text NOT NULL DEFAULT '', ""PromoBadge"" text NOT NULL DEFAULT '', ""PromoPrice"" numeric, ""SyncInventory"" boolean NOT NULL DEFAULT true);"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Categories"" (""Id"" uuid NOT NULL PRIMARY KEY, ""Name"" text NOT NULL, ""Description"" text, ""Icon"" text, ""IsActive"" boolean NOT NULL DEFAULT true, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP);"); } catch { }
     try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" DROP COLUMN IF EXISTS ""Category"";"); } catch { }

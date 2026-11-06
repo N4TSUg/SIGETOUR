@@ -132,7 +132,15 @@
                             </td>
                             <td class="p-4 font-bold text-primary font-mono tracking-wide">@vehicle.LicensePlate</td>
                             <td class="p-4">
-                                <div class="font-bold text-on-surface">@vehicle.Model</div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-bold text-on-surface">@vehicle.Model</span>
+                                    @if (vehicle.IsFlagship)
+                                    {
+                                        <span class="inline-flex items-center gap-1 text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-xs" title="Unidad Principal mostrada en el encabezado del Catálogo de Flota">
+                                            <span class="material-symbols-outlined text-[13px] text-amber-600" style="font-variation-settings: 'FILL' 1;">star</span> Principal Catálogo
+                                        </span>
+                                    }
+                                </div>
                                 <div class="text-xs text-on-surface-variant">@(string.IsNullOrEmpty(vehicle.Category) ? "Transporte Turístico" : vehicle.Category)</div>
                             </td>
                             <td class="p-4">@vehicle.SeatCapacity pasajeros</td>
@@ -155,7 +163,13 @@
                                     </span>
                                 }
                             </td>
-                            <td class="p-4 text-right space-x-1">
+                            <td class="p-4 text-right space-x-1 whitespace-nowrap">
+                                <form asp-action="SetFlagshipVehicle" asp-controller="Admin" method="post" class="inline">
+                                    <input type="hidden" name="id" value="@vehicle.Id" />
+                                    <button type="submit" class="p-2 @(vehicle.IsFlagship ? "text-amber-600 bg-amber-50 ring-1 ring-amber-300" : "text-on-surface-variant hover:text-amber-600") rounded-lg hover:bg-surface-container transition-all inline-block cursor-pointer" title="@(vehicle.IsFlagship ? "Unidad Principal actual en el Catálogo de Flota" : "Fijar como Unidad Principal en el Catálogo de Flota")">
+                                        <span class="material-symbols-outlined text-[20px]" style="@(vehicle.IsFlagship ? "font-variation-settings: 'FILL' 1;" : "")">star</span>
+                                    </button>
+                                </form>
                                 <a href="@Url.Action("EditVehicle", "Admin", new { id = vehicle.Id })" class="inline-block p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors" title="Editar">
                                     <span class="material-symbols-outlined text-[20px]">edit</span>
                                 </a>

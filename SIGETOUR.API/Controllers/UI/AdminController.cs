@@ -702,6 +702,7 @@ namespace SIGETOUR.API.Controllers.UI
                 ResolutionNumber = vehicle.ResolutionNumber,
                 EquipmentJson = vehicle.EquipmentJson,
                 Status = vehicle.Status,
+                IsFlagship = vehicle.IsFlagship,
                 ExistingImages = vehicle.Images
             };
             return View(dto);
@@ -864,17 +865,84 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        public async Task<IActionResult> SetCoverVehicleImage(Guid vehicleId, Guid imageId)
+        {
+            var vehicle = await _context.Vehicles
+                .Include(v => v.Images)
+                .FirstOrDefaultAsync(v => v.Id == vehicleId);
+
+            if (vehicle == null)
+            {
+                return NotFound(new { success = false, message = "Unidad vehicular no encontrada." });
+            }
+
+            var targetImage = vehicle.Images.FirstOrDefault(i => i.Id == imageId);
+            if (targetImage == null)
+            {
+                return NotFound(new { success = false, message = "Imagen no encontrada en este vehículo." });
+            }
+
+            foreach (var img in vehicle.Images)
+            {
+                img.IsCover = (img.Id == imageId);
+            }
+
+            await _context.SaveChangesAsync();
+            return Json(new { success = true, imageId = imageId });
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SetFlagshipVehicle(Guid id)
+        {
+            var vehicle = await _context.Vehicles.FindAsync(id);
+            if (vehicle == null) return NotFound();
+
+            var currentFlagships = await _context.Vehicles.Where(v => v.IsFlagship).ToListAsync();
+            foreach (var f in currentFlagships)
+            {
+                f.IsFlagship = false;
+            }
+
+            vehicle.IsFlagship = true;
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"La unidad \"{vehicle.Model} ({vehicle.LicensePlate})\" ha sido seleccionada como la unidad principal en el catálogo de flota.";
+            return RedirectToAction(nameof(Fleet));
+        }
+
+        [HttpPost]
         public async Task<IActionResult> DeleteVehicleImage(Guid id, Guid vehicleId)
         {
             var image = await _context.VehicleImages.FindAsync(id);
             if (image != null)
             {
                 // Try to delete from disk
-                var path = Path.Combine(_env.WebRootPath, image.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                try
+                {
+                    var path = Path.Combine(_env.WebRootPath, image.ImageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                    if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                }
+                catch { }
+
                 _context.VehicleImages.Remove(image);
+
+                if (image.IsCover)
+                {
+                    var otherImage = await _context.VehicleImages.FirstOrDefaultAsync(vi => vi.VehicleId == vehicleId && vi.Id != id);
+                    if (otherImage != null)
+                    {
+                        otherImage.IsCover = true;
+                    }
+                }
+
                 await _context.SaveChangesAsync();
             }
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest" || Request.Headers.Accept.ToString().Contains("application/json"))
+            {
+                return Json(new { success = true });
+            }
+
             return RedirectToAction("EditVehicle", new { id = vehicleId });
         }
         
@@ -892,6 +960,9 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction("Fleet");
         }
 
+        [HttpGet]
+        [Route("Admin/Fleet")]
+        [Route("Admin/Vehicles")]
         public async Task<IActionResult> Fleet(string? search, string? status, int page = 1)
         {
             var query = _context.Vehicles

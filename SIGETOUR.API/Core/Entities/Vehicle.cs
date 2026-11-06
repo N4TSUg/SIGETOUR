@@ -67,6 +67,7 @@ namespace SIGETOUR.API.Core.Entities
         // Estado
         public bool IsActive { get; set; } = true; // Activo Operativamente
         public string Status { get; set; } = "Operativo en Ruta (En Servicio)";
+        public bool IsFlagship { get; set; } = false; // Unidad destacada/principal en el Catálogo de Flota
 
         // Galería de imágenes
         public ICollection<VehicleImage> Images { get; set; } = new List<VehicleImage>();

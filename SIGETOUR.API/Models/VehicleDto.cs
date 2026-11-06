@@ -73,9 +73,9 @@ namespace SIGETOUR.API.Models
         }
 
         public string? Status { get; set; } = "Operativo en Ruta (En Servicio)";
+        public bool IsFlagship { get; set; } = false;
 
         // Read-only property for the view to render existing images
         public ICollection<VehicleImage> ExistingImages { get; set; } = new List<VehicleImage>();
     }
 }
-

@@ -3,7 +3,10 @@
     ViewData["Title"] = "Flota Turística Certificada en Cajamarca | Turismo Chilón";
     Layout = "_Layout";
 
-    var heroVehicle = Model.Vehicles?.FirstOrDefault(v => v.ExistingImages != null && v.ExistingImages.Any());
+    var heroVehicle = Model.Vehicles?.FirstOrDefault(v => v.IsFlagship && v.ExistingImages != null && v.ExistingImages.Any())
+        ?? Model.Vehicles?.FirstOrDefault(v => v.IsFlagship)
+        ?? Model.Vehicles?.FirstOrDefault(v => v.ExistingImages != null && v.ExistingImages.Any())
+        ?? Model.Vehicles?.FirstOrDefault();
     var heroImgUrl = heroVehicle?.ExistingImages.FirstOrDefault(i => i.IsCover)?.ImageUrl 
         ?? heroVehicle?.ExistingImages.FirstOrDefault()?.ImageUrl 
         ?? "/images/vehicles/c2e81465587b4d158cb22c87908d0380.png";

@@ -35,7 +35,8 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             var vehicles = await query
-                .OrderByDescending(v => v.SeatCapacity)
+                .OrderByDescending(v => v.IsFlagship)
+                .ThenByDescending(v => v.SeatCapacity)
                 .ToListAsync();
 
             var categories = await _context.Vehicles
@@ -116,6 +117,7 @@ namespace SIGETOUR.API.Controllers.UI
                 ResolutionNumber = v.ResolutionNumber,
                 EquipmentJson = v.EquipmentJson,
                 Status = v.Status,
+                IsFlagship = v.IsFlagship,
                 ExistingImages = v.Images?.ToList() ?? new List<Core.Entities.VehicleImage>()
             };
         }
