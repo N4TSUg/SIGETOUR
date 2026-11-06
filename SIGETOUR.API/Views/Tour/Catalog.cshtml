@@ -449,39 +449,45 @@ else
 </div>
 </div>
 <!-- SECTION: ARMA TU TOUR PRIVADO O EXCLUSIVO -->
-<section class="max-w-7xl mx-auto px-4 md:px-8 py-10">
-<div class="relative rounded-3xl overflow-hidden bg-gradient-to-r from-inverse-surface via-primary to-primary-container p-8 md:p-12 text-on-primary shadow-xl">
-<div class="absolute -right-16 -top-16 w-80 h-80 bg-surface-container-high/10 rounded-full blur-2xl pointer-events-none"></div>
-<div class="absolute right-1/4 -bottom-20 w-64 h-64 bg-tertiary/20 rounded-full blur-xl pointer-events-none"></div>
-<div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+<section class="max-w-7xl mx-auto px-4 md:px-8 py-10" id="tour-privado">
+<div class="bg-gradient-to-br from-secondary via-[#134e4a] to-primary rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden text-white">
+<div class="absolute -right-16 -bottom-16 w-80 h-80 rounded-full bg-primary-light/10 pointer-events-none"></div>
+<div class="absolute right-1/3 -top-20 w-72 h-72 rounded-full bg-accent-red/10 blur-3xl pointer-events-none"></div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
 <div class="lg:col-span-8 space-y-4">
-<span class="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest/20 backdrop-blur rounded-full text-xs font-bold tracking-wider uppercase text-inverse-on-surface">
-<span class="material-symbols-outlined text-[16px] text-tertiary-fixed-dim">groups</span> Servicio Corporativo y Delegaciones
-</span>
-<h2 class="text-headline-lg font-headline-lg font-bold text-white tracking-tight">
-  ¿Viajas en Familia o Grupo? Arma tu Tour 100% Privado
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-primary-light text-xs font-semibold border border-white/15">
+<span class="w-2 h-2 rounded-full bg-accent-red animate-pulse"></span>
+<span>Atención Inmediata por Turismo Chilón</span>
+</div>
+<h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white leading-tight">
+  ¿Viajas en familia o necesitas transporte turístico exclusivo?
 </h2>
-<p class="text-body-lg font-body-lg text-surface-container-lowest/90 max-w-2xl leading-relaxed">Disfruta de vans exclusivas puerta a puerta, horarios personalizados a tu ritmo, traslados directos y traslados cómodos hacia el Aeropuerto Mayor General FAP Armando Revoredo Iglesias.</p>
-<div class="flex flex-wrap gap-4 pt-2">
-<div class="flex items-center gap-2 text-sm text-surface-bright">
-<span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Vans de 11 a 19 pasajeros
+<p class="text-sm sm:text-base text-surface-container-high/90 max-w-2xl leading-relaxed">
+  Cotiza tu circuito privado o traslados al instante con nuestros operadores autorizados. Disfruta de vans exclusivas puerta a puerta, horarios a tu ritmo y salidas garantizadas desde Jr. 2 de Mayo 569.
+</p>
+<div class="flex flex-wrap items-center gap-6 pt-2 text-xs font-semibold text-primary-fixed">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">bolt</span>
+<span>Respuesta rápida en WhatsApp</span>
 </div>
-<div class="flex items-center gap-2 text-sm text-surface-bright">
-<span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Factura Comercial &amp; Convenios
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">check_circle</span>
+<span>Aceptamos Yape, Plin y Tarjetas</span>
 </div>
-<div class="flex items-center gap-2 text-sm text-surface-bright">
-<span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Asignación Inmediata
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">airport_shuttle</span>
+<span>Vans de 11 a 19 pasajeros</span>
 </div>
 </div>
 </div>
-<div class="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-3 justify-center">
-<a class="px-6 py-4 bg-tertiary-container hover:bg-tertiary text-on-tertiary rounded-xl font-label-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95 text-center" href="@ContactService.GetWhatsAppUrl("Hola Turismo Chilón, solicito cotización para un servicio privado")" target="_blank">
-<span class="material-symbols-outlined text-[22px]">chat</span>
-<span>Cotizar Tour Privado</span>
+<div class="lg:col-span-4 flex flex-col gap-3">
+<a class="w-full bg-[#25D366] hover:bg-[#1ebe5d] text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 text-sm active:scale-98" href="@ContactService.GetWhatsAppUrl("Hola Turismo Chilón, deseo cotizar un tour privado o servicio exclusivo en Cajamarca")" rel="noopener noreferrer" target="_blank">
+<span class="material-symbols-outlined text-[20px]">chat</span>
+<span>WhatsApp: @ContactService.WhatsAppFormatted</span>
 </a>
-<a class="px-6 py-3.5 bg-surface-container-lowest/15 hover:bg-surface-container-lowest/25 backdrop-blur text-on-primary border border-surface-container-lowest/30 rounded-xl font-label-md font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all text-center" href="tel:@ContactService.PhoneCall">
-<span class="material-symbols-outlined text-[20px]">call</span>
-<span>Llamar Directo a Central</span>
+<a class="w-full bg-white/15 hover:bg-white/25 text-white font-bold py-3 px-6 rounded-xl transition-colors border border-white/20 flex items-center justify-center gap-2 text-sm" href="tel:@ContactService.PhoneCall">
+<span class="material-symbols-outlined text-[19px] text-primary-light">call</span>
+<span>Llamar: @ContactService.PhoneFormatted</span>
 </a>
 </div>
 </div>
