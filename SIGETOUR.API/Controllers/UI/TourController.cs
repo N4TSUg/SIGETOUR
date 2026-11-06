@@ -66,11 +66,6 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
 
-            if (maxPrice.HasValue && maxPrice.Value > 0)
-            {
-                query = query.Where(t => t.BasePrice <= maxPrice.Value);
-            }
-
             if (!string.IsNullOrWhiteSpace(shift) && shift != "Todos" && shift != "Cualquier Turno")
             {
                 query = query.Where(t => t.Shifts.Any(s => s.ShiftName.ToLower().Contains(shift.ToLower())));
@@ -93,16 +88,28 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
 
-            // Sorting
-            query = sortBy switch
-            {
-                "price-asc" => query.OrderBy(t => t.BasePrice),
-                "price-desc" => query.OrderByDescending(t => t.BasePrice),
-                "title" => query.OrderBy(t => t.Title),
-                _ => query.OrderBy(t => t.Title)
-            };
+            var activeFeatured = await _context.FeaturedPackages
+                .Where(f => f.IsActive)
+                .ToDictionaryAsync(f => f.TourPackageId, f => f);
+            ViewBag.ActiveFeatured = activeFeatured;
 
             var tours = await query.ToListAsync();
+
+            if (maxPrice.HasValue && maxPrice.Value > 0)
+            {
+                tours = tours.Where(t =>
+                    (activeFeatured.TryGetValue(t.Id, out var f) && f.PromoPrice.HasValue ? f.PromoPrice.Value : t.BasePrice) <= maxPrice.Value
+                ).ToList();
+            }
+
+            // Sorting taking into account promo price
+            tours = sortBy switch
+            {
+                "price-asc" => tours.OrderBy(t => activeFeatured.TryGetValue(t.Id, out var f) && f.PromoPrice.HasValue ? f.PromoPrice.Value : t.BasePrice).ToList(),
+                "price-desc" => tours.OrderByDescending(t => activeFeatured.TryGetValue(t.Id, out var f) && f.PromoPrice.HasValue ? f.PromoPrice.Value : t.BasePrice).ToList(),
+                "title" => tours.OrderBy(t => t.Title).ToList(),
+                _ => tours.OrderBy(t => t.Title).ToList()
+            };
 
             // Load categories with count of active tours
             var categories = await _context.Categories
@@ -110,11 +117,6 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(c => c.TourPackages)
                 .OrderBy(c => c.DisplayOrder)
                 .ToListAsync();
-
-            var activeFeatured = await _context.FeaturedPackages
-                .Where(f => f.IsActive)
-                .ToDictionaryAsync(f => f.TourPackageId, f => f);
-            ViewBag.ActiveFeatured = activeFeatured;
 
             ViewBag.Categories = categories;
             ViewBag.CurrentQ = q;

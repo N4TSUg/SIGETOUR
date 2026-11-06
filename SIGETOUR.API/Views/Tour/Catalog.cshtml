@@ -11,6 +11,7 @@
     var curDate = ViewBag.CurrentDate as string;
     var curModality = ViewBag.CurrentModality as string;
 
+    var activeFeatured = ViewBag.ActiveFeatured as Dictionary<Guid, SIGETOUR.API.Core.Entities.FeaturedPackage>;
     var featuredTour = Model?.FirstOrDefault(t => t.Images != null && t.Images.Any(i => i.IsMain)) 
         ?? Model?.FirstOrDefault(t => t.Images != null && t.Images.Any())
         ?? Model?.FirstOrDefault();
@@ -19,7 +20,11 @@
         ?? "/images/tours/0fca1e9d-4750-4257-b311-1846dec19498_1787801341422.jpg";
     var featuredTourTitle = featuredTour?.Title ?? "Cumbemayo & Bosque de Piedras";
     var featuredTourCategory = featuredTour?.Category?.Name ?? "Arqueología y Naturaleza";
-    var featuredTourPrice = featuredTour != null ? featuredTour.BasePrice.ToString("0.00") : "40.00";
+
+    var heroFp = (featuredTour != null && activeFeatured != null && activeFeatured.TryGetValue(featuredTour.Id, out var hFp)) ? hFp : null;
+    var heroEffectivePrice = (heroFp != null && heroFp.PromoPrice.HasValue) ? heroFp.PromoPrice.Value : (featuredTour?.BasePrice ?? 40.00m);
+    var hasHeroPromo = heroFp != null && heroFp.PromoPrice.HasValue && heroFp.PromoPrice.Value < (featuredTour?.BasePrice ?? 0);
+    var featuredTourPrice = heroEffectivePrice.ToString("0.00");
     var featuredTourDuration = featuredTour?.Duration ?? "4 Horas (Medio Día)";
     var featuredTourSlug = featuredTour?.Slug ?? "cumbemayo-bosque-de-piedras";
     var totalTours = Model?.Count() ?? 0;
@@ -108,10 +113,20 @@
               </span>
             </div>
             <div class="text-right shrink-0">
-              <span class="text-[9px] uppercase tracking-wider text-white/70 block">Desde</span>
-              <span class="text-base sm:text-lg font-extrabold text-tertiary-fixed drop-shadow-sm">
-                S/ @featuredTourPrice
-              </span>
+              @if (hasHeroPromo)
+              {
+                <span class="text-[9px] uppercase tracking-wider text-amber-300 block line-through">Antes S/ @(featuredTour?.BasePrice.ToString("0.00"))</span>
+                <span class="text-base sm:text-lg font-extrabold text-amber-400 drop-shadow-sm">
+                  S/ @featuredTourPrice
+                </span>
+              }
+              else
+              {
+                <span class="text-[9px] uppercase tracking-wider text-white/70 block">Desde</span>
+                <span class="text-base sm:text-lg font-extrabold text-tertiary-fixed drop-shadow-sm">
+                  S/ @featuredTourPrice
+                </span>
+              }
             </div>
           </div>
         </div>
@@ -373,7 +388,6 @@ Garantías de Viaje Chilón
                 <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
                     <span class="bg-surface-container-lowest/90 backdrop-blur text-primary text-[11px] font-bold px-2 py-1 rounded-md shadow-sm">Acreditado DIRCETUR</span>
                     @{
-                        var activeFeatured = ViewBag.ActiveFeatured as Dictionary<Guid, SIGETOUR.API.Core.Entities.FeaturedPackage>;
                         var fp = (activeFeatured != null && activeFeatured.TryGetValue(tour.Id, out var fItem)) ? fItem : null;
                     }
                     @if (fp != null && !string.IsNullOrEmpty(fp.PromoBadge) && fp.PromoBadge != "none")
@@ -404,11 +418,25 @@ Garantías de Viaje Chilón
                 </div>
                 <div class="pt-4 border-t border-outline-variant/60 flex items-center justify-between">
                     <div>
-                        <span class="text-[11px] uppercase tracking-wider text-secondary block">Precio por pasajero</span>
-                        <div class="flex items-baseline gap-1">
-                            <span class="text-headline-md font-headline-md font-extrabold text-tertiary">S/ @tour.BasePrice.ToString("0.00")</span>
-                            <span class="text-xs text-outline">PEN</span>
-                        </div>
+                        @if (fp != null && fp.PromoPrice.HasValue && fp.PromoPrice.Value < tour.BasePrice)
+                        {
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wider">Oferta</span>
+                                <span class="text-[11px] text-outline line-through font-semibold">Antes S/ @tour.BasePrice.ToString("0.00")</span>
+                            </div>
+                            <div class="flex items-baseline gap-1">
+                                <span class="text-headline-md font-headline-md font-extrabold text-primary">S/ @fp.PromoPrice.Value.ToString("0.00")</span>
+                                <span class="text-xs text-outline font-semibold">PEN</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <span class="text-[11px] uppercase tracking-wider text-secondary block">Precio por pasajero</span>
+                            <div class="flex items-baseline gap-1">
+                                <span class="text-headline-md font-headline-md font-extrabold text-tertiary">S/ @tour.BasePrice.ToString("0.00")</span>
+                                <span class="text-xs text-outline">PEN</span>
+                            </div>
+                        }
                     </div>
                     <div class="flex items-center gap-2">
                         <a href="/Tour/Details/@tour.Slug" class="p-2 border border-outline-variant hover:border-primary text-secondary hover:text-primary rounded-lg text-xs font-bold transition-all" title="Ver Itinerario Completo">
