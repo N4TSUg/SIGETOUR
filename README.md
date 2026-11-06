@@ -211,23 +211,100 @@ El servicio está configurado para integración y despliegue continuo (CI/CD) au
   cd SIGETOUR/out && ./SIGETOUR.API
   ```
 
-### Matriz de Variables de Entorno en Render
+### Matriz Completa de Variables de Entorno (.env / Render)
 
-| Variable | Descripción | Valor de Ejemplo / Formato |
-| :--- | :--- | :--- |
-| `ASPNETCORE_ENVIRONMENT` | Modo de ejecución del framework | `Production` |
-| `PORT` | Puerto asignado dinámicamente por Render | `80` (o automático) |
-| `DATABASE_URL` | Cadena de conexión URI a PostgreSQL | `postgres://<usuario>:<password>@<host>:5432/<nombre_db>` |
-| `CLOUDINARY_URL` | Cadena de conexión de Cloudinary | `cloudinary://<api_key>:<api_secret>@<cloud_name>` |
-| `Cloudinary__CloudName` | Nombre del Cloud en Cloudinary | `<tu_cloud_name>` |
-| `Cloudinary__ApiKey` | Clave API pública de Cloudinary | `<tu_api_key>` |
-| `Cloudinary__ApiSecret` | Clave API secreta de Cloudinary | `<tu_api_secret>` |
-| `Culqi__PublicKey` | Clave pública de pasarela Culqi | `pk_test_<tu_public_key>` |
-| `Culqi__SecretKey` | Clave secreta de pasarela Culqi | `sk_test_<tu_secret_key>` |
-| `EmailSettings__Host` | Servidor SMTP para correos | `smtp.gmail.com` |
-| `EmailSettings__Port` | Puerto SMTP TLS | `587` |
-| `EmailSettings__SenderEmail` | Correo remitente oficial | `contacto@tuempresa.com` |
-| `EmailSettings__Password` | Contraseña de aplicación SMTP | `<tu_password_smtp>` |
+A continuación se detalla la nómina completa de variables de entorno requeridas por la aplicación, organizadas por módulo funcional. Todos los valores sensibles están enmascarados con marcadores para proteger las credenciales:
+
+| Categoría | Variable | Descripción | Valor / Formato de Ejemplo |
+| :--- | :--- | :--- | :--- |
+| **Servidor** | `ASPNETCORE_ENVIRONMENT` | Entorno de ejecución de ASP.NET Core | `Production` / `Development` |
+| **Servidor** | `PORT` | Puerto HTTP dinámico del contenedor | `80` (o asignado por Render) |
+| **Base de Datos** | `DATABASE_URL` | Cadena de conexión URI a PostgreSQL | `postgresql://<user>:<password>@<host>/<database>?sslmode=require` |
+| **Seguridad** | `Jwt__Key` | Clave secreta para firma de tokens JWT | `<clave_secreta_jwt_minimo_256_bits>` |
+| **Seguridad** | `Payments__CheckoutSigningKey` | Llave HMAC para firma de checkout | `<clave_secreta_checkout_base64_32bytes>` |
+| **Pagos Culqi** | `Culqi__PublicKey` | Llave pública de integración Culqi | `pk_test_<tu_public_key>` |
+| **Pagos Culqi** | `Culqi__SecretKey` | Llave privada secreta de Culqi | `sk_test_<tu_secret_key>` |
+| **Pagos Culqi** | `Culqi__WebhookUser` | Usuario para autenticación de Webhook | `<usuario_webhook_culqi>` |
+| **Pagos Culqi** | `Culqi__WebhookPassword` | Contraseña para autenticación de Webhook | `<password_webhook_culqi>` |
+| **Facturación** | `Nubefact__Ruta` | Endpoint API del PSE Nubefact | `https://api.nubefact.com/api/v1/<tu_identificador>` |
+| **Facturación** | `Nubefact__Token` | Token de autorización de Nubefact | `<tu_token_autorizacion_nubefact>` |
+| **Facturación** | `Nubefact__Mode` | Modo de facturación SUNAT | `Demo` / `Production` |
+| **Facturación** | `Nubefact__BoletaSeries` | Serie oficial para Boletas Electrónicas | `BBB1` |
+| **Facturación** | `Nubefact__FacturaSeries` | Serie oficial para Facturas Electrónicas | `FFF1` |
+| **Multimedia** | `Cloudinary__CloudName` | Nombre de cuenta Cloudinary | `<tu_cloud_name>` |
+| **Multimedia** | `Cloudinary__ApiKey` | Clave API pública de Cloudinary | `<tu_api_key>` |
+| **Multimedia** | `Cloudinary__ApiSecret` | Clave API secreta de Cloudinary | `<tu_api_secret>` |
+| **Multimedia** | `CLOUDINARY_URL` *(Opcional)* | Conexión en una sola línea | `cloudinary://<api_key>:<api_secret>@<cloud_name>` |
+| **Correos SMTP** | `SMTP_HOST` | Servidor SMTP para envío de vouchers | `smtp.gmail.com` |
+| **Correos SMTP** | `SMTP_PORT` | Puerto de conexión SMTP TLS | `587` |
+| **Correos SMTP** | `SMTP_USER` | Usuario o correo remitente SMTP | `<tu_correo_emisor@gmail.com>` |
+| **Correos SMTP** | `SMTP_PASSWORD` | Contraseña de aplicación SMTP | `<tu_contraseña_aplicacion_smtp>` |
+| **Correos SMTP** | `SMTP_ENABLE_SSL` | Habilitación de cifrado SSL/TLS | `true` |
+| **Correos SMTP** | `SMTP_FROM_NAME` | Nombre visible del remitente | `"Turismo Chilón Cajamarca"` |
+| **Correos Brevo** | `BREVO_API_KEY` | Llave API para transaccional Brevo | `<tu_api_key_de_brevo>` |
+| **Empresa** | `Company__TradeName` | Nombre comercial de la agencia | `"TURISMO CHILÓN"` |
+| **Empresa** | `Company__LegalName` | Razón social oficial | `"TRANSPORTE & TURISMO CAJAMARCA S.A.C."` |
+| **Empresa** | `Company__Ruc` | Registro Único de Contribuyente | `20601248901` |
+| **Empresa** | `Company__FiscalAddress` | Domicilio fiscal y base operativa | `"Jr. 2 de Mayo 569, Cajamarca - Perú"` |
+| **Empresa** | `Company__Phone` | Central telefónica de atención | `"+51 928 876 259 / +51 944 746 364"` |
+| **Empresa** | `Company__WhatsApp` | Número WhatsApp principal | `928876259` |
+| **Empresa** | `Company__WhatsAppSecondary` | Número WhatsApp de soporte | `944746364` |
+| **Empresa** | `Company__Email` | Correo corporativo institucional | `informes@turismochilon.com` |
+
+---
+
+### Plantilla de Archivo `.env` (Para Entorno Local / Desarrollo)
+
+Puedes crear un archivo `.env` o `.env.local` en la raíz del proyecto copiando esta estructura y completando los valores entre `<...>`:
+
+```ini
+# --- ENTORNO Y HOSTING ---
+ASPNETCORE_ENVIRONMENT=Production
+
+# --- BASE DE DATOS POSTGRESQL ---
+DATABASE_URL="postgresql://<db_user>:<db_password>@<db_host>/<db_name>?sslmode=require"
+
+# --- SEGURIDAD Y TOKENS ---
+Jwt__Key="<clave_secreta_jwt_min_256_bits>"
+Payments__CheckoutSigningKey="<clave_firma_hmac_checkout_32bytes>"
+
+# --- PASARELA DE PAGOS CULQI ---
+Culqi__PublicKey="pk_test_<tu_public_key>"
+Culqi__SecretKey="sk_test_<tu_secret_key>"
+Culqi__WebhookUser="<usuario_webhook_culqi>"
+Culqi__WebhookPassword="<password_webhook_culqi>"
+
+# --- FACTURACIÓN ELECTRÓNICA SUNAT (NUBEFACT) ---
+Nubefact__Ruta="https://api.nubefact.com/api/v1/<tu_identificador>"
+Nubefact__Token="<tu_token_autorizacion_nubefact>"
+Nubefact__Mode="Demo"
+Nubefact__BoletaSeries="BBB1"
+Nubefact__FacturaSeries="FFF1"
+
+# --- ALMACENAMIENTO MULTIMEDIA (CLOUDINARY) ---
+Cloudinary__CloudName="<tu_cloud_name>"
+Cloudinary__ApiKey="<tu_api_key>"
+Cloudinary__ApiSecret="<tu_api_secret>"
+
+# --- NOTIFICACIONES Y CORREOS (SMTP / GMAIL / BREVO) ---
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="<tu_correo_emisor@gmail.com>"
+SMTP_PASSWORD="<tu_contraseña_aplicacion_smtp>"
+SMTP_ENABLE_SSL=true
+SMTP_FROM_NAME="Turismo Chilón Cajamarca"
+BREVO_API_KEY="<tu_api_key_de_brevo>"
+
+# --- IDENTIDAD INSTITUCIONAL (TURISMO CHILÓN S.A.C.) ---
+Company__TradeName="TURISMO CHILÓN"
+Company__LegalName="TRANSPORTE & TURISMO CAJAMARCA S.A.C."
+Company__Ruc="20601248901"
+Company__FiscalAddress="Jr. 2 de Mayo 569, Cajamarca - Perú"
+Company__Phone="+51 928 876 259 / +51 944 746 364"
+Company__WhatsApp="928876259"
+Company__WhatsAppSecondary="944746364"
+Company__Email="informes@turismochilon.com"
+```
 
 ---
 
