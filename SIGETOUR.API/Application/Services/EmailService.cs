@@ -46,11 +46,12 @@ namespace SIGETOUR.API.Application.Services
         {
             get
             {
-                return Environment.GetEnvironmentVariable("SMTP_USER")
+                var email = Environment.GetEnvironmentVariable("SMTP_USER")
                     ?? Environment.GetEnvironmentVariable("SMTP_EMAIL")
                     ?? _config["EmailSettings:SenderEmail"]
                     ?? _config["EmailSettings:User"]
                     ?? "enriquearana1402@gmail.com";
+                return email.Trim();
             }
         }
 
@@ -77,10 +78,17 @@ namespace SIGETOUR.API.Application.Services
             }
         }
 
-        private string SmtpPassword => Environment.GetEnvironmentVariable("SMTP_PASSWORD")
-            ?? Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD")
-            ?? _config["EmailSettings:Password"]
-            ?? "";
+        private string SmtpPassword
+        {
+            get
+            {
+                var val = Environment.GetEnvironmentVariable("SMTP_PASSWORD")
+                    ?? Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD")
+                    ?? _config["EmailSettings:Password"]
+                    ?? "";
+                return val.Replace(" ", "").Trim();
+            }
+        }
 
         private bool EnableSsl
         {
