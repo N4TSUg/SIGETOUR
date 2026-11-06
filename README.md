@@ -1,7 +1,7 @@
 # SIGETOUR - Turismo Chilón S.A.C.
 > **Sistema Integrado de Gestión de Tours, Despacho Operativo y Control de Flota**  
-> *Cajamarca, Perú • Acreditado por MINCETUR & DIRCETUR (Cert. N° 4412)*  
-> **Despliegue Oficial en Producción:** [https://sigetour.onrender.com](https://sigetour.onrender.com)
+> *Cajamarca, Perú • Acreditado por MINCETUR & DIRCETUR (Certificado N° 4412)*  
+> 🌐 **Plataforma Oficial en Producción:** [https://sigetour.onrender.com](https://sigetour.onrender.com)
 
 [![.NET 10.0](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2B-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -13,85 +13,151 @@
 
 ---
 
-## 📌 Descripción General
-**SIGETOUR** es una solución web empresarial desarrollada a medida para la empresa de transporte y turismo **Turismo Chilón S.A.C.** (RUC: 20601248901), con sede central en Jr. 2 de Mayo 569, Cajamarca, Perú.
+## 📌 1. Descripción General del Proyecto
+**SIGETOUR** es una plataforma web empresarial integral diseñada y desarrollada a medida para **Turismo Chilón S.A.C.** (RUC: 20601248901), empresa líder de transporte turístico con sede central en Jr. 2 de Mayo 569, Cajamarca, Perú.
 
-El sistema resuelve integralmente dos áreas estratégicas:
-1. **Área Comercial & Turista:** Catálogo interactivo de circuitos turísticos, promociones dinámicas, catálogo oficial de flota vehicular, checkout responsivo en pasos y emisión de Vouchers de Reserva Oficiales listos para imprimir o compartir vía WhatsApp.
-2. **Operaciones Internas & Despacho:** Programación de salidas en vivo con semáforo de estados (*En Espera, Abordando, En Ruta, Completado*), asignación inteligente de flota vehicular según volumen de pasajeros, padrón de conductores MTC, control de caja chica con arqueo de turnos y generación en un clic del **Manifiesto de Pasajeros Oficial en Excel (.xlsx)** exigido por DIRCETUR y SUTRAN.
+La plataforma resuelve y unifica la cadena de valor turística en dos grandes frentes:
+
+```mermaid
+flowchart LR
+    A["Turista / Pasajero"] --> B["Portal Comercial Web"]
+    B --> C["Catálogo Interactivo de Tours & Flota"]
+    C --> D["Checkout Guiado en 3 Pasos"]
+    D --> E["Pago Online Culqi / Tarjetas"]
+    E --> F["Voucher Digital QR + WhatsApp + PDF"]
+    
+    F --> G["Panel de Operaciones SIGETOUR"]
+    G --> H["Despacho en Vivo & Semáforo de Salidas"]
+    H --> I["Asignación Eficiente de Flota & Chofer MTC"]
+    I --> J["Manifiesto Oficial en Excel (DIRCETUR/SUTRAN)"]
+    G --> K["Caja Chica & Arqueo de Turnos Diarios"]
+    G --> L["Facturación Electrónica SUNAT (Nubefact)"]
+```
 
 ---
 
-## 🔐 Acceso al Sistema y Credenciales
+## 🔐 2. Accesos Oficiales y Credenciales del Sistema
 
-### URLs Oficiales
-* **Servidor de Producción (Render):** [https://sigetour.onrender.com](https://sigetour.onrender.com)
-* **Servidor Local (Desarrollo):** `https://localhost:7103` (o `http://localhost:5047`)
-* **Inicio de Sesión Administrativo:** `/Account/Login`
-* **Panel de Operaciones / Dashboard:** `/Admin/Dashboard`
-* **Catálogo Público de Tours:** `/Tour/Catalog`
-* **Catálogo Público de Flota:** `/Vehicle/Catalog`
+### URLs del Ecosistema
+| Entorno | Servicio | URL |
+| :--- | :--- | :--- |
+| **Producción** | Portal Web Principal | [https://sigetour.onrender.com](https://sigetour.onrender.com) |
+| **Producción** | Panel de Operaciones | [https://sigetour.onrender.com/Admin/Dashboard](https://sigetour.onrender.com/Admin/Dashboard) |
+| **Producción** | Inicio de Sesión | [https://sigetour.onrender.com/Account/Login](https://sigetour.onrender.com/Account/Login) |
+| **Local (Dev)** | Portal Web Principal | `https://localhost:7103` (o `http://localhost:5047`) |
+| **Local (Dev)** | Inicio de Sesión | `https://localhost:7103/Account/Login` |
 
 ### Credenciales de Acceso Sembradas por Defecto
+El sistema cuenta con un seeder criptográfico automático (`IdentitySeeder`) que inicializa los roles y credenciales administrativas si no existen en la base de datos:
 
-| Rol | Usuario | Correo Corporativo | Contraseña | Alcance de Permisos |
+| Rol | Usuario | Correo Electrónico | Contraseña | Nivel de Privilegios |
 | :--- | :--- | :--- | :--- | :--- |
-| **SuperAdmin** | `superadmin` | `superadmin@sigetour.com` | `SuperAdmin123!` | Control total, auditoría, configuración de sistema y gestión de usuarios. |
-| **Admin** | `admin` | `admin@sigetour.com` | `Admin123!` | Administración de tours, despacho de salidas, control de flota, caja chica y reservas. |
-
-> *Nota: Al iniciar la aplicación por primera vez, el seeder crea automáticamente los roles y las credenciales si no existen.*
+| **SuperAdmin** | `superadmin` | `superadmin@sigetour.com` | `SuperAdmin123!` | Control maestro total: gestión de usuarios, roles, auditoría y configuración global. |
+| **Admin** | `admin` | `admin@sigetour.com` | `Admin123!` | Administración de tours, despacho operativo, control de flota, caja chica y reservas. |
 
 ---
 
-## 🚀 Arquitectura y Stack Tecnológico
+## 🏛️ 3. Módulos y Capacidades del Sistema
 
-* **Backend:** ASP.NET Core 10 (C# 13) con arquitectura orientada a servicios, controladores MVC y endpoints RESTful.
-* **Persistencia & ORM:** Entity Framework Core 10 con soporte nativo PostgreSQL (`Npgsql.EntityFrameworkCore.PostgreSQL`).
-* **Base de Datos:** PostgreSQL en la nube (Neon / Render) con migraciones automáticas al iniciar.
-* **Seguridad & Autenticación:** ASP.NET Core Identity con esquema Cookie Authentication persistente y protección contra CSRF (`[ValidateAntiForgeryToken]`).
-* **Frontend:** Razor Views (.cshtml), Tailwind CSS v3 con diseño responsivo mobile-first, Material Symbols Outlined y JavaScript ES6+ modular.
-* **Accesibilidad & Calidad:** Cumplimiento de estándares WCAG 2.1 AA auditados por SonarQube Cloud (etiquetas nativas `<button>`, `<label>` semánticas, navegación accesible por teclado).
-* **Reportería Oficial:** ClosedXML para la generación en tiempo real de Manifiestos de Pasajeros y Liquidaciones en hojas de cálculo Excel (`.xlsx`).
-* **Testing:** xUnit, Moq, InMemory DbContext y FluentAssertions con **154 pruebas unitarias automatizadas (100% exitosas)**.
+### 🚍 3.1. Módulo de Flota Vehicular y Conductores
+* **Ficha Técnica Oficial:** Placa, modelo, año de fabricación, número de chasis (VIN), motor, combustible y capacidad de 14 a 19 pasajeros.
+* **Semáforo Normativo de Vencimientos:** Monitoreo y alertas visuales de vigencia para:
+  * SOAT Turístico.
+  * CITV (Certificado de Inspección Técnica Vehicular).
+  * TUC (Tarjeta Única de Circulación emitida por el MTC).
+* **Unidad Insignia (Flagship):** Marcación con botón estelar de la unidad emblemática para representarla en el banner principal del catálogo público.
+* **Galería Multimedia con Visor Lightbox:**
+  * Subida múltiple con soporte **drag-and-drop**.
+  * Selección de foto de portada (`IsCover`).
+  * Visor en pantalla completa con soporte táctil (*swipe*), navegación con flechas del teclado (`←`, `→`), tecla `Esc`, contador dinámico y carrusel inferior de miniaturas.
+* **Padrón de Choferes:** Registro de conductores profesionales con categoría de brevete (A-IIIa, A-IIIc), vigencia y unidad habitual.
 
----
-
-## 📦 Módulos Principales del Sistema
-
-### 1. Despacho en Vivo y Manifiesto de Pasajeros (DIRCETUR / SUTRAN)
-* **Tablero de Salidas del Día:** Monitoreo en tiempo real de salidas filtrables por turno (Mañana / Tarde) y fecha.
-* **Semáforo Operativo:**
-  * 🟡 `Pendiente de Asignación`: Pasajeros confirmados sin vehículo o chofer asignado.
-  * 🟠 `Abordando`: Unidad en punto de embarque recibiendo a los turistas.
+### 🧭 3.2. Módulo de Despacho en Vivo y Manifiesto de Pasajeros (DIRCETUR / SUTRAN)
+* **Tablero de Salidas Diarias:** Monitoreo en tiempo real de salidas filtrables por turno (Mañana / Tarde) y fecha.
+* **Semáforo de Estados de Despacho:**
+  * 🟡 `Pendiente de Asignación`: Pasajeros confirmados sin vehículo ni conductor asignados.
+  * 🟠 `Abordando`: Unidad en base recibiendo pasajeros y verificando identidad.
   * 🟢 `En Ruta`: Vehículo en trayecto hacia el circuito turístico.
-  * ⚪ `Completado`: Tour finalizado y pasajeros retornados a la base.
-* **Asignación Justa de Capacidad:** Permite asignar unidades de 14, 16 o 19 pasajeros en función de las reservas reales para minimizar costos de combustible.
-* **Exportación de Manifiesto en Excel:** Emite el documento reglamentario con datos de la empresa, placa, chofer, número de brevete y nómina completa de turistas con DNI/Pasaporte y asiento.
+  * ⚪ `Completado`: Tour finalizado con retorno a la base operativa.
+* **Asignación Justa de Capacidad:** Permite asignar unidades de 14 o 19 plazas según la demanda real del turno, reduciendo sobrecostos de combustible.
+* **Exportación de Manifiesto Oficial en Excel (`.xlsx`):** Generación automática mediante ClosedXML del formato reglamentario exigido por DIRCETUR y SUTRAN, conteniendo datos de la empresa, placa, chofer, número de brevete y nómina completa de turistas con documento de identidad y asiento.
 
-### 2. Flota Vehicular y Conductores
-* **Ficha Técnica Integral:** Placa, modelo, año de fabricación, tipo de combustible, categoría y capacidad de asientos.
-* **Alertas Normativas:** Monitoreo de vigencia de SOAT Turístico, Revisión Técnica (CITV) y TUC emitido por el MTC.
-* **Unidad Insignia (Flagship):** Selector en panel administrativo para definir qué vehículo representa a la empresa en el encabezado del catálogo de flota.
-* **Galería Fotográfica:** Carga múltiple con drag-and-drop, selección de foto de portada (`IsCover`) y visor **Lightbox de pantalla completa** con navegación por teclado (`←`, `→`, `Esc`) y gestos táctiles.
-* **Padrón de Conductores:** Control de licencias profesionales (A-IIIa, A-IIIc), vigencia y asignación en despacho.
+### 🏞️ 3.3. Módulo de Catálogo Turístico y Paquetes Destacados
+* **Buscador & Filtros Inteligentes:** Búsqueda en vivo por destino/circuito, fecha de viaje, turno (Mañana/Tarde), presupuesto y nivel de exigencia física.
+* **Paquetes Estrella en Portada:** Gestor de paquetes destacados con porcentaje de descuento, tarifa promocional y badge de oferta con fecha de expiración.
+* **Ficha de Tour & Lightbox:** Itinerario detallado con paradas y tiempos estimados, lista de inclusiones/exclusiones (guía, transporte, tickets) y galería interactiva en pantalla completa.
+* **Moderación de Reseñas:** Panel para revisar y aprobar testimonios de turistas antes de su publicación en el portal.
 
-### 3. Catálogo de Tours y Reserva Comercial
-* **Vitrina Dinámica:** Filtros por turno, fecha, presupuesto y nivel de exigencia física.
-* **Tour Recomendado en Hero:** Selector en panel administrativo para fijar la oferta estrella en el banner principal.
-* **Galería Multimedia con Lightbox:** Visor interactivo en pantalla completa para explorar los atractivos de cada circuito antes de reservar.
-* **Checkout Guiado & Voucher Oficial:** Proceso simplificado de compra con emisión de boleto con código QR/código de reserva, desglose de recojo en hotel y enlace directo de asistencia por WhatsApp.
+### 💳 3.4. Módulo de Checkout, Pagos Online y Vouchers de Viaje
+* **Proceso de Compra en 3 Pasos:** Validación en tiempo real de datos del titular, desglose de recojo en hotel céntrico de Cajamarca y políticas de viaje.
+* **Pasarela de Pagos Culqi:** Integración de tarjeta de crédito/débito con tokenización segura, validación 3DS y webhooks con verificación de firma HMAC e idempotencia.
+* **Voucher Oficial de Reserva:**
+  * Código único de reserva con código QR para validación rápida en el abordaje.
+  * Optimizado para impresión limpia en una sola hoja A4.
+  * Botón de compartir directo a WhatsApp con mensaje preconfigurado.
+* **Descarga de Voucher en PDF:** Motor vectorial integrado con `QuestPDF` para generación instantánea de comprobantes descargables.
+* **Notificaciones por Correo:** Envío automatizado de confirmación con voucher adjunto mediante `EmailService`.
 
-### 4. Caja Chica y Turnos de Caja
-* **Fondo Fijo Operativo:** Registro y categorización de egresos (combustible, peajes, compras menores) con soporte de comprobante.
-* **Arqueo y Cierre Diario:** Conciliación entre ingresos por reservas (efectivo/transferencia) y egresos de campo.
+### 💰 3.5. Módulo de Caja Chica y Arqueo Diario de Turnos
+* **Fondo Fijo de Caja Chica:** Registro de egresos operativos menores (combustible, peajes, refrigerios, mantenimiento de ruta) con comprobantes digitalizados y cálculo en tiempo real del gasto pendiente de reposición (`PendingSpent`).
+* **Turnos de Caja Diaria:** Apertura con saldo inicial en efectivo, captura automática de cobros por reservas web/ventanilla, arqueo físico y conciliación de diferencias.
+* **Liquidación Financiera en Excel:** Exportación completa del reporte de caja diaria en formato `.xlsx`.
+
+### 🧾 3.6. Facturación Electrónica SUNAT (Nubefact)
+* Emisión automática de **Boletas de Venta Electrónicas (`BBB1`)** y **Facturas Electrónicas (`FFF1`)** bajo estándar UBL 2.1 de SUNAT.
+* Validación automática de DNI ante RENIEC y RUC ante SUNAT.
+
+### ☁️ 3.7. Almacenamiento Multimedia Permanente (Cloudinary)
+* Almacenamiento desacoplado en la nube en carpetas organizadas (`sigetour/vehicles` y `sigetour/tours`).
+* Optimización automática al vuelo con conversión a formatos ligeros (`.webp`, `.avif`) y compresión inteligente (`q_auto, f_auto`).
+* Eliminación sincronizada: al eliminar una foto en el panel, se remueve de Cloudinary liberando espacio.
+* **Fallback local transparente:** Si no hay credenciales de Cloudinary configuradas, la aplicación guarda automáticamente en el disco local sin interrumpir el funcionamiento.
 
 ---
 
-## ⚙️ Puesta en Marcha Local
+## 🛠️ 4. Stack Tecnológico y Arquitectura
+
+```
+SIGETOUR/
+├── SIGETOUR.API/                     # Proyecto Web ASP.NET Core 10 (MVC + Web API)
+│   ├── Application/                  # Lógica de aplicación, DTOs, Mappings y Servicios
+│   │   ├── DTOs/                     # Objetos de transferencia de datos
+│   │   ├── Interfaces/               # Contratos e interfaces de servicios
+│   │   ├── Invoicing/                # Servicio de facturación electrónica Nubefact
+│   │   ├── Mappings/                 # Perfiles de AutoMapper
+│   │   ├── Options/                  # Clases de configuración fuertemente tipadas (Cloudinary)
+│   │   ├── Payments/                 # Integración Culqi (Tokens, Cargos, Webhooks HMAC)
+│   │   └── Services/                 # Implementaciones (Cloudinary, PDF, Email, Excel)
+│   ├── Controllers/                  # Controladores RESTful API y Controladores UI MVC
+│   │   └── UI/                       # AdminController, BookingController, TourController, etc.
+│   ├── Core/Entities/                # Entidades de dominio y modelo relacional
+│   ├── Infrastructure/Data/          # AppDbContext, configuraciones de EF Core y Seeders
+│   └── Views/                        # Vistas Razor (.cshtml) con Tailwind CSS
+└── SIGETOUR.Tests/                   # Suite de pruebas automatizadas (xUnit + Moq)
+    ├── Audit/                        # Auditoría de hardening y seguridad
+    ├── Controllers/                  # Pruebas de controladores administrativos y públicos
+    ├── Helpers/                      # Factories de DbContext InMemory y Mocks
+    ├── Payments/                     # Pruebas unitarias e integración de Culqi
+    └── Services/                     # Pruebas de Cloudinary, PDF, Despacho y Contacto
+```
+
+* **Lenguaje & Framework:** C# 13 / .NET 10.0 (ASP.NET Core).
+* **ORM:** Entity Framework Core 10 con soporte SplitQuery y migraciones PostgreSQL.
+* **Base de Datos:** PostgreSQL 16+ (soporte para Neon Lakebase Postgres y Render PostgreSQL).
+* **Seguridad:** ASP.NET Core Identity con esquema Cookie persistente, protección CSRF y JWT Bearer.
+* **Frontend:** Razor Views, Tailwind CSS v3 (diseño responsivo mobile-first), Material Symbols Outlined.
+* **Accesibilidad:** WCAG 2.1 AA auditado por SonarQube Cloud (etiquetas semánticas `<button>`, `<label>` asociadas).
+* **Reportería y Documentos:** ClosedXML (`.xlsx`) y QuestPDF (`.pdf`).
+* **Pruebas:** xUnit con **171 pruebas unitarias 100% aprobadas**.
+
+---
+
+## ⚙️ 5. Configuración y Puesta en Marcha Local
 
 ### Prerrequisitos
-* [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-* [PostgreSQL](https://www.postgresql.org/) (versión 14 o superior)
+* [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) instalado.
+* [PostgreSQL](https://www.postgresql.org/) v14 o superior (o una base de datos en Neon/Cloud).
+* Git instalado.
 
 ### Pasos de Instalación
 1. **Clonar el repositorio:**
@@ -101,7 +167,7 @@ El sistema resuelve integralmente dos áreas estratégicas:
    ```
 
 2. **Configurar la base de datos:**
-   Crear o modificar `SIGETOUR.API/appsettings.Development.json` con la cadena de conexión local:
+   En `SIGETOUR.API/appsettings.Development.json` (o en un archivo `.env` en la raíz), configura tu conexión:
    ```json
    {
      "ConnectionStrings": {
@@ -110,30 +176,32 @@ El sistema resuelve integralmente dos áreas estratégicas:
    }
    ```
 
-3. **Restaurar paquetes y compilar:**
+3. **Restaurar dependencias y compilar:**
    ```bash
    dotnet restore
    dotnet build
    ```
 
-4. **Ejecutar la suite de pruebas automatizadas:**
+4. **Ejecutar la suite de pruebas unitarias:**
    ```bash
    dotnet test SIGETOUR.Tests/SIGETOUR.Tests.csproj
    ```
-   *(Verificar que se superen los 154 tests sin errores).*
+   *(Verificar que se ejecuten las 171 pruebas con 0 errores).*
 
 5. **Iniciar la aplicación:**
    ```bash
    dotnet run --project SIGETOUR.API/SIGETOUR.API.csproj
    ```
-   Abrir el navegador en `https://localhost:7103` o `http://localhost:5047`.
+   Abre tu navegador en `https://localhost:7103` o `http://localhost:5047`.  
+   *Las tablas de la base de datos y los usuarios se sembrarán automáticamente al iniciar.*
 
 ---
 
-## ☁️ Despliegue en Producción (Render)
+## 🌐 6. Despliegue en Producción (Render)
 
-El proyecto está configurado para despliegue continuo mediante Git en **Render**:
-* **Runtime:** .NET 10 Web Service en contenedor Linux.
+El servicio está configurado para integración y despliegue continuo (CI/CD) automático desde la rama `main` en **Render**:
+
+* **Entorno:** Web Service Linux (.NET 10).
 * **Build Command:**
   ```bash
   cd SIGETOUR && dotnet publish SIGETOUR.API/SIGETOUR.API.csproj -c Release -o out
@@ -142,37 +210,30 @@ El proyecto está configurado para despliegue continuo mediante Git en **Render*
   ```bash
   cd SIGETOUR/out && ./SIGETOUR.API
   ```
-* **Variables de Entorno Requeridas en Render:**
-  * `ASPNETCORE_ENVIRONMENT`: `Production`
-  * `DATABASE_URL`: Cadena de conexión PostgreSQL (formato URI estándar `postgres://user:password@host:port/database`).
-  * `PORT`: `80` o puerto asignado por Render (el backend mapea automáticamente `PORT` a las URLs de Kestrel).
+
+### Matriz de Variables de Entorno en Render
+
+| Variable | Descripción | Valor de Ejemplo / Formato |
+| :--- | :--- | :--- |
+| `ASPNETCORE_ENVIRONMENT` | Modo de ejecución del framework | `Production` |
+| `PORT` | Puerto asignado dinámicamente por Render | `80` (o automático) |
+| `DATABASE_URL` | Cadena de conexión URI a PostgreSQL | `postgres://user:password@host:5432/sigetour_db` |
+| `CLOUDINARY_URL` | Cadena de conexión de Cloudinary | `cloudinary://<api_key>:<api_secret>@<cloud_name>` |
+| `Cloudinary__CloudName` | Nombre del Cloud en Cloudinary | `dbpt3vklj` |
+| `Cloudinary__ApiKey` | Clave API pública de Cloudinary | `538277629653922` |
+| `Cloudinary__ApiSecret` | Clave API secreta de Cloudinary | `DKuM8Ct8...` |
+| `Culqi__PublicKey` | Clave pública de pasarela Culqi | `pk_test_...` |
+| `Culqi__SecretKey` | Clave secreta de pasarela Culqi | `sk_test_...` |
+| `EmailSettings__Host` | Servidor SMTP para correos | `smtp.gmail.com` |
+| `EmailSettings__Port` | Puerto SMTP TLS | `587` |
+| `EmailSettings__SenderEmail` | Correo remitente oficial | `informes.chilon@gmail.com` |
+| `EmailSettings__Password` | Contraseña de aplicación SMTP | `xxxx xxxx xxxx xxxx` |
 
 ---
 
-## 🖼️ Almacenamiento Multimedia en la Nube (Cloudinary)
+## 📸 7. Banco de Imágenes Oficiales (Recursos de Gerencia)
 
-SIGETOUR integra **Cloudinary** para el almacenamiento permanente, compresión inteligente y distribución CDN de las fotos de tours y vehículos:
-
-### Opciones de Configuración
-
-El servicio admite cualquiera de las dos modalidades de credenciales:
-
-1. **Opción 1: Cadena de conexión única (Recomendada):**
-   * Variable de entorno: `CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>`
-
-2. **Opción 2: Variables individuales:**
-   * En `appsettings.json` o variables de entorno de Render:
-     * `Cloudinary__CloudName` (o `Cloudinary:CloudName`)
-     * `Cloudinary__ApiKey` (o `Cloudinary:ApiKey`)
-     * `Cloudinary__ApiSecret` (o `Cloudinary:ApiSecret`)
-
-> 💡 **Fallback Local Automático:** Si no se proporcionan credenciales de Cloudinary (por ejemplo, en desarrollo local sin conexión a internet), el sistema almacena automáticamente los archivos en `wwwroot/images/` para no bloquear el flujo de trabajo.
-
----
-
-## 📸 Banco de Imágenes Oficiales (Recursos de Gerencia)
-
-Enlaces compartidos por la **Gerencia de Turismo Chilón** con fotografías en alta resolución para la alimentación del catálogo:
+Carpetas oficiales facilitadas por la **Gerencia de Turismo Chilón S.A.C.** para la alimentación fotográfica del catálogo:
 
 1. 🌲 **Granja Porcón:** [Ver fotos en Google Drive](https://drive.google.com/drive/folders/1TuNSSZLvPQlfJ7igR9T0TO_moiK2Vent)
 2. 🎸 **Namora (Guitarras y Laguna San Nicolás):** [Ver fotos en Google Drive](https://drive.google.com/drive/folders/1htID0HCeG4kGQoMv1KxF-8qyeTplrWOQ)
@@ -184,7 +245,7 @@ Enlaces compartidos por la **Gerencia de Turismo Chilón** con fotografías en a
 
 ---
 
-## 📋 Resumen de Circuitos Comerciales Oficiales
+## 📋 8. Resumen de Circuitos Comerciales Oficiales
 
 | N° | Circuito / Tour | Subtítulo / Badge | Horario / Turno | Tarifa Sugerida | Atractivos Principales |
 | :-: | :--- | :--- | :--- | :-: | :--- |
@@ -198,6 +259,6 @@ Enlaces compartidos por la **Gerencia de Turismo Chilón** con fotografías en a
 
 ---
 
-## 📄 Licencia y Derechos
+## 📄 9. Licencia y Derechos de Autor
 Desarrollado para **Turismo Chilón S.A.C.** como parte del Proyecto de Tesis / Capstone de Ingeniería de Software.  
 Todos los derechos reservados © 2025-2026.
