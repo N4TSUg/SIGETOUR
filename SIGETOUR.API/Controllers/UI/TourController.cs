@@ -81,15 +81,15 @@ namespace SIGETOUR.API.Controllers.UI
                 var durLower = duration.Trim().ToLower();
                 if (durLower.Contains("medio") || durLower.Contains("half"))
                 {
-                    query = query.Where(t => t.Duration.ToLower().Contains("medio") || t.Duration.ToLower().Contains("4 hora") || t.Duration.ToLower().Contains("4h") || t.Duration.ToLower().Contains("3"));
+                    query = query.Where(t => t.Duration != null && (t.Duration.ToLower().Contains("medio") || t.Duration.ToLower().Contains("4 hora") || t.Duration.ToLower().Contains("4h") || t.Duration.ToLower().Contains("3")));
                 }
                 else if (durLower.Contains("completo") || durLower.Contains("full"))
                 {
-                    query = query.Where(t => t.Duration.ToLower().Contains("completo") || t.Duration.ToLower().Contains("6") || t.Duration.ToLower().Contains("8") || t.Duration.ToLower().Contains("9") || t.Duration.ToLower().Contains("jornada"));
+                    query = query.Where(t => t.Duration != null && (t.Duration.ToLower().Contains("completo") || t.Duration.ToLower().Contains("6") || t.Duration.ToLower().Contains("8") || t.Duration.ToLower().Contains("9") || t.Duration.ToLower().Contains("jornada")));
                 }
                 else
                 {
-                    query = query.Where(t => t.Duration.ToLower().Contains(durLower));
+                    query = query.Where(t => t.Duration != null && t.Duration.ToLower().Contains(durLower));
                 }
             }
 
