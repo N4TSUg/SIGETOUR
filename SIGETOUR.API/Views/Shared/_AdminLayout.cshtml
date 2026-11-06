@@ -115,6 +115,11 @@
     }
   </script>
 <style>
+    html, body {
+      height: 100% !important;
+      max-height: 100% !important;
+      overflow: hidden !important;
+    }
     .material-symbols-outlined {
       font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
       display: inline-block;
@@ -752,6 +757,12 @@ document.addEventListener('click', function(e) {
         dropdown.classList.add('hidden');
     }
 });
+
+window.addEventListener('scroll', function() {
+    if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+    }
+}, { passive: true });
 </script>
 
 @await RenderSectionAsync("Scripts", required: false)

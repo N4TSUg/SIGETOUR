@@ -246,12 +246,12 @@
                     </div>
 
                     <!-- Upload zone -->
-                    <label for="VehicleImages" class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-outline-variant rounded-xl cursor-pointer hover:bg-surface-container-low transition-colors bg-surface group">
-                        <span class="material-symbols-outlined text-3xl text-outline group-hover:text-primary transition-colors">cloud_upload</span>
+                    <div id="drop-zone" class="relative flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/40 hover:border-primary rounded-xl cursor-pointer hover:bg-surface-container-low/40 transition-colors bg-surface group text-center p-4 select-none" onclick="document.getElementById('VehicleImages').click()">
+                        <input id="VehicleImages" type="file" name="VehicleImages" multiple accept="image/jpeg,image/png,image/webp" class="hidden" onchange="previewImages(this)" />
+                        <span class="material-symbols-outlined text-3xl text-primary group-hover:scale-110 transition-transform">cloud_upload</span>
                         <span class="text-body-sm text-on-surface-variant mt-1 text-center">Arrastra fotos aquí o <span class="text-primary underline font-bold">haz clic para examinar</span></span>
                         <span class="text-label-sm text-outline mt-0.5">JPG, PNG, WebP – máx. 10 MB por foto</span>
-                        <input id="VehicleImages" type="file" name="VehicleImages" multiple accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="previewImages(this)" />
-                    </label>
+                    </div>
 
                     <!-- Preview container -->
                     <div id="image-preview" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 hidden"></div>
@@ -472,6 +472,7 @@
 
     function previewImages(input) {
         const container = document.getElementById('image-preview');
+        if (!container) return;
         container.innerHTML = '';
         if (input.files && input.files.length > 0) {
             container.classList.remove('hidden');
@@ -479,8 +480,19 @@
                 const reader = new FileReader();
                 reader.onload = e => {
                     const div = document.createElement('div');
-                    div.className = 'relative rounded-xl overflow-hidden border border-outline-variant aspect-video bg-surface-container-low';
-                    div.innerHTML = `<img src="${e.target.result}" alt="${file.name}" class="w-full h-full object-cover" /><span class="absolute bottom-1 left-1 bg-surface-container/80 text-label-sm text-on-surface px-1 rounded">${file.name}</span>`;
+                    div.className = 'relative rounded-xl border border-primary/40 overflow-hidden bg-surface-container-low shadow-sm flex flex-col';
+                    div.innerHTML = `
+                        <div class="relative h-32 w-full overflow-hidden bg-surface-container">
+                            <img src="${e.target.result}" alt="${file.name}" class="w-full h-full object-cover">
+                        </div>
+                        <div class="p-2.5 bg-surface-container-lowest flex-1 flex flex-col justify-between gap-1.5">
+                            <span class="text-xs font-semibold text-on-surface truncate block" title="${file.name}">${file.name}</span>
+                            <div class="flex items-center justify-between gap-1 pt-1 border-t border-outline-variant/40">
+                                <span class="px-2 py-0.5 rounded text-[10px] bg-primary/10 text-primary font-bold">Por Guardar</span>
+                                <span class="text-[11px] text-on-surface-variant font-medium">${(file.size / 1024 / 1024).toFixed(1)} MB</span>
+                            </div>
+                        </div>
+                    `;
                     container.appendChild(div);
                 };
                 reader.readAsDataURL(file);
@@ -489,6 +501,38 @@
             container.classList.add('hidden');
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('VehicleImages');
+
+        if (dropZone && fileInput) {
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.add('border-primary', 'bg-surface-container-low/60');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropZone.classList.remove('border-primary', 'bg-surface-container-low/60');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', e => {
+                const dt = e.dataTransfer;
+                const files = dt ? dt.files : null;
+                if (files && files.length > 0) {
+                    fileInput.files = files;
+                    previewImages(fileInput);
+                }
+            }, false);
+        }
+    });
 
     function setCoverVehicleImage(vehicleId, imageId, btnElement) {
         if (!vehicleId || vehicleId === '00000000-0000-0000-0000-000000000000') {
