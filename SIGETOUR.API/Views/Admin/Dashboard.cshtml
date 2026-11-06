@@ -91,8 +91,8 @@
                 @{
                     var todayDeps = Model.Departures.Where(d => d.DepartureDate.Date == DateTime.UtcNow.AddHours(-5).Date).ToList();
                     var enRutaCount = todayDeps.Count(d => d.StatusColor == "emerald");
-                    var abordandoCount = todayDeps.Count(d => d.StatusColor == "amber" || d.StatusColor == "sky");
-                    var enEsperaCount = Math.Max(0, Model.TodayDeparturesCount - enRutaCount - abordandoCount);
+                    var abordandoCount = todayDeps.Count(d => d.StatusColor == "amber");
+                    var enEsperaCount = todayDeps.Count(d => d.StatusColor == "slate" || d.StatusColor == "sky");
                 }
                 <div class="flex flex-wrap gap-1.5 mt-2">
                     @if (Model.TodayDeparturesCount > 0)
@@ -104,7 +104,7 @@
                             <span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span> @abordandoCount abordando
                         </span>
                         <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                            @enEsperaCount en espera
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> @enEsperaCount en espera
                         </span>
                     }
                     else if (!string.IsNullOrEmpty(Model.NextDepartureDateText))

@@ -229,17 +229,58 @@ namespace SIGETOUR.API.Controllers.UI
                         ? veh.SeatCapacity 
                         : (tour.MaxCapacity > 0 ? tour.MaxCapacity : 15);
 
-                    string status;
-                    string statusColor;
-                    if (veh != null || assignedDriver != null)
+                    DateTime depDateTime = depDate;
+                    if (DateTime.TryParse(formattedTime, out var parsedTime))
                     {
-                        status = "Despachado / En Ruta";
-                        statusColor = "emerald";
+                        depDateTime = depDate.Date.Add(parsedTime.TimeOfDay);
                     }
                     else
                     {
-                        status = "Pendiente de Asignación";
-                        statusColor = "amber";
+                        if (formattedTime.Contains("PM", StringComparison.OrdinalIgnoreCase))
+                            depDateTime = depDate.Date.AddHours(14).AddMinutes(30);
+                        else
+                            depDateTime = depDate.Date.AddHours(9).AddMinutes(30);
+                    }
+
+                    var nowPeru = DateTime.UtcNow.AddHours(-5);
+                    string status;
+                    string statusColor;
+
+                    if (veh != null || assignedDriver != null)
+                    {
+                        if (depDate == todayPeru && nowPeru < depDateTime && (depDateTime - nowPeru).TotalMinutes <= 45)
+                        {
+                            status = "Abordando Pasajeros";
+                            statusColor = "amber";
+                        }
+                        else if (depDate == todayPeru && nowPeru >= depDateTime)
+                        {
+                            status = "En Ruta (Despachado)";
+                            statusColor = "emerald";
+                        }
+                        else
+                        {
+                            status = "En Espera (Unidad Asignada)";
+                            statusColor = "sky";
+                        }
+                    }
+                    else
+                    {
+                        if (depDate == todayPeru && nowPeru < depDateTime && (depDateTime - nowPeru).TotalMinutes <= 45 && (depDateTime - nowPeru).TotalMinutes >= 0)
+                        {
+                            status = "Abordando (Por Asignar)";
+                            statusColor = "amber";
+                        }
+                        else if (depDate == todayPeru && nowPeru >= depDateTime)
+                        {
+                            status = "En Ruta (Despacho Pendiente)";
+                            statusColor = "emerald";
+                        }
+                        else
+                        {
+                            status = "En Espera (Programada)";
+                            statusColor = "slate";
+                        }
                     }
 
                     string formattedDateStr;
