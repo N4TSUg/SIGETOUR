@@ -1,5 +1,16 @@
 @model IEnumerable<SIGETOUR.API.Core.Entities.TourPackage>
-@{ Layout = "_Layout"; }
+@{ 
+    Layout = "_Layout"; 
+    var curCatId = ViewBag.CurrentCategoryId as Guid?;
+    var curDuration = ViewBag.CurrentDuration as string;
+    var curShift = ViewBag.CurrentShift as string;
+    var curDifficulty = ViewBag.CurrentDifficulty as string;
+    var curMaxPrice = ViewBag.CurrentMaxPrice as decimal?;
+    var curSortBy = ViewBag.CurrentSortBy as string;
+    var curQ = ViewBag.CurrentQ as string;
+    var curDate = ViewBag.CurrentDate as string;
+    var curModality = ViewBag.CurrentModality as string;
+}
 <main class="flex-1">
 <!-- HERO SECTION: Destinos y Circuitos Turísticos -->
 <section class="relative bg-gradient-to-b from-surface-container-low via-surface to-surface-bright py-12 md:py-16 border-b border-outline-variant/60">
@@ -7,8 +18,8 @@
 <!-- Breadcrumb & Badge -->
 <div class="flex flex-wrap items-center gap-2 mb-4">
 <span class="px-3 py-1 bg-surface-container text-primary text-label-sm font-label-sm rounded-full border border-primary/20 flex items-center gap-1">
-<span class="material-symbols-outlined text-[14px]">explore</span> Catálogo Oficial 2025
-          </span>
+<span class="material-symbols-outlined text-[14px]">explore</span> Catálogo Oficial 2026
+</span>
 <span class="text-outline text-xs">/</span>
 <span class="text-secondary text-body-sm font-body-sm">Cajamarca, Perú</span>
 <span class="text-outline text-xs">/</span>
@@ -17,9 +28,9 @@
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-end">
 <div class="lg:col-span-8">
 <h1 class="text-headline-lg md:text-display-lg font-display-lg text-inverse-surface tracking-tight leading-tight mb-4">
-              Explora los Mejores Destinos y Circuitos Turísticos de Cajamarca
-            </h1>
-<p class="text-body-lg font-body-lg text-on-surface-variant max-w-3xl leading-relaxed">Viaja seguro con nuestra moderna flota de Mercedes-Benz Sprinter y Toyota HiAce, asistencia permanente y cobertura SOAT turística integral con asistencia permanente.</p>
+  Explora los Mejores Destinos y Circuitos Turísticos de Cajamarca
+</h1>
+<p class="text-body-lg font-body-lg text-on-surface-variant max-w-3xl leading-relaxed">Viaja seguro con nuestra moderna flota de Mercedes-Benz Sprinter y Toyota HiAce, guías certificados y cobertura SOAT turística integral con asistencia permanente.</p>
 </div>
 <!-- Mini trust counters -->
 <div class="lg:col-span-4 flex lg:justify-end">
@@ -40,20 +51,32 @@
 <!-- FAST ROUTE SEARCH BAR -->
 <div class="mt-8 bg-surface-container-lowest rounded-2xl p-4 md:p-5 shadow-lg border border-outline-variant/80">
 <form method="get" action="@Url.Action("Catalog", "Tour")" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 md:gap-4 items-center">
-@if (ViewBag.CurrentCategoryId != null)
+@if (curCatId.HasValue)
 {
-    <input type="hidden" name="categoryId" value="@ViewBag.CurrentCategoryId" />
+    <input type="hidden" name="categoryId" value="@curCatId" />
 }
-@if (ViewBag.CurrentSortBy != null)
+@if (!string.IsNullOrEmpty(curSortBy))
 {
-    <input type="hidden" name="sortBy" value="@ViewBag.CurrentSortBy" />
+    <input type="hidden" name="sortBy" value="@curSortBy" />
+}
+@if (!string.IsNullOrEmpty(curDuration))
+{
+    <input type="hidden" name="duration" value="@curDuration" />
+}
+@if (!string.IsNullOrEmpty(curDifficulty))
+{
+    <input type="hidden" name="difficulty" value="@curDifficulty" />
+}
+@if (curMaxPrice.HasValue)
+{
+    <input type="hidden" name="maxPrice" value="@curMaxPrice" />
 }
 <!-- Search Destination -->
 <div class="lg:col-span-4">
 <label for="q" class="block text-label-sm font-label-sm text-secondary mb-1">Destino o Circuito</label>
 <div class="relative flex items-center">
 <span class="material-symbols-outlined absolute left-3 text-secondary text-[20px]">tour</span>
-<input id="q" name="q" value="@ViewBag.CurrentQ" class="w-full pl-10 pr-4 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface placeholder:text-outline outline-none" placeholder="Ej. Cumbemayo, Otuzco, Porcón..." type="text">
+<input id="q" name="q" value="@curQ" class="w-full pl-10 pr-4 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface placeholder:text-outline outline-none" placeholder="Ej. Cumbemayo, Otuzco, Porcón..." type="text">
 </div>
 </div>
 <!-- Date Selector -->
@@ -61,7 +84,7 @@
 <label for="date" class="block text-label-sm font-label-sm text-secondary mb-1">Fecha del Tour</label>
 <div class="relative flex items-center">
 <span class="material-symbols-outlined absolute left-3 text-secondary text-[20px]">calendar_month</span>
-<input id="date" name="date" class="w-full pl-10 pr-3 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface outline-none" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@(string.IsNullOrEmpty(ViewBag.CurrentDate) ? DateTime.Today.ToString("yyyy-MM-dd") : ViewBag.CurrentDate)">
+<input id="date" name="date" class="w-full pl-10 pr-3 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface outline-none" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" value="@(string.IsNullOrEmpty(curDate) ? DateTime.Today.ToString("yyyy-MM-dd") : curDate)">
 </div>
 </div>
 <!-- Turno / Horario -->
@@ -70,9 +93,9 @@
 <div class="relative flex items-center">
 <span class="material-symbols-outlined absolute left-3 text-secondary text-[20px]">schedule</span>
 <select id="shift" name="shift" class="w-full pl-10 pr-8 py-2.5 bg-surface-bright/50 border border-outline-variant rounded-lg text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 text-on-surface outline-none appearance-none">
-<option value="Todos" selected="@(ViewBag.CurrentShift == "Todos" || string.IsNullOrEmpty(ViewBag.CurrentShift))">Cualquier Turno</option>
-<option value="Mañana" selected="@(ViewBag.CurrentShift == "Mañana")">Mañana (09:00 AM - 09:30 AM)</option>
-<option value="Tarde" selected="@(ViewBag.CurrentShift == "Tarde")">Tarde (02:30 PM - 03:30 PM)</option>
+<option value="Todos" selected="@(curShift == "Todos" || string.IsNullOrEmpty(curShift))">Cualquier Turno</option>
+<option value="Mañana" selected="@(curShift == "Mañana")">Mañana (09:00 AM - 09:30 AM)</option>
+<option value="Tarde" selected="@(curShift == "Tarde")">Tarde (02:30 PM - 03:30 PM)</option>
 </select>
 <span class="material-symbols-outlined absolute right-3 pointer-events-none text-secondary text-[18px]">expand_more</span>
 </div>
@@ -109,21 +132,18 @@
 <span class="font-bold">Filtrar Circuitos</span>
 </div>
 <a href="@Url.Action("Catalog", "Tour")" class="text-label-sm text-tertiary hover:underline font-semibold cursor-pointer">
-              Limpiar Filtros
+  Limpiar Filtros
 </a>
 </div>
 <div class="space-y-6 pt-5">
 <!-- Category Filter -->
 <div>
 <h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-3 flex items-center justify-between">
-<span class="">Categoría</span>
+<span>Categoría</span>
 <span class="text-[11px] text-outline font-normal">@Model.Count() tours</span>
 </h2>
 <div class="space-y-1.5 text-body-sm">
-@{
-    var curCatId = ViewBag.CurrentCategoryId as Guid?;
-}
-<a href="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, modality = ViewBag.CurrentModality, difficulty = ViewBag.CurrentDifficulty, maxPrice = ViewBag.CurrentMaxPrice, sortBy = ViewBag.CurrentSortBy })" class="flex items-center justify-between cursor-pointer group p-1.5 rounded-lg hover:bg-surface-container-low transition-colors @(!curCatId.HasValue ? "font-bold text-primary bg-surface-container-low" : "text-on-surface")">
+<a href="@Url.Action("Catalog", "Tour", new { q = curQ, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = curSortBy })" class="flex items-center justify-between cursor-pointer group p-1.5 rounded-lg hover:bg-surface-container-low transition-colors @(!curCatId.HasValue ? "font-bold text-primary bg-surface-container-low" : "text-on-surface")">
 <div class="flex items-center gap-2">
 <span class="w-2 h-2 rounded-full @(!curCatId.HasValue ? "bg-primary" : "bg-outline-variant")"></span>
 <span class="group-hover:text-primary transition-colors font-medium">Todos los Circuitos</span>
@@ -135,7 +155,7 @@
     foreach (var cat in (IEnumerable<SIGETOUR.API.Core.Entities.Category>)ViewBag.Categories)
     {
         var isSelected = curCatId == cat.Id;
-        <a href="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = cat.Id, date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, modality = ViewBag.CurrentModality, difficulty = ViewBag.CurrentDifficulty, maxPrice = ViewBag.CurrentMaxPrice, sortBy = ViewBag.CurrentSortBy })" class="flex items-center justify-between cursor-pointer group p-1.5 rounded-lg hover:bg-surface-container-low transition-colors @(isSelected ? "font-bold text-primary bg-primary-container/20" : "text-on-surface-variant hover:text-primary")">
+        <a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = cat.Id, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = curSortBy })" class="flex items-center justify-between cursor-pointer group p-1.5 rounded-lg hover:bg-surface-container-low transition-colors @(isSelected ? "font-bold text-primary bg-primary-container/20" : "text-on-surface-variant hover:text-primary")">
             <div class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[16px] @(isSelected ? "text-primary" : "text-outline")">@(string.IsNullOrWhiteSpace(cat.Icon) ? "landscape" : cat.Icon)</span>
                 <span>@cat.Name</span>
@@ -146,71 +166,88 @@
 }
 </div>
 </div>
-<!-- Duración -->
+<!-- Duración del Recorrido -->
 <div class="pt-4 border-t border-outline-variant/60">
-<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-3">Duración del Recorrido</h2>
+<div class="flex items-center justify-between mb-3">
+  <h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary">Duración del Recorrido</h2>
+  @if (!string.IsNullOrEmpty(curDuration) && curDuration != "Todos")
+  {
+    <a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = "", sortBy = curSortBy })" class="text-[11px] text-primary hover:underline font-semibold">Todas</a>
+  }
+</div>
 <div class="grid grid-cols-2 gap-2 text-body-sm">
-<button class="px-3 py-2 border border-primary bg-surface-container-low text-primary font-semibold rounded-lg text-center text-xs transition-all" type="button">
-                  Medio Día <span class="block text-[10px] font-normal text-secondary">3 - 4.5 hrs</span>
-</button>
-<button class="px-3 py-2 border border-outline-variant hover:border-primary text-secondary rounded-lg text-center text-xs transition-all" type="button">
-                  Día Completo <span class="block text-[10px] font-normal text-outline">6 - 8 hrs</span>
-</button>
+  <a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = (curDuration == "Medio Día" ? "" : "Medio Día"), sortBy = curSortBy })" class="px-3 py-2 border rounded-lg text-center text-xs transition-all flex flex-col items-center justify-center cursor-pointer @(curDuration == "Medio Día" ? "border-primary bg-primary text-white font-bold shadow-xs" : "border-outline-variant hover:border-primary text-secondary hover:text-primary bg-surface-container-lowest")">
+    <span>Medio Día</span>
+    <span class="block text-[10px] font-normal @(curDuration == "Medio Día" ? "text-white/80" : "text-secondary")">3 - 4.5 hrs</span>
+  </a>
+  <a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = (curDuration == "Día Completo" ? "" : "Día Completo"), sortBy = curSortBy })" class="px-3 py-2 border rounded-lg text-center text-xs transition-all flex flex-col items-center justify-center cursor-pointer @(curDuration == "Día Completo" ? "border-primary bg-primary text-white font-bold shadow-xs" : "border-outline-variant hover:border-primary text-secondary hover:text-primary bg-surface-container-lowest")">
+    <span>Día Completo</span>
+    <span class="block text-[10px] font-normal @(curDuration == "Día Completo" ? "text-white/80" : "text-outline")">6 - 8 hrs</span>
+  </a>
 </div>
 </div>
-<!-- Turno de Salida -->
+<!-- Turno de Salida (Checkboxes Interactivos) -->
 <div class="pt-4 border-t border-outline-variant/60">
-<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-2.5">Turno de Salida</h2>
+<div class="flex items-center justify-between mb-2.5">
+  <h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary">Turno de Salida</h2>
+  @if (!string.IsNullOrEmpty(curShift) && curShift != "Todos")
+  {
+    <a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = "", modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = curSortBy })" class="text-[11px] text-primary hover:underline font-semibold">Cualquiera</a>
+  }
+</div>
 <div class="space-y-2">
-<label for="Ma_ana__9_00_AM___9_30_AM_" class="flex items-center gap-2 text-body-sm cursor-pointer">
-<input id="Ma_ana__9_00_AM___9_30_AM_" checked="" class="rounded text-primary focus:ring-primary border-outline-variant" type="checkbox">
-<span class="">Mañana (9:00 AM / 9:30 AM)</span>
+<label class="flex items-center gap-2 text-body-sm cursor-pointer select-none">
+  <input id="catalog_shift_manana" type="checkbox" onchange="onCatalogShiftChange()" class="rounded text-primary focus:ring-primary border-outline-variant cursor-pointer" @(curShift == "Mañana" || string.IsNullOrEmpty(curShift) || curShift == "Todos" ? "checked" : "")>
+  <span class="@(curShift == "Mañana" ? "font-bold text-primary" : "")">Mañana (9:00 AM / 9:30 AM)</span>
 </label>
-<label for="Tarde__2_30_PM___3_30_PM_" class="flex items-center gap-2 text-body-sm cursor-pointer">
-<input id="Tarde__2_30_PM___3_30_PM_" checked="" class="rounded text-primary focus:ring-primary border-outline-variant" type="checkbox">
-<span class="">Tarde (2:30 PM / 3:30 PM)</span>
+<label class="flex items-center gap-2 text-body-sm cursor-pointer select-none">
+  <input id="catalog_shift_tarde" type="checkbox" onchange="onCatalogShiftChange()" class="rounded text-primary focus:ring-primary border-outline-variant cursor-pointer" @(curShift == "Tarde" || string.IsNullOrEmpty(curShift) || curShift == "Todos" ? "checked" : "")>
+  <span class="@(curShift == "Tarde" ? "font-bold text-primary" : "")">Tarde (2:30 PM / 3:30 PM)</span>
 </label>
 </div>
 </div>
-<!-- Rango de Precios -->
+<!-- Rango de Precios (Slider Interactivo) -->
 <div class="pt-4 border-t border-outline-variant/60">
 <div class="flex justify-between items-center mb-2">
-<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary">Presupuesto por Persona</h2>
-<span class="text-xs font-bold text-primary">S/ 25 - S/ 50</span>
+<h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary">Presupuesto Máximo</h2>
+<span id="priceLabel" class="text-xs font-bold text-primary">@(curMaxPrice.HasValue && curMaxPrice.Value < 80 ? $"Hasta S/ {curMaxPrice.Value:F0}" : "Todos los Precios")</span>
 </div>
-<label for="field" class="sr-only">Campo de formulario</label>
-<input id="field" class="w-full accent-primary h-2 bg-secondary-container rounded-lg cursor-pointer" max="80" min="25" type="range" value="50">
+<label for="priceRangeSlider" class="sr-only">Presupuesto por persona</label>
+<input id="priceRangeSlider" class="w-full accent-primary h-2 bg-secondary-container rounded-lg cursor-pointer" max="80" min="25" step="5" type="range" value="@(curMaxPrice.HasValue && curMaxPrice.Value < 80 ? curMaxPrice.Value.ToString("F0") : "80")">
 <div class="flex justify-between text-[11px] text-outline mt-1 font-medium">
-<span class="">S/ 25 min</span>
-<span class="">S/ 80+ max</span>
+<span>S/ 25 min</span>
+@if (curMaxPrice.HasValue && curMaxPrice.Value < 80)
+{
+    <button type="button" onclick="resetPriceFilter()" class="text-primary hover:underline font-bold text-[11px] cursor-pointer">Ver todos</button>
+}
+<span>S/ 80+ max</span>
 </div>
 </div>
 <!-- Exigencia Física -->
 <div class="pt-4 border-t border-outline-variant/60">
 <h2 class="text-label-md font-label-md uppercase tracking-wider text-secondary mb-2.5">Nivel de Exigencia</h2>
 <div class="flex flex-wrap gap-1.5">
-<a href="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = ViewBag.CurrentCategoryId, difficulty = "Todos", date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, sortBy = ViewBag.CurrentSortBy })" class="px-2.5 py-1 text-xs rounded-md border transition-colors @(string.IsNullOrEmpty(ViewBag.CurrentDifficulty) || ViewBag.CurrentDifficulty == "Todos" ? "bg-primary text-on-primary font-bold border-primary" : "bg-surface-bright text-secondary border-outline-variant hover:border-primary")">Todos</a>
-<a href="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = ViewBag.CurrentCategoryId, difficulty = "Ligero", date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, sortBy = ViewBag.CurrentSortBy })" class="px-2.5 py-1 text-xs rounded-md border transition-colors @(ViewBag.CurrentDifficulty == "Ligero" ? "bg-primary text-on-primary font-bold border-primary" : "bg-surface-bright text-secondary border-outline-variant hover:border-primary")">Ligero</a>
-<a href="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = ViewBag.CurrentCategoryId, difficulty = "Moderado", date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, sortBy = ViewBag.CurrentSortBy })" class="px-2.5 py-1 text-xs rounded-md border transition-colors @(ViewBag.CurrentDifficulty == "Moderado" ? "bg-primary text-on-primary font-bold border-primary" : "bg-surface-bright text-secondary border-outline-variant hover:border-primary")">Moderado</a>
-<a href="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = ViewBag.CurrentCategoryId, difficulty = "Exigente", date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, sortBy = ViewBag.CurrentSortBy })" class="px-2.5 py-1 text-xs rounded-md border transition-colors @(ViewBag.CurrentDifficulty == "Exigente" ? "bg-primary text-on-primary font-bold border-primary" : "bg-surface-bright text-secondary border-outline-variant hover:border-primary")">Exigente</a>
+<a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, difficulty = "Todos", date = curDate, shift = curShift, maxPrice = curMaxPrice, duration = curDuration, sortBy = curSortBy })" class="px-2.5 py-1 text-xs rounded-md border transition-colors @(string.IsNullOrEmpty(curDifficulty) || curDifficulty == "Todos" ? "bg-primary text-on-primary font-bold border-primary" : "bg-surface-bright text-secondary border-outline-variant hover:border-primary")">Todos</a>
+<a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, difficulty = "Ligero", date = curDate, shift = curShift, maxPrice = curMaxPrice, duration = curDuration, sortBy = curSortBy })" class="px-2.5 py-1 text-xs rounded-md border transition-colors @(curDifficulty == "Ligero" ? "bg-primary text-on-primary font-bold border-primary" : "bg-surface-bright text-secondary border-outline-variant hover:border-primary")">Ligero</a>
+<a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, difficulty = "Moderado", date = curDate, shift = curShift, maxPrice = curMaxPrice, duration = curDuration, sortBy = curSortBy })" class="px-2.5 py-1 text-xs rounded-md border transition-colors @(curDifficulty == "Moderado" ? "bg-primary text-on-primary font-bold border-primary" : "bg-surface-bright text-secondary border-outline-variant hover:border-primary")">Moderado</a>
+<a href="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, difficulty = "Exigente", date = curDate, shift = curShift, maxPrice = curMaxPrice, duration = curDuration, sortBy = curSortBy })" class="px-2.5 py-1 text-xs rounded-md border transition-colors @(curDifficulty == "Exigente" ? "bg-primary text-on-primary font-bold border-primary" : "bg-surface-bright text-secondary border-outline-variant hover:border-primary")">Exigente</a>
 </div>
 </div>
 <!-- Garantías Chilón -->
 <div class="pt-4 border-t border-outline-variant/60 bg-surface-bright/60 -mx-5 -mb-5 p-5 rounded-b-2xl">
 <h2 class="text-label-sm font-label-sm font-bold text-on-surface mb-2 flex items-center gap-1.5">
 <span class="material-symbols-outlined text-[16px] text-primary">shield</span>
-                Garantías de Viaje Chilón
-              </h2>
+Garantías de Viaje Chilón
+</h2>
 <div class="space-y-1.5 text-body-sm">
-<label for="Salida_Diaria_Garantizada" class="flex items-center gap-2 cursor-pointer">
-<input id="Salida_Diaria_Garantizada" checked="" class="rounded text-primary focus:ring-primary border-outline-variant" disabled="" type="checkbox">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary border-outline-variant" disabled="" type="checkbox">
 <span class="text-xs">Salida Diaria Garantizada</span>
 </label>
-<label for="Recojo_en_Hotel_C_ntrico" class="flex items-center gap-2 cursor-pointer">
-<input id="Recojo_en_Hotel_C_ntrico" checked="" class="rounded text-primary focus:ring-primary border-outline-variant" disabled="" type="checkbox">
+<label class="flex items-center gap-2 cursor-pointer">
+<input checked="" class="rounded text-primary focus:ring-primary border-outline-variant" disabled="" type="checkbox">
 <span class="text-xs">Recojo en Hotel Céntrico</span>
 </label>
-
 </div>
 </div>
 </div>
@@ -222,16 +259,16 @@
 <div class="flex items-center gap-2">
 <span class="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shrink-0"></span>
 <p class="text-xs sm:text-body-md font-medium text-on-surface">
-    Mostrando <strong class="font-bold text-primary">@Model.Count() circuitos disponibles</strong>@(string.IsNullOrEmpty(ViewBag.CurrentQ) ? "" : $" para \"{ViewBag.CurrentQ}\"") en Cajamarca
+    Mostrando <strong class="font-bold text-primary">@Model.Count() circuitos disponibles</strong>@(string.IsNullOrEmpty(curQ) ? "" : $" para \"{curQ}\"") en Cajamarca
 </p>
 </div>
 <div class="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2.5 w-full sm:w-auto">
 <label for="Ordenar_por_" class="text-xs font-semibold text-secondary shrink-0">Ordenar por:</label>
 <select id="Ordenar_por_" onchange="window.location.href=this.value" class="w-full sm:w-auto py-2 px-3 bg-surface-bright border border-outline-variant rounded-xl text-xs sm:text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
-<option value="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = ViewBag.CurrentCategoryId, date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, modality = ViewBag.CurrentModality, difficulty = ViewBag.CurrentDifficulty, maxPrice = ViewBag.CurrentMaxPrice, sortBy = "" })" selected="@(string.IsNullOrEmpty(ViewBag.CurrentSortBy))">Más populares y recomendados</option>
-<option value="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = ViewBag.CurrentCategoryId, date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, modality = ViewBag.CurrentModality, difficulty = ViewBag.CurrentDifficulty, maxPrice = ViewBag.CurrentMaxPrice, sortBy = "price-asc" })" selected="@(ViewBag.CurrentSortBy == "price-asc")">Precio: menor a mayor</option>
-<option value="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = ViewBag.CurrentCategoryId, date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, modality = ViewBag.CurrentModality, difficulty = ViewBag.CurrentDifficulty, maxPrice = ViewBag.CurrentMaxPrice, sortBy = "price-desc" })" selected="@(ViewBag.CurrentSortBy == "price-desc")">Precio: mayor a menor</option>
-<option value="@Url.Action("Catalog", "Tour", new { q = ViewBag.CurrentQ, categoryId = ViewBag.CurrentCategoryId, date = ViewBag.CurrentDate, shift = ViewBag.CurrentShift, modality = ViewBag.CurrentModality, difficulty = ViewBag.CurrentDifficulty, maxPrice = ViewBag.CurrentMaxPrice, sortBy = "title" })" selected="@(ViewBag.CurrentSortBy == "title")">Alfabético (A - Z)</option>
+<option value="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = "" })" selected="@(string.IsNullOrEmpty(curSortBy))">Más populares y recomendados</option>
+<option value="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = "price-asc" })" selected="@(curSortBy == "price-asc")">Precio: menor a mayor</option>
+<option value="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = "price-desc" })" selected="@(curSortBy == "price-desc")">Precio: mayor a menor</option>
+<option value="@Url.Action("Catalog", "Tour", new { q = curQ, categoryId = curCatId, date = curDate, shift = curShift, modality = curModality, difficulty = curDifficulty, maxPrice = curMaxPrice, duration = curDuration, sortBy = "title" })" selected="@(curSortBy == "title")">Alfabético (A - Z)</option>
 </select>
 </div>
 </div>
@@ -336,38 +373,37 @@ else
 <!-- SECTION: ARMA TU TOUR PRIVADO O EXCLUSIVO -->
 <section class="max-w-7xl mx-auto px-4 md:px-8 py-10">
 <div class="relative rounded-3xl overflow-hidden bg-gradient-to-r from-inverse-surface via-primary to-primary-container p-8 md:p-12 text-on-primary shadow-xl">
-<!-- Geometric Accent Shapes -->
 <div class="absolute -right-16 -top-16 w-80 h-80 bg-surface-container-high/10 rounded-full blur-2xl pointer-events-none"></div>
 <div class="absolute right-1/4 -bottom-20 w-64 h-64 bg-tertiary/20 rounded-full blur-xl pointer-events-none"></div>
 <div class="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
 <div class="lg:col-span-8 space-y-4">
 <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-container-lowest/20 backdrop-blur rounded-full text-xs font-bold tracking-wider uppercase text-inverse-on-surface">
 <span class="material-symbols-outlined text-[16px] text-tertiary-fixed-dim">groups</span> Servicio Corporativo y Delegaciones
-            </span>
+</span>
 <h2 class="text-headline-lg font-headline-lg font-bold text-white tracking-tight">
-              ¿Viajas en Familia o Grupo? Arma tu Tour 100% Privado
-            </h2>
+  ¿Viajas en Familia o Grupo? Arma tu Tour 100% Privado
+</h2>
 <p class="text-body-lg font-body-lg text-surface-container-lowest/90 max-w-2xl leading-relaxed">Disfruta de vans exclusivas puerta a puerta, horarios personalizados a tu ritmo, traslados directos y traslados cómodos hacia el Aeropuerto Mayor General FAP Armando Revoredo Iglesias.</p>
 <div class="flex flex-wrap gap-4 pt-2">
 <div class="flex items-center gap-2 text-sm text-surface-bright">
 <span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Vans de 11 a 19 pasajeros
-              </div>
+</div>
 <div class="flex items-center gap-2 text-sm text-surface-bright">
 <span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Factura Comercial &amp; Convenios
-              </div>
+</div>
 <div class="flex items-center gap-2 text-sm text-surface-bright">
 <span class="material-symbols-outlined text-tertiary-fixed text-[20px]">check_circle</span> Asignación Inmediata
-              </div>
+</div>
 </div>
 </div>
 <div class="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col gap-3 justify-center">
 <a class="px-6 py-4 bg-tertiary-container hover:bg-tertiary text-on-tertiary rounded-xl font-label-lg font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all active:scale-95 text-center" href="@ContactService.GetWhatsAppUrl("Hola Turismo Chilón, solicito cotización para un servicio privado")" target="_blank">
 <span class="material-symbols-outlined text-[22px]">chat</span>
-<span class="">Cotizar Tour Privado</span>
+<span>Cotizar Tour Privado</span>
 </a>
 <a class="px-6 py-3.5 bg-surface-container-lowest/15 hover:bg-surface-container-lowest/25 backdrop-blur text-on-primary border border-surface-container-lowest/30 rounded-xl font-label-md font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all text-center" href="tel:@ContactService.PhoneCall">
 <span class="material-symbols-outlined text-[20px]">call</span>
-<span class="">Llamar Directo a Central</span>
+<span>Llamar Directo a Central</span>
 </a>
 </div>
 </div>
@@ -379,13 +415,13 @@ else
 <div class="lg:col-span-5 space-y-4">
 <div class="inline-flex items-center gap-2 text-primary font-label-sm uppercase tracking-wider font-bold">
 <span class="material-symbols-outlined text-[18px]">location_on</span> Punto de Embarque Oficial
-          </div>
+</div>
 <h2 class="text-headline-md font-headline-md text-inverse-surface font-bold">
-            Oficina Central de Pasajes &amp; Terminal de Salida
-          </h2>
+  Oficina Central de Pasajes &amp; Terminal de Salida
+</h2>
 <p class="text-body-md font-body-md text-on-surface-variant">
-            Ubicados estratégicamente a solo 3 cuadras de la Plaza de Armas de Cajamarca. Nuestras unidades cuentan con sala de espera climatizada, custodia de equipaje y WiFi de cortesía.
-          </p>
+  Ubicados estratégicamente a solo 3 cuadras de la Plaza de Armas de Cajamarca. Nuestras unidades cuentan con sala de espera climatizada, custodia de equipaje y WiFi de cortesía.
+</p>
 <div class="space-y-3 pt-2">
 <div class="flex items-start gap-3">
 <div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary mt-0.5 shrink-0">
@@ -430,7 +466,6 @@ else
     loading="lazy" 
     referrerpolicy="no-referrer-when-downgrade">
   </iframe>
-  <!-- Pin Flotante Superior -->
   <div class="absolute top-4 left-4 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-md border border-outline-variant flex items-center gap-2.5 pointer-events-none">
     <div class="w-3 h-3 rounded-full bg-accent-red animate-ping"></div>
     <div>
@@ -438,7 +473,6 @@ else
       <span class="text-[11px] text-on-surface-variant block">A 3 cuadras de la Plaza de Armas</span>
     </div>
   </div>
-  <!-- Barra Flotante Inferior de Información y Acciones -->
   <div class="relative z-10 bg-surface-container-lowest/95 backdrop-blur-md p-3.5 sm:p-4 rounded-xl border border-outline-variant/80 shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -465,7 +499,58 @@ else
 </div>
 </section>
 </main>
-<!-- FOOTER (Institutional - Strictly adheres to brand & no unauthorized domain) -->
 
+@section Scripts {
+<script>
+function onCatalogShiftChange() {
+    const manana = document.getElementById('catalog_shift_manana');
+    const tarde = document.getElementById('catalog_shift_tarde');
+    const isManana = manana ? manana.checked : false;
+    const isTarde = tarde ? tarde.checked : false;
 
+    let newShift = 'Todos';
+    if (isManana && !isTarde) newShift = 'Mañana';
+    else if (!isManana && isTarde) newShift = 'Tarde';
+    else if (!isManana && !isTarde) newShift = 'Todos';
 
+    const url = new URL(window.location.href);
+    if (newShift === 'Todos') {
+        url.searchParams.delete('shift');
+    } else {
+        url.searchParams.set('shift', newShift);
+    }
+    window.location.href = url.toString();
+}
+
+function resetPriceFilter() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('maxPrice');
+    window.location.href = url.toString();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const slider = document.getElementById('priceRangeSlider');
+    const priceLabel = document.getElementById('priceLabel');
+    if (slider && priceLabel) {
+        slider.addEventListener('input', function() {
+            const val = parseInt(this.value);
+            if (val >= 80) {
+                priceLabel.textContent = 'Todos los Precios';
+            } else {
+                priceLabel.textContent = 'Hasta S/ ' + val;
+            }
+        });
+        slider.addEventListener('change', function() {
+            const val = parseInt(this.value);
+            const url = new URL(window.location.href);
+            if (val >= 80) {
+                url.searchParams.delete('maxPrice');
+            } else {
+                url.searchParams.set('maxPrice', val);
+            }
+            window.location.href = url.toString();
+        });
+    }
+});
+</script>
+}

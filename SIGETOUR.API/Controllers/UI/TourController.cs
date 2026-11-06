@@ -19,14 +19,15 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         public async Task<IActionResult> Catalog(
-            string? q,
-            Guid? categoryId,
-            string? date,
-            string? shift,
-            string? modality,
-            string? difficulty,
-            decimal? maxPrice,
-            string? sortBy)
+            string? q = null,
+            Guid? categoryId = null,
+            string? date = null,
+            string? shift = null,
+            string? modality = null,
+            string? difficulty = null,
+            decimal? maxPrice = null,
+            string? sortBy = null,
+            string? duration = null)
         {
             var query = _context.TourPackages
                 .Include(t => t.Images)
@@ -75,6 +76,23 @@ namespace SIGETOUR.API.Controllers.UI
                 query = query.Where(t => t.Shifts.Any(s => s.ShiftName.ToLower().Contains(shift.ToLower())));
             }
 
+            if (!string.IsNullOrWhiteSpace(duration) && duration != "Todos")
+            {
+                var durLower = duration.Trim().ToLower();
+                if (durLower.Contains("medio") || durLower.Contains("half"))
+                {
+                    query = query.Where(t => t.Duration.ToLower().Contains("medio") || t.Duration.ToLower().Contains("4 hora") || t.Duration.ToLower().Contains("4h") || t.Duration.ToLower().Contains("3"));
+                }
+                else if (durLower.Contains("completo") || durLower.Contains("full"))
+                {
+                    query = query.Where(t => t.Duration.ToLower().Contains("completo") || t.Duration.ToLower().Contains("6") || t.Duration.ToLower().Contains("8") || t.Duration.ToLower().Contains("9") || t.Duration.ToLower().Contains("jornada"));
+                }
+                else
+                {
+                    query = query.Where(t => t.Duration.ToLower().Contains(durLower));
+                }
+            }
+
             // Sorting
             query = sortBy switch
             {
@@ -106,6 +124,7 @@ namespace SIGETOUR.API.Controllers.UI
             ViewBag.CurrentModality = modality;
             ViewBag.CurrentDifficulty = difficulty;
             ViewBag.CurrentMaxPrice = maxPrice;
+            ViewBag.CurrentDuration = duration;
             ViewBag.CurrentSortBy = sortBy;
 
             return View(tours);
