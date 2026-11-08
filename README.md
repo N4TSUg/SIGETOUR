@@ -6,10 +6,10 @@
 [![.NET 10.0](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%2B-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Render](https://img.shields.io/badge/Render-Production-46E3B7?logo=render&logoColor=white)](https://sigetour.onrender.com)
-[![Cloudinary](https://img.shields.io/badge/Cloudinary-Integrated-3448C5?logo=cloudinary&logoColor=white)](https://cloudinary.com/)
-[![Tests Passing](https://img.shields.io/badge/Tests-171%2F171%20Passing%20(100%25)-brightgreen?logo=xunit)]()
-[![SonarQube Quality Gate](https://img.shields.io/badge/SonarQube-Passed-4C9BD4?logo=sonarqube&logoColor=white)]()
+[![Render](https://img.shields.io/badge/Render-Online-46E3B7?logo=render&logoColor=white)](https://sigetour.onrender.com)
+[![Cloudinary](https://img.shields.io/badge/Cloudinary-Cloud%20Media-3448C5?logo=cloudinary&logoColor=white)](https://cloudinary.com/)
+[![Tests Passing](https://img.shields.io/badge/Tests-171%20Passed-brightgreen?logo=dotnet&logoColor=white)](https://github.com/N4TSUg/SIGETOUR/tree/main/SIGETOUR.Tests)
+[![SonarQube Quality Gate](https://img.shields.io/badge/SonarQube-Passed-4C9BD4?logo=sonarqube&logoColor=white)](https://sonarcloud.io/project/overview?id=N4TSUg_SIGETOUR)
 
 ---
 
