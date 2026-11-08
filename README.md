@@ -115,7 +115,9 @@ El sistema cuenta con un seeder criptográfico automático (`IdentitySeeder`) qu
 
 ---
 
-## 🛠️ 4. Stack Tecnológico y Arquitectura
+## 🛠️ 4. Stack Tecnológico Integral
+
+El sistema está construido bajo una arquitectura moderna de capas desacopladas, utilizando el ecosistema oficial de **.NET 10** y las mejores prácticas de ingeniería de software:
 
 ```
 SIGETOUR/
@@ -141,18 +143,137 @@ SIGETOUR/
     └── Services/                     # Pruebas de Cloudinary, PDF, Despacho y Contacto
 ```
 
-* **Lenguaje & Framework:** C# 13 / .NET 10.0 (ASP.NET Core).
-* **ORM:** Entity Framework Core 10 con soporte SplitQuery y migraciones PostgreSQL.
-* **Base de Datos:** PostgreSQL 16+ (soporte para Neon Lakebase Postgres y Render PostgreSQL).
-* **Seguridad:** ASP.NET Core Identity con esquema Cookie persistente, protección CSRF y JWT Bearer.
-* **Frontend:** Razor Views, Tailwind CSS v3 (diseño responsivo mobile-first), Material Symbols Outlined.
-* **Accesibilidad:** WCAG 2.1 AA auditado por SonarQube Cloud (etiquetas semánticas `<button>`, `<label>` asociadas).
-* **Reportería y Documentos:** ClosedXML (`.xlsx`) y QuestPDF (`.pdf`).
-* **Pruebas:** xUnit con **171 pruebas unitarias 100% aprobadas**.
+### Desglose por Capas de Tecnología
+
+| Capa / Dominio | Tecnología / Herramienta | Versión | Propósito en el Proyecto |
+| :--- | :--- | :--- | :--- |
+| **Frontend SSR** | **Razor Views (.cshtml)** | .NET 10 | Motor de renderizado del lado del servidor de alto rendimiento con layouts modulares. |
+| **Estilos & UI** | **Tailwind CSS** | v3.4 | Framework utilitario para diseño responsivo mobile-first con paleta esmeralda/turquesa. |
+| **Iconografía** | **Material Symbols Outlined** | v2.0 | Tipografía vectorial moderna de Google Fonts para iconografía de alta nitidez. |
+| **Interactividad** | **JavaScript ES6+ Vanilla** | Nativo | Visor Lightbox con navegación por teclado y swipe táctil, carga drag-and-drop y validaciones. |
+| **Accesibilidad** | **W3C WCAG 2.1 AA** | Nivel AA | Cumplimiento auditado por SonarQube Cloud con etiquetas semánticas nativas (`<button>`, `<label>`). |
+| **Lenguaje Core** | **C# 13** | C# 13 | Lenguaje fuertemente tipado con pattern matching, records y null-safety activado. |
+| **Framework Backend**| **ASP.NET Core** | 10.0 | Plataforma web unificada para controladores MVC y endpoints RESTful Web API con Kestrel. |
+| **ORM Relacional** | **Entity Framework Core** | 10.0.12 | Mapeo objeto-relacional con consultas divididas (`SplitQuery`) y 14 migraciones Code-First. |
+| **Driver PostgreSQL**| **Npgsql.EntityFrameworkCore**| 10.0.3 | Proveedor ADO.NET / EF Core de alto rendimiento para PostgreSQL. |
+| **Base de Datos** | **PostgreSQL** | 16+ / 18 | RDBMS relacional transaccional (ACID) con 30 tablas normalizadas e integridad referencial estricta. |
+| **Cloud Database** | **Neon Lakebase Postgres** | Serverless | Base de datos cloud serverless con pooling de conexiones y alta disponibilidad. |
+| **Seguridad & Auth** | **ASP.NET Core Identity** | 10.0.12 | Gestión de usuarios, roles (RBAC), hashing PBKDF2 y cookies de sesión persistentes. |
+| **Tokens API** | **JWT Bearer Authentication** | 10.0.12 | Autenticación stateless mediante tokens JSON Web Tokens firmados con HMAC-SHA256. |
+| **Mapeo de Objetos** | **AutoMapper** | 16.2.0 | Transformación desacoplada entre Entidades de Dominio y Objetos de Transferencia (DTOs). |
+| **Planillas Excel** | **ClosedXML** | 0.105.1 | Generación de Manifiestos de Pasajeros MTC y Liquidaciones de Caja en formato `.xlsx`. |
+| **Documentos PDF** | **QuestPDF** | 2026.9.1 | Motor de maquetación vectorial para generación de Boletos Oficiales y Vouchers en PDF. |
+| **Multimedia Cloud** | **CloudinaryDotNet** | 1.29.3 | SDK oficial para subida, optimización WebP/AVIF (`q_auto, f_auto`) y CDN global. |
+| **Documentación API**| **OpenAPI / Swagger** | 10.0.10 | Especificación y documentación de endpoints RESTful vía `Microsoft.AspNetCore.OpenApi`. |
+| **Testing** | **xUnit** & **Moq** | 2.x / 4.x | Suite de **171 pruebas unitarias e integración** con simulación de servicios y DbContext InMemory. |
+| **Calidad de Código**| **SonarQube Cloud** | Cloud | Análisis estático de código continuo (SAST), Quality Gate A, 0 vulnerabilidades y 0 hot-spots. |
+| **Contenedores** | **Docker & Docker Compose** | v26+ | Empaquetado en contenedores Linux multi-etapa con `docker-compose.yml` para despliegue local. |
+| **Plataforma Cloud** | **Render Web Services** | Cloud | Alojamiento en contenedores Linux con despliegue continuo (CI/CD) conectado a GitHub. |
 
 ---
 
-## ⚙️ 5. Configuración y Puesta en Marcha Local
+## 🔌 5. APIs e Integraciones Externas
+
+SIGETOUR se conecta con servicios externos líderes en la industria para garantizar pagos seguros, facturación electrónica certificada, almacenamiento multimedia y notificaciones automáticas:
+
+```mermaid
+flowchart TD
+    SIGETOUR["SIGETOUR Platform (.NET 10)"]
+    
+    SIGETOUR -->|"Tokenización & Cobros 3DS (v2)"| CULQI["Pasarela Culqi API"]
+    CULQI -->|"Webhooks HMAC-SHA256"| SIGETOUR
+    
+    SIGETOUR -->|"Emisión UBL 2.1 (Boleta/Factura)"| NUBEFACT["Nubefact API (PSE / SUNAT)"]
+    NUBEFACT -->|"Validación RUC / DNI"| RENIEC_SUNAT["SUNAT & RENIEC"]
+    
+    SIGETOUR -->|"Upload & Optimización WebP"| CLOUDINARY["Cloudinary Media API"]
+    CLOUDINARY -->|"CDN Global (Akamai/Fastly)"| USUARIO["Navegador del Turista"]
+    
+    SIGETOUR -->|"Vouchers & Notificaciones PDF"| BREVO_SMTP["Brevo & Google SMTP API"]
+    SIGETOUR -->|"Click-to-Chat con Voucher"| WHATSAPP["WhatsApp Business API"]
+```
+
+### Detalle de Integraciones
+
+1. 💳 **Pasarela de Pagos Online Culqi API v2:**
+   * **Endpoint Base:** `https://api.culqi.com/v2`
+   * **Tokenización en Cliente:** Captura segura de datos de tarjeta (Visa, Mastercard, Amex, Diners) mediante `Culqi.js` sin almacenar números de tarjeta en el servidor (cumplimiento PCI-DSS).
+   * **Cargos y 3D Secure (3DS):** Procesamiento de cargos directos con soporte para autenticación de dos factores bancaria.
+   * **Webhooks Criptográficos:** Endpoint receptor `/api/culqipayments/webhook` protegido con validación de firma HMAC-SHA256, verificación de timestamp e idempotencia para eventos `charge.succeeded` y `charge.failed`.
+
+2. 🧾 **Facturación Electrónica Nubefact (PSE Acreditado ante SUNAT):**
+   * **Endpoint Base:** `https://api.nubefact.com/api/v1/`
+   * **Estándar:** UBL 2.1 oficial de SUNAT para Boletas Electrónicas (`BBB1`) y Facturas Electrónicas (`FFF1`).
+   * **Funcionalidades:** Cálculo automático de IGV (18%), generación de código Hash, código QR oficial, descarga de XML firmado y Constancia de Recepción (CDR).
+   * **Validación de Identidad:** Consulta en línea de DNI ante RENIEC y RUC ante SUNAT para autocompletado y validación de clientes.
+
+3. ☁️ **Almacenamiento Multimedia Cloudinary Media API:**
+   * **SDK Integrado:** `CloudinaryDotNet 1.29.3`
+   * **Directorio Organizado:** Las imágenes se canalizan en carpetas designadas (`sigetour/vehicles`, `sigetour/tours`).
+   * **Optimización Inteligente:** Parámetros automáticos `q_auto, f_auto` que transforman imágenes pesadas tomadas con celular (8-10 MB) a formatos de última generación (`.webp`, `.avif`) de menos de 100 KB sin pérdida visual.
+   * **Eliminación Sincronizada:** Al borrar un vehículo o tour en el panel administrativo, el servicio invoca la API de Cloudinary para eliminar el recurso en la nube liberando espacio.
+   * **Fallback Transparente:** En ausencia de credenciales cloud, el sistema conmuta automáticamente al almacenamiento local en `wwwroot/images/` sin interrumpir la operación.
+
+4. 📧 **Notificaciones Transaccionales (Brevo API v3 & Google SMTP):**
+   * Envío automatizado de correos electrónicos transaccionales con confirmación de compra y el Voucher Oficial en PDF adjunto.
+   * Soporte dual: API Key de Brevo (`BREVO_API_KEY`) y servidor SMTP TLS en puerto 587 (`smtp.gmail.com`).
+
+5. 📱 **Integración con WhatsApp Business (Click-to-Chat API):**
+   * Generación dinámica de hipervínculos estructurados (`https://wa.me/51928876259?text=...`) que permiten al pasajero recibir su voucher y comunicarse con la central de despacho en un solo clic.
+
+---
+
+## 🤖 6. Ecosistema de Agentes y Habilidades Autónomas (.agents / Antigravity AI)
+
+El ciclo de vida, la arquitectura y el control de calidad de SIGETOUR han sido concebidos y acelerados utilizando el **Ecosistema de Agentes de Inteligencia Artificial de Google DeepMind (Antigravity)** junto con las habilidades autónomas almacenadas en el directorio `.agents/`:
+
+```mermaid
+graph TD
+    subgraph Antigravity_Ecosystem ["Ecosistema de Agentes Antigravity"]
+        LeadAgent["Antigravity Lead Agent (Planificador y Orquestador)"]
+        SubagentVehicle["Subagente: vehicle-module-rebuilder"]
+        SubagentFeatured["Subagente: featured-packages-developer"]
+        SubagentSecurity["Subagente: security-hardening-agent"]
+        
+        LeadAgent --> SubagentVehicle
+        LeadAgent --> SubagentFeatured
+        LeadAgent --> SubagentSecurity
+    end
+    
+    subgraph Agent_Skills [".agents/skills/ (Habilidades Especializadas)"]
+        SkillNeon["neon (Orquestador de Backend)"]
+        SkillPostgres["neon-postgres (Pooling, Branching, Egress)"]
+        SkillAIGateway["neon-ai-gateway (Proxy LLMs & Embeddings)"]
+        SkillFunctions["neon-functions (Cómputo Serverless)"]
+        SkillStorage["neon-object-storage (S3-Compatible)"]
+        SkillRealtime["neon-realtime (Consultas Reactivas en Vivo)"]
+    end
+    
+    LeadAgent --> Agent_Skills
+```
+
+### Agentes Especializados de Desarrollo
+* **`Antigravity Lead Agent`:** Agente autónomo principal encargado de la planificación, ejecución en sandbox, análisis reactivo, compilación continua y despliegue automatizado.
+* **`vehicle-module-rebuilder`:** Subagente especializado responsable de la reingeniería completa del módulo de flota vehicular, control normativo MTC (SOAT, CITV, TUC), asignación de unidades insignias (`IsFlagship`) y desarrollo del visor Lightbox en pantalla completa.
+* **`featured-packages-developer`:** Subagente dedicado a la implementación de la lógica comercial de paquetes destacados, badges promocionales, descuentos dinámicos y banners de oferta.
+* **`security-hardening-agent`:** Subagente auditor enfocado en la resolución de issues de SonarQube Cloud, eliminación de vulnerabilidades y cumplimiento riguroso de accesibilidad semántica WCAG 2.1 AA.
+
+### Habilidades Autónomas de la Plataforma (`.agents/skills/`)
+El repositorio incluye habilidades listas para que agentes de IA operen sobre la infraestructura del proyecto:
+
+| Habilidad (Skill) | Ruta en el Repositorio | Capacidades Autónomas |
+| :--- | :--- | :--- |
+| **`neon`** | `.agents/skills/neon/` | Orquestador integral de primitivas cloud para Lakebase Postgres (bases de datos efímeras, ramas y configuración). |
+| **`neon-postgres`** | `.agents/skills/neon-postgres/` | Optimización de conexiones agrupadas (pooled vs direct), branching por PR, mitigación de sobrecostos de transferencia (egress) y afinamiento de índices. |
+| **`neon-ai-gateway`** | `.agents/skills/neon-ai-gateway/` | Enrutamiento unificado para modelos de frontera (Gemini, Claude, GPT) con una sola credencial y gestión de embeddings. |
+| **`neon-functions`** | `.agents/skills/neon-functions/` | Ejecución de funciones serverless Node.js de larga duración desplegadas junto a los datos. |
+| **`neon-object-storage`** | `.agents/skills/neon-object-storage/` | Almacenamiento de objetos compatible con S3 que se bifurca automáticamente con las ramas de base de datos. |
+| **`neon-realtime`** | `.agents/skills/neon-realtime/` | Reactividad y sincronización de consultas SQL en vivo para tableros operacionales sin necesidad de websockets manuales. |
+| **`neon-auth`** | `.agents/skills/neon-auth/` | Primitivas para gestión de identidades y enrutamiento seguro de sesiones. |
+
+---
+
+## ⚙️ 7. Configuración y Puesta en Marcha Local
 
 ### Prerrequisitos
 * [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) instalado.
@@ -197,7 +318,7 @@ SIGETOUR/
 
 ---
 
-## 🌐 6. Despliegue en Producción (Render)
+## 🌐 8. Despliegue en Producción (Render)
 
 El servicio está configurado para integración y despliegue continuo (CI/CD) automático desde la rama `main` en **Render**:
 
@@ -308,7 +429,7 @@ Company__Email="informes@turismochilon.com"
 
 ---
 
-## 📸 7. Banco de Imágenes Oficiales (Recursos de Gerencia)
+## 📸 9. Banco de Imágenes Oficiales (Recursos de Gerencia)
 
 Carpetas oficiales facilitadas por la **Gerencia de Turismo Chilón S.A.C.** para la alimentación fotográfica del catálogo:
 
@@ -322,7 +443,7 @@ Carpetas oficiales facilitadas por la **Gerencia de Turismo Chilón S.A.C.** par
 
 ---
 
-## 📋 8. Resumen de Circuitos Comerciales Oficiales
+## 📋 10. Resumen de Circuitos Comerciales Oficiales
 
 | N° | Circuito / Tour | Subtítulo / Badge | Horario / Turno | Tarifa Sugerida | Atractivos Principales |
 | :-: | :--- | :--- | :--- | :-: | :--- |
@@ -336,6 +457,6 @@ Carpetas oficiales facilitadas por la **Gerencia de Turismo Chilón S.A.C.** par
 
 ---
 
-## 📄 9. Licencia y Derechos de Autor
+## 📄 11. Licencia y Derechos de Autor
 Desarrollado para **Turismo Chilón S.A.C.** como parte del Proyecto de Tesis / Capstone de Ingeniería de Software.  
 Todos los derechos reservados © 2025-2026.
