@@ -1257,16 +1257,22 @@ namespace SIGETOUR.API.Controllers.UI
 
             ViewBag.UserRoles = userRoles;
 
-            // Catálogo oficial de roles: SuperAdmin, Admin, Operador
-            string[] allowedRoles = { "SuperAdmin", "Admin", "Operador" };
-            foreach (var r in allowedRoles)
+            // Asegurar existencia de roles base del sistema
+            string[] baseRoles = { "SuperAdmin", "Admin", "Operador" };
+            foreach (var r in baseRoles)
             {
                 if (!await _roleManager.RoleExistsAsync(r))
                 {
                     await _roleManager.CreateAsync(new IdentityRole(r));
                 }
             }
-            ViewBag.AvailableRoles = allowedRoles.ToList();
+
+            // Catálogo dinámico de todos los roles registrados en el sistema
+            var availableRoles = await _roleManager.Roles
+                .Select(r => r.Name!)
+                .OrderBy(r => r)
+                .ToListAsync();
+            ViewBag.AvailableRoles = availableRoles;
 
             ViewBag.CurrentUserId = _userManager.GetUserId(User);
             ViewBag.CurrentUserName = User.Identity?.Name ?? "";
@@ -1338,7 +1344,7 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             var roleName = model.Role?.Trim();
-            if (roleName != "SuperAdmin" && roleName != "Admin" && roleName != "Operador")
+            if (string.IsNullOrWhiteSpace(roleName))
             {
                 roleName = "Operador";
             }
@@ -1352,7 +1358,14 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (!await _roleManager.RoleExistsAsync(roleName))
             {
-                await _roleManager.CreateAsync(new IdentityRole(roleName));
+                if (isLoggedAsSuperAdmin)
+                {
+                    await _roleManager.CreateAsync(new IdentityRole(roleName));
+                }
+                else
+                {
+                    roleName = "Operador";
+                }
             }
             await _userManager.AddToRoleAsync(user, roleName);
 
@@ -1460,10 +1473,6 @@ namespace SIGETOUR.API.Controllers.UI
 
             var currentRoles = await _userManager.GetRolesAsync(user);
             string roleName = model.Role?.Trim() ?? "Operador";
-            if (roleName != "SuperAdmin" && roleName != "Admin" && roleName != "Operador")
-            {
-                roleName = "Operador";
-            }
 
             if (isLastActiveSuperAdmin && roleName != "SuperAdmin")
             {
@@ -1472,7 +1481,7 @@ namespace SIGETOUR.API.Controllers.UI
             }
             else if (isSelf)
             {
-                roleName = currentRoles.FirstOrDefault() ?? "Admin";
+                roleName = currentRoles.FirstOrDefault() ?? "SuperAdmin";
             }
             else if (string.Equals(roleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase) && !User.IsInRole("SuperAdmin"))
             {
@@ -1480,22 +1489,67 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(Users));
             }
 
-            // Aplicar el cambio de rol seguro si difiere del actual
-            if (!currentRoles.Contains(roleName))
+            if (!await _roleManager.RoleExistsAsync(roleName))
             {
-                if (!await _roleManager.RoleExistsAsync(roleName))
+                if (User.IsInRole("SuperAdmin"))
                 {
                     await _roleManager.CreateAsync(new IdentityRole(roleName));
                 }
+                else
+                {
+                    roleName = currentRoles.FirstOrDefault() ?? "Operador";
+                }
+            }
 
+            bool roleChanged = false;
+            // Aplicar el cambio de rol seguro si difiere del actual
+            if (!currentRoles.Contains(roleName))
+            {
                 if (currentRoles.Any())
                 {
                     await _userManager.RemoveFromRolesAsync(user, currentRoles);
                 }
                 await _userManager.AddToRoleAsync(user, roleName);
+                roleChanged = true;
+            }
+
+            // Invalida inmediatamente sesiones activas si se desactivó al usuario, si cambió de rol o contraseña
+            if (roleChanged || !model.IsActive || !string.IsNullOrWhiteSpace(model.NewPassword))
+            {
+                await _userManager.UpdateSecurityStampAsync(user);
             }
 
             TempData["SuccessMessage"] = $"Usuario '{user.FirstName} {user.LastName}' actualizado exitosamente con rol {roleName}.";
+            return RedirectToAction(nameof(Users));
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "SuperAdmin")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateRole(string roleName)
+        {
+            if (string.IsNullOrWhiteSpace(roleName))
+            {
+                TempData["ErrorMessage"] = "El nombre del rol no puede estar vacío.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var cleanRole = roleName.Trim();
+            if (await _roleManager.RoleExistsAsync(cleanRole))
+            {
+                TempData["ErrorMessage"] = $"El rol '{cleanRole}' ya existe en el sistema.";
+                return RedirectToAction(nameof(Users));
+            }
+
+            var result = await _roleManager.CreateAsync(new IdentityRole(cleanRole));
+            if (!result.Succeeded)
+            {
+                var error = string.Join("; ", result.Errors.Select(e => e.Description));
+                TempData["ErrorMessage"] = $"Error al crear rol: {error}";
+                return RedirectToAction(nameof(Users));
+            }
+
+            TempData["SuccessMessage"] = $"Rol '{cleanRole}' registrado exitosamente.";
             return RedirectToAction(nameof(Users));
         }
 
@@ -2716,6 +2770,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RefundBookingPayment(Guid id, decimal refundAmount, string reason, string? paymentMethod = "Efectivo")
         {
@@ -2958,6 +3013,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteBooking(Guid id)
         {
@@ -3873,6 +3929,7 @@ namespace SIGETOUR.API.Controllers.UI
         // --- EDICIÓN Y ANULACIÓN DE REGISTROS DE CAJA Y CAJA CHICA --- //
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateCashTransaction(Guid id, string type, string category, decimal amount, string paymentMethod, string? referenceCode, string description)
         {
@@ -3916,6 +3973,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteCashTransaction(Guid id)
         {
@@ -3946,6 +4004,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdatePettyCashMovement(Guid id, string movementType, string expenseCategory, string voucherType, string? voucherNumber, string? supplier, decimal amount, string responsiblePerson, string concept)
         {
@@ -3979,6 +4038,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePettyCashMovement(Guid id)
         {
@@ -3997,6 +4057,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateCashShift(Guid shiftId, decimal initialAmount, decimal? actualCash, string? notes)
         {

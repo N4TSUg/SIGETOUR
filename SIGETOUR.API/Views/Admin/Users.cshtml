@@ -8,7 +8,7 @@
     var userRoles = ViewBag.UserRoles as Dictionary<string, string> ?? new Dictionary<string, string>();
     var currentUserId = ViewBag.CurrentUserId as string ?? "";
     var currentUserName = ViewBag.CurrentUserName as string ?? User.Identity?.Name ?? "";
-    bool isLoggedAsSuperAdmin = string.Equals(currentUserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+    bool isLoggedAsSuperAdmin = User.IsInRole("SuperAdmin");
     var availableRoles = ViewBag.AvailableRoles as List<string> ?? new List<string> { "SuperAdmin", "Admin", "Operador" };
 }
 
@@ -43,10 +43,19 @@
         <h1 class="text-display-sm font-bold text-on-surface">Gestión de Usuarios</h1>
         <p class="text-body-lg text-on-surface-variant">Personal, administradores y operadores de Turismo Chilón.</p>
     </div>
-    <button type="button" onclick="openCreateUserModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shrink-0 cursor-pointer">
-        <span class="material-symbols-outlined">person_add</span>
-        <span>Nuevo Usuario</span>
-    </button>
+    <div class="flex items-center gap-2">
+        @if (isLoggedAsSuperAdmin)
+        {
+            <button type="button" onclick="openCreateRoleModal()" class="bg-surface-container hover:bg-surface-container-high text-on-surface px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 border border-outline-variant transition-all shadow-sm shrink-0 cursor-pointer">
+                <span class="material-symbols-outlined text-primary">admin_panel_settings</span>
+                <span>Nuevo Rol</span>
+            </button>
+        }
+        <button type="button" onclick="openCreateUserModal()" class="bg-primary text-on-primary px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-sm shrink-0 cursor-pointer">
+            <span class="material-symbols-outlined">person_add</span>
+            <span>Nuevo Usuario</span>
+        </button>
+    </div>
 </div>
 
 <!-- Barra de Búsqueda de Usuarios -->
@@ -118,7 +127,7 @@
                         var role = userRoles.ContainsKey(user.Id) ? userRoles[user.Id] : "Operador";
                         var searchMeta = $"{user.FirstName} {user.LastName} {user.Email} {user.UserName} {role}".ToLower();
                         bool isCurrent = user.Id == currentUserId;
-                        bool isSuperAdminAcc = string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
+                        bool isSuperAdminAcc = (role == "SuperAdmin") || string.Equals(user.UserName, "superadmin", StringComparison.OrdinalIgnoreCase);
                         bool canEditThisUser = !isSuperAdminAcc || isLoggedAsSuperAdmin;
 
                         <tr class="hover:bg-surface-container-low/50 transition-colors user-row" data-search="@searchMeta">
@@ -299,11 +308,10 @@
                 <div>
                     <label for="Role" class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
                     <select id="Role" name="Role" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
-                        <option value="Operador" selected>Operador</option>
-                        <option value="Admin">Admin</option>
-                        @if (isLoggedAsSuperAdmin)
+                        @foreach (var r in availableRoles)
                         {
-                            <option value="SuperAdmin">SuperAdmin</option>
+                            if (r == "SuperAdmin" && !isLoggedAsSuperAdmin) continue;
+                            <option value="@r" selected="@(r == "Operador")">@r</option>
                         }
                     </select>
                 </div>
@@ -391,11 +399,10 @@
                 <div>
                     <label for="editUserRole" class="block text-label-sm font-bold text-on-surface mb-1">Rol Asignado</label>
                     <select name="Role" id="editUserRole" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm font-semibold text-on-surface focus:outline-none focus:border-primary">
-                        <option value="Operador">Operador</option>
-                        <option value="Admin">Admin</option>
-                        @if (isLoggedAsSuperAdmin)
+                        @foreach (var r in availableRoles)
                         {
-                            <option value="SuperAdmin">SuperAdmin</option>
+                            if (r == "SuperAdmin" && !isLoggedAsSuperAdmin) continue;
+                            <option value="@r">@r</option>
                         }
                     </select>
 
@@ -487,8 +494,54 @@
     </div>
 </div>
 
+<!-- ======================================================== -->
+<!-- MODAL: REGISTRAR NUEVO ROL                               -->
+<!-- ======================================================== -->
+@if (isLoggedAsSuperAdmin)
+{
+    <div id="createRoleModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm hidden">
+        <div class="bg-surface-container-lowest rounded-2xl max-w-md w-full p-6 shadow-2xl border border-outline-variant">
+            <div class="flex items-center justify-between border-b border-outline-variant pb-3 mb-4">
+                <h3 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">admin_panel_settings</span>
+                    Registrar Nuevo Rol
+                </h3>
+                <button type="button" onclick="closeCreateRoleModal()" class="text-outline hover:text-on-surface p-1 rounded-lg hover:bg-surface-container cursor-pointer">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <form asp-action="CreateRole" method="post" class="space-y-4">
+                @Html.AntiForgeryToken()
+                <div>
+                    <label for="newRoleNameInput" class="block text-label-sm font-bold text-on-surface mb-1">Nombre del Rol <span class="text-red-500">*</span></label>
+                    <input type="text" name="roleName" id="newRoleNameInput" required placeholder="Ej. Guia, Supervisor, Contador" class="w-full py-2 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-body-sm text-on-surface focus:outline-none focus:border-primary" />
+                    <p class="text-[11px] text-outline mt-1">El nuevo rol estará disponible de inmediato para ser asignado a usuarios del sistema.</p>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-3 border-t border-outline-variant">
+                    <button type="button" onclick="closeCreateRoleModal()" class="px-4 py-2 rounded-lg border border-outline text-on-surface font-semibold text-body-sm hover:bg-surface-container transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold text-body-sm hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+                        <span class="material-symbols-outlined text-[18px]">add_moderator</span>
+                        <span>Crear Rol</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
 <script>
-    // Control de modales de usuarios
+    // Control de modales de usuarios y roles
+    function openCreateRoleModal() {
+        document.getElementById('createRoleModal')?.classList.remove('hidden');
+    }
+    function closeCreateRoleModal() {
+        document.getElementById('createRoleModal')?.classList.add('hidden');
+    }
+
     function openCreateUserModal() {
         document.getElementById('createUserModal')?.classList.remove('hidden');
     }
@@ -625,6 +678,7 @@
     // Cerrar con tecla Escape
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
+            closeCreateRoleModal();
             closeCreateUserModal();
             closeEditUserModal();
             closeDeleteUserModal();

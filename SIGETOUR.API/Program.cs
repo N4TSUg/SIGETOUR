@@ -125,7 +125,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequiredLength = 4;
 })
 .AddEntityFrameworkStores<AppDbContext>()
-.AddDefaultTokenProviders();
+.AddDefaultTokenProviders()
+.AddClaimsPrincipalFactory<SIGETOUR.API.Infrastructure.Security.AppUserClaimsPrincipalFactory>();
 
 // 3. Cookie Configuration for Identity
 builder.Services.ConfigureApplicationCookie(options =>
@@ -139,6 +140,22 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/Account/Login";
     options.LogoutPath = "/Account/Logout";
     options.AccessDeniedPath = "/Account/Login";
+    options.Events.OnValidatePrincipal = async context =>
+    {
+        var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = context.Principal != null ? await userManager.GetUserAsync(context.Principal) : null;
+        if (user == null || !user.IsActive)
+        {
+            context.RejectPrincipal();
+            await Microsoft.AspNetCore.Authentication.AuthenticationHttpContextExtensions.SignOutAsync(context.HttpContext, IdentityConstants.ApplicationScheme);
+        }
+    };
+});
+
+builder.Services.Configure<SecurityStampValidatorOptions>(options =>
+{
+    // Valida en tiempo real para invalidar inmediatamente sesiones de usuarios desactivados o con roles cambiados
+    options.ValidationInterval = TimeSpan.Zero;
 });
 
 // 4. Authentication & JWT Configuration
@@ -158,6 +175,41 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "default_super_secret_key_1234567890_min_256_bits"))
     };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+            var username = context.Principal?.Identity?.Name;
+            if (!string.IsNullOrEmpty(username))
+            {
+                var user = await userManager.FindByNameAsync(username);
+                if (user == null || !user.IsActive)
+                {
+                    context.Fail("La cuenta de usuario se encuentra desactivada o ya no existe.");
+                }
+            }
+        }
+    };
+});
+
+// 4.5. Configuración de Políticas de Autorización basadas en AppPermissions
+builder.Services.AddAuthorization(options =>
+{
+    foreach (var permission in SIGETOUR.API.Core.Security.AppPermissions.AllPermissions)
+    {
+        options.AddPolicy(permission, policy => policy.RequireAssertion(ctx =>
+        {
+            if (ctx.User.IsInRole("SuperAdmin")) return true;
+            if (ctx.User.HasClaim("Permission", permission)) return true;
+            foreach (var role in ctx.User.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value))
+            {
+                if (SIGETOUR.API.Core.Security.AppPermissions.GetDefaultPermissionsForRole(role).Contains(permission))
+                    return true;
+            }
+            return false;
+        }));
+    }
 });
 
 // 4. Configuración de AutoMapper
