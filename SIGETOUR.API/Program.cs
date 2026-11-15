@@ -250,12 +250,31 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<SIGETOUR.API.Infrastructure.Data.AppDbContext>();
     try
     {
-        db.Database.Migrate();
+        if (db.Database.IsRelational())
+        {
+            var pendingMigrations = db.Database.GetPendingMigrations().ToList();
+            if (pendingMigrations.Any())
+            {
+                Console.WriteLine($"[DB Diagnostic] Migraciones pendientes detectadas ({pendingMigrations.Count}): {string.Join(", ", pendingMigrations)}");
+                try
+                {
+                    db.Database.Migrate();
+                    Console.WriteLine("[DB Diagnostic] Migraciones aplicadas exitosamente.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[DB Diagnostic Notice] No se aplicaron todas las migraciones automáticamente (posible correspondencia con esquema previo o tablas existentes): {ex.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("[DB Diagnostic] Base de datos relacional al día: sin migraciones pendientes.");
+            }
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[DB Migration Notice] {ex.Message}");
-        try { db.Database.EnsureCreated(); } catch { }
+        Console.WriteLine($"[DB Connection Diagnostic] No se pudo verificar migraciones en el arranque: {ex.Message}");
     }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"ItineraryStops\" ADD COLUMN IF NOT EXISTS \"EstimatedTime\" text;"); } catch { }
     try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"ShiftName\" text NOT NULL DEFAULT '';"); } catch { }
@@ -615,108 +634,119 @@ using (var scope = app.Services.CreateScope())
     }
     catch { }
 
-    try
+    var allowDemoFinancialData = app.Environment.IsDevelopment() || 
+        string.Equals(builder.Configuration["DatabaseSettings:SeedDemoData"], "true", StringComparison.OrdinalIgnoreCase);
+
+    if (allowDemoFinancialData)
     {
-        if (!db.PettyCashAccounts.Any())
+        try
         {
-            var petty = new SIGETOUR.API.Core.Entities.PettyCashAccount
+            if (!db.PettyCashAccounts.Any())
             {
-                Id = Guid.NewGuid(),
-                Name = "Caja Chica Principal - Oficina Cajamarca",
-                TotalFundAmount = 4220.00m,
-                ResponsiblePerson = "Administrador Central",
-                IsActive = true,
-                LastReplenishedAt = DateTime.UtcNow.AddDays(-2)
-            };
-
-            petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
-            {
-                Id = Guid.NewGuid(),
-                AccountId = petty.Id,
-                MovementType = "Egreso",
-                ExpenseCategory = "Combustible",
-                VoucherType = "Factura",
-                VoucherNumber = "F001-002891",
-                Supplier = "Repsol Cajamarca Norte",
-                Amount = 140.00m,
-                ResponsiblePerson = "Juan Carlos Rojas (Conductor)",
-                Concept = "Abastecimiento Diésel B5 para Van Mercedes T7C-841 ruta Cumbemayo",
-                RegisteredAt = DateTime.UtcNow.AddHours(-18)
-            });
-
-            petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
-            {
-                Id = Guid.NewGuid(),
-                AccountId = petty.Id,
-                MovementType = "Egreso",
-                ExpenseCategory = "Peajes",
-                VoucherType = "Boleta",
-                VoucherNumber = "B012-009182",
-                Supplier = "Concesionaria Vial Sierra Norte",
-                Amount = 24.50m,
-                ResponsiblePerson = "Juan Carlos Rojas",
-                Concept = "Pago Peaje ida y vuelta Circuito Porcón",
-                RegisteredAt = DateTime.UtcNow.AddHours(-14)
-            });
-
-            petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
-            {
-                Id = Guid.NewGuid(),
-                AccountId = petty.Id,
-                MovementType = "Egreso",
-                ExpenseCategory = "Alimentación / Refrigerios",
-                VoucherType = "Boleta",
-                VoucherNumber = "B002-004120",
-                Supplier = "Panadería San Antonio Cajamarca",
-                Amount = 65.00m,
-                ResponsiblePerson = "Guía Oficial Chilón",
-                Concept = "Refrigerios y aguas minerales para pasajeros de salida especial",
-                RegisteredAt = DateTime.UtcNow.AddHours(-6)
-            });
-
-            db.PettyCashAccounts.Add(petty);
-            db.SaveChanges();
-        }
-
-        if (!db.CashRegisterShifts.Any())
-        {
-            var todayStr = DateTime.UtcNow.ToString("yyyyMMdd");
-            var shift = new SIGETOUR.API.Core.Entities.CashRegisterShift
-            {
-                Id = Guid.NewGuid(),
-                ShiftNumber = $"CJ-{todayStr}-01",
-                OpenedByUserName = "Admin Central",
-                OpenedAt = DateTime.UtcNow.Date.AddHours(7),
-                InitialAmount = 300.00m,
-                IsOpen = true,
-                Notes = "Apertura de turno matutino para cobro en counter y pasarela online"
-            };
-
-            var confirmedBookings = db.Bookings.Where(b => b.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed).Take(5).ToList();
-            foreach (var b in confirmedBookings)
-            {
-                string pMethod = !string.IsNullOrWhiteSpace(b.PaymentMethod) ? b.PaymentMethod : "Efectivo";
-                shift.Transactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
+                var petty = new SIGETOUR.API.Core.Entities.PettyCashAccount
                 {
                     Id = Guid.NewGuid(),
-                    ShiftId = shift.Id,
-                    TransactionType = "Ingreso",
-                    Category = "Cobro de Reserva",
-                    Amount = b.TotalAmount,
-                    PaymentMethod = pMethod,
-                    ReferenceCode = b.ReferenceCode,
-                    BookingId = b.Id,
-                    Description = $"Cobro por reserva de {b.CustomerName} - Tour con {b.TotalPassengers} pasajero(s)",
-                    RegisteredBy = "Sistema / Counter",
-                    CreatedAt = b.BookingDate
+                    Name = "Caja Chica Principal - Oficina Cajamarca",
+                    TotalFundAmount = 4220.00m,
+                    ResponsiblePerson = "Administrador Central",
+                    IsActive = true,
+                    LastReplenishedAt = DateTime.UtcNow.AddDays(-2)
+                };
+
+                petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = petty.Id,
+                    MovementType = "Egreso",
+                    ExpenseCategory = "Combustible",
+                    VoucherType = "Factura",
+                    VoucherNumber = "F001-002891",
+                    Supplier = "Repsol Cajamarca Norte",
+                    Amount = 140.00m,
+                    ResponsiblePerson = "Juan Carlos Rojas (Conductor)",
+                    Concept = "Abastecimiento Diésel B5 para Van Mercedes T7C-841 ruta Cumbemayo",
+                    RegisteredAt = DateTime.UtcNow.AddHours(-18)
                 });
+
+                petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = petty.Id,
+                    MovementType = "Egreso",
+                    ExpenseCategory = "Peajes",
+                    VoucherType = "Boleta",
+                    VoucherNumber = "B012-009182",
+                    Supplier = "Concesionaria Vial Sierra Norte",
+                    Amount = 24.50m,
+                    ResponsiblePerson = "Juan Carlos Rojas",
+                    Concept = "Pago Peaje ida y vuelta Circuito Porcón",
+                    RegisteredAt = DateTime.UtcNow.AddHours(-14)
+                });
+
+                petty.Movements.Add(new SIGETOUR.API.Core.Entities.PettyCashMovement
+                {
+                    Id = Guid.NewGuid(),
+                    AccountId = petty.Id,
+                    MovementType = "Egreso",
+                    ExpenseCategory = "Alimentación / Refrigerios",
+                    VoucherType = "Boleta",
+                    VoucherNumber = "B002-004120",
+                    Supplier = "Panadería San Antonio Cajamarca",
+                    Amount = 65.00m,
+                    ResponsiblePerson = "Guía Oficial Chilón",
+                    Concept = "Refrigerios y aguas minerales para pasajeros de salida especial",
+                    RegisteredAt = DateTime.UtcNow.AddHours(-6)
+                });
+
+                db.PettyCashAccounts.Add(petty);
+                db.SaveChanges();
             }
 
-            db.CashRegisterShifts.Add(shift);
-            db.SaveChanges();
+            if (!db.CashRegisterShifts.Any())
+            {
+                var todayStr = DateTime.UtcNow.ToString("yyyyMMdd");
+                var shift = new SIGETOUR.API.Core.Entities.CashRegisterShift
+                {
+                    Id = Guid.NewGuid(),
+                    ShiftNumber = $"CJ-{todayStr}-01",
+                    OpenedByUserName = "Admin Central",
+                    OpenedAt = DateTime.UtcNow.Date.AddHours(7),
+                    InitialAmount = 300.00m,
+                    IsOpen = true,
+                    Notes = "Apertura de turno matutino para cobro en counter y pasarela online"
+                };
+
+                var confirmedBookings = db.Bookings.Where(b => b.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed).Take(5).ToList();
+                foreach (var b in confirmedBookings)
+                {
+                    // Bloque 8: Una reserva confirmada NO implica necesariamente que se haya cobrado TotalAmount.
+                    // Debe registrarse únicamente el PaidAmount real efectivamente cobrado a caja.
+                    if (b.PaidAmount > 0)
+                    {
+                        string pMethod = !string.IsNullOrWhiteSpace(b.PaymentMethod) ? b.PaymentMethod : "Efectivo";
+                        shift.Transactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
+                        {
+                            Id = Guid.NewGuid(),
+                            ShiftId = shift.Id,
+                            TransactionType = "Ingreso",
+                            Category = "Cobro de Reserva",
+                            Amount = b.PaidAmount,
+                            PaymentMethod = pMethod,
+                            ReferenceCode = b.ReferenceCode,
+                            BookingId = b.Id,
+                            Description = $"Cobro por reserva de {b.CustomerName} - Tour con {b.TotalPassengers} pasajero(s) (Abonado: S/ {b.PaidAmount:N2} de S/ {b.TotalAmount:N2})",
+                            RegisteredBy = "Sistema / Counter",
+                            CreatedAt = b.BookingDate
+                        });
+                    }
+                }
+
+                db.CashRegisterShifts.Add(shift);
+                db.SaveChanges();
+            }
         }
+        catch { }
     }
-    catch { }
 
     try
     {
