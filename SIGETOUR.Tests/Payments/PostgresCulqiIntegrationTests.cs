@@ -192,11 +192,13 @@ namespace SIGETOUR.Tests.Payments
             Assert.Equal(75m, cashTx.Amount);
 
             // 6. Cleanup de prueba para no ensuciar la base de pruebas
+            db.ChangeTracker.Clear();
             db.ElectronicReceipts.RemoveRange(await db.ElectronicReceipts.Where(r => r.BookingId == booking.Id).ToListAsync());
             db.CashTransactions.RemoveRange(await db.CashTransactions.Where(t => t.BookingId == booking.Id).ToListAsync());
             db.CulqiPayments.RemoveRange(await db.CulqiPayments.Where(p => p.BookingId == booking.Id).ToListAsync());
             db.BookingItems.RemoveRange(await db.BookingItems.Where(i => i.BookingId == booking.Id).ToListAsync());
-            db.Bookings.Remove(updatedBooking);
+            var bDel = await db.Bookings.FindAsync(booking.Id);
+            if (bDel != null) db.Bookings.Remove(bDel);
             await db.SaveChangesAsync();
         }
 
@@ -945,10 +947,14 @@ namespace SIGETOUR.Tests.Payments
             Assert.Equal(45m, cashTx.Amount);
 
             // Cleanup
+            db.ChangeTracker.Clear();
             db.ElectronicReceipts.RemoveRange(await db.ElectronicReceipts.Where(r => r.BookingId == booking.Id).ToListAsync());
-            db.CashTransactions.Remove(cashTx);
-            db.CulqiPayments.Remove(updatedPayment);
-            db.Bookings.Remove(updatedBooking);
+            var cDel = await db.CashTransactions.FirstOrDefaultAsync(t => t.CulqiPaymentId == payment.Id);
+            if (cDel != null) db.CashTransactions.Remove(cDel);
+            var pDel = await db.CulqiPayments.FindAsync(payment.Id);
+            if (pDel != null) db.CulqiPayments.Remove(pDel);
+            var bDel2 = await db.Bookings.FindAsync(booking.Id);
+            if (bDel2 != null) db.Bookings.Remove(bDel2);
             await db.SaveChangesAsync();
         }
 

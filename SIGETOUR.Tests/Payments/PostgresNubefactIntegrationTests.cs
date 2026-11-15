@@ -179,12 +179,17 @@ namespace SIGETOUR.Tests.Payments
             Assert.Equal(60m, persistedReceipt.TotalAmount);
 
             // Cleanup
-            db.ElectronicReceipts.Remove(persistedReceipt);
+            db.ChangeTracker.Clear();
+            var rDel = await db.ElectronicReceipts.FirstOrDefaultAsync(r => r.CulqiPaymentId == payment.Id);
+            if (rDel != null) db.ElectronicReceipts.Remove(rDel);
             var cashTxs = await db.CashTransactions.Where(t => t.CulqiPaymentId == payment.Id).ToListAsync();
             db.CashTransactions.RemoveRange(cashTxs);
-            db.CulqiPayments.Remove(payment);
-            db.Bookings.Remove(booking);
-            db.TourPackages.Remove(tour);
+            var pDel = await db.CulqiPayments.FindAsync(payment.Id);
+            if (pDel != null) db.CulqiPayments.Remove(pDel);
+            var bDel = await db.Bookings.FindAsync(booking.Id);
+            if (bDel != null) db.Bookings.Remove(bDel);
+            var tDel = await db.TourPackages.FindAsync(tour.Id);
+            if (tDel != null) db.TourPackages.Remove(tDel);
             await db.SaveChangesAsync();
         }
 

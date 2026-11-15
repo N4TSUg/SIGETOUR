@@ -1050,7 +1050,7 @@ public sealed class CulqiPaymentsController : ControllerBase
         }
 
         // La transacción en PostgreSQL evita contabilizar dos veces la MISMA operación.
-        await using var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, safeCt) : null;
+        await using var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, safeCt) : null;
         var current = await _db.Set<CulqiPayment>().FirstAsync(p => p.Id == attemptId, safeCt);
         if (IsPaidStatus(current.Status))
         {
