@@ -20,37 +20,11 @@ namespace SIGETOUR.Tests.Payments
     [Collection("PostgresDatabaseCollection")]
     public class PostgresBookingCashConsistencyTests
     {
-        private static readonly string ConnectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")
-            ?? "Host=localhost;Database=sigetour_test_db;Username=postgres;Password=3nriqueA1402#";
-
         private readonly ITestOutputHelper _output;
 
         public PostgresBookingCashConsistencyTests(ITestOutputHelper output)
         {
             _output = output;
-        }
-
-        private AppDbContext CreatePostgresDbContext()
-        {
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(ConnectionString, npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
-                .Options;
-
-            return new AppDbContext(options);
-        }
-
-        private async Task<bool> IsPostgresAvailableAsync()
-        {
-            try
-            {
-                await using var db = CreatePostgresDbContext();
-                return await db.Database.CanConnectAsync();
-            }
-            catch (Exception ex)
-            {
-                _output.WriteLine($"[OMITIDA] Error conectando a PostgreSQL de pruebas: {ex.Message}");
-                return false;
-            }
         }
 
         private static AdminController CreateControllerWithTempData(AppDbContext context)
@@ -63,16 +37,10 @@ namespace SIGETOUR.Tests.Payments
             return controller;
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_CreateBooking_AtomicPersistenceWithCashTransaction()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] PostgreSQL de pruebas no disponible.");
-                return;
-            }
-
-            await using var db = CreatePostgresDbContext();
+            await using var db = await PostgresTestHelper.RequirePostgresAsync(_output);
 
             var shift = await db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
             if (shift == null)
@@ -127,16 +95,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_EditBooking_IncrementalPayment_CommittedTogetherInPostgres()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] PostgreSQL de pruebas no disponible.");
-                return;
-            }
-
-            await using var db = CreatePostgresDbContext();
+            await using var db = await PostgresTestHelper.RequirePostgresAsync(_output);
 
             var shift = await db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
             if (shift == null)
@@ -211,16 +173,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_RefundBookingPayment_PersistsEgresoAndAdjustsBookingAtomicallyInPostgres()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] PostgreSQL de pruebas no disponible.");
-                return;
-            }
-
-            await using var db = CreatePostgresDbContext();
+            await using var db = await PostgresTestHelper.RequirePostgresAsync(_output);
 
             var shift = await db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
             if (shift == null)
@@ -266,16 +222,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_DeleteCashTransaction_RejectedWhenLinkedToBooking_PreservesHistory()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] PostgreSQL de pruebas no disponible.");
-                return;
-            }
-
-            await using var db = CreatePostgresDbContext();
+            await using var db = await PostgresTestHelper.RequirePostgresAsync(_output);
 
             var shift = await db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
             if (shift == null)

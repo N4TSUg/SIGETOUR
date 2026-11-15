@@ -7,6 +7,7 @@ using SIGETOUR.API.Application.Services;
 using SIGETOUR.API.Core.Common;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
+using SIGETOUR.Tests.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,9 +16,6 @@ namespace SIGETOUR.Tests.Payments
     [Collection("PostgresDatabaseCollection")]
     public class PostgresCapacityConcurrencyTests
     {
-        private static readonly string ConnectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")
-            ?? "Host=localhost;Database=sigetour_test_db;Username=postgres;Password=3nriqueA1402#";
-
         private readonly ITestOutputHelper _output;
 
         public PostgresCapacityConcurrencyTests(ITestOutputHelper output)
@@ -25,37 +23,17 @@ namespace SIGETOUR.Tests.Payments
             _output = output;
         }
 
-        private AppDbContext CreatePostgresDbContext()
+        private static AppDbContext CreatePostgresDbContext()
         {
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(ConnectionString)
-                .Options;
-
+            var conn = PostgresTestHelper.GetConfiguredConnectionString()!;
+            var options = PostgresTestHelper.CreatePostgresOptions(conn);
             return new AppDbContext(options);
         }
 
-        private async Task<bool> IsPostgresAvailableAsync()
-        {
-            try
-            {
-                await using var db = CreatePostgresDbContext();
-                return await db.Database.CanConnectAsync();
-            }
-            catch (Exception ex)
-            {
-                _output.WriteLine($"[OMITIDA] Error conectando a PostgreSQL de pruebas: {ex.Message}");
-                return false;
-            }
-        }
-
-        [Fact]
+        [SkippableFact]
         public async Task ConcurrentBookings_OnPostgreSQL_NeverExceedMaxCapacity()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("PostgreSQL no disponible. Prueba omitida.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             var testTourId = Guid.NewGuid();
             var travelDate = PeruTime.Today.AddDays(7);

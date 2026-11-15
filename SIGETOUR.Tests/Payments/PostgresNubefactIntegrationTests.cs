@@ -29,9 +29,6 @@ namespace SIGETOUR.Tests.Payments
     [Collection("PostgresDatabaseCollection")]
     public class PostgresNubefactIntegrationTests
     {
-        private static readonly string ConnectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")
-            ?? "Host=localhost;Database=sigetour_test_db;Username=postgres;Password=3nriqueA1402#";
-
         private readonly ITestOutputHelper _output;
 
         public PostgresNubefactIntegrationTests(ITestOutputHelper output)
@@ -41,25 +38,9 @@ namespace SIGETOUR.Tests.Payments
 
         private AppDbContext CreatePostgresDbContext()
         {
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(ConnectionString, npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
-                .Options;
-
+            var conn = PostgresTestHelper.GetConfiguredConnectionString()!;
+            var options = PostgresTestHelper.CreatePostgresOptions(conn);
             return new AppDbContext(options);
-        }
-
-        private async Task<bool> IsPostgresAvailableAsync()
-        {
-            try
-            {
-                await using var db = CreatePostgresDbContext();
-                return await db.Database.CanConnectAsync();
-            }
-            catch (Exception ex)
-            {
-                _output.WriteLine($"[OMITIDA] Error conectando a PostgreSQL de pruebas: {ex.Message}");
-                return false;
-            }
         }
 
         private static IConfiguration CreateConfig()
@@ -78,14 +59,10 @@ namespace SIGETOUR.Tests.Payments
             return new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_VerifyAndApply_AtomicallyPersistsPendingReceiptBeforeCommit()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
             var config = CreateConfig();
@@ -194,14 +171,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_ProcessPendingReceipts_RecoversPendingReceiptInDatabase()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
             var config = CreateConfig();

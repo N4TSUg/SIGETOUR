@@ -17,6 +17,7 @@ using SIGETOUR.API.Controllers.UI;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
 using SIGETOUR.API.Models;
+using SIGETOUR.Tests.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -25,10 +26,6 @@ namespace SIGETOUR.Tests.Payments
     [Collection("PostgresDatabaseCollection")]
     public class PostgresCulqiIntegrationTests
     {
-        // Base de datos dedicada y aislada exclusivamente para pruebas (NUNCA la base operativa sigetour_db)
-        private static readonly string ConnectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")
-            ?? "Host=localhost;Database=sigetour_test_db;Username=postgres;Password=3nriqueA1402#";
-
         private readonly IConfiguration _config;
         private readonly CheckoutAccess _checkoutAccess;
         private readonly ITestOutputHelper _output;
@@ -44,7 +41,7 @@ namespace SIGETOUR.Tests.Payments
                 { "Culqi:SecretKey", "sk_test_sample_secret_key_123" },
                 { "Culqi:WebhookUser", "webhook_user_sigetour" },
                 { "Culqi:WebhookPassword", "webhook_pass_secret_test" },
-                { "ConnectionStrings:DefaultConnection", ConnectionString }
+                { "ConnectionStrings:DefaultConnection", PostgresTestHelper.GetConfiguredConnectionString() ?? string.Empty }
             };
 
             _config = new ConfigurationBuilder().AddInMemoryCollection(inMemorySettings).Build();
@@ -53,40 +50,15 @@ namespace SIGETOUR.Tests.Payments
 
         private AppDbContext CreatePostgresDbContext()
         {
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(ConnectionString, npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
-                .Options;
-
+            var conn = PostgresTestHelper.GetConfiguredConnectionString()!;
+            var options = PostgresTestHelper.CreatePostgresOptions(conn);
             return new AppDbContext(options);
         }
 
-        private async Task<bool> IsPostgresAvailableAsync()
-        {
-            try
-            {
-                await using var db = CreatePostgresDbContext();
-                var canConnect = await db.Database.CanConnectAsync();
-                if (!canConnect)
-                {
-                    _output.WriteLine("[OMITIDA] Base de datos de pruebas PostgreSQL (sigetour_test_db) no accesible.");
-                }
-                return canConnect;
-            }
-            catch (Exception ex)
-            {
-                _output.WriteLine($"[OMITIDA] Error conectando a PostgreSQL de pruebas: {ex.Message}");
-                return false;
-            }
-        }
-
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_FullPaymentCycle_AtomicUpdateAndNoDuplicates()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -203,14 +175,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_SplitPayment_AdvanceThenBalance_PersistsBothUniqueCashTransactions()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -322,14 +290,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_FilteredIndex_AllowsMultiplePendingReceiptsWithoutNumber_EnforcesUniqueOnRealNumbers()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -430,14 +394,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_CancelledBookingPayment_RetainsExternalMoney_PersistsIncidentAndCashTransaction()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -503,14 +463,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_CapacityCheck_DoesNotThrowDateTimeUnspecifiedException()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -559,14 +515,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_ConcurrentChargeCalls_OnlyOneClaimsAttempt()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -658,14 +610,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_3DSRequired_ReusesExistingAttempt_DoesNotCreateDuplicate()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -718,14 +666,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_ExcessPayment_TerminalState_NoDuplicateIncidentsOnRepeatedCheck()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -810,14 +754,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_CurrencyValidation_RejectsNonPEN()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
@@ -872,14 +812,10 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
-        [Fact]
+        [SkippableFact]
         public async Task Postgres_YapeTokenCharge_TransitionsChannelAndCompletesPayment()
         {
-            if (!await IsPostgresAvailableAsync())
-            {
-                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
-                return;
-            }
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
 
             await using var db = CreatePostgresDbContext();
 
