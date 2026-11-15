@@ -142,8 +142,16 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/Login";
     options.Events.OnValidatePrincipal = async context =>
     {
+        // 1. Ejecutar validación del SecurityStamp estándar de Identity
+        await SecurityStampValidator.ValidatePrincipalAsync(context);
+        if (context.Principal == null)
+        {
+            return;
+        }
+
+        // 2. Verificar que la cuenta de usuario continúe activa en la base de datos
         var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
-        var user = context.Principal != null ? await userManager.GetUserAsync(context.Principal) : null;
+        var user = await userManager.GetUserAsync(context.Principal);
         if (user == null || !user.IsActive)
         {
             context.RejectPrincipal();
@@ -187,6 +195,14 @@ builder.Services.AddAuthentication(options =>
                 if (user == null || !user.IsActive)
                 {
                     context.Fail("La cuenta de usuario se encuentra desactivada o ya no existe.");
+                    return;
+                }
+
+                var tokenStamp = context.Principal?.FindFirst("SecurityStamp")?.Value;
+                if (!string.IsNullOrEmpty(tokenStamp) && !string.Equals(user.SecurityStamp, tokenStamp, StringComparison.Ordinal))
+                {
+                    context.Fail("La sesión o permisos del token han sido revocados.");
+                    return;
                 }
             }
         }
@@ -200,7 +216,6 @@ builder.Services.AddAuthorization(options =>
     {
         options.AddPolicy(permission, policy => policy.RequireAssertion(ctx =>
         {
-            if (ctx.User.IsInRole("SuperAdmin")) return true;
             if (ctx.User.HasClaim("Permission", permission)) return true;
             foreach (var role in ctx.User.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value))
             {
@@ -234,6 +249,7 @@ builder.Services.AddScoped<SIGETOUR.API.Application.Interfaces.ICapacityValidati
 builder.Services.AddSingleton<CheckoutAccess>();
 builder.Services.AddHttpClient<CulqiApiClient>();
 builder.Services.AddHttpClient<SIGETOUR.API.Application.Invoicing.IElectronicReceiptService, SIGETOUR.API.Application.Invoicing.NubefactInvoiceService>();
+builder.Services.AddHostedService<SIGETOUR.API.Application.Invoicing.NubefactRecoveryBackgroundService>();
 builder.Services.AddSingleton<SIGETOUR.API.Application.Interfaces.IVisitorCounterService, SIGETOUR.API.Application.Services.VisitorCounterService>();
 builder.Services.AddSingleton<SIGETOUR.API.Application.Interfaces.ICompanyContactService, SIGETOUR.API.Application.Services.CompanyContactService>();
 builder.Services.AddScoped<SIGETOUR.API.Application.Interfaces.IEmailService, SIGETOUR.API.Application.Services.EmailService>();
@@ -349,7 +365,8 @@ using (var scope = app.Services.CreateScope())
                 CONSTRAINT ""CK_CulqiPayment_Positive"" CHECK (""AmountCents"" > 0)
             );
             CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_ProviderId"" ON ""CulqiPayments"" (""ProviderId"");
-            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId"" ON ""CulqiPayments"" (""BookingId"") WHERE ""Status"" IN ('created', 'processing', 'verification');
+            DROP INDEX IF EXISTS ""IX_CulqiPayments_BookingId"";
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId"" ON ""CulqiPayments"" (""BookingId"") WHERE ""Status"" IN ('created', 'processing', 'verification', '3ds_required');
             CREATE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId_CreatedAtUtc"" ON ""CulqiPayments"" (""BookingId"", ""CreatedAtUtc"");
         ");
     } catch { }

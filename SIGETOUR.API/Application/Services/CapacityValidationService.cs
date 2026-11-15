@@ -32,19 +32,16 @@ namespace SIGETOUR.API.Application.Services
                 return (false, 0, 0, "La cantidad de pasajeros debe ser mayor a 0.");
             }
 
-            // En bases de datos relacionales (PostgreSQL), si nos encontramos dentro de una transacción activa,
+            // En bases de datos relacionales PostgreSQL, bajo una transacción activa,
             // adquirimos un bloqueo pesimista sobre la fila del TourPackage para serializar consultas concurrentes
-            // y garantizar 0% de sobreventa bajo alta concurrencia.
+            // y garantizar 0% de sobreventa bajo alta concurrencia. No se ignoran silenciosamente errores de bloqueo.
             if (_context.Database.IsRelational() && _context.Database.CurrentTransaction != null)
             {
-                try
+                var isNpgsql = _context.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+                if (isNpgsql)
                 {
                     await _context.Database.ExecuteSqlInterpolatedAsync(
                         $"SELECT 1 FROM \"TourPackages\" WHERE \"Id\" = {tourId} FOR UPDATE;", ct);
-                }
-                catch
-                {
-                    // Fallback transparente si el provider no soporta la sintaxis FOR UPDATE
                 }
             }
 

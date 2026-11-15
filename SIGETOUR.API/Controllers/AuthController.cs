@@ -60,6 +60,7 @@ namespace SIGETOUR.API.Controllers
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
                 new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
                 new Claim("IsActive", user.IsActive ? "true" : "false"),
+                new Claim("SecurityStamp", user.SecurityStamp ?? string.Empty),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
 
@@ -72,6 +73,19 @@ namespace SIGETOUR.API.Controllers
                     if (!authClaims.Any(c => c.Type == "Permission" && c.Value == perm))
                     {
                         authClaims.Add(new Claim("Permission", perm));
+                    }
+                }
+
+                var identityRole = await _roleManager.FindByNameAsync(userRole);
+                if (identityRole != null)
+                {
+                    var roleClaims = await _roleManager.GetClaimsAsync(identityRole);
+                    foreach (var claim in roleClaims.Where(c => c.Type == "Permission"))
+                    {
+                        if (!authClaims.Any(c => c.Type == "Permission" && c.Value == claim.Value))
+                        {
+                            authClaims.Add(new Claim("Permission", claim.Value));
+                        }
                     }
                 }
             }

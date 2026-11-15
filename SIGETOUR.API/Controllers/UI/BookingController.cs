@@ -15,6 +15,7 @@ using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Application.Services;
 using SIGETOUR.API.Core.Common;
 using SIGETOUR.API.Core.Entities;
+using SIGETOUR.API.Core.Security;
 using SIGETOUR.API.Infrastructure.Data;
 using SIGETOUR.API.Models;
 
@@ -58,7 +59,16 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (User?.Identity?.IsAuthenticated == true)
             {
-                return true;
+                // El personal autenticado debe contar con permiso operativo explícito para ver reservas o comprobantes
+                if (User.IsInRole("SuperAdmin") ||
+                    User.IsInRole("Admin") ||
+                    User.IsInRole("Operador") ||
+                    User.HasClaim("Permission", AppPermissions.BookingsView) ||
+                    User.HasClaim("Permission", AppPermissions.ReceiptsView))
+                {
+                    return true;
+                }
+                // Un usuario autenticado sin roles ni permisos asignados es rechazado
             }
 
             if (!string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token))

@@ -42,6 +42,19 @@ namespace SIGETOUR.API.Infrastructure.Security
                         identity.AddClaim(new Claim("Permission", perm));
                     }
                 }
+
+                var identityRole = await RoleManager.FindByNameAsync(role);
+                if (identityRole != null)
+                {
+                    var roleClaims = await RoleManager.GetClaimsAsync(identityRole);
+                    foreach (var claim in roleClaims.Where(c => c.Type == "Permission"))
+                    {
+                        if (!identity.HasClaim("Permission", claim.Value))
+                        {
+                            identity.AddClaim(new Claim("Permission", claim.Value));
+                        }
+                    }
+                }
             }
 
             return identity;

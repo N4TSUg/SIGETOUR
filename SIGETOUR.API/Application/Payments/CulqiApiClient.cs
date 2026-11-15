@@ -61,4 +61,62 @@ public sealed record CulqiResult(bool Success, int HttpStatus, JsonDocument? Bod
         if (Body is null || !Body.RootElement.TryGetProperty(field, out var prop)) return null;
         return prop.TryGetInt64(out var value) ? value : null;
     }
+
+    public string? GetDeclineOrErrorCode()
+    {
+        if (Body is null) return null;
+        var root = Body.RootElement;
+        if (root.TryGetProperty("decline_code", out var dc)) return dc.GetString();
+        if (root.TryGetProperty("code", out var c)) return c.GetString();
+        if (root.TryGetProperty("outcome", out var outcome) && outcome.TryGetProperty("code", out var oc)) return oc.GetString();
+        if (root.TryGetProperty("error", out var err))
+        {
+            if (err.TryGetProperty("decline_code", out var edc)) return edc.GetString();
+            if (err.TryGetProperty("code", out var ec)) return ec.GetString();
+        }
+        return null;
+    }
+
+    public string? GetErrorOrUserMessage(string? sourceId = null)
+    {
+        if (Body is null) return null;
+        var root = Body.RootElement;
+
+        // 1. Mensaje de usuario en raíz
+        if (root.TryGetProperty("user_message", out var um) && !string.IsNullOrWhiteSpace(um.GetString()))
+            return um.GetString();
+
+        // 2. Anidado en outcome
+        if (root.TryGetProperty("outcome", out var outcome))
+        {
+            if (outcome.TryGetProperty("user_message", out var oum) && !string.IsNullOrWhiteSpace(oum.GetString()))
+                return oum.GetString();
+            if (outcome.TryGetProperty("merchant_message", out var omm) && !string.IsNullOrWhiteSpace(omm.GetString()))
+                return omm.GetString();
+        }
+
+        // 3. Anidado en error
+        if (root.TryGetProperty("error", out var err))
+        {
+            if (err.TryGetProperty("user_message", out var eum) && !string.IsNullOrWhiteSpace(eum.GetString()))
+                return eum.GetString();
+            if (err.TryGetProperty("merchant_message", out var emm) && !string.IsNullOrWhiteSpace(emm.GetString()))
+                return emm.GetString();
+        }
+
+        if (root.TryGetProperty("merchant_message", out var mm) && !string.IsNullOrWhiteSpace(mm.GetString()))
+            return mm.GetString();
+
+        // 4. Códigos específicos de Yape (código de aprobación inválido o expirado)
+        var code = GetDeclineOrErrorCode();
+        if (code is "AUT0014" or "AUT0007")
+        {
+            return "Código de aprobación de Yape inválido o expirado. Genera un nuevo código en tu app Yape.";
+        }
+
+        bool isYape = sourceId != null && (sourceId.StartsWith("ype_") || sourceId.Contains("yape", StringComparison.OrdinalIgnoreCase));
+        return isYape
+            ? "No se pudo procesar el pago con Yape. Por favor verifica tu código de aprobación o saldo en la app Yape."
+            : "Tarjeta rechazada por la entidad bancaria";
+    }
 }

@@ -536,13 +536,27 @@ public sealed class CulqiPaymentsController : ControllerBase
                     message = applied ? "Cargo verificado exitosamente" : "Esperando confirmación final del proveedor" });
             }
 
-            // 3. Diferenciación de Rechazo Definitivo (fondos insuficientes, tarjeta inválida/declinada, 400/402)
+            // 3. Diferenciación de Rechazo Definitivo (fondos insuficientes, tarjeta inválida/declinada, OTP inválido o expirado, 400/402)
             if (charge.HttpStatus is >= 400 and < 500)
             {
-                var errorMsg = charge.Text("user_message") ?? charge.Text("merchant_message") ?? "Tarjeta rechazada por la entidad bancaria";
+                var errorMsg = charge.GetErrorOrUserMessage(request.SourceId);
+                var errorCode = charge.GetDeclineOrErrorCode();
+                var correlationId = Guid.NewGuid().ToString("N")[..8];
+                var maskedToken = SanitizeToken(request.SourceId);
+
+                _logger?.LogWarning("Culqi cargo rechazado [{CorrelationId}]: HTTP {HttpStatus}, Code: {ErrorCode}, Msg: {ErrorMsg}, Token: {MaskedToken}",
+                    correlationId, charge.HttpStatus, errorCode, errorMsg, maskedToken);
+
                 payment.Status = "failed";
                 await _db.SaveChangesAsync(ct);
-                return BadRequest(new { attemptId = payment.Id, status = "failed", message = errorMsg });
+                return BadRequest(new
+                {
+                    attemptId = payment.Id,
+                    status = "failed",
+                    message = errorMsg,
+                    code = errorCode,
+                    correlationId
+                });
             }
 
             // 4. Errores ambiguos / servidor externo (HTTP 5xx)
@@ -1220,6 +1234,13 @@ public sealed class CulqiPaymentsController : ControllerBase
         }
 
         return true;
+    }
+
+    private static string SanitizeToken(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return "null";
+        if (token.Length <= 8) return "***";
+        return $"{token[..8]}***";
     }
 }
 

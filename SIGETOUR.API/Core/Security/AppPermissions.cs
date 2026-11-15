@@ -39,7 +39,14 @@ namespace SIGETOUR.API.Core.Security
         {
             return roleName switch
             {
-                "SuperAdmin" => AllPermissions,
+                "SuperAdmin" => new[]
+                {
+                    SupervisionView, SupervisionManage,
+                    UsersManage, RolesManage,
+                    IncidentsManage,
+                    BookingsView, ReceiptsView,
+                    CashView, ManifestView, ToursView
+                },
                 "Admin" => new[]
                 {
                     ToursView, ToursManage,

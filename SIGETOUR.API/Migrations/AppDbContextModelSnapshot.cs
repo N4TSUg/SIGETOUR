@@ -542,7 +542,7 @@ namespace SIGETOUR.API.Migrations
 
                     b.HasIndex("BookingId")
                         .IsUnique()
-                        .HasFilter("\"Status\" IN ('created', 'processing', 'verification')");
+                        .HasFilter("\"Status\" IN ('created', 'processing', 'verification', '3ds_required')");
 
                     b.HasIndex("ProviderId")
                         .IsUnique();
