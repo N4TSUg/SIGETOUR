@@ -17,6 +17,7 @@ using Xunit.Abstractions;
 
 namespace SIGETOUR.Tests.Payments
 {
+    [Collection("PostgresDatabaseCollection")]
     public class PostgresBookingCashConsistencyTests
     {
         private static readonly string ConnectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")
@@ -145,13 +146,17 @@ namespace SIGETOUR.Tests.Payments
                 await db.SaveChangesAsync();
             }
 
-            var tour = await db.TourPackages.FirstOrDefaultAsync();
-            if (tour == null)
+            var tour = new TourPackage
             {
-                tour = new TourPackage { Id = Guid.NewGuid(), Title = "Tour PG B3 Delta", Slug = "tour-pg-b3-d-" + Guid.NewGuid().ToString("N")[..6], BasePrice = 100m, IsActive = true };
-                db.TourPackages.Add(tour);
-                await db.SaveChangesAsync();
-            }
+                Id = Guid.NewGuid(),
+                Title = "Tour PG B3 Delta " + Guid.NewGuid().ToString("N")[..6],
+                Slug = "tour-pg-b3-d-" + Guid.NewGuid().ToString("N")[..6],
+                BasePrice = 100m,
+                MaxCapacity = 50,
+                IsActive = true
+            };
+            db.TourPackages.Add(tour);
+            await db.SaveChangesAsync();
 
             var booking = new Booking
             {
@@ -202,6 +207,7 @@ namespace SIGETOUR.Tests.Payments
             db.CashTransactions.Remove(deltaTx);
             db.BookingItems.RemoveRange(await db.BookingItems.Where(i => i.BookingId == booking.Id).ToListAsync());
             db.Bookings.Remove(updatedBooking);
+            db.TourPackages.Remove(tour);
             await db.SaveChangesAsync();
         }
 

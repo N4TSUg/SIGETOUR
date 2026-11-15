@@ -18,6 +18,7 @@ using System.Net.Http;
 using SIGETOUR.API.Application.Services;
 using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Application.Invoicing;
+using SIGETOUR.API.Core.Common;
 
 namespace SIGETOUR.API.Controllers.UI
 {
@@ -32,6 +33,7 @@ namespace SIGETOUR.API.Controllers.UI
         private readonly ICashReportExportService _cashReportService;
         private readonly SIGETOUR.API.Application.Interfaces.IVisitorCounterService _visitorCounterService;
         private readonly IImageStorageService? _imageStorageService;
+        private readonly ICapacityValidationService _capacityService;
 
         public AdminController(
             AppDbContext context, 
@@ -41,7 +43,8 @@ namespace SIGETOUR.API.Controllers.UI
             IManifestExportService manifestService,
             ICashReportExportService cashReportService,
             SIGETOUR.API.Application.Interfaces.IVisitorCounterService visitorCounterService,
-            IImageStorageService? imageStorageService = null)
+            IImageStorageService? imageStorageService = null,
+            ICapacityValidationService? capacityService = null)
         {
             _context = context;
             _userManager = userManager;
@@ -51,6 +54,7 @@ namespace SIGETOUR.API.Controllers.UI
             _cashReportService = cashReportService;
             _visitorCounterService = visitorCounterService;
             _imageStorageService = imageStorageService;
+            _capacityService = capacityService ?? new CapacityValidationService(_context);
         }
 
         public async Task<IActionResult> Dashboard()
@@ -63,7 +67,7 @@ namespace SIGETOUR.API.Controllers.UI
             var bookingsCount = await _context.Bookings.CountAsync();
 
             // Fecha local de Cajamarca / Perú (UTC-5)
-            var peruNow = DateTime.UtcNow.AddHours(-5);
+            var peruNow = PeruTime.Now;
             var todayPeru = peruNow.Date;
             var todayPeruStr = todayPeru.ToString("yyyy-MM-dd");
 
@@ -76,11 +80,11 @@ namespace SIGETOUR.API.Controllers.UI
                 .Where(b => b.Status != BookingStatus.Cancelled)
                 .ToListAsync();
 
-            // Reservas del día de viaje
+            // Reservas del día de viaje (evaluando fecha local de Perú)
             var todayBookings = allActiveBookings.Where(b =>
+                b.TravelDate.Date == todayPeru ||
                 b.TravelDate.ToString("yyyy-MM-dd") == todayPeruStr ||
-                b.TravelDate.AddHours(-5).ToString("yyyy-MM-dd") == todayPeruStr ||
-                b.TravelDate.Date == todayPeru
+                PeruTime.ToPeruTime(b.TravelDate).Date == todayPeru
             ).ToList();
 
             var todayPax = todayBookings.Sum(b => b.TotalPassengers);
@@ -246,44 +250,45 @@ namespace SIGETOUR.API.Controllers.UI
                             depDateTime = depDate.Date.AddHours(9).AddMinutes(30);
                     }
 
-                    var nowPeru = DateTime.UtcNow.AddHours(-5);
+                    double durationHours = ResolveTourDurationHours(tour, shiftKey);
+                    DateTime endDateTime = depDateTime.AddHours(durationHours);
+
+                    bool hasUnitOrDriver = (veh != null || assignedDriver != null);
                     string status;
                     string statusColor;
 
-                    if (veh != null || assignedDriver != null)
+                    if (depDate > todayPeru)
                     {
-                        if (depDate == todayPeru && nowPeru < depDateTime && (depDateTime - nowPeru).TotalMinutes <= 45)
-                        {
-                            status = "Abordando Pasajeros";
-                            statusColor = "amber";
-                        }
-                        else if (depDate == todayPeru && nowPeru >= depDateTime)
-                        {
-                            status = "En Ruta (Despachado)";
-                            statusColor = "emerald";
-                        }
-                        else
-                        {
-                            status = "En Espera (Unidad Asignada)";
-                            statusColor = "sky";
-                        }
+                        // Salida programada para un día futuro
+                        status = hasUnitOrDriver ? "En Espera (Unidad Asignada)" : "En Espera (Programada)";
+                        statusColor = hasUnitOrDriver ? "sky" : "slate";
                     }
-                    else
+                    else if (depDate < todayPeru || (depDate == todayPeru && peruNow >= endDateTime))
                     {
-                        if (depDate == todayPeru && nowPeru < depDateTime && (depDateTime - nowPeru).TotalMinutes <= 45 && (depDateTime - nowPeru).TotalMinutes >= 0)
+                        // Salida concluida (fecha anterior o tour que ya cumplió su duración de recorrido hoy)
+                        status = "Finalizado (Retorno Concluido)";
+                        statusColor = "zinc";
+                    }
+                    else // Salida correspondiente al día de hoy aún no culminada
+                    {
+                        if (peruNow < depDateTime)
                         {
-                            status = "Abordando (Por Asignar)";
-                            statusColor = "amber";
+                            var minutesToDeparture = (depDateTime - peruNow).TotalMinutes;
+                            if (minutesToDeparture <= 45 && minutesToDeparture >= 0)
+                            {
+                                status = hasUnitOrDriver ? "Abordando Pasajeros" : "Abordando (Por Asignar)";
+                                statusColor = "amber";
+                            }
+                            else
+                            {
+                                status = hasUnitOrDriver ? "En Espera (Unidad Asignada)" : "En Espera (Programada)";
+                                statusColor = hasUnitOrDriver ? "sky" : "slate";
+                            }
                         }
-                        else if (depDate == todayPeru && nowPeru >= depDateTime)
+                        else // peruNow >= depDateTime && peruNow < endDateTime
                         {
-                            status = "En Ruta (Despacho Pendiente)";
+                            status = hasUnitOrDriver ? "En Ruta (Despachado)" : "En Ruta (Despacho Pendiente)";
                             statusColor = "emerald";
-                        }
-                        else
-                        {
-                            status = "En Espera (Programada)";
-                            statusColor = "slate";
                         }
                     }
 
@@ -2467,6 +2472,17 @@ namespace SIGETOUR.API.Controllers.UI
                 await using var dbTx = await _context.Database.BeginTransactionAsync();
                 try
                 {
+                    var capacityResult = await _capacityService.ValidateCapacityAsync(
+                        tour.Id, model.TravelDate, model.ShiftName, model.TotalPassengers, null);
+
+                    if (!capacityResult.IsAvailable)
+                    {
+                        ModelState.AddModelError("", capacityResult.ErrorMessage ?? "No hay cupos suficientes para la fecha y turno seleccionados.");
+                        ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+                        ViewBag.ActiveFeatured = activeFeatured;
+                        return View(model);
+                    }
+
                     await _context.SaveChangesAsync();
                     await dbTx.CommitAsync();
                 }
@@ -2479,6 +2495,17 @@ namespace SIGETOUR.API.Controllers.UI
             }
             else
             {
+                var capacityResult = await _capacityService.ValidateCapacityAsync(
+                    tour.Id, model.TravelDate, model.ShiftName, model.TotalPassengers, null);
+
+                if (!capacityResult.IsAvailable)
+                {
+                    ModelState.AddModelError("", capacityResult.ErrorMessage ?? "No hay cupos suficientes para la fecha y turno seleccionados.");
+                    ViewBag.Tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
+                    ViewBag.ActiveFeatured = activeFeatured;
+                    return View(model);
+                }
+
                 await _context.SaveChangesAsync();
             }
 
@@ -2632,7 +2659,37 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
             }
 
-            var selectedTour = await _context.TourPackages.FindAsync(model.TourPackageId);
+            var targetTourId = model.TourPackageId != Guid.Empty
+                ? model.TourPackageId
+                : (booking.Items.FirstOrDefault()?.TourPackageId ?? Guid.Empty);
+
+            var targetPassengers = model.TotalPassengers > 0
+                ? model.TotalPassengers
+                : (booking.TotalPassengers > 0 ? booking.TotalPassengers : 1);
+
+            var targetTravelDate = model.TravelDate != default
+                ? model.TravelDate
+                : (booking.TravelDate != default ? booking.TravelDate : PeruTime.Today);
+
+            var targetShiftName = !string.IsNullOrWhiteSpace(model.ShiftName)
+                ? model.ShiftName
+                : (!string.IsNullOrWhiteSpace(booking.ShiftName) ? booking.ShiftName : "Mañana");
+
+            var selectedTour = targetTourId != Guid.Empty
+                ? await _context.TourPackages.FindAsync(targetTourId)
+                : null;
+
+            if (selectedTour != null)
+            {
+                var capacityResult = await _capacityService.ValidateCapacityAsync(
+                    selectedTour.Id, targetTravelDate, targetShiftName, targetPassengers, booking.Id);
+
+                if (!capacityResult.IsAvailable)
+                {
+                    TempData["ErrorMessage"] = capacityResult.ErrorMessage ?? "No hay cupos suficientes para la modificación solicitada.";
+                    return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                }
+            }
 
             string pickupLocation = model.BoardingPoint ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(model.HotelDetails) && (pickupLocation.Contains("Hotel") || pickupLocation == "Otro"))
@@ -2640,37 +2697,37 @@ namespace SIGETOUR.API.Controllers.UI
                 pickupLocation = $"Hotel: {model.HotelDetails.Trim()}";
             }
 
-            booking.CustomerName = model.CustomerName ?? string.Empty;
-            booking.CustomerDni = model.CustomerDni ?? string.Empty;
-            booking.CustomerPhone = model.CustomerPhone ?? string.Empty;
+            booking.CustomerName = !string.IsNullOrWhiteSpace(model.CustomerName) ? model.CustomerName : booking.CustomerName;
+            booking.CustomerDni = model.CustomerDni ?? booking.CustomerDni;
+            booking.CustomerPhone = model.CustomerPhone ?? booking.CustomerPhone;
             booking.CustomerEmail = !string.IsNullOrWhiteSpace(model.CustomerEmail) ? model.CustomerEmail.Trim() : (!string.IsNullOrWhiteSpace(booking.CustomerEmail) ? booking.CustomerEmail : "manual@agencia.com");
-            booking.TravelDate = DateTime.SpecifyKind(model.TravelDate, DateTimeKind.Utc);
-            booking.ShiftName = model.ShiftName ?? string.Empty;
-            booking.PickupLocation = pickupLocation;
-            booking.TotalPassengers = model.TotalPassengers;
-            booking.TotalAmount = model.TotalAmount;
+            booking.TravelDate = DateTime.SpecifyKind(targetTravelDate, DateTimeKind.Utc);
+            booking.ShiftName = targetShiftName;
+            booking.PickupLocation = !string.IsNullOrWhiteSpace(pickupLocation) ? pickupLocation : booking.PickupLocation;
+            booking.TotalPassengers = targetPassengers;
+            booking.TotalAmount = model.TotalAmount > 0 ? model.TotalAmount : booking.TotalAmount;
             booking.PaidAmount = model.PaidAmount;
             booking.PaymentMethod = model.PaymentMethod ?? string.Empty;
             booking.OperationNumber = model.OperationNumber ?? string.Empty;
             booking.InvoiceType = model.InvoiceType ?? string.Empty;
             booking.InvoiceNumber = model.InvoiceNumber ?? string.Empty;
             booking.Status = model.Status;
-            booking.AdditionalPassengersJson = string.IsNullOrWhiteSpace(model.AdditionalPassengersJson) ? "[]" : model.AdditionalPassengersJson;
+            booking.AdditionalPassengersJson = string.IsNullOrWhiteSpace(model.AdditionalPassengersJson) ? (booking.AdditionalPassengersJson ?? "[]") : model.AdditionalPassengersJson;
 
             // Actualizar o reasignar el tour en BookingItem si cambió de tour
             if (selectedTour != null)
             {
                 var featured = activeFeatured.TryGetValue(selectedTour.Id, out var fp) ? fp : null;
                 var expectedUnitPrice = (featured?.PromoPrice.HasValue == true) ? featured.PromoPrice.Value : selectedTour.BasePrice;
-                var unitPrice = model.TotalPassengers > 0 ? (model.TotalAmount / model.TotalPassengers) : expectedUnitPrice;
+                var unitPrice = targetPassengers > 0 ? (booking.TotalAmount / targetPassengers) : expectedUnitPrice;
 
                 var item = booking.Items.FirstOrDefault();
                 if (item != null)
                 {
                     item.TourPackageId = selectedTour.Id;
                     item.UnitPrice = unitPrice;
-                    item.Passengers = model.TotalPassengers;
-                    item.SubTotal = model.TotalAmount;
+                    item.Passengers = targetPassengers;
+                    item.SubTotal = booking.TotalAmount;
                     _context.Entry(item).State = EntityState.Modified;
                 }
                 else
@@ -2740,6 +2797,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelBooking(Guid id)
         {
@@ -2755,11 +2813,34 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReactivateBooking(Guid id)
         {
-            var booking = await _context.Bookings.FindAsync(id);
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
             if (booking == null) return NotFound();
+
+            if (booking.Status == BookingStatus.Confirmed)
+            {
+                TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} ya se encuentra confirmada.";
+                return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+            }
+
+            var item = booking.Items.FirstOrDefault();
+            if (item != null)
+            {
+                var capacityResult = await _capacityService.ValidateCapacityAsync(
+                    item.TourPackageId, booking.TravelDate, booking.ShiftName, booking.TotalPassengers, booking.Id);
+
+                if (!capacityResult.IsAvailable)
+                {
+                    TempData["ErrorMessage"] = $"No es posible reactivar la reserva {booking.ReferenceCode}: {capacityResult.ErrorMessage}";
+                    return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                }
+            }
 
             booking.Status = BookingStatus.Confirmed;
             _context.Bookings.Update(booking);
@@ -4234,6 +4315,36 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             return isAfternoon ? "03:30 PM" : "09:30 AM";
+        }
+
+        private static double ResolveTourDurationHours(SIGETOUR.API.Core.Entities.TourPackage tour, string shiftKey)
+        {
+            if (tour.Shifts != null && tour.Shifts.Any())
+            {
+                var shift = tour.Shifts.FirstOrDefault(s =>
+                    s.IsActive && !string.IsNullOrWhiteSpace(shiftKey) && (
+                        s.ShiftName.Equals(shiftKey, StringComparison.OrdinalIgnoreCase) ||
+                        shiftKey.Contains(s.ShiftName, StringComparison.OrdinalIgnoreCase)));
+
+                if (shift != null && shift.EndTime > shift.StartTime)
+                {
+                    return Math.Min(12.0, Math.Max(1.5, (shift.EndTime - shift.StartTime).TotalHours));
+                }
+            }
+
+            var durationText = (tour.Duration ?? "").ToLower();
+            if (durationText.Contains("día") || durationText.Contains("dia") || durationText.Contains("full"))
+            {
+                return 8.0;
+            }
+
+            var match = System.Text.RegularExpressions.Regex.Match(durationText, @"(\d+(?:[\.,]\d+)?)\s*(?:hora|hr|h)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (match.Success && double.TryParse(match.Groups[1].Value.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var hours))
+            {
+                return Math.Min(12.0, Math.Max(1.5, hours));
+            }
+
+            return 4.0;
         }
 
         private static TimeSpan ParseTimeForSorting(string timeStr)

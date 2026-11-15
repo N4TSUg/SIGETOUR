@@ -26,6 +26,7 @@ using Xunit.Abstractions;
 
 namespace SIGETOUR.Tests.Payments
 {
+    [Collection("PostgresDatabaseCollection")]
     public class PostgresNubefactIntegrationTests
     {
         private static readonly string ConnectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION")

@@ -22,6 +22,7 @@ using Xunit.Abstractions;
 
 namespace SIGETOUR.Tests.Payments
 {
+    [Collection("PostgresDatabaseCollection")]
     public class PostgresCulqiIntegrationTests
     {
         // Base de datos dedicada y aislada exclusivamente para pruebas (NUNCA la base operativa sigetour_db)

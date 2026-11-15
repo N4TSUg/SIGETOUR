@@ -10,8 +10,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SIGETOUR.API.Application.Invoicing;
+using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Application.Services;
+using SIGETOUR.API.Core.Common;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
 using SIGETOUR.API.Models;
@@ -23,15 +25,18 @@ namespace SIGETOUR.API.Controllers.UI
         private readonly AppDbContext _context;
         private readonly CheckoutAccess _checkoutAccess;
         private readonly IConfiguration _configuration;
+        private readonly ICapacityValidationService _capacityService;
 
         public BookingController(
             AppDbContext context,
             CheckoutAccess? checkoutAccess = null,
-            IConfiguration? configuration = null)
+            IConfiguration? configuration = null,
+            ICapacityValidationService? capacityService = null)
         {
             _context = context;
             _configuration = configuration ?? new ConfigurationBuilder().Build();
             _checkoutAccess = checkoutAccess ?? CreateDefaultCheckoutAccess(_configuration);
+            _capacityService = capacityService ?? new CapacityValidationService(_context);
         }
 
         private static CheckoutAccess CreateDefaultCheckoutAccess(IConfiguration config)
@@ -125,7 +130,7 @@ namespace SIGETOUR.API.Controllers.UI
                 return View(tour);
             }
 
-            var peruToday = DateTime.UtcNow.AddHours(-5).Date;
+            var peruToday = PeruTime.Today;
             if (model.TravelDate.Date < peruToday)
             {
                 ModelState.AddModelError("TravelDate", "La fecha del viaje no puede ser una fecha en el pasado.");
@@ -138,26 +143,12 @@ namespace SIGETOUR.API.Controllers.UI
                 return View(tour);
             }
 
-            // Validación de sobreventa / capacidad máxima (compatible con PostgreSQL timestamptz UTC)
-            var travelDateUtc = DateTime.SpecifyKind(model.TravelDate.Date, DateTimeKind.Utc);
-            var nextDayUtc = travelDateUtc.AddDays(1);
+            var capacityCheck = await _capacityService.ValidateCapacityAsync(
+                tour.Id, model.TravelDate, model.Shift, model.Passengers, null);
 
-            var bookedPaxQuery = _context.BookingItems
-                .Where(bi => bi.TourPackageId == tour.Id &&
-                             bi.Booking.TravelDate >= travelDateUtc &&
-                             bi.Booking.TravelDate < nextDayUtc &&
-                             bi.Booking.Status != BookingStatus.Cancelled);
-
-            if (!string.IsNullOrWhiteSpace(model.Shift))
+            if (!capacityCheck.IsAvailable)
             {
-                bookedPaxQuery = bookedPaxQuery.Where(bi => bi.Booking.ShiftName == model.Shift);
-            }
-
-            var bookedPax = await bookedPaxQuery.SumAsync(bi => bi.Passengers);
-
-            if (tour.MaxCapacity > 0 && bookedPax + model.Passengers > tour.MaxCapacity)
-            {
-                ModelState.AddModelError("", $"No hay cupos suficientes para la fecha y turno seleccionados. Capacidad máxima: {tour.MaxCapacity}, ocupados: {bookedPax}, solicitados: {model.Passengers}.");
+                ModelState.AddModelError("", capacityCheck.ErrorMessage ?? "No hay cupos suficientes para la fecha y turno seleccionados.");
                 return View(tour);
             }
 
@@ -225,8 +216,35 @@ namespace SIGETOUR.API.Controllers.UI
                 SubTotal = effectiveUnitPrice * model.Passengers
             });
 
-            _context.Bookings.Add(booking);
-            await _context.SaveChangesAsync();
+            if (_context.Database.IsRelational())
+            {
+                await using var dbTx = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    var finalCapacity = await _capacityService.ValidateCapacityAsync(
+                        tour.Id, model.TravelDate, model.Shift, model.Passengers, null);
+
+                    if (!finalCapacity.IsAvailable)
+                    {
+                        ModelState.AddModelError("", finalCapacity.ErrorMessage ?? "No hay cupos suficientes para la fecha y turno seleccionados.");
+                        return View(tour);
+                    }
+
+                    _context.Bookings.Add(booking);
+                    await _context.SaveChangesAsync();
+                    await dbTx.CommitAsync();
+                }
+                catch
+                {
+                    await dbTx.RollbackAsync();
+                    throw;
+                }
+            }
+            else
+            {
+                _context.Bookings.Add(booking);
+                await _context.SaveChangesAsync();
+            }
 
             // Guardar en sesión y cookie de forma segura para permitir acceso inmediato a su voucher
             var checkoutToken = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultCheckoutTtl);

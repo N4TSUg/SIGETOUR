@@ -90,9 +90,10 @@
                 </div>
                 @{
                     var todayDeps = Model.Departures.Where(d => d.DepartureDate.Date == DateTime.UtcNow.AddHours(-5).Date).ToList();
-                    var enRutaCount = todayDeps.Count(d => d.StatusColor == "emerald");
-                    var abordandoCount = todayDeps.Count(d => d.StatusColor == "amber");
-                    var enEsperaCount = todayDeps.Count(d => d.StatusColor == "slate" || d.StatusColor == "sky");
+                    var enRutaCount = todayDeps.Count(d => d.Status.StartsWith("En Ruta"));
+                    var abordandoCount = todayDeps.Count(d => d.Status.StartsWith("Abordando"));
+                    var enEsperaCount = todayDeps.Count(d => d.Status.StartsWith("En Espera"));
+                    var finalizadoCount = todayDeps.Count(d => d.Status.StartsWith("Finalizado"));
                 }
                 <div class="flex flex-wrap gap-1.5 mt-2">
                     @if (Model.TodayDeparturesCount > 0)
@@ -106,6 +107,12 @@
                         <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
                             <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> @enEsperaCount en espera
                         </span>
+                        @if (finalizadoCount > 0)
+                        {
+                            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-zinc-100 text-zinc-700">
+                                <span class="w-1.5 h-1.5 rounded-full bg-zinc-500"></span> @finalizadoCount finalizados
+                            </span>
+                        }
                     }
                     else if (!string.IsNullOrEmpty(Model.NextDepartureDateText))
                     {
@@ -320,6 +327,13 @@
                                     {
                                         <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">
                                             <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                            @dep.Status
+                                        </span>
+                                    }
+                                    else if (dep.StatusColor == "zinc")
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-300">
+                                            <span class="material-symbols-outlined text-[13px] text-zinc-600">check_circle</span>
                                             @dep.Status
                                         </span>
                                     }

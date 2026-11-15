@@ -230,6 +230,7 @@ builder.Services.AddSession(options =>
 builder.Services.AddScoped<ITourPackageService, TourPackageService>();
 builder.Services.AddScoped<IManifestExportService, ManifestExportService>();
 builder.Services.AddScoped<ICashReportExportService, CashReportExportService>();
+builder.Services.AddScoped<SIGETOUR.API.Application.Interfaces.ICapacityValidationService, SIGETOUR.API.Application.Services.CapacityValidationService>();
 builder.Services.AddSingleton<CheckoutAccess>();
 builder.Services.AddHttpClient<CulqiApiClient>();
 builder.Services.AddHttpClient<SIGETOUR.API.Application.Invoicing.IElectronicReceiptService, SIGETOUR.API.Application.Invoicing.NubefactInvoiceService>();
