@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using SIGETOUR.API.Application.Services;
 using SIGETOUR.API.Application.Payments;
+using SIGETOUR.API.Application.Invoicing;
 
 namespace SIGETOUR.API.Controllers.UI
 {
@@ -2944,6 +2945,16 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             return NotFound("El comprobante electrónico aún no cuenta con archivo PDF disponible.");
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "SuperAdmin,Admin")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecoverPendingReceipts([FromServices] IElectronicReceiptService receiptService, CancellationToken ct)
+        {
+            var count = await receiptService.ProcessPendingReceiptsAsync(ct);
+            TempData["SuccessMessage"] = $"Se procesaron y recuperaron {count} comprobante(s) pendiente(s).";
+            return RedirectToAction(nameof(Bookings));
         }
 
         [HttpPost]

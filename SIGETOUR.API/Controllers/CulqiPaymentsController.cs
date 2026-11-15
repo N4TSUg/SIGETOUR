@@ -1161,18 +1161,40 @@ public sealed class CulqiPaymentsController : ControllerBase
             });
         }
 
+        // Bloque 4: Registrar una tarea persistente de emisión junto con el pago antes de confirmar la transacción
+        var pendingReceipt = await _db.ElectronicReceipts
+            .FirstOrDefaultAsync(r => r.CulqiPaymentId == current.Id, safeCt);
+
+        if (pendingReceipt == null)
+        {
+            var isFacturaChoice = string.Equals(booking.InvoiceType, "factura", StringComparison.OrdinalIgnoreCase);
+            pendingReceipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                CulqiPaymentId = current.Id,
+                ReceiptType = isFacturaChoice ? "Factura" : "Boleta",
+                Series = isFacturaChoice ? (_config["Nubefact:FacturaSeries"] ?? "F001") : (_config["Nubefact:BoletaSeries"] ?? "B001"),
+                Status = "Pending",
+                Environment = _config["Nubefact:Mode"]?.Trim() ?? "Demo",
+                TotalAmount = paidIncrement,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            _db.ElectronicReceipts.Add(pendingReceipt);
+        }
+
         await ProcessPendingWebhookEventsAsync(current.ProviderId ?? payment.ProviderId, safeCt);
         await _db.SaveChangesAsync(safeCt);
         if (tx != null) await tx.CommitAsync(safeCt);
 
-        // Disparo desacoplado para emisión asíncrona de comprobante NubeFact (modo simulación en Sandbox)
+        // Disparo desacoplado para emisión asíncrona de comprobante NubeFact pasando exactReceiptId
         try
         {
-            await _receiptService.GenerateReceiptAsync(booking.Id, current.Id, safeCt);
+            await _receiptService.GenerateReceiptAsync(booking.Id, current.Id, pendingReceipt.Id, safeCt);
         }
-        catch
+        catch (Exception ex)
         {
-            // Falla en emisión no anula el cobro verificado
+            _logger?.LogError(ex, "Falla en emisión desacoplada para pago {PaymentId}. Queda registrado en Pending para recuperación.", current.Id);
         }
 
         // Enviar correo de confirmación de reserva y boleto oficial con archivos adjuntos PDF

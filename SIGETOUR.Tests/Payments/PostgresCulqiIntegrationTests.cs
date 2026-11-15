@@ -647,6 +647,7 @@ namespace SIGETOUR.Tests.Payments
             Assert.Single(cashTxs);
 
             // Cleanup
+            db.ElectronicReceipts.RemoveRange(await db.ElectronicReceipts.Where(r => r.BookingId == booking.Id).ToListAsync());
             db.CashTransactions.RemoveRange(cashTxs);
             db.CulqiPayments.RemoveRange(await db.CulqiPayments.Where(p => p.BookingId == booking.Id).ToListAsync());
             var bDel = await db.Bookings.FindAsync(booking.Id);
@@ -944,6 +945,7 @@ namespace SIGETOUR.Tests.Payments
             Assert.Equal(45m, cashTx.Amount);
 
             // Cleanup
+            db.ElectronicReceipts.RemoveRange(await db.ElectronicReceipts.Where(r => r.BookingId == booking.Id).ToListAsync());
             db.CashTransactions.Remove(cashTx);
             db.CulqiPayments.Remove(updatedPayment);
             db.Bookings.Remove(updatedBooking);

@@ -10,7 +10,9 @@ namespace SIGETOUR.API.Application.Invoicing
         Task<ElectronicReceipt?> GetReceiptByIdAsync(Guid receiptId, CancellationToken ct = default);
         Task<ElectronicReceipt?> GetReceiptByBookingIdAsync(Guid bookingId, CancellationToken ct = default);
         Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId = null, CancellationToken ct = default);
+        Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, CancellationToken ct = default);
         Task<ElectronicReceipt> RetryReceiptAsync(Guid receiptId, CancellationToken ct = default);
         Task<ElectronicReceipt?> QueryReceiptFromProviderAsync(Guid receiptId, CancellationToken ct = default);
+        Task<int> ProcessPendingReceiptsAsync(CancellationToken ct = default);
     }
 }

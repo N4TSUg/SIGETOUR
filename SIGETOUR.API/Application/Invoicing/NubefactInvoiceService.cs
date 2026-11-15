@@ -68,21 +68,50 @@ namespace SIGETOUR.API.Application.Invoicing
                 .FirstOrDefaultAsync(ct);
         }
 
-        public async Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId = null, CancellationToken ct = default)
+        public Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId = null, CancellationToken ct = default)
         {
-            // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado, Demo o Simulado)
-            var existing = await _db.ElectronicReceipts
-                .OrderByDescending(r => r.CreatedAtUtc)
-                .FirstOrDefaultAsync(r => ((culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId) || (culqiPaymentId == null && r.BookingId == bookingId))
-                    && (r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation"), ct);
-            if (existing != null) return existing;
+            return GenerateReceiptAsync(bookingId, culqiPaymentId, exactReceiptId: null, ct);
+        }
 
-            // Reutilizar registro si quedó en estado fallido/rechazado para actualizarlo en vez de duplicarlo
-            var receipt = await _db.ElectronicReceipts
-                .OrderByDescending(r => r.CreatedAtUtc)
-                .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
-                    || (culqiPaymentId == null && r.BookingId == bookingId), ct);
-            bool isNew = receipt == null;
+        public async Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, CancellationToken ct = default)
+        {
+            var mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
+            ElectronicReceipt? receipt = null;
+            bool isNew = false;
+
+            if (exactReceiptId.HasValue && exactReceiptId.Value != Guid.Empty)
+            {
+                receipt = await _db.ElectronicReceipts.FirstOrDefaultAsync(r => r.Id == exactReceiptId.Value, ct);
+                if (receipt == null)
+                {
+                    throw new InvalidOperationException($"No se encontró el comprobante {exactReceiptId.Value} solicitado.");
+                }
+                if (receipt.Status is "Accepted" or "Demo" or "Simulation")
+                {
+                    return receipt;
+                }
+                if (culqiPaymentId == null && receipt.CulqiPaymentId != null)
+                {
+                    culqiPaymentId = receipt.CulqiPaymentId;
+                }
+                isNew = false;
+            }
+            else
+            {
+                // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado, Demo o Simulado)
+                var existing = await _db.ElectronicReceipts
+                    .OrderByDescending(r => r.CreatedAtUtc)
+                    .FirstOrDefaultAsync(r => ((culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId) || (culqiPaymentId == null && r.BookingId == bookingId && r.CulqiPaymentId == null))
+                        && (r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation"), ct);
+                if (existing != null) return existing;
+
+                // Reutilizar registro si quedó en estado fallido/rechazado para actualizarlo en vez de duplicarlo
+                receipt = await _db.ElectronicReceipts
+                    .OrderByDescending(r => r.CreatedAtUtc)
+                    .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
+                        || (culqiPaymentId == null && r.BookingId == bookingId && r.CulqiPaymentId == null), ct);
+                isNew = receipt == null;
+            }
 
             var booking = await _db.Bookings
                 .Include(b => b.Items)
@@ -92,7 +121,6 @@ namespace SIGETOUR.API.Application.Invoicing
             if (booking == null)
                 throw new InvalidOperationException($"No se encontró la reserva {bookingId} para facturación electrónica.");
 
-            var mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
             CulqiPayment? culqiPayment = null;
             if (culqiPaymentId.HasValue)
             {
@@ -113,10 +141,17 @@ namespace SIGETOUR.API.Application.Invoicing
             // 2. Determinación de importes, anticipos y saldos
             var paymentAmount = culqiPayment != null
                 ? culqiPayment.AmountCents / 100m
-                : booking.PaidAmount;
+                : (receipt != null && receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.PaidAmount);
 
-            var isAdvance = culqiPayment != null && booking.PaidAmount < booking.TotalAmount;
-            var isBalance = culqiPayment != null && booking.PaidAmount >= booking.TotalAmount && (booking.PaidAmount - paymentAmount > 0);
+            var isAdvance = (culqiPayment != null && booking.PaidAmount < booking.TotalAmount)
+                || (culqiPayment == null && paymentAmount < booking.TotalAmount);
+            var isBalance = (culqiPayment != null && booking.PaidAmount >= booking.TotalAmount && (booking.PaidAmount - paymentAmount > 0))
+                || (culqiPayment == null && booking.PaidAmount >= booking.TotalAmount && paymentAmount < booking.TotalAmount);
+
+            // Preservar ambiente histórico si ya fue establecido en el comprobante
+            var effectiveEnvironment = !string.IsNullOrWhiteSpace(receipt?.Environment)
+                ? receipt.Environment
+                : mode;
 
             // Búsqueda de comprobante previo para regularización de anticipo conforme al manual NubeFact (mismo ambiente, excluye Simulación)
             ElectronicReceipt? prevAdvanceReceipt = null;
@@ -126,7 +161,7 @@ namespace SIGETOUR.API.Application.Invoicing
                     .OrderByDescending(r => r.CreatedAtUtc)
                     .FirstOrDefaultAsync(r => r.BookingId == bookingId && r.Id != (receipt != null ? receipt.Id : Guid.Empty)
                         && (r.Status == "Accepted" || r.Status == "Demo")
-                        && r.Environment == mode
+                        && r.Environment == effectiveEnvironment
                         && r.Environment != "Simulation", ct);
             }
             bool isAdvanceRegularization = isBalance && prevAdvanceReceipt != null;
@@ -190,12 +225,16 @@ namespace SIGETOUR.API.Application.Invoicing
                 {
                     BookingId = booking.Id,
                     CulqiPaymentId = culqiPaymentId,
+                    Environment = effectiveEnvironment,
                     CreatedAtUtc = DateTime.UtcNow
                 };
             }
 
             receipt.ReceiptType = receiptType;
-            receipt.Series = defaultSeries;
+            if (string.IsNullOrWhiteSpace(receipt.Series))
+            {
+                receipt.Series = defaultSeries;
+            }
             // No generar correlativos aleatorios; NubeFact asigna el número oficial correlativo
             receipt.CustomerDocType = docType;
             receipt.CustomerDocNumber = !string.IsNullOrWhiteSpace(dni) ? dni : "00000000";
@@ -204,10 +243,14 @@ namespace SIGETOUR.API.Application.Invoicing
             receipt.SubtotalAmount = subtotal;
             receipt.IgvAmount = igv;
             receipt.TotalAmount = total;
+            if (string.IsNullOrWhiteSpace(receipt.Environment))
+            {
+                receipt.Environment = effectiveEnvironment;
+            }
 
             // 5. Separación estricta de Modos: Mock, Demo y Production
-            mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
-            var isMock = string.Equals(mode, "Mock", StringComparison.OrdinalIgnoreCase);
+            mode = effectiveEnvironment;
+            var isMock = string.Equals(mode, "Mock", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Simulation", StringComparison.OrdinalIgnoreCase);
             var ruta = _config["Nubefact:Ruta"]?.Trim();
             var token = _config["Nubefact:Token"]?.Trim();
 
@@ -375,13 +418,15 @@ namespace SIGETOUR.API.Application.Invoicing
                 var itmTotal = Math.Round(itm.SubTotal * ratio, 2);
                 var itmSubtotal = isExonerado || igvRate <= 0 ? itmTotal : Math.Round(itmTotal / (1m + igvRate), 2);
                 var itmIgv = itmTotal - itmSubtotal;
+                var effectivePriceUnit = qty > 0 ? Math.Round(itmTotal / qty, 2) : itmTotal;
 
                 snapshotItems.Add(new
                 {
                     TourTitle = pkgTitle,
                     Quantity = qty,
                     Unit = "NIU",
-                    UnitPrice = itm.UnitPrice > 0 ? itm.UnitPrice : (qty > 0 ? Math.Round(itmTotal / qty, 2) : itmTotal),
+                    UnitPrice = effectivePriceUnit,
+                    FullPackageUnitPrice = itm.UnitPrice > 0 ? itm.UnitPrice : effectivePriceUnit,
                     Subtotal = itmSubtotal,
                     Igv = itmIgv,
                     Total = itmTotal
@@ -415,7 +460,7 @@ namespace SIGETOUR.API.Application.Invoicing
                     MedioPago = !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Culqi",
                     OperacionNumero = booking.OperationNumber,
                     Modalidad = isAdvance ? "Adelanto / Seña" : (isBalance ? "Saldo Final" : "Total 100%"),
-                    Ambiente = mode
+                    Ambiente = effectiveEnvironment
                 },
                 Items = snapshotItems,
                 Totales = new
@@ -429,7 +474,10 @@ namespace SIGETOUR.API.Application.Invoicing
                 }
             };
 
-            receipt.Environment = mode;
+            if (string.IsNullOrWhiteSpace(receipt.Environment))
+            {
+                receipt.Environment = effectiveEnvironment;
+            }
             receipt.SnapshotJson = JsonSerializer.Serialize(snapshot);
             receipt.Status = "Pending";
             if (isNew)
@@ -508,14 +556,17 @@ namespace SIGETOUR.API.Application.Invoicing
                         }
 
                         var sunatDesc = root.TryGetProperty("sunat_description", out var descProp) ? descProp.GetString() : null;
-                        receipt.Environment = mode;
+                        if (string.IsNullOrWhiteSpace(receipt.Environment))
+                        {
+                            receipt.Environment = effectiveEnvironment;
+                        }
 
                         if (isSunatAccepted)
                         {
                             receipt.Status = "Accepted";
                             receipt.ProviderDescription = sunatDesc ?? "Aceptado por SUNAT";
                         }
-                        else if (string.Equals(mode, "Demo", StringComparison.OrdinalIgnoreCase))
+                        else if (string.Equals(receipt.Environment, "Demo", StringComparison.OrdinalIgnoreCase))
                         {
                             // En modo DEMO, la disponibilidad de un PDF no equivale a aceptación tributaria SUNAT
                             receipt.Status = "Demo";
@@ -643,7 +694,43 @@ namespace SIGETOUR.API.Application.Invoicing
 
             // Si falló (Rejected) o quedó en Pending sin número correlativo, reintentar la emisión utilizando
             // el identificador exacto de este comprobante para garantizar idempotencia en NubeFact (codigo_unico)
-            return await GenerateReceiptAsync(receipt.BookingId, receipt.CulqiPaymentId, ct);
+            return await GenerateReceiptAsync(receipt.BookingId, receipt.CulqiPaymentId, receipt.Id, ct);
+        }
+
+        public async Task<int> ProcessPendingReceiptsAsync(CancellationToken ct = default)
+        {
+            var cutoff = DateTime.UtcNow.AddSeconds(-15);
+            var pendingReceipts = await _db.ElectronicReceipts
+                .Where(r => r.Status == "Pending" && r.CreatedAtUtc <= cutoff)
+                .OrderBy(r => r.CreatedAtUtc)
+                .Take(20)
+                .ToListAsync(ct);
+
+            int processedCount = 0;
+            foreach (var receipt in pendingReceipts)
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(receipt.Number))
+                    {
+                        var queried = await QueryReceiptFromProviderAsync(receipt.Id, ct);
+                        if (queried != null && (queried.Status == "Accepted" || queried.Status == "Demo" || queried.Status == "Submitted"))
+                        {
+                            processedCount++;
+                            continue;
+                        }
+                    }
+
+                    await GenerateReceiptAsync(receipt.BookingId, receipt.CulqiPaymentId, receipt.Id, ct);
+                    processedCount++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "No se pudo recuperar el comprobante pendiente {ReceiptId}", receipt.Id);
+                }
+            }
+
+            return processedCount;
         }
 
         public async Task<ElectronicReceipt?> QueryReceiptFromProviderAsync(Guid receiptId, CancellationToken ct = default)
@@ -667,8 +754,12 @@ namespace SIGETOUR.API.Application.Invoicing
 
             try
             {
-                var mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
-                var sendToSunat = string.Equals(mode, "Production", StringComparison.OrdinalIgnoreCase)
+                // Preservar el ambiente histórico del comprobante
+                var docEnvironment = !string.IsNullOrWhiteSpace(receipt.Environment)
+                    ? receipt.Environment
+                    : (_config["Nubefact:Mode"]?.Trim() ?? "Demo");
+
+                var sendToSunat = string.Equals(docEnvironment, "Production", StringComparison.OrdinalIgnoreCase)
                     && string.Equals(_config["Nubefact:SendToSunat"], "true", StringComparison.OrdinalIgnoreCase);
 
                 var isFactura = receipt.ReceiptType == "Factura";
@@ -703,14 +794,19 @@ namespace SIGETOUR.API.Application.Invoicing
                     }
 
                     var sunatQueryDesc = root.TryGetProperty("sunat_description", out var qDescProp) ? qDescProp.GetString() : null;
-                    receipt.Environment = mode;
+
+                    // Preservar ambiente histórico sin sobreescribirlo si ya existía
+                    if (string.IsNullOrWhiteSpace(receipt.Environment))
+                    {
+                        receipt.Environment = docEnvironment;
+                    }
 
                     if (sunatAccepted)
                     {
                         receipt.Status = "Accepted";
                         receipt.ProviderDescription = sunatQueryDesc ?? "Aceptado por SUNAT";
                     }
-                    else if (string.Equals(mode, "Demo", StringComparison.OrdinalIgnoreCase))
+                    else if (string.Equals(receipt.Environment, "Demo", StringComparison.OrdinalIgnoreCase))
                     {
                         receipt.Status = "Demo";
                         receipt.ProviderDescription = sunatQueryDesc ?? "Documento generado en DEMO NubeFact (sin aceptación tributaria SUNAT)";
@@ -733,7 +829,7 @@ namespace SIGETOUR.API.Application.Invoicing
                     {
                         receipt.QrData = q.GetString();
                     }
-                    if (receipt.Status == "Accepted")
+                    if (receipt.Status == "Accepted" || receipt.Status == "Demo")
                     {
                         receipt.LastError = null;
                     }

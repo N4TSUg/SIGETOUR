@@ -462,6 +462,14 @@
               @if (hasValidReceipt)
               {
                 <span>Comprobante Tributario: <strong>@receipt!.ReceiptType @receipt.FullNumber</strong></span>
+                @if (receipt.Status == "Demo" || receipt.Environment == "Demo")
+                {
+                  <span class="block mt-0.5 text-[9px] font-bold text-amber-700 uppercase">[DOCUMENTO DEMO NUBEFACT - SIN VALIDEZ TRIBUTARIA]</span>
+                }
+                else if (receipt.Status == "Simulation" || receipt.Environment == "Simulation")
+                {
+                  <span class="block mt-0.5 text-[9px] font-bold text-purple-700 uppercase">[DOCUMENTO DE PRUEBA (MOCK) - SIN VALIDEZ TRIBUTARIA]</span>
+                }
               }
               else if (Model.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed)
               {
@@ -498,6 +506,14 @@
             @if (hasValidReceipt)
             {
               <span>Tu <strong>@receipt!.ReceiptType Electrónica (@receipt.FullNumber)</strong> está disponible para descarga oficial.</span>
+              @if (receipt.Status == "Demo" || receipt.Environment == "Demo")
+              {
+                <span class="block mt-1 font-semibold text-amber-800 text-[11px] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md inline-block">Ambiente DEMO (Prueba de emisión sin efecto fiscal)</span>
+              }
+              else if (receipt.Status == "Simulation" || receipt.Environment == "Simulation")
+              {
+                <span class="block mt-1 font-semibold text-purple-800 text-[11px] bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md inline-block">Ambiente SIMULACIÓN (Mock interno sin efecto fiscal)</span>
+              }
             }
             else
             {
