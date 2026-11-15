@@ -155,5 +155,69 @@ namespace SIGETOUR.Tests.Services
             var successVal = (bool)property.GetValue(jsonResult.Value)!;
             Assert.True(successVal);
         }
+
+        [Theory]
+        [InlineData("cliente@gmail.com", true)]
+        [InlineData("turista@hotmail.com", true)]
+        [InlineData("viajero@outlook.com", true)]
+        [InlineData("contacto@empresa.com.pe", true)]
+        [InlineData("gerencia@cajamarca.gob.pe", true)]
+        [InlineData("not-an-email", false)]
+        [InlineData("@sin-usuario.com", false)]
+        [InlineData("sin-dominio@", false)]
+        [InlineData("usuario@sin-tld", false)]
+        [InlineData("con espacios@dominio.com", false)]
+        public void EmailValidationHelper_ValidatesRecipientEmailCorrectly(string email, bool expectedValid)
+        {
+            var result = SIGETOUR.API.Core.Common.EmailValidationHelper.ValidateRecipientEmail(email);
+            Assert.Equal(expectedValid, result.IsValid);
+        }
+
+        [Theory]
+        [InlineData("{\"code\":\"bad_request\",\"message\":\"domain is not allowed\"}", null, true)]
+        [InlineData("Sender domain not verified in Brevo account", null, true)]
+        [InlineData("You can only send testing emails to your own email address (domain not verified)", null, true)]
+        [InlineData(null, "550 5.7.1 Relaying denied to destination domain", true)]
+        [InlineData(null, "5.7.26 This message does not pass authentication checks (SPF/DKIM)", true)]
+        [InlineData("Authentication failed: invalid api-key", null, false)]
+        [InlineData(null, "The operation has timed out", false)]
+        public void EmailValidationHelper_ClassifiesProviderDomainRestrictionAccurately(string? resp, string? exMsg, bool expectedIsDomainRestriction)
+        {
+            var ex = !string.IsNullOrEmpty(exMsg) ? new System.Exception(exMsg) : null;
+            var classification = SIGETOUR.API.Core.Common.EmailValidationHelper.ClassifyProviderError(resp, ex);
+
+            Assert.Equal(expectedIsDomainRestriction, classification.IsProviderDomainRestriction);
+            if (expectedIsDomainRestriction)
+            {
+                Assert.Equal(SIGETOUR.API.Core.Common.EmailFailureCategory.ProviderDomainRestriction, classification.Category);
+                Assert.Contains("sandbox", classification.UserMessage, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [Fact]
+        public async Task SendBookingConfirmationEmailAsync_ConvertsHttpBaseUrlToHttps()
+        {
+            var service = CreateService();
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "RES-HTTPS-01",
+                CustomerName = "Juan <script>alert(1)</script> Pérez",
+                CustomerEmail = "juan.perez@turismochilon.com",
+                CustomerPhone = "987654321",
+                TravelDate = DateTime.UtcNow.AddDays(5),
+                ShiftName = "Turno Tarde",
+                TotalPassengers = 1,
+                TotalAmount = 50m,
+                PaidAmount = 50m,
+                Status = BookingStatus.Confirmed
+            };
+
+            // base URL with HTTP on a public domain
+            var (success, message, attachedCount) = await service.SendBookingConfirmationEmailAsync(booking, "http://turismochilon.com");
+
+            Assert.True(success);
+            Assert.Contains("juan.perez@turismochilon.com", message);
+        }
     }
 }

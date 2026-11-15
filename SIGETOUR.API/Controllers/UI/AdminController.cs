@@ -34,6 +34,7 @@ namespace SIGETOUR.API.Controllers.UI
         private readonly SIGETOUR.API.Application.Interfaces.IVisitorCounterService _visitorCounterService;
         private readonly IImageStorageService? _imageStorageService;
         private readonly ICapacityValidationService _capacityService;
+        private readonly ILogger<AdminController>? _logger;
 
         public AdminController(
             AppDbContext context, 
@@ -44,7 +45,8 @@ namespace SIGETOUR.API.Controllers.UI
             ICashReportExportService cashReportService,
             SIGETOUR.API.Application.Interfaces.IVisitorCounterService visitorCounterService,
             IImageStorageService? imageStorageService = null,
-            ICapacityValidationService? capacityService = null)
+            ICapacityValidationService? capacityService = null,
+            ILogger<AdminController>? logger = null)
         {
             _context = context;
             _userManager = userManager;
@@ -55,6 +57,7 @@ namespace SIGETOUR.API.Controllers.UI
             _visitorCounterService = visitorCounterService;
             _imageStorageService = imageStorageService;
             _capacityService = capacityService ?? new CapacityValidationService(_context);
+            _logger = logger;
         }
 
         public async Task<IActionResult> Dashboard()
@@ -841,32 +844,39 @@ namespace SIGETOUR.API.Controllers.UI
                 {
                     if (file.Length > 0)
                     {
-                        string imageUrl;
-                        if (_imageStorageService != null)
+                        try
                         {
-                            imageUrl = await _imageStorageService.UploadImageAsync(file, "vehicles");
-                        }
-                        else
-                        {
-                            var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "images", "vehicles");
-                            Directory.CreateDirectory(uploadsFolder);
-                            var ext = Path.GetExtension(file.FileName);
-                            var fileName = Guid.NewGuid().ToString("N") + ext;
-                            var filePath = Path.Combine(uploadsFolder, fileName);
-                            using (var stream = new FileStream(filePath, FileMode.Create))
+                            string imageUrl;
+                            if (_imageStorageService != null)
                             {
-                                await file.CopyToAsync(stream);
+                                imageUrl = await _imageStorageService.UploadImageAsync(file, "vehicles");
                             }
-                            imageUrl = "/images/vehicles/" + fileName;
-                        }
+                            else
+                            {
+                                var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "images", "vehicles");
+                                Directory.CreateDirectory(uploadsFolder);
+                                var ext = Path.GetExtension(file.FileName);
+                                var fileName = Guid.NewGuid().ToString("N") + ext;
+                                var filePath = Path.Combine(uploadsFolder, fileName);
+                                using (var stream = new FileStream(filePath, FileMode.Create))
+                                {
+                                    await file.CopyToAsync(stream);
+                                }
+                                imageUrl = "/images/vehicles/" + fileName;
+                            }
 
-                        _context.VehicleImages.Add(new SIGETOUR.API.Core.Entities.VehicleImage
+                            _context.VehicleImages.Add(new SIGETOUR.API.Core.Entities.VehicleImage
+                            {
+                                VehicleId = vehicle.Id,
+                                ImageUrl = imageUrl,
+                                IsCover = isFirst
+                            });
+                            isFirst = false;
+                        }
+                        catch (Exception ex)
                         {
-                            VehicleId = vehicle.Id,
-                            ImageUrl = imageUrl,
-                            IsCover = isFirst
-                        });
-                        isFirst = false;
+                            _logger?.LogWarning(ex, "[EditVehicle] Archivo de imagen omitido: {FileName}. Error: {Message}", file.FileName, ex.Message);
+                        }
                     }
                 }
                 try
@@ -2021,9 +2031,30 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         public async Task<IActionResult> DeleteTour(Guid id)
         {
-            var tour = await _context.TourPackages.FindAsync(id);
+            var tour = await _context.TourPackages
+                .Include(t => t.Images)
+                .FirstOrDefaultAsync(t => t.Id == id);
+
             if (tour != null)
             {
+                if (tour.Images != null && tour.Images.Count > 0)
+                {
+                    foreach (var img in tour.Images.ToList())
+                    {
+                        if (_imageStorageService != null && !string.IsNullOrWhiteSpace(img.ImageUrl))
+                        {
+                            try
+                            {
+                                await _imageStorageService.DeleteImageAsync(img.ImageUrl);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogWarning(ex, "Error al eliminar imagen de tour {ImageUrl}", img.ImageUrl);
+                            }
+                        }
+                    }
+                }
+
                 _context.TourPackages.Remove(tour);
                 await _context.SaveChangesAsync();
             }
@@ -2276,33 +2307,40 @@ namespace SIGETOUR.API.Controllers.UI
                 {
                     if (file.Length > 0)
                     {
-                        string imageUrl;
-                        if (_imageStorageService != null)
+                        try
                         {
-                            imageUrl = await _imageStorageService.UploadImageAsync(file, "tours");
-                        }
-                        else
-                        {
-                            var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "images", "tours");
-                            if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
-                            var uniqueFileName = Guid.NewGuid().ToString() + "_" + file.FileName;
-                            var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-                            using (var fileStream = new FileStream(filePath, FileMode.Create))
+                            string imageUrl;
+                            if (_imageStorageService != null)
                             {
-                                await file.CopyToAsync(fileStream);
+                                imageUrl = await _imageStorageService.UploadImageAsync(file, "tours");
                             }
-                            imageUrl = "/images/tours/" + uniqueFileName;
+                            else
+                            {
+                                var uploadsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "images", "tours");
+                                if (!Directory.Exists(uploadsFolder)) Directory.CreateDirectory(uploadsFolder);
+                                var uniqueFileName = Guid.NewGuid().ToString() + "_" + file.FileName;
+                                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+                                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                                {
+                                    await file.CopyToAsync(fileStream);
+                                }
+                                imageUrl = "/images/tours/" + uniqueFileName;
+                            }
+                            
+                            var newImg = new TourImage 
+                            { 
+                                Id = Guid.NewGuid(),
+                                TourPackageId = tour.Id,
+                                ImageUrl = imageUrl,
+                                IsMain = tour.Images.Count == 0 
+                            };
+                            _context.TourImages.Add(newImg);
+                            tour.Images.Add(newImg);
                         }
-                        
-                        var newImg = new TourImage 
-                        { 
-                            Id = Guid.NewGuid(),
-                            TourPackageId = tour.Id,
-                            ImageUrl = imageUrl,
-                            IsMain = tour.Images.Count == 0 
-                        };
-                        _context.TourImages.Add(newImg);
-                        tour.Images.Add(newImg);
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "[ProcessImages] Archivo de imagen omitido: {FileName}. Error: {Message}", file.FileName, ex.Message);
+                        }
                     }
                 }
             }
@@ -2958,14 +2996,20 @@ namespace SIGETOUR.API.Controllers.UI
                 var clean = email.Trim();
                 if (clean != booking.CustomerEmail)
                 {
-                    booking.CustomerEmail = clean;
+                    var valRes = SIGETOUR.API.Core.Common.EmailValidationHelper.ValidateRecipientEmail(clean);
+                    if (!valRes.IsValid)
+                    {
+                        return Json(new { success = false, message = valRes.ErrorMessage });
+                    }
+                    booking.CustomerEmail = valRes.NormalizedEmail!;
                     await _context.SaveChangesAsync();
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(booking.CustomerEmail) || !booking.CustomerEmail.Contains("@"))
+            var finalEmailVal = SIGETOUR.API.Core.Common.EmailValidationHelper.ValidateRecipientEmail(booking.CustomerEmail);
+            if (!finalEmailVal.IsValid)
             {
-                return Json(new { success = false, message = "La reserva no tiene un correo electrónico válido registrado." });
+                return Json(new { success = false, message = finalEmailVal.ErrorMessage ?? "La reserva no tiene un correo electrónico válido registrado." });
             }
 
             var baseUrl = $"{Request.Scheme}://{Request.Host}";

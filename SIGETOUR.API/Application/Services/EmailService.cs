@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Application.Payments;
+using SIGETOUR.API.Core.Common;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
 using System;
@@ -94,6 +95,10 @@ namespace SIGETOUR.API.Application.Services
             ?? _config["EmailSettings:BrevoApiKey"]
             ?? "";
 
+        private bool EnableSimulation =>
+            string.Equals(_config["EmailSettings:EnableSimulation"], "true", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(Environment.GetEnvironmentVariable("EMAIL_SIMULATION"), "true", StringComparison.OrdinalIgnoreCase);
+
         private bool EnableSsl
         {
             get
@@ -111,37 +116,46 @@ namespace SIGETOUR.API.Application.Services
             IEnumerable<Attachment>? attachments = null,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(toEmail) || !toEmail.Contains("@"))
+            // 1. Validación de destinatario dentro del sistema (RFC 5322).
+            // El sistema acepta cualquier dominio público o privado válido sin restricciones arbitrarias.
+            var validation = EmailValidationHelper.ValidateRecipientEmail(toEmail);
+            if (!validation.IsValid)
             {
-                return (false, "La dirección de correo destinatario no es válida.");
+                _logger.LogWarning("[EmailService SINTAXIS INVALIDA] Destinatario rechazado por formato: '{Email}'. Detalle: {Error}",
+                    toEmail, validation.ErrorMessage);
+                return (false, validation.ErrorMessage ?? "La dirección de correo destinatario no es válida.");
             }
 
+            var cleanToEmail = validation.NormalizedEmail!;
             var attList = attachments != null ? attachments.ToList() : new List<Attachment>();
 
-            // 1. Envío prioritario mediante Brevo REST API (Puerto 443 HTTPS - no bloqueado por Render Free)
+            // 2. Modo simulación explícito o automático cuando no hay credenciales configuradas
+            if (EnableSimulation || (string.IsNullOrWhiteSpace(BrevoApiKey) && string.IsNullOrWhiteSpace(SmtpPassword)))
+            {
+                _logger.LogInformation(
+                    "[EmailService SIMULACIÓN] Correo preparado para {ToEmail} desde {SenderEmail} ({AttCount} adjuntos). " +
+                    "Modo de prueba activo: no se consumen cuotas de proveedores externos.",
+                    cleanToEmail, SenderEmail, attList.Count);
+
+                return (true, $"Modo de prueba: Boleto digital preparado con éxito ({attList.Count} archivo(s) PDF adjuntos) para {cleanToEmail}. (Configure SMTP_PASSWORD o BREVO_API_KEY para entrega real en producción).");
+            }
+
+            // 3. Envío prioritario mediante Brevo REST API (Puerto 443 HTTPS - recomendado para hosting en la nube)
             if (!string.IsNullOrWhiteSpace(BrevoApiKey))
             {
                 try
                 {
-                    return await SendViaBrevoApiAsync(toEmail, subject, htmlBody, textBody, attList, cancellationToken);
+                    return await SendViaBrevoApiAsync(cleanToEmail, subject, htmlBody, textBody, attList, cancellationToken);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "[EmailService Brevo API ERROR] Falló envío a {ToEmail}: {Error}", toEmail, ex.Message);
-                    return (false, $"Error al enviar vía Brevo HTTP: {ex.Message}");
+                    var classification = EmailValidationHelper.ClassifyProviderError(null, ex);
+                    _logger.LogError(ex, "[EmailService Brevo API EXCEPCION] Falló envío a {ToEmail}: {Diagnostic}", cleanToEmail, classification.DiagnosticMessage);
+                    return (false, classification.UserMessage);
                 }
             }
 
-            // Modo simulación si no hay contraseña SMTP ni BrevoApiKey
-            if (string.IsNullOrWhiteSpace(SmtpPassword))
-            {
-                _logger.LogInformation(
-                    "[EmailService SIMULACIÓN] Correo preparado para {ToEmail} desde {SenderEmail} ({AttCount} adjuntos). Configure SMTP_PASSWORD o BREVO_API_KEY para entrega real.",
-                    toEmail, SenderEmail, attList.Count);
-
-                return (true, $"Modo de prueba: Boleto digital preparado con éxito ({attList.Count} archivo(s) PDF adjuntos) para {toEmail}. (Ingrese su Contraseña de Aplicación en SMTP_PASSWORD o clave en BREVO_API_KEY para entrega real).");
-            }
-
+            // 4. Envío por protocolo SMTP estándar
             try
             {
                 using var client = new SmtpClient(SmtpHost, SmtpPort)
@@ -163,7 +177,7 @@ namespace SIGETOUR.API.Application.Services
                     SubjectEncoding = Encoding.UTF8
                 };
 
-                mail.To.Add(new MailAddress(toEmail.Trim()));
+                mail.To.Add(new MailAddress(cleanToEmail));
 
                 // Agregar versiones Plain Text y HTML para compatibilidad óptima con Gmail y clientes móviles
                 if (!string.IsNullOrWhiteSpace(textBody))
@@ -179,17 +193,14 @@ namespace SIGETOUR.API.Application.Services
                 }
 
                 await client.SendMailAsync(mail, cancellationToken);
-                _logger.LogInformation("[EmailService] Correo con {Count} adjuntos enviado exitosamente a {ToEmail}", attList.Count, toEmail);
-                return (true, $"Correo y {attList.Count} archivo(s) PDF (Boleto y Boleta) enviados exitosamente a {toEmail}.");
+                _logger.LogInformation("[EmailService] Correo con {Count} adjuntos enviado exitosamente a {ToEmail}", attList.Count, cleanToEmail);
+                return (true, $"Correo y {attList.Count} archivo(s) PDF (Boleto y Boleta) enviados exitosamente a {cleanToEmail}.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[EmailService ERROR] Falló el envío de correo a {ToEmail}: {Error}", toEmail, ex.Message);
-                if (ex.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase) || ex.InnerException?.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase) == true)
-                {
-                    return (false, "Render (plan Free) bloquea los puertos SMTP salientes (587/465). Para enviar correos gratis en la nube, configure la variable 'BREVO_API_KEY' (funciona sobre HTTPS puerto 443).");
-                }
-                return (false, $"Error al conectar con el servidor de correo: {ex.Message}");
+                var classification = EmailValidationHelper.ClassifyProviderError(null, ex);
+                _logger.LogError(ex, "[EmailService SMTP ERROR] Falló el envío de correo a {ToEmail}: {Diagnostic}", cleanToEmail, classification.DiagnosticMessage);
+                return (false, classification.UserMessage);
             }
         }
 
@@ -240,8 +251,9 @@ namespace SIGETOUR.API.Application.Services
                 return (true, $"Correo y {attList.Count} archivo(s) PDF enviados exitosamente vía Brevo HTTP a {toEmail}.");
             }
 
-            _logger.LogError("[EmailService Brevo API Rechazo {StatusCode}] Respuesta: {Body}", resp.StatusCode, respBody);
-            return (false, $"Brevo API rechazó el envío ({resp.StatusCode}): {respBody}");
+            var classification = EmailValidationHelper.ClassifyProviderError(respBody, null);
+            _logger.LogError("[EmailService Brevo API Rechazo {StatusCode}] {Diagnostic}", resp.StatusCode, classification.DiagnosticMessage);
+            return (false, classification.UserMessage);
         }
 
         public async Task<(bool Success, string Message, int AttachedCount)> SendBookingConfirmationEmailAsync(
@@ -264,6 +276,11 @@ namespace SIGETOUR.API.Application.Services
                 baseUrl = _config["App:BaseUrl"] ?? "https://localhost:7103";
             }
             baseUrl = baseUrl.TrimEnd('/');
+            if (!baseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && !baseUrl.Contains("localhost"))
+            {
+                var schemeIdx = baseUrl.IndexOf("://", StringComparison.Ordinal);
+                baseUrl = "https://" + (schemeIdx >= 0 ? baseUrl.Substring(schemeIdx + 3) : baseUrl);
+            }
 
             // Obtener AppDbContext para consultar recibos e ítems si faltan
             using var scope = _serviceProvider.CreateScope();
@@ -326,7 +343,7 @@ namespace SIGETOUR.API.Application.Services
                 {
                     try
                     {
-                        using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(12) };
+                        using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
                         receiptPdfBytes = await httpClient.GetByteArrayAsync(receipt.PdfUrl, cancellationToken);
                     }
                     catch (Exception ex)

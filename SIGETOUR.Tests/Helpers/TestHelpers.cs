@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Moq;
 using SIGETOUR.API.Application.Interfaces;
+using SIGETOUR.API.Application.Services;
 using SIGETOUR.API.Controllers.UI;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
@@ -97,7 +98,9 @@ namespace SIGETOUR.Tests.Helpers
             Mock<ICashReportExportService>? cashReportService = null,
             Mock<SIGETOUR.API.Application.Interfaces.IVisitorCounterService>? visitorCounterService = null,
             string currentUserId = "current-admin-id",
-            string currentUserName = "admin@sigetour.com")
+            string currentUserName = "admin@sigetour.com",
+            IImageStorageService? imageStorageService = null,
+            ICapacityValidationService? capacityService = null)
         {
             userManager ??= CreateMockUserManager();
             roleManager ??= CreateMockRoleManager();
@@ -114,7 +117,9 @@ namespace SIGETOUR.Tests.Helpers
                 env.Object,
                 manifestService.Object,
                 cashReportService.Object,
-                visitorCounterService.Object);
+                visitorCounterService.Object,
+                imageStorageService,
+                capacityService);
 
             var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
             {

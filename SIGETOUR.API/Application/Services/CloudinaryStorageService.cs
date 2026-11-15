@@ -79,11 +79,96 @@ namespace SIGETOUR.API.Application.Services
             _logger.LogWarning("Cloudinary no configurado (CLOUDINARY_URL o CloudName/ApiKey/ApiSecret no provistos). Se utilizará almacenamiento local en wwwroot como fallback.");
         }
 
-        public async Task<string> UploadImageAsync(IFormFile file, string folder, string? customFileName = null)
+        public static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".webp"
+        };
+
+        public static readonly HashSet<string> AllowedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "image/jpeg", "image/pjpeg", "image/png", "image/x-png", "image/webp"
+        };
+
+        public const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+
+        public static bool ValidateImageFile(IFormFile file, out string? errorMessage)
         {
             if (file == null || file.Length == 0)
             {
-                throw new ArgumentException("El archivo proporcionado está vacío.", nameof(file));
+                errorMessage = "El archivo proporcionado está vacío.";
+                return false;
+            }
+
+            if (file.Length > MaxFileSizeBytes)
+            {
+                errorMessage = $"El archivo excede el tamaño máximo permitido de 5 MB ({file.Length / (1024.0 * 1024.0):F2} MB).";
+                return false;
+            }
+
+            var extension = Path.GetExtension(file.FileName);
+            if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
+            {
+                errorMessage = $"La extensión de archivo '{extension}' no está permitida. Formatos aceptados: JPG, PNG, WEBP.";
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(file.ContentType) && !AllowedMimeTypes.Contains(file.ContentType))
+            {
+                errorMessage = $"El tipo de contenido MIME '{file.ContentType}' no corresponde a una imagen permitida (image/jpeg, image/png, image/webp).";
+                return false;
+            }
+
+            // Validación de magic bytes en el stream (firmas JPEG, PNG o WEBP)
+            try
+            {
+                using var stream = file.OpenReadStream();
+                if (stream.Length < 3)
+                {
+                    errorMessage = "El contenido del archivo es insuficiente para verificar la firma de imagen.";
+                    return false;
+                }
+
+                var header = new byte[Math.Min(12, (int)stream.Length)];
+                var read = stream.Read(header, 0, header.Length);
+
+                bool isJpeg = read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF;
+                bool isPng = read >= 8 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47 &&
+                             header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A;
+                bool isWebp = read >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46 &&
+                              header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50;
+
+                if (!isJpeg && !isPng && !isWebp)
+                {
+                    errorMessage = "El contenido del archivo no corresponde a una firma de imagen válida (JPEG, PNG o WEBP).";
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Error al leer el archivo para validación: {ex.Message}";
+                return false;
+            }
+
+            errorMessage = null;
+            return true;
+        }
+
+        public async Task<string> UploadImageAsync(IFormFile file, string folder, string? customFileName = null)
+        {
+            if (!ValidateImageFile(file, out var validationError))
+            {
+                _logger.LogWarning("[CloudinaryStorageService] Archivo rechazado por validación de seguridad: {Error}", validationError);
+                throw new ArgumentException(validationError, nameof(file));
+            }
+
+            var cleanFolder = Regex.Replace(folder ?? "general", @"[^a-zA-Z0-9_\-]", "").ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(cleanFolder)) cleanFolder = "general";
+
+            string? cleanCustomName = null;
+            if (!string.IsNullOrWhiteSpace(customFileName))
+            {
+                var withoutExt = Path.GetFileNameWithoutExtension(customFileName);
+                cleanCustomName = Regex.Replace(withoutExt, @"[^a-zA-Z0-9_\-]", "");
             }
 
             // Si Cloudinary está activo, subir directamente a la nube
@@ -92,7 +177,6 @@ namespace SIGETOUR.API.Application.Services
                 try
                 {
                     using var stream = file.OpenReadStream();
-                    var cleanFolder = string.IsNullOrWhiteSpace(folder) ? "general" : folder.Trim('/').ToLowerInvariant();
 
                     var uploadParams = new ImageUploadParams
                     {
@@ -104,9 +188,9 @@ namespace SIGETOUR.API.Application.Services
                         Transformation = new Transformation().Quality("auto").FetchFormat("auto")
                     };
 
-                    if (!string.IsNullOrWhiteSpace(customFileName))
+                    if (!string.IsNullOrWhiteSpace(cleanCustomName))
                     {
-                        uploadParams.PublicId = Path.GetFileNameWithoutExtension(customFileName);
+                        uploadParams.PublicId = cleanCustomName;
                     }
 
                     var uploadResult = await _cloudinary.UploadAsync(uploadParams);
@@ -126,24 +210,24 @@ namespace SIGETOUR.API.Application.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Excepción al subir imagen a Cloudinary. Intentando fallback local.");
-                    // Si falla la subida a Cloudinary (ej. caída de red), intentar fallback local para no bloquear la operación
+                    _logger.LogError(ex, "Excepción al subir imagen a Cloudinary. Intentando fallback local controlado.");
+                    // Fallback transparente a almacenamiento local ante cortes de red o credenciales inválidas
                 }
             }
 
-            // Fallback: Guardar en el disco local de wwwroot
-            var cleanLocalFolder = string.IsNullOrWhiteSpace(folder) ? "general" : folder.Trim('/');
-            var localUploadsDir = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "images", cleanLocalFolder);
+            // Fallback local seguro en wwwroot/images/{cleanFolder}
+            var basePath = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var localUploadsDir = Path.Combine(basePath, "images", cleanFolder);
             
             if (!Directory.Exists(localUploadsDir))
             {
                 Directory.CreateDirectory(localUploadsDir);
             }
 
-            var extension = Path.GetExtension(file.FileName);
-            var finalFileName = string.IsNullOrWhiteSpace(customFileName)
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var finalFileName = string.IsNullOrWhiteSpace(cleanCustomName)
                 ? $"{Guid.NewGuid():N}{extension}"
-                : (customFileName.EndsWith(extension, StringComparison.OrdinalIgnoreCase) ? customFileName : $"{customFileName}{extension}");
+                : $"{cleanCustomName}_{Guid.NewGuid():N}{extension}";
 
             var localFilePath = Path.Combine(localUploadsDir, finalFileName);
             using (var localStream = new FileStream(localFilePath, FileMode.Create))
@@ -151,7 +235,7 @@ namespace SIGETOUR.API.Application.Services
                 await file.CopyToAsync(localStream);
             }
 
-            var relativeUrl = $"/images/{cleanLocalFolder}/{finalFileName}";
+            var relativeUrl = $"/images/{cleanFolder}/{finalFileName}";
             _logger.LogInformation("Imagen guardada localmente: {Url}", relativeUrl);
             return relativeUrl;
         }
@@ -164,8 +248,16 @@ namespace SIGETOUR.API.Application.Services
             }
 
             // 1. Si la URL pertenece a Cloudinary
-            if (imageUrl.Contains("res.cloudinary.com", StringComparison.OrdinalIgnoreCase))
+            if (imageUrl.Contains("cloudinary.com", StringComparison.OrdinalIgnoreCase))
             {
+                if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri) ||
+                    (!uri.Host.EndsWith("cloudinary.com", StringComparison.OrdinalIgnoreCase) ||
+                     (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)))
+                {
+                    _logger.LogWarning("[Security] URL de Cloudinary inválida o maliciosa: {Url}", imageUrl);
+                    return false;
+                }
+
                 if (_useCloudinary && _cloudinary != null)
                 {
                     try
@@ -190,14 +282,23 @@ namespace SIGETOUR.API.Application.Services
             // 2. Si es una ruta local en wwwroot (/images/...)
             try
             {
-                var relative = imageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
                 var basePath = _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-                var fullLocalPath = Path.Combine(basePath, relative);
+                var allowedImagesDir = Path.GetFullPath(Path.Combine(basePath, "images"));
+
+                var normalizedRelative = imageUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                var fullLocalPath = Path.GetFullPath(Path.Combine(basePath, normalizedRelative));
+
+                // Protección estricta contra Path Traversal: debe residir dentro de wwwroot/images
+                if (!fullLocalPath.StartsWith(allowedImagesDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning("[Security] Intento de eliminación fuera del directorio permitido de imágenes: {Path}", fullLocalPath);
+                    return false;
+                }
 
                 if (File.Exists(fullLocalPath))
                 {
                     File.Delete(fullLocalPath);
-                    _logger.LogInformation("Archivo local eliminado: {Path}", fullLocalPath);
+                    _logger.LogInformation("Archivo local eliminado exitosamente: {Path}", fullLocalPath);
                     return true;
                 }
             }
