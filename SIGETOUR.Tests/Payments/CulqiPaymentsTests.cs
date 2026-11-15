@@ -460,7 +460,8 @@ namespace SIGETOUR.Tests.Payments
             var configMock = new ConfigurationBuilder().AddInMemoryCollection().Build();
             var bookingController = new BookingController(context, _checkoutAccess, configMock);
 
-            var result = await bookingController.ConfirmPayment(booking.Id, "Efectivo en Counter");
+            var token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultCheckoutTtl);
+            var result = await bookingController.ConfirmPayment(booking.Id, "Efectivo en Counter", token);
             var redirect = Assert.IsType<RedirectToActionResult>(result);
             Assert.Equal("Voucher", redirect.ActionName);
 
@@ -2414,22 +2415,23 @@ namespace SIGETOUR.Tests.Payments
             context.ElectronicReceipts.AddRange(receipt1, receipt2);
             await context.SaveChangesAsync();
 
-            var controller = new BookingController(context);
+            var controller = new BookingController(context, _checkoutAccess, _config);
+            var token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
 
             // A. Ticket por identificador exacto de comprobante (receipt1)
-            var res1 = await controller.Ticket(receipt1.Id);
+            var res1 = await controller.Ticket(receipt1.Id, token: token);
             var vr1 = Assert.IsType<ViewResult>(res1);
             var model1 = Assert.IsType<ElectronicReceipt>(vr1.Model);
             Assert.Equal("1001", model1.Number);
 
             // B. Ticket por identificador exacto de comprobante (receipt2)
-            var res2 = await controller.Ticket(receipt2.Id);
+            var res2 = await controller.Ticket(receipt2.Id, token: token);
             var vr2 = Assert.IsType<ViewResult>(res2);
             var model2 = Assert.IsType<ElectronicReceipt>(vr2.Model);
             Assert.Equal("1002", model2.Number);
 
             // C. Ticket por paymentId específico
-            var resByPayment = await controller.Ticket(booking.Id, "80", payment1.Id);
+            var resByPayment = await controller.Ticket(booking.Id, "80", payment1.Id, token: token);
             var vrByPay = Assert.IsType<ViewResult>(resByPayment);
             var modelByPay = Assert.IsType<ElectronicReceipt>(vrByPay.Model);
             Assert.Equal("1001", modelByPay.Number);

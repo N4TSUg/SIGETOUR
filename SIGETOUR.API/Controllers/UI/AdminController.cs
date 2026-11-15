@@ -2722,7 +2722,8 @@ namespace SIGETOUR.API.Controllers.UI
                 .FirstOrDefaultAsync();
 
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
-            var voucherPdfUrl = $"{baseUrl}/b/{booking.ReferenceCode}";
+            var token = checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
+            var voucherPdfUrl = $"{baseUrl}/b/{booking.ReferenceCode}?token={Uri.EscapeDataString(token)}";
             var tourTitle = booking.Items?.FirstOrDefault()?.TourPackage?.Title ?? "Tour Turístico Cajamarca";
 
             string? receiptPdfUrl = null;
@@ -2730,7 +2731,7 @@ namespace SIGETOUR.API.Controllers.UI
             if (receipt != null)
             {
                 receiptSeriesNumber = $"{receipt.Series}-{receipt.Number}";
-                receiptPdfUrl = $"{baseUrl}/b/{booking.ReferenceCode}/boleta";
+                receiptPdfUrl = $"{baseUrl}/b/{booking.ReferenceCode}/boleta?token={Uri.EscapeDataString(token)}";
             }
 
             return Json(new

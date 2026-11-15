@@ -515,6 +515,7 @@
           <!-- Manual Offline Action (Active for Transfer and Cash) -->
           <form id="form-confirm-manual" method="post" action="/Booking/ConfirmPayment" class="hidden">
             <input type="hidden" name="bookingId" value="@Model.Id" />
+            <input type="hidden" name="token" value="@ViewBag.CheckoutToken" />
             <input type="hidden" name="manualPaymentMethod" id="input-manual-payment-method" value="Pago en Counter (Efectivo)" />
             @Html.AntiForgeryToken()
             <button class="w-full py-4 px-6 bg-amber-700 hover:bg-amber-800 active:scale-[0.99] text-white font-label-lg text-title-md font-bold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3" type="submit">

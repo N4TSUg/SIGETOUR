@@ -56,11 +56,16 @@ function isValid3DSOrigin(origin) {
   return origin === "https://3ds.culqi.com" || origin === "https://checkout.culqi.com";
 }
 
+function getVoucherRedirectUrl(bookingId) {
+  const token = currentBookingContext?.checkoutToken;
+  return token ? `/Booking/Voucher/${bookingId}?token=${encodeURIComponent(token)}` : `/Booking/Voucher/${bookingId}`;
+}
+
 function handle3DSChargeResult(isOk, result, bookingId, onStatus) {
-  if (isOk && result.status === "paid") {
+  if (isOk && (result.status === "paid" || result.status === "paid_excess")) {
     if (onStatus) onStatus("¡Pago 3D Secure exitoso! Redirigiendo a tu voucher...", "success");
     setTimeout(() => {
-      window.location.href = `/Booking/Voucher/${bookingId}`;
+      window.location.href = getVoucherRedirectUrl(bookingId);
     }, 800);
     return;
   }
@@ -113,13 +118,13 @@ window.addEventListener("message", async function (event) {
 }, false);
 
 function handleQrPollResponse(checkData, bookingId, checkout, onStatus, onQrState) {
-  if (checkData.status === "paid") {
+  if (checkData.status === "paid" || checkData.status === "paid_excess") {
     detenerSondeoQr();
     try { checkout.close(); } catch (e) {}
     if (onStatus) onStatus("¡Pago QR con Yape/Plin verificado exitosamente! Redirigiendo...", "success");
     if (onQrState) onQrState({ state: "paid" });
     setTimeout(() => {
-      window.location.href = `/Booking/Voucher/${bookingId}`;
+      window.location.href = getVoucherRedirectUrl(bookingId);
     }, 900);
     return;
   }
@@ -206,10 +211,10 @@ async function handleTokenChargeResponse(res, statusData, tokenId, bookingId, on
     await trigger3DSAuthentication(tokenId, onStatus);
     return;
   }
-  if (res.ok && statusData.status === "paid") {
+  if (res.ok && (statusData.status === "paid" || statusData.status === "paid_excess")) {
     if (onStatus) onStatus("¡Pago exitoso verificado! Redirigiendo a tu voucher...", "success");
     setTimeout(() => {
-      window.location.href = `/Booking/Voucher/${bookingId}`;
+      window.location.href = getVoucherRedirectUrl(bookingId);
     }, 800);
     return;
   }
@@ -302,12 +307,13 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
   const data = await prepararCobroCulqi(bookingId, checkoutToken, mode, channel, onStatus);
 
   // Idempotencia: si ya estaba acreditado previamente
-  if (data.status === "paid") {
+  if (data.status === "paid" || data.status === "paid_excess") {
     if (onStatus) onStatus("La reserva ya cuenta con un pago verificado. Redirigiendo al voucher...", "success");
+    const vUrl = checkoutToken ? `/Booking/Voucher/${bookingId}?token=${encodeURIComponent(checkoutToken)}` : `/Booking/Voucher/${bookingId}`;
     setTimeout(() => {
-      window.location.href = `/Booking/Voucher/${bookingId}`;
+      window.location.href = vUrl;
     }, 800);
-    return { attemptId: data.attemptId, status: "paid" };
+    return { attemptId: data.attemptId, status: data.status };
   }
 
   if (typeof CulqiCheckout === "undefined") {
@@ -357,12 +363,12 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
 }
 
 function handleRevisarStatus(data, bookingId, onStatus) {
-  if (data.status === "paid") {
+  if (data.status === "paid" || data.status === "paid_excess") {
     if (onStatus) onStatus("¡Pago confirmado y acreditado! Redirigiendo al voucher...", "success");
     const targetBookingId = data?.bookingId || bookingId;
     if (targetBookingId) {
       setTimeout(() => {
-        window.location.href = `/Booking/Voucher/${targetBookingId}`;
+        window.location.href = getVoucherRedirectUrl(targetBookingId);
       }, 800);
     }
     return;

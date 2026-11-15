@@ -32,8 +32,10 @@
 
     var tourTitle = tour?.Title ?? "Tour Turístico Cajamarca";
     var hostUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
-    var shortVoucherUrl = $"{hostUrl}/b/{Model.ReferenceCode}";
-    var shortReceiptUrl = $"{hostUrl}/b/{Model.ReferenceCode}/boleta";
+    var rawToken = ViewBag.CheckoutToken as string ?? Context.Request.Query["token"].ToString();
+    var tokenQuery = !string.IsNullOrWhiteSpace(rawToken) ? $"?token={Uri.EscapeDataString(rawToken)}" : "";
+    var shortVoucherUrl = $"{hostUrl}/b/{Model.ReferenceCode}{tokenQuery}";
+    var shortReceiptUrl = $"{hostUrl}/b/{Model.ReferenceCode}/boleta{tokenQuery}";
 
     var waMessage = $"¡Hola *{Model.CustomerName}*! Le saluda Turismo Chilón.\n\n" +
                     $"Le confirmamos que su reserva para el tour *{tourTitle}* programada para el *{Model.TravelDate:dd/MM/yyyy}* se encuentra CONFIRMADA.\n\n" +
@@ -526,7 +528,10 @@ function resendConfirmationEmail(bookingId) {
         btn.disabled = true;
         btn.innerText = '(Enviando...)';
     }
-    fetch(`/Booking/ResendConfirmationEmail/${bookingId}`, {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token') || '@(ViewBag.CheckoutToken ?? "")';
+    const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+    fetch(`/Booking/ResendConfirmationEmail/${bookingId}${qs}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
     })

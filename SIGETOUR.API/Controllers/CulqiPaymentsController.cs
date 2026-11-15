@@ -124,6 +124,8 @@ public sealed class CulqiPaymentsController : ControllerBase
         }
     }
 
+    private static bool IsPaidStatus(string? status) => status is "paid" or "paid_excess";
+
     [HttpPost("prepare")]
     [AllowAnonymous]
     public async Task<IActionResult> Prepare([FromBody] PreparePayment request, CancellationToken ct)
@@ -155,9 +157,9 @@ public sealed class CulqiPaymentsController : ControllerBase
         if (request.Channel == "wallet_qr" && cents < 600)
             return BadRequest(new { message = "El método QR requiere al menos S/ 6" });
 
-        // Gestión inteligente y consulta de intentos previos antes de permitir nuevos cargos
+        // Gestión inteligente y consulta de intentos previos antes de permitir nuevos cargos (incluyendo 3ds_required)
         var existingAttempts = await _db.Set<CulqiPayment>()
-            .Where(p => p.BookingId == booking.Id && (p.Status == "created" || p.Status == "processing" || p.Status == "verification" || p.Status == "pending"))
+            .Where(p => p.BookingId == booking.Id && (p.Status == "created" || p.Status == "processing" || p.Status == "verification" || p.Status == "pending" || p.Status == "3ds_required"))
             .OrderByDescending(p => p.CreatedAtUtc)
             .ToListAsync(ct);
 
@@ -167,11 +169,11 @@ public sealed class CulqiPaymentsController : ControllerBase
             if (existingAttempt.ProviderId != null)
             {
                 var isVerified = await VerifyAndApply(existingAttempt.Id, ct);
-                if (isVerified)
+                if (isVerified || IsPaidStatus(existingAttempt.Status))
                 {
                     await _db.SaveChangesAsync(ct);
                     return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
-                        publicKey = _config["Culqi:PublicKey"], status = "paid", message = "La reserva ya cuenta con un pago verificado" });
+                        publicKey = _config["Culqi:PublicKey"], status = existingAttempt.Status, message = "La reserva ya cuenta con un pago verificado" });
                 }
 
                 // Consultar si la orden o cargo expiró o fue rechazado en Culqi
@@ -194,11 +196,11 @@ public sealed class CulqiPaymentsController : ControllerBase
                         if (culqiState is "paid")
                         {
                             var verifiedNow = await VerifyAndApply(existingAttempt.Id, ct);
-                            if (verifiedNow)
+                            if (verifiedNow || IsPaidStatus(existingAttempt.Status))
                             {
                                 await _db.SaveChangesAsync(ct);
                                 return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
-                                    publicKey = _config["Culqi:PublicKey"], status = "paid", message = "Pago verificado exitosamente" });
+                                    publicKey = _config["Culqi:PublicKey"], status = existingAttempt.Status, message = "Pago verificado exitosamente" });
                             }
                         }
 
@@ -257,12 +259,50 @@ public sealed class CulqiPaymentsController : ControllerBase
             }
 
             // 2. Si no tiene ProviderId (interacción pendiente o en vuelo con Culqi):
-            // Si es un intento activo en created con el mismo importe y canal, reutilizarlo
-            if (existingAttempt.Status == "created" && existingAttempt.AmountCents == cents && existingAttempt.Channel == request.Channel && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-20))
+            // Si es un intento en 3ds_required, mantener un solo intento y permitir continuar legítimamente el mismo reto
+            if (existingAttempt.Status == "3ds_required")
             {
+                if (existingAttempt.CreatedAtUtc < DateTime.UtcNow.AddMinutes(-15))
+                {
+                    existingAttempt.Status = "failed";
+                    continue;
+                }
+
+                if (existingAttempt.Channel == request.Channel && existingAttempt.AmountCents == cents)
+                {
+                    await _db.SaveChangesAsync(ct);
+                    return Ok(new
+                    {
+                        attemptId = existingAttempt.Id,
+                        amountCents = cents,
+                        currency = "PEN",
+                        publicKey = _config["Culqi:PublicKey"],
+                        status = "3ds_required",
+                        reused = true,
+                        message = "Existe una validación 3D Secure activa para este abono. Continuando con el mismo reto de autenticación."
+                    });
+                }
+
                 await _db.SaveChangesAsync(ct);
-                return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
-                    publicKey = _config["Culqi:PublicKey"], status = existingAttempt.Status });
+                return Conflict(new
+                {
+                    message = "Existe una transacción con validación 3D Secure en curso. Complete o cancele la autenticación bancaria antes de iniciar un nuevo cobro.",
+                    attemptId = existingAttempt.Id,
+                    status = "3ds_required"
+                });
+            }
+
+            // Si es un intento activo en created con el mismo importe y canal, reutilizarlo
+            if (existingAttempt.Status == "created" && existingAttempt.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-20))
+            {
+                if (existingAttempt.AmountCents == cents && existingAttempt.Channel == request.Channel)
+                {
+                    await _db.SaveChangesAsync(ct);
+                    return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
+                        publicKey = _config["Culqi:PublicKey"], status = existingAttempt.Status });
+                }
+                // Si el usuario cambió de importe o canal antes de pagar, invalidar el intento previo para respetar el índice único
+                existingAttempt.Status = "failed";
             }
 
             // Si es un intento de cargo sin ProviderId en estado ambiguo (processing o verification):
@@ -274,16 +314,15 @@ public sealed class CulqiPaymentsController : ControllerBase
                 {
                     await _db.SaveChangesAsync(ct);
                     var verifiedNow = await VerifyAndApply(existingAttempt.Id, ct);
-                    if (verifiedNow)
+                    if (verifiedNow || IsPaidStatus(existingAttempt.Status))
                     {
                         await _db.SaveChangesAsync(ct);
                         return Ok(new { attemptId = existingAttempt.Id, amountCents = cents, currency = "PEN",
-                            publicKey = _config["Culqi:PublicKey"], status = "paid", message = "La reserva ya cuenta con un cargo verificado tras conciliación" });
+                            publicKey = _config["Culqi:PublicKey"], status = existingAttempt.Status, message = "La reserva ya cuenta con un cargo verificado tras conciliación" });
                     }
                 }
 
                 // Bloquear todo resultado no concluyente para prevenir doble cargo.
-                // NUNCA usar un ping charges?limit=1 y 10 minutos para asumir que el cargo no existió.
                 await _db.SaveChangesAsync(ct);
                 return Conflict(new
                 {
@@ -372,7 +411,9 @@ public sealed class CulqiPaymentsController : ControllerBase
             .FirstOrDefaultAsync(p => p.Id == request.AttemptId, ct);
         if (payment == null) return NotFound();
         if (!_access.Verify(payment.BookingId, request.CheckoutToken)) return Unauthorized();
-        if (payment.Channel != "charge" || (payment.Status != "created" && payment.Status != "3ds_required"))
+
+        // Acepta channel charge y también wallet_qr si el cliente completó la transacción vía token Yape en el modal
+        if ((payment.Channel != "charge" && payment.Channel != "wallet_qr") || (payment.Status != "created" && payment.Status != "3ds_required"))
         {
             if (payment.Status is "verification" or "processing")
             {
@@ -383,20 +424,26 @@ public sealed class CulqiPaymentsController : ControllerBase
                     message = "El cargo previo se encuentra en estado de verificación o procesamiento. Debe conciliarse antes de realizar otra operación."
                 });
             }
-            if (payment.Status == "paid")
+            if (IsPaidStatus(payment.Status))
             {
-                return Ok(new { attemptId = payment.Id, status = "paid", message = "La operación ya fue pagada exitosamente." });
+                return Ok(new { attemptId = payment.Id, status = payment.Status, message = "La operación ya fue pagada exitosamente." });
             }
             return Conflict(new { message = "Intento no disponible para realizar un cargo" });
+        }
+
+        // Si se preparó como wallet_qr pero se finaliza con token (ej. Yape OTP), actualizar canal a charge
+        if (payment.Channel == "wallet_qr")
+        {
+            payment.Channel = "charge";
         }
 
         // Si ya cuenta con un ProviderId registrado, no volver a disparar el cargo externo; verificar su estado:
         if (payment.ProviderId != null)
         {
             var applied = await VerifyAndApply(payment.Id, ct);
-            if (applied)
+            if (applied || IsPaidStatus(payment.Status))
             {
-                return Ok(new { attemptId = payment.Id, status = "paid", message = "Cargo verificado exitosamente" });
+                return Ok(new { attemptId = payment.Id, status = payment.Status, message = "Cargo verificado exitosamente" });
             }
             return Conflict(new { attemptId = payment.Id, status = payment.Status, message = "El cargo ya fue enviado al proveedor y está en proceso de verificación." });
         }
@@ -473,11 +520,19 @@ public sealed class CulqiPaymentsController : ControllerBase
             if (charge.Success && charge.Text("object") == "charge" && charge.Number("amount") == payment.AmountCents
                 && charge.Text("id") is { } chargeId)
             {
+                var currency = charge.Text("currency_code") ?? charge.Text("currency");
+                if (!string.IsNullOrEmpty(currency) && !string.Equals(currency, "PEN", StringComparison.OrdinalIgnoreCase))
+                {
+                    payment.Status = "failed";
+                    await _db.SaveChangesAsync(ct);
+                    return BadRequest(new { attemptId = payment.Id, status = "failed", message = "La moneda del cargo debe ser PEN" });
+                }
+
                 payment.ProviderId = chargeId;
                 payment.Status = "verification";
                 await _db.SaveChangesAsync(ct);
                 var applied = await VerifyAndApply(payment.Id, ct);
-                return Ok(new { attemptId = payment.Id, status = applied ? "paid" : "verification",
+                return Ok(new { attemptId = payment.Id, status = applied ? (IsPaidStatus(payment.Status) ? payment.Status : "paid") : "verification",
                     message = applied ? "Cargo verificado exitosamente" : "Esperando confirmación final del proveedor" });
             }
 
@@ -533,12 +588,7 @@ public sealed class CulqiPaymentsController : ControllerBase
             if (payment == null) return NotFound();
             if (!_access.Verify(payment.BookingId, request.CheckoutToken)) return Unauthorized();
 
-            if (!string.IsNullOrWhiteSpace(payment.ProviderId))
-            {
-                await ProcessPendingWebhookEventsAsync(payment.ProviderId, CancellationToken.None);
-            }
-
-            if (payment.ProviderId != null && payment.Status != "paid")
+            if (payment.ProviderId != null && !IsPaidStatus(payment.Status))
             {
                 // Reconciliación inmediata: si Culqi ya registró el pago, aplicar con safe token para no abortar si el cliente cierra la pestaña
                 var applied = await VerifyAndApply(payment.Id, CancellationToken.None);
@@ -733,9 +783,10 @@ public sealed class CulqiPaymentsController : ControllerBase
         // 3. Manejo de orden expirada o cancelada
         if (orderState is "expired" or "canceled" or "deleted")
         {
-            if (attempt.Status != "paid")
+            if (!IsPaidStatus(attempt.Status))
             {
                 attempt.Status = "expired";
+                await ProcessPendingWebhookEventsAsync(providerId, ct);
                 await _db.SaveChangesAsync(ct);
             }
             return Ok();
@@ -802,7 +853,8 @@ public sealed class CulqiPaymentsController : ControllerBase
                         // Abrir incidencia de auditoría si aún no existe.
                         else if (meta.TryGetProperty("booking_id", out var bkProp) &&
                                  string.Equals(bkProp.GetString(), bookingIdStr, StringComparison.OrdinalIgnoreCase) &&
-                                 chr.TryGetProperty("amount", out var amProp) && amProp.GetInt64() == attempt.AmountCents)
+                                 chr.TryGetProperty("amount", out var amProp) && amProp.GetInt64() == attempt.AmountCents &&
+                                 chr.TryGetProperty("currency_code", out var curP) && string.Equals(curP.GetString(), "PEN", StringComparison.OrdinalIgnoreCase))
                         {
                             var foundId = idProp.GetString() ?? "";
                             var existsIncident = await _db.PaymentIncidents.AnyAsync(i => i.ProviderId == foundId, ct);
@@ -939,8 +991,6 @@ public sealed class CulqiPaymentsController : ControllerBase
         var payment = await _db.Set<CulqiPayment>().AsNoTracking().FirstOrDefaultAsync(p => p.Id == attemptId, safeCt);
         if (payment?.ProviderId == null) return false;
 
-        await ProcessPendingWebhookEventsAsync(payment.ProviderId, safeCt);
-
         var isPaid = false;
         if (payment.Channel == "wallet_qr")
         {
@@ -957,9 +1007,10 @@ public sealed class CulqiPaymentsController : ControllerBase
                         if (orderState is "expired" or "canceled" or "deleted")
                         {
                             var curExp = await _db.Set<CulqiPayment>().FirstAsync(p => p.Id == attemptId, safeCt);
-                            if (curExp.Status != "paid")
+                            if (!IsPaidStatus(curExp.Status))
                             {
                                 curExp.Status = "expired";
+                                await ProcessPendingWebhookEventsAsync(payment.ProviderId, safeCt);
                                 await _db.SaveChangesAsync(safeCt);
                             }
                         }
@@ -977,6 +1028,10 @@ public sealed class CulqiPaymentsController : ControllerBase
             var route = $"charges/{Uri.EscapeDataString(payment.ProviderId)}";
             using var result = await _culqi.GetAsync(route, safeCt);
             if (!result.Success || result.Text("id") != payment.ProviderId || result.Number("amount") != payment.AmountCents)
+                return false;
+
+            var chargeCurrency = result.Text("currency_code") ?? result.Text("currency");
+            if (!string.IsNullOrEmpty(chargeCurrency) && !string.Equals(chargeCurrency, "PEN", StringComparison.OrdinalIgnoreCase))
                 return false;
 
             var root = result.Body?.RootElement;
@@ -997,8 +1052,9 @@ public sealed class CulqiPaymentsController : ControllerBase
         // La transacción en PostgreSQL evita contabilizar dos veces la MISMA operación.
         await using var tx = _db.Database.IsRelational() ? await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable, safeCt) : null;
         var current = await _db.Set<CulqiPayment>().FirstAsync(p => p.Id == attemptId, safeCt);
-        if (current.Status == "paid")
+        if (IsPaidStatus(current.Status))
         {
+            await ProcessPendingWebhookEventsAsync(current.ProviderId ?? payment.ProviderId, safeCt);
             if (tx != null) await tx.CommitAsync(safeCt);
             return true;
         }
@@ -1041,23 +1097,28 @@ public sealed class CulqiPaymentsController : ControllerBase
                 });
             }
 
-            _db.PaymentIncidents.Add(new PaymentIncident
+            var incidentExists = await _db.PaymentIncidents.AnyAsync(i => i.CulqiPaymentId == current.Id, safeCt);
+            if (!incidentExists)
             {
-                Id = Guid.NewGuid(),
-                IncidentType = isCancelled ? "CancelledBookingPayment" : "Overpayment",
-                Severity = "Critical",
-                BookingId = booking.Id,
-                CulqiPaymentId = current.Id,
-                ProviderId = current.ProviderId,
-                Amount = paidIncrement,
-                Currency = "PEN",
-                Description = isCancelled
-                    ? $"El cliente abonó S/ {paidIncrement} externamente pero la reserva {booking.ReferenceCode} se encontraba en estado Cancelada."
-                    : $"El cliente abonó S/ {paidIncrement} en la reserva {booking.ReferenceCode}, excediendo el saldo pendiente.",
-                Status = "PendingReview",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+                _db.PaymentIncidents.Add(new PaymentIncident
+                {
+                    Id = Guid.NewGuid(),
+                    IncidentType = isCancelled ? "CancelledBookingPayment" : "Overpayment",
+                    Severity = "Critical",
+                    BookingId = booking.Id,
+                    CulqiPaymentId = current.Id,
+                    ProviderId = current.ProviderId,
+                    Amount = paidIncrement,
+                    Currency = "PEN",
+                    Description = isCancelled
+                        ? $"El cliente abonó S/ {paidIncrement} externamente pero la reserva {booking.ReferenceCode} se encontraba en estado Cancelada."
+                        : $"El cliente abonó S/ {paidIncrement} en la reserva {booking.ReferenceCode}, excediendo el saldo pendiente.",
+                    Status = "PendingReview",
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
 
+            await ProcessPendingWebhookEventsAsync(current.ProviderId ?? payment.ProviderId, safeCt);
             await _db.SaveChangesAsync(safeCt);
             if (tx != null) await tx.CommitAsync(safeCt);
             return true;
@@ -1100,6 +1161,7 @@ public sealed class CulqiPaymentsController : ControllerBase
             });
         }
 
+        await ProcessPendingWebhookEventsAsync(current.ProviderId ?? payment.ProviderId, safeCt);
         await _db.SaveChangesAsync(safeCt);
         if (tx != null) await tx.CommitAsync(safeCt);
 

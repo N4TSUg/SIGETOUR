@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Controllers.UI;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Models;
@@ -13,6 +15,10 @@ namespace SIGETOUR.Tests.Controllers
 {
     public class BookingControllerTests
     {
+        private readonly CheckoutAccess _checkoutAccess = new CheckoutAccess(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Payments:CheckoutSigningKey"] = "c2lnZXRvdXJfc3VwZXJfc2VjcmV0X2NoZWNrb3V0X3NpZ25pbmdfa2V5XzIwMjZfMzJieXRlcw=="
+        }).Build());
         [Fact]
         public async Task Checkout_Get_ExistingTour_ReturnsViewWithTour()
         {
@@ -124,9 +130,10 @@ namespace SIGETOUR.Tests.Controllers
             TestDbContextFactory.SeedSampleData(context);
             var controller = new BookingController(context);
             var booking = context.Bookings.First();
+            var token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultCheckoutTtl);
 
             // Act
-            var result = await controller.Payment(booking.Id);
+            var result = await controller.Payment(booking.Id, token);
 
             // Assert
             var viewResult = Assert.IsType<ViewResult>(result);
@@ -163,7 +170,8 @@ namespace SIGETOUR.Tests.Controllers
             await context.SaveChangesAsync();
 
             // Act
-            var result = await controller.ConfirmPayment(booking.Id, "Efectivo en Counter");
+            var token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultCheckoutTtl);
+            var result = await controller.ConfirmPayment(booking.Id, "Efectivo en Counter", token);
 
             // Assert
             var redirectResult = Assert.IsType<RedirectToActionResult>(result);
@@ -190,9 +198,10 @@ namespace SIGETOUR.Tests.Controllers
             TestDbContextFactory.SeedSampleData(context);
             var controller = new BookingController(context);
             var booking = context.Bookings.First();
+            var token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
 
             // Act
-            var result = await controller.Voucher(booking.Id);
+            var result = await controller.Voucher(booking.Id, token);
 
             // Assert
             var viewResult = Assert.IsType<ViewResult>(result);
@@ -224,9 +233,10 @@ namespace SIGETOUR.Tests.Controllers
             TestDbContextFactory.SeedSampleData(context);
             var controller = new BookingController(context);
             var booking = context.Bookings.First();
+            var token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
 
             // Act
-            var result = await controller.Ticket(booking.Id, "80");
+            var result = await controller.Ticket(booking.Id, "80", token: token);
 
             // Assert
             var viewResult = Assert.IsType<ViewResult>(result);
@@ -243,9 +253,10 @@ namespace SIGETOUR.Tests.Controllers
             TestDbContextFactory.SeedSampleData(context);
             var controller = new BookingController(context);
             var booking = context.Bookings.First();
+            var token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
 
             // Act
-            var result = await controller.Ticket(booking.Id, "58");
+            var result = await controller.Ticket(booking.Id, "58", token: token);
 
             // Assert
             var viewResult = Assert.IsType<ViewResult>(result);
@@ -309,7 +320,8 @@ namespace SIGETOUR.Tests.Controllers
             await context.SaveChangesAsync();
 
             var controller = new BookingController(context);
-            var result = await controller.Ticket(receipt.Id, "80");
+            var token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
+            var result = await controller.Ticket(receipt.Id, "80", token: token);
 
             var vr = Assert.IsType<ViewResult>(result);
             Assert.Equal("Ticket", vr.ViewName);

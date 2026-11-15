@@ -346,8 +346,8 @@ namespace SIGETOUR.API.Application.Services
                 attachments.Add(new Attachment(new MemoryStream(receiptPdfBytes), receiptFileName, "application/pdf"));
             }
 
-            // Token seguro de acceso al Voucher
-            var voucherToken = _checkoutAccess.Create(booking.Id, TimeSpan.FromDays(30));
+            // Token seguro de acceso al Voucher (30 días de vigencia unificada)
+            var voucherToken = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
             var voucherUrl = $"{baseUrl}/Booking/Voucher/{booking.Id}?token={voucherToken}";
 
             // Pasajeros adicionales

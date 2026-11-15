@@ -13,9 +13,9 @@ public sealed class CulqiPaymentConfiguration : IEntityTypeConfiguration<CulqiPa
         entity.Property(p => p.Channel).HasMaxLength(32).IsRequired();
         entity.Property(p => p.ProviderId).HasMaxLength(100);
         entity.HasIndex(p => p.ProviderId).IsUnique();
-        // Solo un intento no resuelto por reserva. Impide cobro simultáneo en varios nodos.
+        // Solo un intento no resuelto por reserva. Impide cobro simultáneo en varios nodos, incluyendo 3DS.
         entity.HasIndex(p => p.BookingId).IsUnique()
-            .HasFilter("\"Status\" IN ('created', 'processing', 'verification')");
+            .HasFilter("\"Status\" IN ('created', 'processing', 'verification', '3ds_required')");
         entity.HasIndex(p => new { p.BookingId, p.CreatedAtUtc });
         entity.HasOne(p => p.Booking).WithMany().HasForeignKey(p => p.BookingId)
             .OnDelete(DeleteBehavior.Restrict);

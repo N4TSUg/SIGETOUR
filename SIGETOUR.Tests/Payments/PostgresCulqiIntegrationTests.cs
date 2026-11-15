@@ -556,6 +556,400 @@ namespace SIGETOUR.Tests.Payments
             await db.SaveChangesAsync();
         }
 
+        [Fact]
+        public async Task Postgres_ConcurrentChargeCalls_OnlyOneClaimsAttempt()
+        {
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
+
+            await using var db = CreatePostgresDbContext();
+
+            var shift = await db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+            if (shift == null)
+            {
+                shift = new CashRegisterShift { Id = Guid.NewGuid(), IsOpen = true, OpenedAt = DateTime.UtcNow, ShiftNumber = "CJ-CONC-01" };
+                db.CashRegisterShifts.Add(shift);
+                await db.SaveChangesAsync();
+            }
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-CONC-" + Guid.NewGuid().ToString("N")[..6].ToUpper(),
+                CustomerName = "Concurrency Client",
+                CustomerEmail = "concurrency@sigetour.com",
+                CustomerDni = "72918299",
+                TotalAmount = 80m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending,
+                TravelDate = DateTime.UtcNow.Date.AddDays(2)
+            };
+            db.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 8000,
+                Channel = "charge",
+                Status = "created",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.CulqiPayments.Add(payment);
+            await db.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(15));
+            var chargeId = "chr_test_conc_" + Guid.NewGuid().ToString("N")[..8];
+            var task1EnteredPost = new ManualResetEventSlim(false);
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.Method == HttpMethod.Post)
+                {
+                    task1EnteredPost.Set();
+                    // Simular pequeña latencia de red para garantizar que task2 se ejecute durante el processing
+                    Thread.Sleep(100);
+                }
+                var json = $"{{\"object\":\"charge\",\"id\":\"{chargeId}\",\"amount\":8000,\"currency_code\":\"PEN\",\"capture\":true,\"outcome\":{{\"type\":\"venta_exitosa\"}}}}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            });
+
+            // Disparar dos llamadas concurrentes con dos DbContext separados sobre PostgreSQL real
+            var task1 = Task.Run(async () =>
+            {
+                await using var db1 = CreatePostgresDbContext();
+                var c1 = CreateController(db1, mockClient);
+                return await c1.Charge(new ChargePayment(payment.Id, token, "tkn_test_conc_1"), CancellationToken.None);
+            });
+
+            var task2 = Task.Run(async () =>
+            {
+                // Esperar a que task1 haya reclamado el registro y entrado a la llamada externa de Culqi
+                task1EnteredPost.Wait(TimeSpan.FromSeconds(5));
+                await using var db2 = CreatePostgresDbContext();
+                var c2 = CreateController(db2, mockClient);
+                return await c2.Charge(new ChargePayment(payment.Id, token, "tkn_test_conc_2"), CancellationToken.None);
+            });
+
+            var results = await Task.WhenAll(task1, task2);
+
+            // Exactamente uno debe tener éxito (OkObjectResult) y el otro debe recibir conflicto (ConflictObjectResult)
+            var okCount = results.Count(r => r is OkObjectResult);
+            var conflictCount = results.Count(r => r is ConflictObjectResult);
+            Assert.Equal(1, okCount);
+            Assert.Equal(1, conflictCount);
+
+            // Verificar en PostgreSQL que solo existe exactamente 1 CashTransaction
+            var cashTxs = await db.CashTransactions.Where(t => t.CulqiPaymentId == payment.Id).ToListAsync();
+            Assert.Single(cashTxs);
+
+            // Cleanup
+            db.CashTransactions.RemoveRange(cashTxs);
+            db.CulqiPayments.RemoveRange(await db.CulqiPayments.Where(p => p.BookingId == booking.Id).ToListAsync());
+            var bDel = await db.Bookings.FindAsync(booking.Id);
+            if (bDel != null) db.Bookings.Remove(bDel);
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task Postgres_3DSRequired_ReusesExistingAttempt_DoesNotCreateDuplicate()
+        {
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
+
+            await using var db = CreatePostgresDbContext();
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-3DS-" + Guid.NewGuid().ToString("N")[..6].ToUpper(),
+                CustomerName = "3DS Client",
+                CustomerEmail = "client3ds@sigetour.com",
+                CustomerDni = "72918300",
+                TotalAmount = 90m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending,
+                TravelDate = DateTime.UtcNow.Date.AddDays(3)
+            };
+            db.Bookings.Add(booking);
+
+            var existing3dsPayment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 9000,
+                Channel = "charge",
+                Status = "3ds_required",
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-2)
+            };
+            db.CulqiPayments.Add(existing3dsPayment);
+            await db.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(15));
+            var mockClient = CreateMockCulqiClient(_ => new HttpResponseMessage(HttpStatusCode.OK));
+            var controller = CreateController(db, mockClient);
+
+            // Act: Intentar preparar un nuevo pago mientras el intento 3DS está activo
+            var prepResult = await controller.Prepare(new PreparePayment(booking.Id, token, "full", "charge"), CancellationToken.None) as OkObjectResult;
+            Assert.NotNull(prepResult);
+
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(prepResult.Value));
+            Assert.True(doc.RootElement.GetProperty("reused").GetBoolean());
+            Assert.Equal(existing3dsPayment.Id.ToString(), doc.RootElement.GetProperty("attemptId").GetString());
+            Assert.Equal("3ds_required", doc.RootElement.GetProperty("status").GetString());
+
+            // Verificar que no se creó un segundo intento en PostgreSQL (se mantiene solo 1)
+            var countAttempts = await db.CulqiPayments.CountAsync(p => p.BookingId == booking.Id);
+            Assert.Equal(1, countAttempts);
+
+            // Cleanup
+            db.CulqiPayments.Remove(existing3dsPayment);
+            db.Bookings.Remove(booking);
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task Postgres_ExcessPayment_TerminalState_NoDuplicateIncidentsOnRepeatedCheck()
+        {
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
+
+            await using var db = CreatePostgresDbContext();
+
+            var shift = await db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+            if (shift == null)
+            {
+                shift = new CashRegisterShift { Id = Guid.NewGuid(), IsOpen = true, OpenedAt = DateTime.UtcNow, ShiftNumber = "CJ-EXC-01" };
+                db.CashRegisterShifts.Add(shift);
+                await db.SaveChangesAsync();
+            }
+
+            // Reserva por S/ 50.00
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-EXC-" + Guid.NewGuid().ToString("N")[..6].ToUpper(),
+                CustomerName = "Excess Client",
+                CustomerEmail = "excess@sigetour.com",
+                CustomerDni = "72918301",
+                TotalAmount = 50m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending,
+                TravelDate = DateTime.UtcNow.Date.AddDays(4)
+            };
+            db.Bookings.Add(booking);
+
+            // Intento por S/ 70.00 (exceso de S/ 20.00)
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 7000,
+                Channel = "charge",
+                Status = "verification",
+                ProviderId = "chr_test_exc_pg_" + Guid.NewGuid().ToString("N")[..8],
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.CulqiPayments.Add(payment);
+            await db.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(15));
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                var json = $"{{\"object\":\"charge\",\"id\":\"{payment.ProviderId}\",\"amount\":7000,\"currency_code\":\"PEN\",\"capture\":true,\"outcome\":{{\"type\":\"venta_exitosa\"}}}}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            });
+
+            var controller = CreateController(db, mockClient);
+
+            // 1er Check: debe detectar paid_excess, registrar 1 incidente y 1 movimiento de caja
+            var res1 = await controller.Check(new CheckPayment(payment.Id, token, booking.Id), CancellationToken.None) as OkObjectResult;
+            Assert.NotNull(res1);
+
+            var dbPayment = await db.CulqiPayments.FindAsync(payment.Id);
+            Assert.NotNull(dbPayment);
+            Assert.Equal("paid_excess", dbPayment.Status);
+
+            var incidents1 = await db.PaymentIncidents.Where(i => i.CulqiPaymentId == payment.Id).ToListAsync();
+            Assert.Single(incidents1);
+            Assert.Equal("Overpayment", incidents1[0].IncidentType);
+            Assert.Equal(70m, incidents1[0].Amount);
+
+            var txs1 = await db.CashTransactions.Where(t => t.CulqiPaymentId == payment.Id).ToListAsync();
+            Assert.Single(txs1);
+
+            // 2do Check repetido: debe ser idempotente, NO debe duplicar incidentes ni movimientos
+            var res2 = await controller.Check(new CheckPayment(payment.Id, token, booking.Id), CancellationToken.None) as OkObjectResult;
+            Assert.NotNull(res2);
+
+            var incidents2 = await db.PaymentIncidents.Where(i => i.CulqiPaymentId == payment.Id).ToListAsync();
+            Assert.Single(incidents2);
+
+            var txs2 = await db.CashTransactions.Where(t => t.CulqiPaymentId == payment.Id).ToListAsync();
+            Assert.Single(txs2);
+
+            // Cleanup
+            db.PaymentIncidents.RemoveRange(incidents2);
+            db.CashTransactions.RemoveRange(txs2);
+            db.CulqiPayments.Remove(dbPayment);
+            var bDel = await db.Bookings.FindAsync(booking.Id);
+            if (bDel != null) db.Bookings.Remove(bDel);
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task Postgres_CurrencyValidation_RejectsNonPEN()
+        {
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
+
+            await using var db = CreatePostgresDbContext();
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-CURR-" + Guid.NewGuid().ToString("N")[..6].ToUpper(),
+                CustomerName = "Currency Client",
+                CustomerEmail = "curr@sigetour.com",
+                CustomerDni = "72918302",
+                TotalAmount = 60m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending,
+                TravelDate = DateTime.UtcNow.Date.AddDays(3)
+            };
+            db.Bookings.Add(booking);
+
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 6000,
+                Channel = "charge",
+                Status = "created",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.CulqiPayments.Add(payment);
+            await db.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(15));
+            var chargeId = "chr_test_usd_" + Guid.NewGuid().ToString("N")[..8];
+
+            // Culqi responde con moneda USD
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                var json = $"{{\"object\":\"charge\",\"id\":\"{chargeId}\",\"amount\":6000,\"currency_code\":\"USD\",\"capture\":true,\"outcome\":{{\"type\":\"venta_exitosa\"}}}}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            });
+
+            var controller = CreateController(db, mockClient);
+            var res = await controller.Charge(new ChargePayment(payment.Id, token, "tkn_test_usd"), CancellationToken.None) as BadRequestObjectResult;
+            Assert.NotNull(res);
+
+            // Estado en PostgreSQL debe haber pasado a failed
+            var updatedPayment = await db.CulqiPayments.FindAsync(payment.Id);
+            Assert.NotNull(updatedPayment);
+            Assert.Equal("failed", updatedPayment.Status);
+
+            // Cleanup
+            db.CulqiPayments.Remove(updatedPayment);
+            db.Bookings.Remove(booking);
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task Postgres_YapeTokenCharge_TransitionsChannelAndCompletesPayment()
+        {
+            if (!await IsPostgresAvailableAsync())
+            {
+                _output.WriteLine("[OMITIDA] La base de datos PostgreSQL de pruebas no está disponible.");
+                return;
+            }
+
+            await using var db = CreatePostgresDbContext();
+
+            var shift = await db.CashRegisterShifts.FirstOrDefaultAsync(s => s.IsOpen);
+            if (shift == null)
+            {
+                shift = new CashRegisterShift { Id = Guid.NewGuid(), IsOpen = true, OpenedAt = DateTime.UtcNow, ShiftNumber = "CJ-YAPE-01" };
+                db.CashRegisterShifts.Add(shift);
+                await db.SaveChangesAsync();
+            }
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-YAPE-" + Guid.NewGuid().ToString("N")[..6].ToUpper(),
+                CustomerName = "Yape Client",
+                CustomerEmail = "yape@sigetour.com",
+                CustomerDni = "72918303",
+                TotalAmount = 45m,
+                PaidAmount = 0m,
+                Status = BookingStatus.Pending,
+                TravelDate = DateTime.UtcNow.Date.AddDays(2)
+            };
+            db.Bookings.Add(booking);
+
+            // Preparado inicialmente con canal wallet_qr (pestaña Yape del checkout)
+            var payment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 4500,
+                Channel = "wallet_qr",
+                Status = "created",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.CulqiPayments.Add(payment);
+            await db.SaveChangesAsync();
+
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(15));
+            var chargeId = "chr_test_yape_" + Guid.NewGuid().ToString("N")[..8];
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                var json = $"{{\"object\":\"charge\",\"id\":\"{chargeId}\",\"amount\":4500,\"currency_code\":\"PEN\",\"capture\":true,\"outcome\":{{\"type\":\"venta_exitosa\"}}}}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            });
+
+            var controller = CreateController(db, mockClient);
+            // El cliente completó en el modal usando token de Yape OTP (ype_test_...)
+            var res = await controller.Charge(new ChargePayment(payment.Id, token, "ype_test_yape_token_12345"), CancellationToken.None) as OkObjectResult;
+            Assert.NotNull(res);
+
+            // Verificar en PostgreSQL: canal actualizado a charge, estado paid, reserva confirmada
+            var updatedPayment = await db.CulqiPayments.FindAsync(payment.Id);
+            Assert.NotNull(updatedPayment);
+            Assert.Equal("charge", updatedPayment.Channel);
+            Assert.Equal("paid", updatedPayment.Status);
+
+            var updatedBooking = await db.Bookings.FindAsync(booking.Id);
+            Assert.NotNull(updatedBooking);
+            Assert.Equal(BookingStatus.Confirmed, updatedBooking.Status);
+            Assert.Equal(45m, updatedBooking.PaidAmount);
+
+            var cashTx = await db.CashTransactions.FirstOrDefaultAsync(t => t.CulqiPaymentId == payment.Id);
+            Assert.NotNull(cashTx);
+            Assert.Equal(45m, cashTx.Amount);
+
+            // Cleanup
+            db.CashTransactions.Remove(cashTx);
+            db.CulqiPayments.Remove(updatedPayment);
+            db.Bookings.Remove(updatedBooking);
+            await db.SaveChangesAsync();
+        }
+
         private CulqiApiClient CreateMockCulqiClient(Func<HttpRequestMessage, HttpResponseMessage> handler)
         {
             var mockHttp = new HttpClient(new MockCulqiHttpHandler(handler));

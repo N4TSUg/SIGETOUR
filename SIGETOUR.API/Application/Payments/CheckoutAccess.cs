@@ -8,6 +8,10 @@ namespace SIGETOUR.API.Application.Payments;
 // El token se crea DEL LADO DEL SERVIDOR al crear la reserva; NO se genera en JavaScript.
 public sealed class CheckoutAccess
 {
+    public static readonly TimeSpan DefaultCheckoutTtl = TimeSpan.FromMinutes(30);
+    public static readonly TimeSpan DefaultDocumentTtl = TimeSpan.FromDays(30);
+    public static readonly TimeSpan MaxAllowedTtl = TimeSpan.FromDays(90);
+
     private readonly byte[] _key;
     public CheckoutAccess(IConfiguration config)
     {
@@ -20,7 +24,7 @@ public sealed class CheckoutAccess
 
     public string Create(Guid bookingId, TimeSpan? ttl = null)
     {
-        var expiry = DateTimeOffset.UtcNow.Add(ttl ?? TimeSpan.FromMinutes(30)).ToUnixTimeSeconds();
+        var expiry = DateTimeOffset.UtcNow.Add(ttl ?? DefaultCheckoutTtl).ToUnixTimeSeconds();
         var payload = $"{bookingId:N}.{expiry}";
         var signature = HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(payload));
         return payload + "." + Convert.ToHexString(signature);
@@ -33,7 +37,7 @@ public sealed class CheckoutAccess
         if (parts.Length != 3 || parts[0] != bookingId.ToString("N")) return false;
         if (!long.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var expiry)) return false;
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        if (expiry <= now || expiry > now + 7 * 24 * 60 * 60) return false;
+        if (expiry <= now || expiry > now + (long)MaxAllowedTtl.TotalSeconds) return false;
         byte[] actual;
         try { actual = Convert.FromHexString(parts[2]); }
         catch (FormatException) { return false; }

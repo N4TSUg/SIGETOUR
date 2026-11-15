@@ -49,6 +49,46 @@ namespace SIGETOUR.API.Controllers.UI
             return new CheckoutAccess(inMemoryConfig);
         }
 
+        private bool IsAuthorizedForBooking(Booking booking, string? token)
+        {
+            if (User?.Identity?.IsAuthenticated == true)
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token))
+            {
+                return true;
+            }
+
+            if (Request?.Cookies != null)
+            {
+                try
+                {
+                    if (Request.Cookies.TryGetValue("sigetour_last_booking", out var cookieToken) && !string.IsNullOrWhiteSpace(cookieToken))
+                    {
+                        if (_checkoutAccess.Verify(booking.Id, cookieToken))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            try
+            {
+                var sessionBookingId = HttpContext?.Session?.GetString("LastBookingId");
+                if (!string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString())
+                {
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
         [HttpGet]
         public async Task<IActionResult> Checkout(Guid tourId)
         {
@@ -189,19 +229,19 @@ namespace SIGETOUR.API.Controllers.UI
             await _context.SaveChangesAsync();
 
             // Guardar en sesión y cookie de forma segura para permitir acceso inmediato a su voucher
+            var checkoutToken = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultCheckoutTtl);
             try { HttpContext?.Session?.SetString("LastBookingId", booking.Id.ToString()); } catch { }
             try
             {
-                Response?.Cookies?.Append("sigetour_last_booking", booking.Id.ToString(), new CookieOptions
+                Response?.Cookies?.Append("sigetour_last_booking", checkoutToken, new CookieOptions
                 {
                     HttpOnly = true,
                     SameSite = SameSiteMode.Lax,
-                    Expires = DateTimeOffset.UtcNow.AddHours(4)
+                    Expires = DateTimeOffset.UtcNow.Add(CheckoutAccess.DefaultCheckoutTtl)
                 });
             }
             catch { }
 
-            var checkoutToken = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
             return RedirectToAction("Payment", new { id = booking.Id, token = checkoutToken });
         }
 
@@ -214,19 +254,15 @@ namespace SIGETOUR.API.Controllers.UI
                 .FirstOrDefaultAsync(b => b.Id == id);
             if (booking == null) return RedirectToAction("Catalog", "Tour");
 
-            bool hasContext = HttpContext != null && User != null;
-            bool isStaff = User?.Identity?.IsAuthenticated == true;
-            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
-
-            if (hasContext && !isStaff && !isValidToken)
+            if (!IsAuthorizedForBooking(booking, token))
             {
-                // Bloque 3 Item 5: Rechazar tokens inválidos y no acuñar nuevos para anónimos no autorizados
+                // Bloque 1: Rechazar anónimos o manipulaciones sin autorización
                 return Unauthorized("Acceso no autorizado al proceso de pago. Inicie su reserva desde el catálogo.");
             }
 
             if (string.IsNullOrWhiteSpace(token) || !_checkoutAccess.Verify(booking.Id, token))
             {
-                token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(30));
+                token = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultCheckoutTtl);
             }
 
             ViewBag.CheckoutToken = token;
@@ -249,7 +285,7 @@ namespace SIGETOUR.API.Controllers.UI
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ConfirmPayment(Guid bookingId, string? manualPaymentMethod = null, [FromServices] SIGETOUR.API.Application.Interfaces.IEmailService? emailService = null)
+        public async Task<IActionResult> ConfirmPayment(Guid bookingId, string? manualPaymentMethod = null, string? token = null, [FromServices] SIGETOUR.API.Application.Interfaces.IEmailService? emailService = null)
         {
             var booking = await _context.Bookings
                 .Include(b => b.Items)
@@ -257,6 +293,11 @@ namespace SIGETOUR.API.Controllers.UI
                 .Include(b => b.AssignedVehicle)
                 .FirstOrDefaultAsync(b => b.Id == bookingId);
             if (booking == null) return NotFound();
+
+            if (!IsAuthorizedForBooking(booking, token))
+            {
+                return Unauthorized("Se requiere autorización o token válido para confirmar esta reserva.");
+            }
 
             // Medida de seguridad: los pagos manuales (Counter / Transferencia bancaria)
             // NO confirman el pago ni inflan la caja automáticamente.
@@ -283,15 +324,15 @@ namespace SIGETOUR.API.Controllers.UI
                 catch { }
             }
 
-            var voucherToken = _checkoutAccess.Create(booking.Id, TimeSpan.FromHours(2));
+            var voucherToken = _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
             try { HttpContext?.Session?.SetString("LastBookingId", booking.Id.ToString()); } catch { }
             try
             {
-                Response?.Cookies?.Append("sigetour_last_booking", booking.Id.ToString(), new CookieOptions
+                Response?.Cookies?.Append("sigetour_last_booking", voucherToken, new CookieOptions
                 {
                     HttpOnly = true,
                     SameSite = SameSiteMode.Lax,
-                    Expires = DateTimeOffset.UtcNow.AddHours(4)
+                    Expires = DateTimeOffset.UtcNow.Add(CheckoutAccess.DefaultDocumentTtl)
                 });
             }
             catch { }
@@ -310,22 +351,8 @@ namespace SIGETOUR.API.Controllers.UI
                 
             if (booking == null) return RedirectToAction("Catalog", "Tour");
             
-            bool hasContext = HttpContext != null && User != null;
-            bool isStaff = User?.Identity?.IsAuthenticated == true;
-            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
-
-            string? sessionBookingId = null;
-            try { sessionBookingId = HttpContext?.Session?.GetString("LastBookingId"); } catch { }
-
-            string? cookieBookingId = null;
-            try { Request?.Cookies.TryGetValue("sigetour_last_booking", out cookieBookingId); } catch { }
-
-            bool isSessionOwner = !string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString();
-            bool isCookieOwner = !string.IsNullOrWhiteSpace(cookieBookingId) && cookieBookingId == booking.Id.ToString();
-
-            if (hasContext && !isStaff && !isValidToken && !isSessionOwner && !isCookieOwner)
+            if (!IsAuthorizedForBooking(booking, token))
             {
-                // Bloque 3 Item 6: Proteger Voucher con sesión o token válido
                 return Unauthorized("Se requiere autorización o token válido para acceder al boleto de viaje.");
             }
 
@@ -348,15 +375,10 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound(new { success = false, message = "Reserva no encontrada." });
 
-            bool isStaff = User?.Identity?.IsAuthenticated == true;
-            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
-            string? sessionBookingId = null;
-            try { sessionBookingId = HttpContext?.Session?.GetString("LastBookingId"); } catch { }
-            string? cookieBookingId = null;
-            try { Request?.Cookies.TryGetValue("sigetour_last_booking", out cookieBookingId); } catch { }
-
-            bool isOwner = isStaff || isValidToken || (sessionBookingId == booking.Id.ToString()) || (cookieBookingId == booking.Id.ToString());
-            if (!isOwner) return Unauthorized(new { success = false, message = "No autorizado." });
+            if (!IsAuthorizedForBooking(booking, token))
+            {
+                return Unauthorized(new { success = false, message = "No autorizado." });
+            }
 
             if (string.IsNullOrWhiteSpace(booking.CustomerEmail))
             {
@@ -383,20 +405,7 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound("Reserva no encontrada.");
 
-            bool hasContext = HttpContext != null && User != null;
-            bool isStaff = User?.Identity?.IsAuthenticated == true;
-            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
-
-            string? sessionBookingId = null;
-            try { sessionBookingId = HttpContext?.Session?.GetString("LastBookingId"); } catch { }
-
-            string? cookieBookingId = null;
-            try { Request?.Cookies.TryGetValue("sigetour_last_booking", out cookieBookingId); } catch { }
-
-            bool isSessionOwner = !string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString();
-            bool isCookieOwner = !string.IsNullOrWhiteSpace(cookieBookingId) && cookieBookingId == booking.Id.ToString();
-
-            if (hasContext && !isStaff && !isValidToken && !isSessionOwner && !isCookieOwner)
+            if (!IsAuthorizedForBooking(booking, token))
             {
                 return Unauthorized("Se requiere autorización o token válido para acceder al boleto de viaje.");
             }
@@ -419,22 +428,9 @@ namespace SIGETOUR.API.Controllers.UI
             var booking = await _context.Bookings.FirstOrDefaultAsync(b => b.Id == id);
             if (booking == null) return NotFound("Reserva no encontrada.");
 
-            bool hasContext = HttpContext != null && User != null;
-            bool isStaff = User?.Identity?.IsAuthenticated == true;
-            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
-
-            string? sessionBookingId = null;
-            try { sessionBookingId = HttpContext?.Session?.GetString("LastBookingId"); } catch { }
-
-            string? cookieBookingId = null;
-            try { Request?.Cookies.TryGetValue("sigetour_last_booking", out cookieBookingId); } catch { }
-
-            bool isSessionOwner = !string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString();
-            bool isCookieOwner = !string.IsNullOrWhiteSpace(cookieBookingId) && cookieBookingId == booking.Id.ToString();
-
-            if (hasContext && !isStaff && !isValidToken && !isSessionOwner && !isCookieOwner)
+            if (!IsAuthorizedForBooking(booking, token))
             {
-                return Unauthorized("Se requiere autorización o token válido.");
+                return Unauthorized("Se requiere autorización o token válido para acceder al comprobante.");
             }
 
             var receipt = await _context.ElectronicReceipts
@@ -465,7 +461,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet("b/{code}")]
-        public async Task<IActionResult> ShortVoucherPdf(string code)
+        public async Task<IActionResult> ShortVoucherPdf(string code, string? token = null)
         {
             if (string.IsNullOrWhiteSpace(code)) return NotFound("Código de reserva no válido.");
 
@@ -476,6 +472,11 @@ namespace SIGETOUR.API.Controllers.UI
                 .FirstOrDefaultAsync(b => b.ReferenceCode == cleanCode || b.ReferenceCode == $"RES-{cleanCode}");
 
             if (booking == null) return NotFound($"No se encontró la reserva con código {code}.");
+
+            if (!IsAuthorizedForBooking(booking, token))
+            {
+                return Unauthorized("Se requiere autorización de personal o un enlace firmado válido para acceder al boleto.");
+            }
 
             var receipt = await _context.ElectronicReceipts
                 .Where(r => r.BookingId == booking.Id)
@@ -491,7 +492,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet("b/{code}/boleta")]
-        public async Task<IActionResult> ShortReceiptPdf(string code)
+        public async Task<IActionResult> ShortReceiptPdf(string code, string? token = null)
         {
             if (string.IsNullOrWhiteSpace(code)) return NotFound("Código de reserva no válido.");
 
@@ -500,6 +501,11 @@ namespace SIGETOUR.API.Controllers.UI
                 .FirstOrDefaultAsync(b => b.ReferenceCode == cleanCode || b.ReferenceCode == $"RES-{cleanCode}");
 
             if (booking == null) return NotFound($"No se encontró la reserva con código {code}.");
+
+            if (!IsAuthorizedForBooking(booking, token))
+            {
+                return Unauthorized("Se requiere autorización de personal o un enlace firmado válido para acceder al comprobante.");
+            }
 
             var receipt = await _context.ElectronicReceipts
                 .Where(r => r.BookingId == booking.Id)
@@ -532,7 +538,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet("b/{code}/ver")]
-        public async Task<IActionResult> ShortVoucherHtml(string code)
+        public async Task<IActionResult> ShortVoucherHtml(string code, string? token = null)
         {
             if (string.IsNullOrWhiteSpace(code)) return NotFound("Código de reserva no válido.");
 
@@ -544,8 +550,16 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound($"No se encontró la reserva con código {code}.");
 
-            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromDays(30));
-            return RedirectToAction("Voucher", new { id = booking.Id, token = token });
+            if (!IsAuthorizedForBooking(booking, token))
+            {
+                return Unauthorized("Se requiere autorización de personal o un enlace firmado válido para acceder al boleto.");
+            }
+
+            var redirectToken = (!string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token))
+                ? token
+                : _checkoutAccess.Create(booking.Id, CheckoutAccess.DefaultDocumentTtl);
+
+            return RedirectToAction("Voucher", new { id = booking.Id, token = redirectToken });
         }
 
         [HttpGet]
@@ -601,22 +615,8 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound("Comprobante o reserva no encontrada");
 
-            bool hasContext = HttpContext != null && User != null;
-            bool isStaff = User?.Identity?.IsAuthenticated == true;
-            bool isValidToken = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
-
-            string? sessionBookingId = null;
-            try { sessionBookingId = HttpContext?.Session?.GetString("LastBookingId"); } catch { }
-
-            string? cookieBookingId = null;
-            try { Request?.Cookies.TryGetValue("sigetour_last_booking", out cookieBookingId); } catch { }
-
-            bool isSessionOwner = !string.IsNullOrWhiteSpace(sessionBookingId) && sessionBookingId == booking.Id.ToString();
-            bool isCookieOwner = !string.IsNullOrWhiteSpace(cookieBookingId) && cookieBookingId == booking.Id.ToString();
-
-            if (hasContext && !isStaff && !isValidToken && !isSessionOwner && !isCookieOwner)
+            if (!IsAuthorizedForBooking(booking, token))
             {
-                // Bloque 3 Item 6: Proteger Ticket con sesión autorizada o token
                 return Unauthorized("Se requiere autorización o token válido para acceder al comprobante.");
             }
 
