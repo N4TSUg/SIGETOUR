@@ -2248,6 +2248,32 @@ namespace SIGETOUR.API.Controllers.UI
             }
         }
 
+        private async Task<CashRegisterShift> GetOrCreateActiveOrAdminShiftAsync(CancellationToken ct = default)
+        {
+            var activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.IsOpen, ct);
+            if (activeShift != null) return activeShift;
+
+            var peruNow = DateTime.UtcNow.AddHours(-5);
+            var todayStr = peruNow.ToString("yyyyMMdd");
+            var shiftNumber = $"CJ-ADM-{todayStr}";
+            activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber, ct);
+            if (activeShift != null) return activeShift;
+
+            activeShift = new CashRegisterShift
+            {
+                Id = Guid.NewGuid(),
+                ShiftNumber = shiftNumber,
+                OpenedByUserName = User.Identity?.Name ?? "Administración",
+                OpenedAt = DateTime.UtcNow,
+                InitialAmount = 0m,
+                IsOpen = false,
+                Notes = "Turno administrativo automático para abonos y movimientos de reservas."
+            };
+            _context.CashRegisterShifts.Add(activeShift);
+            await _context.SaveChangesAsync(ct);
+            return activeShift;
+        }
+
         [HttpGet]
         public async Task<IActionResult> CreateBooking()
         {
@@ -2361,29 +2387,44 @@ namespace SIGETOUR.API.Controllers.UI
             });
 
             _context.Bookings.Add(booking);
-            await _context.SaveChangesAsync();
 
             if (booking.PaidAmount > 0)
             {
-                var activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.IsOpen);
-                if (activeShift != null)
+                var shift = await GetOrCreateActiveOrAdminShiftAsync();
+                _context.CashTransactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
                 {
-                    _context.CashTransactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
-                    {
-                        Id = Guid.NewGuid(),
-                        ShiftId = activeShift.Id,
-                        TransactionType = "Ingreso",
-                        Category = "Cobro de Reserva",
-                        Amount = booking.PaidAmount,
-                        PaymentMethod = !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Efectivo",
-                        ReferenceCode = booking.ReferenceCode,
-                        BookingId = booking.Id,
-                        Description = $"Cobro reserva {booking.ReferenceCode} - {booking.CustomerName}",
-                        RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
-                        CreatedAt = DateTime.UtcNow
-                    });
+                    Id = Guid.NewGuid(),
+                    ShiftId = shift.Id,
+                    TransactionType = "Ingreso",
+                    Category = "Cobro de Reserva",
+                    Amount = booking.PaidAmount,
+                    PaymentMethod = !string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Efectivo",
+                    ReferenceCode = booking.ReferenceCode,
+                    BookingId = booking.Id,
+                    Description = $"Cobro reserva {booking.ReferenceCode} - {booking.CustomerName}",
+                    RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            if (_context.Database.IsRelational())
+            {
+                await using var dbTx = await _context.Database.BeginTransactionAsync();
+                try
+                {
                     await _context.SaveChangesAsync();
+                    await dbTx.CommitAsync();
                 }
+                catch (Exception)
+                {
+                    await dbTx.RollbackAsync();
+                    TempData["ErrorMessage"] = "Ocurrió un error al registrar la reserva y su movimiento de caja. No se realizaron cambios parciales.";
+                    return RedirectToAction(nameof(Bookings));
+                }
+            }
+            else
+            {
+                await _context.SaveChangesAsync();
             }
 
             if (emailService != null && !string.IsNullOrWhiteSpace(booking.CustomerEmail) && !booking.CustomerEmail.EndsWith("@agencia.com", StringComparison.OrdinalIgnoreCase))
@@ -2519,6 +2560,23 @@ namespace SIGETOUR.API.Controllers.UI
             var originalPaidAmount = booking.PaidAmount;
             var paidDelta = model.PaidAmount - originalPaidAmount;
 
+            // Bloque 3: Validación contra cobros confirmados por Culqi y reducciones no autorizadas
+            var culqiPaidAmount = await _context.CulqiPayments
+                .Where(p => p.BookingId == booking.Id && (p.Status == "paid" || p.Status == "paid_excess"))
+                .SumAsync(p => (decimal?)p.AmountCents / 100m) ?? 0m;
+
+            if (model.PaidAmount < culqiPaidAmount)
+            {
+                TempData["ErrorMessage"] = $"No es posible reducir el monto pagado por debajo del total cobrado por pasarela Culqi (S/ {culqiPaidAmount:N2}). No se admiten devoluciones de pasarela sin autorización de gerencia.";
+                return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+            }
+
+            if (paidDelta < 0)
+            {
+                TempData["ErrorMessage"] = $"No se permite reducir el monto pagado directamente desde el formulario de edición (reducción de S/ {Math.Abs(paidDelta):N2}). Para registrar una devolución o ajuste justificado, utilice la operación trazable de Devolución de Reserva.";
+                return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+            }
+
             var selectedTour = await _context.TourPackages.FindAsync(model.TourPackageId);
 
             string pickupLocation = model.BoardingPoint ?? string.Empty;
@@ -2575,39 +2633,15 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             _context.Bookings.Update(booking);
-            await _context.SaveChangesAsync();
 
-            // Bloque 4 Item 4: Registrar pagos incrementales para deltas positivos
+            // Bloque 3: Registrar abono incremental dentro de una transacción atómica con el movimiento de caja
             if (paidDelta > 0)
             {
-                var activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.IsOpen);
-                if (activeShift == null)
-                {
-                    var peruNow = DateTime.UtcNow.AddHours(-5);
-                    var todayStr = peruNow.ToString("yyyyMMdd");
-                    var shiftNumber = $"CJ-ADM-{todayStr}";
-                    activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber);
-                    if (activeShift == null)
-                    {
-                        activeShift = new CashRegisterShift
-                        {
-                            Id = Guid.NewGuid(),
-                            ShiftNumber = shiftNumber,
-                            OpenedByUserName = User.Identity?.Name ?? "Administración",
-                            OpenedAt = DateTime.UtcNow,
-                            InitialAmount = 0m,
-                            IsOpen = false,
-                            Notes = "Turno administrativo automático para abonos en reservas."
-                        };
-                        _context.CashRegisterShifts.Add(activeShift);
-                        await _context.SaveChangesAsync();
-                    }
-                }
-
+                var shift = await GetOrCreateActiveOrAdminShiftAsync();
                 _context.CashTransactions.Add(new SIGETOUR.API.Core.Entities.CashTransaction
                 {
                     Id = Guid.NewGuid(),
-                    ShiftId = activeShift.Id,
+                    ShiftId = shift.Id,
                     TransactionType = "Ingreso",
                     Category = originalPaidAmount > 0 ? "Abono de Saldo" : "Cobro de Reserva",
                     Amount = paidDelta,
@@ -2620,6 +2654,29 @@ namespace SIGETOUR.API.Controllers.UI
                     RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
                     CreatedAt = DateTime.UtcNow
                 });
+
+                if (_context.Database.IsRelational())
+                {
+                    await using var dbTx = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        await _context.SaveChangesAsync();
+                        await dbTx.CommitAsync();
+                    }
+                    catch (Exception)
+                    {
+                        await dbTx.RollbackAsync();
+                        TempData["ErrorMessage"] = "Ocurrió un error al registrar el abono incremental. No se aplicaron cambios parciales.";
+                        return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                    }
+                }
+                else
+                {
+                    await _context.SaveChangesAsync();
+                }
+            }
+            else
+            {
                 await _context.SaveChangesAsync();
             }
 
@@ -2655,6 +2712,89 @@ namespace SIGETOUR.API.Controllers.UI
 
             TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} ha sido reactivada con éxito.";
             return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RefundBookingPayment(Guid id, decimal refundAmount, string reason, string? paymentMethod = "Efectivo")
+        {
+            if (refundAmount <= 0)
+            {
+                TempData["ErrorMessage"] = "El monto a devolver debe ser mayor a S/ 0.00.";
+                return RedirectToAction(nameof(EditBooking), new { id });
+            }
+
+            if (string.IsNullOrWhiteSpace(reason) || reason.Trim().Length < 5)
+            {
+                TempData["ErrorMessage"] = "Debe indicar un motivo o justificación válida para la devolución (mínimo 5 caracteres).";
+                return RedirectToAction(nameof(EditBooking), new { id });
+            }
+
+            var booking = await _context.Bookings.FindAsync(id);
+            if (booking == null) return NotFound();
+
+            if (refundAmount > booking.PaidAmount)
+            {
+                TempData["ErrorMessage"] = $"El monto a devolver (S/ {refundAmount:N2}) no puede exceder el total pagado actual (S/ {booking.PaidAmount:N2}).";
+                return RedirectToAction(nameof(EditBooking), new { id });
+            }
+
+            // Proteger cobros confirmados por Culqi: no devolver automáticamente pagos con pasarela/tarjeta
+            var culqiPaidAmount = await _context.CulqiPayments
+                .Where(p => p.BookingId == booking.Id && (p.Status == "paid" || p.Status == "paid_excess"))
+                .SumAsync(p => (decimal?)p.AmountCents / 100m) ?? 0m;
+
+            if (booking.PaidAmount - refundAmount < culqiPaidAmount)
+            {
+                TempData["ErrorMessage"] = $"No es posible realizar la devolución: S/ {culqiPaidAmount:N2} corresponden a cobros confirmados por pasarela Culqi. No se permiten devoluciones automáticas de pasarela sin autorización de gerencia.";
+                return RedirectToAction(nameof(EditBooking), new { id });
+            }
+
+            booking.PaidAmount -= refundAmount;
+            if (booking.PaidAmount < booking.TotalAmount && booking.Status == BookingStatus.Confirmed)
+            {
+                booking.Status = BookingStatus.Pending;
+            }
+            _context.Bookings.Update(booking);
+
+            var shift = await GetOrCreateActiveOrAdminShiftAsync();
+            _context.CashTransactions.Add(new CashTransaction
+            {
+                Id = Guid.NewGuid(),
+                ShiftId = shift.Id,
+                TransactionType = "Egreso",
+                Category = "Devolución de Reserva",
+                Amount = refundAmount,
+                PaymentMethod = !string.IsNullOrWhiteSpace(paymentMethod) ? paymentMethod : "Efectivo",
+                ReferenceCode = booking.ReferenceCode,
+                BookingId = booking.Id,
+                Description = $"Devolución / Ajuste de reserva {booking.ReferenceCode}. Motivo: {reason.Trim()}. Autorizado por: {User.Identity?.Name ?? "Admin"}",
+                RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
+                CreatedAt = DateTime.UtcNow
+            });
+
+            if (_context.Database.IsRelational())
+            {
+                await using var dbTx = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    await _context.SaveChangesAsync();
+                    await dbTx.CommitAsync();
+                }
+                catch (Exception)
+                {
+                    await dbTx.RollbackAsync();
+                    TempData["ErrorMessage"] = "Ocurrió un error al procesar la devolución. No se aplicaron cambios.";
+                    return RedirectToAction(nameof(EditBooking), new { id });
+                }
+            }
+            else
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            TempData["SuccessMessage"] = $"Devolución de S/ {refundAmount:N2} registrada exitosamente como egreso de caja.";
+            return RedirectToAction(nameof(EditBooking), new { id });
         }
 
         [HttpPost]
@@ -3738,6 +3878,18 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(Cash), new { tab = "general" });
             }
 
+            if (tx.CulqiPaymentId != null)
+            {
+                TempData["ErrorMessage"] = "No se puede modificar un movimiento de caja generado por pasarela electrónica (Culqi).";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            if (tx.BookingId != null && tx.Amount != amount)
+            {
+                TempData["ErrorMessage"] = "No se puede alterar el importe de un movimiento vinculado a una reserva turística. Utilice las operaciones de la reserva.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
             tx.TransactionType = type == "Egreso" ? "Egreso" : "Ingreso";
             tx.Category = string.IsNullOrWhiteSpace(category) ? tx.Category : category;
             tx.Amount = amount;
@@ -3760,6 +3912,18 @@ namespace SIGETOUR.API.Controllers.UI
             if (tx == null)
             {
                 TempData["ErrorMessage"] = "El movimiento de caja no existe.";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            if (tx.CulqiPaymentId != null)
+            {
+                TempData["ErrorMessage"] = "No se puede anular ni eliminar un movimiento de caja generado por pasarela electrónica (Culqi).";
+                return RedirectToAction(nameof(Cash), new { tab = "general" });
+            }
+
+            if (tx.BookingId != null)
+            {
+                TempData["ErrorMessage"] = "No se puede eliminar un movimiento vinculado a una reserva turística para preservar la trazabilidad financiera. Si requiere corregir el cobro, registre una devolución autorizada.";
                 return RedirectToAction(nameof(Cash), new { tab = "general" });
             }
 
