@@ -136,12 +136,14 @@ namespace SIGETOUR.Tests.Helpers
                 var canConnect = await db.Database.CanConnectAsync();
                 if (!canConnect)
                 {
-                    Assert.Fail($"Fallo de conexión a la base de datos PostgreSQL de prueba ('{conn}'): CanConnectAsync retornó false.");
+                    var sanitized = SanitizeConnectionString(conn);
+                    Assert.Fail($"Fallo de conexión a la base de datos PostgreSQL de prueba ('{sanitized}'): CanConnectAsync retornó false.");
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is Xunit.Sdk.XunitException))
             {
-                Assert.Fail($"Fallo de conexión a la base de datos PostgreSQL de prueba configurada: {ex.Message}");
+                var sanitized = SanitizeConnectionString(conn);
+                Assert.Fail($"Fallo de conexión a la base de datos PostgreSQL de prueba configurada ('{sanitized}'): {ex.Message}");
             }
 
             return db;
@@ -153,6 +155,39 @@ namespace SIGETOUR.Tests.Helpers
             return new DbContextOptionsBuilder<AppDbContext>()
                 .UseNpgsql(connectionString, npgsql => npgsql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
                 .Options;
+        }
+
+        /// <summary>
+        /// Sanitiza una cadena de conexión para diagnósticos y registros seguros,
+        /// exponiendo únicamente Host:Port/Database y omitiendo totalmente credenciales o tokens.
+        /// </summary>
+        public static string SanitizeConnectionString(string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString)) return string.Empty;
+            try
+            {
+                var builder = new NpgsqlConnectionStringBuilder(connectionString);
+                var host = string.IsNullOrWhiteSpace(builder.Host) ? "localhost" : builder.Host;
+                var port = builder.Port == 0 ? 5432 : builder.Port;
+                var db = string.IsNullOrWhiteSpace(builder.Database) ? "(ninguna)" : builder.Database;
+                return $"{host}:{port}/{db}";
+            }
+            catch
+            {
+                return "[cadena no analizable]";
+            }
+        }
+
+        /// <summary>
+        /// Abre una conexión NpgsqlConnection aplicando obligatoriamente la validación
+        /// centralizada de seguridad EnsureSafeTestDatabase antes de intentar abrir el socket.
+        /// </summary>
+        public static async Task<NpgsqlConnection> OpenSafeConnectionAsync(string connectionString)
+        {
+            EnsureSafeTestDatabase(connectionString);
+            var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            return conn;
         }
     }
 }

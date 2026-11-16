@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Infrastructure.Data;
@@ -24,171 +25,244 @@ namespace SIGETOUR.Tests.Audit
             _output = output;
         }
 
-        private static string? GetConn() => PostgresTestHelper.GetConfiguredConnectionString();
-
-        private static async Task<string> CreateTestSchemaAsync(string baseConn)
-        {
-            var schemaName = $"sigetour_mig_{Guid.NewGuid():N}";
-            await using var conn = new NpgsqlConnection(baseConn);
-            await conn.OpenAsync();
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"
-                CREATE SCHEMA ""{schemaName}"";
-                COMMENT ON SCHEMA ""{schemaName}"" IS 'sigetour_test_schema:{schemaName}';
-            ";
-            await cmd.ExecuteNonQueryAsync();
-            return schemaName;
-        }
-
-        private static async Task DropTestSchemaAsync(string baseConn, string schemaName)
-        {
-            if (string.IsNullOrWhiteSpace(schemaName) || schemaName.Equals("public", StringComparison.OrdinalIgnoreCase))
-                return;
-
-            try
-            {
-                await using var conn = new NpgsqlConnection(baseConn);
-                await conn.OpenAsync();
-                await using var cmd = conn.CreateCommand();
-                cmd.CommandText = $@"DROP SCHEMA IF EXISTS ""{schemaName}"" CASCADE;";
-                await cmd.ExecuteNonQueryAsync();
-            }
-            catch
-            {
-                // Ignorar en bloque de limpieza
-            }
-        }
-
-        private static AppDbContext CreateMigratedDbContext(string baseConn, string schemaName)
-        {
-            var builder = new NpgsqlConnectionStringBuilder(baseConn)
-            {
-                SearchPath = schemaName
-            };
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseNpgsql(builder.ConnectionString)
-                .Options;
-            return new AppDbContext(options);
-        }
+        private const string PriorMigrationName = "20261116203628_VerifyAndHardenElectronicReceiptCashTransactionForeignKey";
+        private const string HardenedMigrationShortName = "HardenForeignKeyResolutionAndValidation";
+        private const string FkConstraintName = "FK_ElectronicReceipts_CashTransactions_CashTransactionId";
 
         // =========================================================================
-        // GRUPO 1: PRUEBAS DE MIGRACIONES REALES EN POSTGRESQL AISLADO
+        // GRUPO 1: RESOLUCIÓN CORRECTA DE TABLAS Y VALIDACIÓN DE CLAVE FORÁNEA (PUNTOS 1 Y 2)
+        // Ejecutan migraciones REALES mediante IMigrator / MigrateAsync()
         // =========================================================================
 
         [SkippableFact]
-        public async Task Migration_ForeignKey_WhenMissingInTargetTable_IsCreatedSuccessfully()
+        public async Task Point1_TableResolution_WhenBothTablesInUsualSchema_MigratesAndValidatesForeignKey()
         {
-            var baseConn = GetConn();
-            if (string.IsNullOrWhiteSpace(baseConn))
-            {
-                Skip.If(true, "PostgreSQL no configurado.");
-                return;
-            }
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
 
-            var schema = await CreateTestSchemaAsync(baseConn);
             try
             {
-                await using var db = CreateMigratedDbContext(baseConn, schema);
-                // 1. Aplicar todas las migraciones reales sobre el esquema
+                await using var db = fixture.CreateDbContext();
+                // 1. Ejecutar la migración real completa
                 await db.Database.MigrateAsync();
 
-                // 2. Eliminar explícitamente la clave foránea en este esquema
-                await db.Database.ExecuteSqlRawAsync(@"
-                    ALTER TABLE ""ElectronicReceipts"" 
-                    DROP CONSTRAINT IF EXISTS ""FK_ElectronicReceipts_CashTransactions_CashTransactionId"";
-                ");
-
-                // 3. Ejecutar la migración correctiva / lógica de verificación de clave foránea
-                await using (var conn = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(baseConn) { SearchPath = schema }.ConnectionString))
-                {
-                    await conn.OpenAsync();
-                    await using var cmd = conn.CreateCommand();
-                    cmd.CommandText = @"
-                        DO $$
-                        DECLARE
-                            v_schema text := current_schema();
-                            v_target_rel_oid oid;
-                            v_ref_rel_oid oid;
-                            v_con record;
-                            v_orphans_count integer;
-                            v_fk_name text := 'FK_ElectronicReceipts_CashTransactions_CashTransactionId';
-                        BEGIN
-                            SELECT c.oid INTO v_target_rel_oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'ElectronicReceipts' AND n.nspname = v_schema;
-                            SELECT c.oid INTO v_ref_rel_oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'CashTransactions' AND n.nspname = v_schema;
-                            IF v_target_rel_oid IS NULL OR v_ref_rel_oid IS NULL THEN RETURN; END IF;
-
-                            SELECT c.conname, c.contype, c.conrelid, c.confrelid, c.confdeltype,
-                                   (SELECT attname FROM pg_attribute WHERE attrelid = c.conrelid AND attnum = c.conkey[1]) AS from_col,
-                                   (SELECT attname FROM pg_attribute WHERE attrelid = c.confrelid AND attnum = c.confkey[1]) AS to_col,
-                                   array_length(c.conkey, 1) AS from_col_count,
-                                   array_length(c.confkey, 1) AS to_col_count
-                            INTO v_con FROM pg_constraint c WHERE c.conrelid = v_target_rel_oid AND c.conname = v_fk_name;
-
-                            IF FOUND THEN
-                                IF v_con.contype = 'f' AND v_con.confrelid = v_ref_rel_oid AND v_con.from_col = 'CashTransactionId' AND v_con.to_col = 'Id' AND v_con.from_col_count = 1 AND v_con.to_col_count = 1 AND v_con.confdeltype = 'n' THEN
-                                    RETURN;
-                                ELSE
-                                    RAISE EXCEPTION 'Incompatible';
-                                END IF;
-                            END IF;
-
-                            EXECUTE format('
-                                ALTER TABLE %I.""ElectronicReceipts""
-                                ADD CONSTRAINT %I
-                                FOREIGN KEY (""CashTransactionId"")
-                                REFERENCES %I.""CashTransactions"" (""Id"")
-                                ON DELETE SET NULL', v_schema, v_fk_name, v_schema);
-                        END $$;
-                    ";
-                    await cmd.ExecuteNonQueryAsync();
-                }
-
-                // 4. Comprobar que la restricción fue creada y apunta exactamente a CashTransactions(Id) ON DELETE SET NULL
-                await using var checkConn = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(baseConn) { SearchPath = schema }.ConnectionString);
-                await checkConn.OpenAsync();
-                await using var checkCmd = checkConn.CreateCommand();
-                checkCmd.CommandText = @"
-                    SELECT c.contype::text, c.confdeltype::text, ref_t.relname
+                // 2. Comprobar que la clave foránea existe en la tabla y esquema objetivo
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString);
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT c.convalidated, c.contype::text, c.confdeltype::text, ref_t.relname
                     FROM pg_constraint c
                     JOIN pg_class t ON t.oid = c.conrelid
                     JOIN pg_namespace n ON n.oid = t.relnamespace
                     JOIN pg_class ref_t ON ref_t.oid = c.confrelid
                     WHERE t.relname = 'ElectronicReceipts'
-                      AND n.nspname = current_schema()
-                      AND c.conname = 'FK_ElectronicReceipts_CashTransactions_CashTransactionId';
+                      AND n.nspname = @schema
+                      AND c.conname = @fkName;
                 ";
-                await using var reader = await checkCmd.ExecuteReaderAsync();
-                Assert.True(await reader.ReadAsync(), "La clave foránea no fue creada.");
-                Assert.Equal("f", reader.GetString(0));
-                Assert.Equal("n", reader.GetString(1)); // 'n' = SET NULL
-                Assert.Equal("CashTransactions", reader.GetString(2));
+                cmd.Parameters.AddWithValue("@schema", fixture.SchemaName);
+                cmd.Parameters.AddWithValue("@fkName", FkConstraintName);
+
+                await using var reader = await cmd.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync(), "La clave foránea no fue creada en la tabla objetivo.");
+                Assert.True(reader.GetBoolean(0), "La clave foránea debe tener convalidated = true.");
+                Assert.Equal("f", reader.GetString(1));
+                Assert.Equal("n", reader.GetString(2)); // ON DELETE SET NULL
+                Assert.Equal("CashTransactions", reader.GetString(3));
             }
             finally
             {
-                await DropTestSchemaAsync(baseConn, schema);
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
             }
         }
 
         [SkippableFact]
-        public async Task Migration_ForeignKey_WhenCorrectAlreadyExists_SucceedsWithoutRecreating()
+        public async Task Point1_TableResolution_WhenSearchPathHasEmptyFirstSchema_FindsTablesInNextSchemaAndMigrates()
         {
-            var baseConn = GetConn();
-            if (string.IsNullOrWhiteSpace(baseConn))
-            {
-                Skip.If(true, "PostgreSQL no configurado.");
-                return;
-            }
+            PostgresIsolatedScenarioFixture? emptyPrefixFixture = null;
+            PostgresIsolatedScenarioFixture? mainFixture = null;
 
-            var schema = await CreateTestSchemaAsync(baseConn);
             try
             {
-                await using var db = CreateMigratedDbContext(baseConn, schema);
+                emptyPrefixFixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+                mainFixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+                if (emptyPrefixFixture == null || mainFixture == null) return;
+
+                // 1. Migrar mainFixture hasta la migración previa para que las tablas existan físicamente en mainFixture
+                await using (var dbInit = mainFixture.CreateDbContext())
+                {
+                    var migratorInit = dbInit.GetInfrastructure().GetRequiredService<IMigrator>();
+                    await migratorInit.MigrateAsync(PriorMigrationName);
+
+                    // Eliminar la FK temporalmente en mainFixture para probar su resolución y creación
+                    await dbInit.Database.ExecuteSqlRawAsync($@"
+                        ALTER TABLE ""ElectronicReceipts"" DROP CONSTRAINT IF EXISTS ""{FkConstraintName}"";
+                    ");
+                }
+
+                // Sincronizar el historial de migraciones en emptyPrefixFixture para que EF Core evalúe
+                // únicamente la migración correctiva bajo current_schema() = emptyPrefixFixture
+                await using (var emptyConn = await PostgresTestHelper.OpenSafeConnectionAsync(emptyPrefixFixture.ConnectionString))
+                {
+                    await using var emptyCmd = emptyConn.CreateCommand();
+                    emptyCmd.CommandText = $@"
+                        CREATE TABLE ""{emptyPrefixFixture.SchemaName}"".""__EFMigrationsHistory"" (
+                            ""MigrationId"" character varying(150) NOT NULL PRIMARY KEY,
+                            ""ProductVersion"" character varying(32) NOT NULL
+                        );
+                        INSERT INTO ""{emptyPrefixFixture.SchemaName}"".""__EFMigrationsHistory""
+                        SELECT * FROM ""{mainFixture.SchemaName}"".""__EFMigrationsHistory"";
+                    ";
+                    await emptyCmd.ExecuteNonQueryAsync();
+                }
+
+                // 2. Configurar search_path con un primer esquema vacío seguido del esquema con las tablas
+                var dualSearchPath = $"{emptyPrefixFixture.SchemaName},{mainFixture.SchemaName}";
+                var dualConnBuilder = new NpgsqlConnectionStringBuilder(mainFixture.ConnectionString)
+                {
+                    SearchPath = dualSearchPath
+                };
+
+                var options = new DbContextOptionsBuilder<AppDbContext>()
+                    .UseNpgsql(dualConnBuilder.ConnectionString)
+                    .Options;
+
+                await using var dbDual = new AppDbContext(options);
+                var migrator = dbDual.GetInfrastructure().GetRequiredService<IMigrator>();
+
+                // 3. Migrar usando search_path multi-esquema donde current_schema() es el esquema vacío
+                await migrator.MigrateAsync();
+
+                // 4. Verificar que to_regclass resolvió ElectronicReceipts en mainFixture y creó la FK validada
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(mainFixture.ConnectionString);
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT c.convalidated, n.nspname
+                    FROM pg_constraint c
+                    JOIN pg_class t ON t.oid = c.conrelid
+                    JOIN pg_namespace n ON n.oid = t.relnamespace
+                    WHERE t.relname = 'ElectronicReceipts'
+                      AND n.nspname = @schema
+                      AND c.conname = @fkName;
+                ";
+                cmd.Parameters.AddWithValue("@schema", mainFixture.SchemaName);
+                cmd.Parameters.AddWithValue("@fkName", FkConstraintName);
+
+                await using var reader = await cmd.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync(), "to_regclass debió encontrar la tabla en el segundo esquema de search_path.");
+                Assert.True(reader.GetBoolean(0), "La restricción debe estar validada.");
+                Assert.Equal(mainFixture.SchemaName, reader.GetString(1));
+            }
+            finally
+            {
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, emptyPrefixFixture, mainFixture);
+            }
+        }
+
+        [SkippableFact]
+        public async Task Point1_TableResolution_WhenHomonymousConstraintExistsInAnotherSchema_CreatesInTargetSchemaWithoutInterference()
+        {
+            PostgresIsolatedScenarioFixture? otherSchemaFixture = null;
+            PostgresIsolatedScenarioFixture? targetFixture = null;
+
+            try
+            {
+                otherSchemaFixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+                targetFixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+                if (otherSchemaFixture == null || targetFixture == null) return;
+
+                // En otherSchema, crear una tabla ficticia con una restricción del MISMO nombre
+                await using (var otherConn = await PostgresTestHelper.OpenSafeConnectionAsync(otherSchemaFixture.ConnectionString))
+                {
+                    await using var otherCmd = otherConn.CreateCommand();
+                    otherCmd.CommandText = $@"
+                        CREATE TABLE ""{otherSchemaFixture.SchemaName}"".""DummyTable"" (id uuid PRIMARY KEY, note text);
+                        ALTER TABLE ""{otherSchemaFixture.SchemaName}"".""DummyTable""
+                        ADD CONSTRAINT ""{FkConstraintName}""
+                        CHECK (note IS NOT NULL);
+                    ";
+                    await otherCmd.ExecuteNonQueryAsync();
+                }
+
+                // En targetFixture, ejecutar la migración real
+                await using var db = targetFixture.CreateDbContext();
+                await db.Database.MigrateAsync();
+
+                // Verificar que la restricción en targetFixture es FK y no colisionó con la de otherSchema
+                await using var targetConn = await PostgresTestHelper.OpenSafeConnectionAsync(targetFixture.ConnectionString);
+                await using var cmd = targetConn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT c.contype::text, c.convalidated
+                    FROM pg_constraint c
+                    JOIN pg_class t ON t.oid = c.conrelid
+                    JOIN pg_namespace n ON n.oid = t.relnamespace
+                    WHERE t.relname = 'ElectronicReceipts'
+                      AND n.nspname = @schema
+                      AND c.conname = @fkName;
+                ";
+                cmd.Parameters.AddWithValue("@schema", targetFixture.SchemaName);
+                cmd.Parameters.AddWithValue("@fkName", FkConstraintName);
+
+                await using var reader = await cmd.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync(), "La FK debió crearse en el esquema objetivo a pesar del nombre homónimo en otro esquema.");
+                Assert.Equal("f", reader.GetString(0));
+                Assert.True(reader.GetBoolean(1));
+            }
+            finally
+            {
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, otherSchemaFixture, targetFixture);
+            }
+        }
+
+        [SkippableFact]
+        public async Task Point1_TableResolution_WhenRequiredTableMissing_FailsWithClearDiagnostic_AndDoesNotRecordMigration()
+        {
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
+
+            try
+            {
+                await using var db = fixture.CreateDbContext();
+                var migrator = db.GetInfrastructure().GetRequiredService<IMigrator>();
+
+                // 1. Llevar la base hasta la migración anterior a la clave foránea
+                await migrator.MigrateAsync(PriorMigrationName);
+
+                // 2. Eliminar deliberadamente la tabla referenciada CashTransactions para simular ausencia en search_path
+                await db.Database.ExecuteSqlRawAsync(@"DROP TABLE ""CashTransactions"" CASCADE;");
+
+                // 3. Ejecutar la migración real mediante IMigrator
+                var ex = await Assert.ThrowsAsync<PostgresException>(() => migrator.MigrateAsync());
+                Assert.Contains("CashTransactions", ex.Message);
+                Assert.Contains("No se encontró la tabla", ex.Message);
+
+                // 4. Comprobar que la migración fallida NO quedó registrada en __EFMigrationsHistory
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString);
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"SELECT count(*) FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" LIKE @name;";
+                cmd.Parameters.AddWithValue("@name", $"%{HardenedMigrationShortName}%");
+                var recordedCount = (long?)await cmd.ExecuteScalarAsync();
+                Assert.Equal(0, recordedCount);
+            }
+            finally
+            {
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
+            }
+        }
+
+        [SkippableFact]
+        public async Task Point2_ForeignKey_WhenCorrectAndValidated_PreservesOriginalOidWithoutRecreating()
+        {
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
+
+            try
+            {
+                await using var db = fixture.CreateDbContext();
                 // Migración completa
                 await db.Database.MigrateAsync();
 
-                // Obtener el OID de la restricción existente
-                await using var conn = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(baseConn) { SearchPath = schema }.ConnectionString);
-                await conn.OpenAsync();
+                // Obtener el OID de la restricción creada y validada
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString);
                 await using var cmdOid = conn.CreateCommand();
                 cmdOid.CommandText = @"
                     SELECT c.oid
@@ -196,189 +270,132 @@ namespace SIGETOUR.Tests.Audit
                     JOIN pg_class t ON t.oid = c.conrelid
                     JOIN pg_namespace n ON n.oid = t.relnamespace
                     WHERE t.relname = 'ElectronicReceipts'
-                      AND n.nspname = current_schema()
-                      AND c.conname = 'FK_ElectronicReceipts_CashTransactions_CashTransactionId';
+                      AND n.nspname = @schema
+                      AND c.conname = @fkName;
                 ";
+                cmdOid.Parameters.AddWithValue("@schema", fixture.SchemaName);
+                cmdOid.Parameters.AddWithValue("@fkName", FkConstraintName);
                 var originalOid = (uint?)await cmdOid.ExecuteScalarAsync();
                 Assert.NotNull(originalOid);
 
                 // Volver a aplicar db.Database.MigrateAsync()
                 await db.Database.MigrateAsync();
 
-                // Comprobar que el OID de la restricción sigue siendo el mismo (no fue destruida ni recreada)
+                // Comprobar que el OID de la restricción sigue siendo exactamente el mismo
                 var newOid = (uint?)await cmdOid.ExecuteScalarAsync();
                 Assert.Equal(originalOid, newOid);
             }
             finally
             {
-                await DropTestSchemaAsync(baseConn, schema);
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
             }
         }
 
         [SkippableFact]
-        public async Task Migration_ForeignKey_WhenSameNameConstraintExistsInAnotherSchema_CreatesInTargetSchemaWithoutInterference()
+        public async Task Point2_ForeignKey_WhenCorrectNotValidWithoutOrphans_ValidatesConstraintWithoutRecreating()
         {
-            var baseConn = GetConn();
-            if (string.IsNullOrWhiteSpace(baseConn))
-            {
-                Skip.If(true, "PostgreSQL no configurado.");
-                return;
-            }
-
-            var targetSchema = await CreateTestSchemaAsync(baseConn);
-            var otherSchema = await CreateTestSchemaAsync(baseConn);
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
 
             try
             {
-                // En otherSchema, crear una tabla y una restricción con el MISMO nombre
-                await using (var connOther = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(baseConn) { SearchPath = otherSchema }.ConnectionString))
-                {
-                    await connOther.OpenAsync();
-                    await using var cmdOther = connOther.CreateCommand();
-                    cmdOther.CommandText = @"
-                        CREATE TABLE ""Dummy"" (id uuid PRIMARY KEY, note text);
-                        ALTER TABLE ""Dummy"" 
-                        ADD CONSTRAINT ""FK_ElectronicReceipts_CashTransactions_CashTransactionId"" 
-                        CHECK (note IS NOT NULL);
-                    ";
-                    await cmdOther.ExecuteNonQueryAsync();
-                }
+                await using var db = fixture.CreateDbContext();
+                var migrator = db.GetInfrastructure().GetRequiredService<IMigrator>();
 
-                // En targetSchema, aplicar las migraciones
-                await using var dbTarget = CreateMigratedDbContext(baseConn, targetSchema);
-                await dbTarget.Database.MigrateAsync();
+                // 1. Migrar hasta la migración anterior
+                await migrator.MigrateAsync(PriorMigrationName);
 
-                // Comprobar que la clave foránea en targetSchema existe y es válida
-                await using (var connTarget = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(baseConn) { SearchPath = targetSchema }.ConnectionString))
+                // 2. Modificar la clave foránea para que sea NOT VALID
+                await db.Database.ExecuteSqlRawAsync($@"
+                    ALTER TABLE ""ElectronicReceipts"" DROP CONSTRAINT IF EXISTS ""{FkConstraintName}"";
+                    ALTER TABLE ""ElectronicReceipts""
+                    ADD CONSTRAINT ""{FkConstraintName}""
+                    FOREIGN KEY (""CashTransactionId"")
+                    REFERENCES ""CashTransactions"" (""Id"")
+                    ON DELETE SET NULL NOT VALID;
+                ");
+
+                // Verificar que inicialmente convalidated es false y capturar OID
+                uint initialOid;
+                await using (var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString))
                 {
-                    await connTarget.OpenAsync();
-                    await using var cmdCheck = connTarget.CreateCommand();
-                    cmdCheck.CommandText = @"
-                        SELECT c.contype::text, t.relname
+                    await using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT c.oid, c.convalidated
                         FROM pg_constraint c
                         JOIN pg_class t ON t.oid = c.conrelid
                         JOIN pg_namespace n ON n.oid = t.relnamespace
-                        WHERE n.nspname = current_schema()
-                          AND c.conname = 'FK_ElectronicReceipts_CashTransactions_CashTransactionId';
+                        WHERE t.relname = 'ElectronicReceipts'
+                          AND n.nspname = @schema
+                          AND c.conname = @fkName;
                     ";
-                    await using var reader = await cmdCheck.ExecuteReaderAsync();
+                    cmd.Parameters.AddWithValue("@schema", fixture.SchemaName);
+                    cmd.Parameters.AddWithValue("@fkName", FkConstraintName);
+                    await using var reader = await cmd.ExecuteReaderAsync();
                     Assert.True(await reader.ReadAsync());
-                    Assert.Equal("f", reader.GetString(0)); // es Foreign Key en targetSchema
-                    Assert.Equal("ElectronicReceipts", reader.GetString(1));
+                    initialOid = reader.GetFieldValue<uint>(0);
+                    Assert.False(reader.GetBoolean(1), "La restricción debe comenzar como NOT VALID.");
+                }
+
+                // 3. Ejecutar la migración real correctiva
+                await migrator.MigrateAsync();
+
+                // 4. Verificar que convalidated pasó a true y el OID fue preservado
+                await using (var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString))
+                {
+                    await using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT c.oid, c.convalidated
+                        FROM pg_constraint c
+                        JOIN pg_class t ON t.oid = c.conrelid
+                        JOIN pg_namespace n ON n.oid = t.relnamespace
+                        WHERE t.relname = 'ElectronicReceipts'
+                          AND n.nspname = @schema
+                          AND c.conname = @fkName;
+                    ";
+                    cmd.Parameters.AddWithValue("@schema", fixture.SchemaName);
+                    cmd.Parameters.AddWithValue("@fkName", FkConstraintName);
+                    await using var reader = await cmd.ExecuteReaderAsync();
+                    Assert.True(await reader.ReadAsync());
+                    var postOid = reader.GetFieldValue<uint>(0);
+                    Assert.Equal(initialOid, postOid);
+                    Assert.True(reader.GetBoolean(1), "La migración debió validar la restricción (convalidated = true).");
                 }
             }
             finally
             {
-                await DropTestSchemaAsync(baseConn, targetSchema);
-                await DropTestSchemaAsync(baseConn, otherSchema);
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
             }
         }
 
         [SkippableFact]
-        public async Task Migration_ForeignKey_WhenIncompatibleConstraintExistsInTargetTable_AbortsWithClearDiagnostic()
+        public async Task Point2_ForeignKey_WhenCorrectNotValidWithOrphans_Aborts_PreservesData_AndDoesNotRecordMigration()
         {
-            var baseConn = GetConn();
-            if (string.IsNullOrWhiteSpace(baseConn))
-            {
-                Skip.If(true, "PostgreSQL no configurado.");
-                return;
-            }
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
 
-            var schema = await CreateTestSchemaAsync(baseConn);
             try
             {
-                await using var db = CreateMigratedDbContext(baseConn, schema);
-                await db.Database.MigrateAsync();
+                await using var db = fixture.CreateDbContext();
+                var migrator = db.GetInfrastructure().GetRequiredService<IMigrator>();
 
-                // Eliminar la FK correcta y poner una restricción incompatible con ese mismo nombre
-                // (por ejemplo, con ON DELETE CASCADE 'c' en lugar de SET NULL 'n')
-                await db.Database.ExecuteSqlRawAsync(@"
-                    ALTER TABLE ""ElectronicReceipts"" 
-                    DROP CONSTRAINT IF EXISTS ""FK_ElectronicReceipts_CashTransactions_CashTransactionId"";
+                // 1. Migrar hasta la migración previa
+                await migrator.MigrateAsync(PriorMigrationName);
 
-                    ALTER TABLE ""ElectronicReceipts""
-                    ADD CONSTRAINT ""FK_ElectronicReceipts_CashTransactions_CashTransactionId""
-                    FOREIGN KEY (""CashTransactionId"")
-                    REFERENCES ""CashTransactions"" (""Id"")
-                    ON DELETE CASCADE;
+                // 2. Eliminar la restricción para poder insertar un registro huérfano histórico
+                await db.Database.ExecuteSqlRawAsync($@"
+                    ALTER TABLE ""ElectronicReceipts"" DROP CONSTRAINT IF EXISTS ""{FkConstraintName}"";
                 ");
 
-                // Ejecutar el bloque de migración de verificación
-                var targetConnStr = new NpgsqlConnectionStringBuilder(baseConn) { SearchPath = schema }.ConnectionString;
-                await using var conn = new NpgsqlConnection(targetConnStr);
-                await conn.OpenAsync();
-                await using var cmd = conn.CreateCommand();
-                cmd.CommandText = @"
-                    DO $$
-                    DECLARE
-                        v_schema text := current_schema();
-                        v_target_rel_oid oid;
-                        v_ref_rel_oid oid;
-                        v_con record;
-                        v_fk_name text := 'FK_ElectronicReceipts_CashTransactions_CashTransactionId';
-                    BEGIN
-                        SELECT c.oid INTO v_target_rel_oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'ElectronicReceipts' AND n.nspname = v_schema;
-                        SELECT c.oid INTO v_ref_rel_oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'CashTransactions' AND n.nspname = v_schema;
-
-                        SELECT c.conname, c.contype, c.conrelid, c.confrelid, c.confdeltype,
-                               (SELECT attname FROM pg_attribute WHERE attrelid = c.conrelid AND attnum = c.conkey[1]) AS from_col,
-                               (SELECT attname FROM pg_attribute WHERE attrelid = c.confrelid AND attnum = c.confkey[1]) AS to_col,
-                               array_length(c.conkey, 1) AS from_col_count,
-                               array_length(c.confkey, 1) AS to_col_count
-                        INTO v_con FROM pg_constraint c WHERE c.conrelid = v_target_rel_oid AND c.conname = v_fk_name;
-
-                        IF FOUND THEN
-                            IF v_con.contype = 'f' AND v_con.confrelid = v_ref_rel_oid AND v_con.from_col = 'CashTransactionId' AND v_con.to_col = 'Id' AND v_con.from_col_count = 1 AND v_con.to_col_count = 1 AND v_con.confdeltype = 'n' THEN
-                                RETURN;
-                            ELSE
-                                RAISE EXCEPTION 'Migración abortada: La restricción % en %.ElectronicReceipts existe pero tiene una definición incompatible (tipo=%, ref_oid=%, from_col=%, to_col=%, on_delete=%). Se requiere revisión manual de auditoría para no alterar la integridad.',
-                                    v_fk_name, v_schema, v_con.contype, v_con.confrelid, v_con.from_col, v_con.to_col, v_con.confdeltype;
-                            END IF;
-                        END IF;
-                    END $$;
-                ";
-
-                var ex = await Assert.ThrowsAsync<PostgresException>(() => cmd.ExecuteNonQueryAsync());
-                Assert.Contains("definición incompatible", ex.Message);
-            }
-            finally
-            {
-                await DropTestSchemaAsync(baseConn, schema);
-            }
-        }
-
-        [SkippableFact]
-        public async Task Migration_ForeignKey_WhenOrphanedDataExists_AbortsWithClearDiagnostic_AndDoesNotDeleteOrAlterData()
-        {
-            var baseConn = GetConn();
-            if (string.IsNullOrWhiteSpace(baseConn))
-            {
-                Skip.If(true, "PostgreSQL no configurado.");
-                return;
-            }
-
-            var schema = await CreateTestSchemaAsync(baseConn);
-            try
-            {
-                await using var db = CreateMigratedDbContext(baseConn, schema);
-                await db.Database.MigrateAsync();
-
-                // Eliminar FK temporalmente
-                await db.Database.ExecuteSqlRawAsync(@"
-                    ALTER TABLE ""ElectronicReceipts"" 
-                    DROP CONSTRAINT IF EXISTS ""FK_ElectronicReceipts_CashTransactions_CashTransactionId"";
-                ");
-
-                // Insertar un registro huérfano (CashTransactionId no existe en CashTransactions)
+                // 3. Insertar el registro huérfano histórico (CashTransactionId no existe)
                 var orphanReceiptId = Guid.NewGuid();
                 var nonExistentCashTxId = Guid.NewGuid();
 
-                // Crear Booking mínimo usando EF Core
                 var booking = new Booking
                 {
                     Id = Guid.NewGuid(),
-                    ReferenceCode = "BK-ORPH-01",
-                    CustomerName = "Test Orphan",
+                    ReferenceCode = "BK-ORPH-NOTVALID-01",
+                    CustomerName = "Orphan User",
                     CustomerDni = "12345678",
                     CustomerEmail = "orphan@example.com",
                     CustomerPhone = "999888777",
@@ -399,11 +416,11 @@ namespace SIGETOUR.Tests.Audit
                     Id = orphanReceiptId,
                     BookingId = booking.Id,
                     ReceiptType = "Boleta",
-                    Series = "ORP1",
-                    Number = "00000001",
+                    Series = "ORP2",
+                    Number = "00000002",
                     CustomerDocType = "1",
                     CustomerDocNumber = "12345678",
-                    CustomerName = "Test Orphan",
+                    CustomerName = "Orphan User",
                     CustomerEmail = "orphan@example.com",
                     TotalAmount = 100m,
                     SubtotalAmount = 84.75m,
@@ -415,156 +432,192 @@ namespace SIGETOUR.Tests.Audit
                 db.ElectronicReceipts.Add(receipt);
                 await db.SaveChangesAsync();
 
-                // Ejecutar verificación de clave foránea
-                var targetConnStr = new NpgsqlConnectionStringBuilder(baseConn) { SearchPath = schema }.ConnectionString;
-                await using var conn = new NpgsqlConnection(targetConnStr);
-                await conn.OpenAsync();
-                await using var cmd = conn.CreateCommand();
-                cmd.CommandText = @"
-                    DO $$
-                    DECLARE
-                        v_schema text := current_schema();
-                        v_target_rel_oid oid;
-                        v_ref_rel_oid oid;
-                        v_orphans_count integer;
-                        v_fk_name text := 'FK_ElectronicReceipts_CashTransactions_CashTransactionId';
-                    BEGIN
-                        EXECUTE format('
-                            SELECT COUNT(*)
-                            FROM %I.""ElectronicReceipts"" r
-                            WHERE r.""CashTransactionId"" IS NOT NULL
-                              AND NOT EXISTS (
-                                  SELECT 1 FROM %I.""CashTransactions"" ct WHERE ct.""Id"" = r.""CashTransactionId""
-                              )', v_schema, v_schema)
-                        INTO v_orphans_count;
-
-                        IF v_orphans_count > 0 THEN
-                            RAISE EXCEPTION 'Migración abortada: Existen % registros en %.ElectronicReceipts con CashTransactionId huérfano (no existe en CashTransactions). Se requiere intervención manual para no perder trazabilidad.',
-                                v_orphans_count, v_schema;
-                        END IF;
-                    END $$;
-                ";
-
-                var ex = await Assert.ThrowsAsync<PostgresException>(() => cmd.ExecuteNonQueryAsync());
-                Assert.Contains("huérfano", ex.Message);
-
-                // Comprobar que el registro huérfano NO fue eliminado ni alterado
-                await using var verifyCmd = conn.CreateCommand();
-                verifyCmd.CommandText = $@"SELECT ""CashTransactionId"" FROM ""ElectronicReceipts"" WHERE ""Id"" = '{orphanReceiptId}';";
-                var remainingCashTxId = (Guid?)await verifyCmd.ExecuteScalarAsync();
-                Assert.Equal(nonExistentCashTxId, remainingCashTxId);
-            }
-            finally
-            {
-                await DropTestSchemaAsync(baseConn, schema);
-            }
-        }
-
-        [SkippableFact]
-        public async Task Migration_WhenOriginalMigrationAlreadyApplied_CorrectiveMigrationVerifiesAndCompletesStructure()
-        {
-            var baseConn = GetConn();
-            if (string.IsNullOrWhiteSpace(baseConn))
-            {
-                Skip.If(true, "PostgreSQL no configurado.");
-                return;
-            }
-
-            var schema = await CreateTestSchemaAsync(baseConn);
-            try
-            {
-                await using var db = CreateMigratedDbContext(baseConn, schema);
-                // Aplicar migraciones
-                await db.Database.MigrateAsync();
-
-                // Simular el caso de Render donde la migración original consta como aplicada
-                // y la clave foránea no estaba creada
-                await db.Database.ExecuteSqlRawAsync(@"
-                    ALTER TABLE ""ElectronicReceipts"" 
-                    DROP CONSTRAINT IF EXISTS ""FK_ElectronicReceipts_CashTransactions_CashTransactionId"";
+                // 4. Agregar la restricción como NOT VALID (PostgreSQL lo permite en datos existentes con NOT VALID)
+                await db.Database.ExecuteSqlRawAsync($@"
+                    ALTER TABLE ""ElectronicReceipts""
+                    ADD CONSTRAINT ""{FkConstraintName}""
+                    FOREIGN KEY (""CashTransactionId"")
+                    REFERENCES ""CashTransactions"" (""Id"")
+                    ON DELETE SET NULL NOT VALID;
                 ");
 
-                // Ejecutar la migración correctiva
-                var migrator = db.Database.GetService<IMigrator>();
-                var targetConnStr = new NpgsqlConnectionStringBuilder(baseConn) { SearchPath = schema }.ConnectionString;
-                await using (var conn = new NpgsqlConnection(targetConnStr))
+                // 5. Ejecutar la migración real: debe abortar por presencia de huérfanos antes de validar
+                var ex = await Assert.ThrowsAsync<PostgresException>(() => migrator.MigrateAsync());
+                Assert.Contains("huérfano", ex.Message);
+                Assert.Contains("NOT VALID", ex.Message);
+
+                // 5. Verificar que el comprobante NO fue eliminado ni su referencia anulada
+                await using (var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString))
                 {
-                    await conn.OpenAsync();
-                    await using var cmd = conn.CreateCommand();
-                    cmd.CommandText = @"
-                        DO $$
-                        DECLARE
-                            v_schema text := current_schema();
-                            v_target_rel_oid oid;
-                            v_ref_rel_oid oid;
-                            v_con record;
-                            v_orphans_count integer;
-                            v_fk_name text := 'FK_ElectronicReceipts_CashTransactions_CashTransactionId';
-                        BEGIN
-                            SELECT c.oid INTO v_target_rel_oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'ElectronicReceipts' AND n.nspname = v_schema;
-                            SELECT c.oid INTO v_ref_rel_oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'CashTransactions' AND n.nspname = v_schema;
-                            IF v_target_rel_oid IS NULL OR v_ref_rel_oid IS NULL THEN RETURN; END IF;
+                    await using var verifyCmd = conn.CreateCommand();
+                    verifyCmd.CommandText = $@"SELECT ""CashTransactionId"" FROM ""ElectronicReceipts"" WHERE ""Id"" = '{orphanReceiptId}';";
+                    var remainingCashTxId = (Guid?)await verifyCmd.ExecuteScalarAsync();
+                    Assert.Equal(nonExistentCashTxId, remainingCashTxId);
 
-                            SELECT c.conname, c.contype, c.conrelid, c.confrelid, c.confdeltype,
-                                   (SELECT attname FROM pg_attribute WHERE attrelid = c.conrelid AND attnum = c.conkey[1]) AS from_col,
-                                   (SELECT attname FROM pg_attribute WHERE attrelid = c.confrelid AND attnum = c.confkey[1]) AS to_col,
-                                   array_length(c.conkey, 1) AS from_col_count,
-                                   array_length(c.confkey, 1) AS to_col_count
-                            INTO v_con FROM pg_constraint c WHERE c.conrelid = v_target_rel_oid AND c.conname = v_fk_name;
-
-                            IF FOUND THEN
-                                IF v_con.contype = 'f' AND v_con.confrelid = v_ref_rel_oid AND v_con.from_col = 'CashTransactionId' AND v_con.to_col = 'Id' AND v_con.from_col_count = 1 AND v_con.to_col_count = 1 AND v_con.confdeltype = 'n' THEN
-                                    RETURN;
-                                ELSE
-                                    RAISE EXCEPTION 'Incompatible';
-                                END IF;
-                            END IF;
-
-                            EXECUTE format('
-                                ALTER TABLE %I.""ElectronicReceipts""
-                                ADD CONSTRAINT %I
-                                FOREIGN KEY (""CashTransactionId"")
-                                REFERENCES %I.""CashTransactions"" (""Id"")
-                                ON DELETE SET NULL', v_schema, v_fk_name, v_schema);
-                        END $$;
-                    ";
-                    await cmd.ExecuteNonQueryAsync();
+                    // 6. Verificar que la migración NO fue registrada en el historial
+                    await using var histCmd = conn.CreateCommand();
+                    histCmd.CommandText = @"SELECT count(*) FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" LIKE @name;";
+                    histCmd.Parameters.AddWithValue("@name", $"%{HardenedMigrationShortName}%");
+                    var recordedCount = (long?)await histCmd.ExecuteScalarAsync();
+                    Assert.Equal(0, recordedCount);
                 }
-
-                // Comprobar que la clave foránea fue verificada y completada
-                await using var checkConn = new NpgsqlConnection(targetConnStr);
-                await checkConn.OpenAsync();
-                await using var checkCmd = checkConn.CreateCommand();
-                checkCmd.CommandText = @"
-                    SELECT count(*) FROM pg_constraint c
-                    JOIN pg_class t ON t.oid = c.conrelid
-                    JOIN pg_namespace n ON n.oid = t.relnamespace
-                    WHERE t.relname = 'ElectronicReceipts' AND n.nspname = current_schema()
-                      AND c.conname = 'FK_ElectronicReceipts_CashTransactions_CashTransactionId';
-                ";
-                var fkCount = (long?)await checkCmd.ExecuteScalarAsync();
-                Assert.Equal(1, fkCount);
             }
             finally
             {
-                await DropTestSchemaAsync(baseConn, schema);
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
             }
         }
 
         [SkippableFact]
-        public async Task Migration_RepeatedExecution_ProducesZeroChangesAndZeroErrors()
+        public async Task Point2_ForeignKey_WhenIncompatibleConstraintExists_Aborts_AndDoesNotRecordMigration()
         {
-            var baseConn = GetConn();
-            if (string.IsNullOrWhiteSpace(baseConn))
-            {
-                Skip.If(true, "PostgreSQL no configurado.");
-                return;
-            }
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
 
-            var schema = await CreateTestSchemaAsync(baseConn);
             try
             {
-                await using var db = CreateMigratedDbContext(baseConn, schema);
+                await using var db = fixture.CreateDbContext();
+                var migrator = db.GetInfrastructure().GetRequiredService<IMigrator>();
+
+                // 1. Migrar hasta la migración previa
+                await migrator.MigrateAsync(PriorMigrationName);
+
+                // 2. Colocar una restricción incompatible con ON DELETE CASCADE en vez de SET NULL
+                await db.Database.ExecuteSqlRawAsync($@"
+                    ALTER TABLE ""ElectronicReceipts"" DROP CONSTRAINT IF EXISTS ""{FkConstraintName}"";
+                    ALTER TABLE ""ElectronicReceipts""
+                    ADD CONSTRAINT ""{FkConstraintName}""
+                    FOREIGN KEY (""CashTransactionId"")
+                    REFERENCES ""CashTransactions"" (""Id"")
+                    ON DELETE CASCADE;
+                ");
+
+                // 3. Ejecutar la migración real mediante IMigrator
+                var ex = await Assert.ThrowsAsync<PostgresException>(() => migrator.MigrateAsync());
+                Assert.Contains("definición incompatible", ex.Message);
+
+                // 4. Verificar que la migración NO fue registrada
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString);
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"SELECT count(*) FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" LIKE @name;";
+                cmd.Parameters.AddWithValue("@name", $"%{HardenedMigrationShortName}%");
+                var recordedCount = (long?)await cmd.ExecuteScalarAsync();
+                Assert.Equal(0, recordedCount);
+            }
+            finally
+            {
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
+            }
+        }
+
+        [SkippableFact]
+        public async Task Point2_ForeignKey_WhenConstraintMissingWithoutOrphans_CreatesSuccessfully()
+        {
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
+
+            try
+            {
+                await using var db = fixture.CreateDbContext();
+                var migrator = db.GetInfrastructure().GetRequiredService<IMigrator>();
+
+                // 1. Migrar hasta la migración previa
+                await migrator.MigrateAsync(PriorMigrationName);
+
+                // 2. Eliminar la clave foránea
+                await db.Database.ExecuteSqlRawAsync($@"
+                    ALTER TABLE ""ElectronicReceipts"" DROP CONSTRAINT IF EXISTS ""{FkConstraintName}"";
+                ");
+
+                // 3. Ejecutar la migración real
+                await migrator.MigrateAsync();
+
+                // 4. Comprobar que fue creada y validada
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString);
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT c.convalidated, c.contype::text, c.confdeltype::text
+                    FROM pg_constraint c
+                    JOIN pg_class t ON t.oid = c.conrelid
+                    JOIN pg_namespace n ON n.oid = t.relnamespace
+                    WHERE t.relname = 'ElectronicReceipts'
+                      AND n.nspname = @schema
+                      AND c.conname = @fkName;
+                ";
+                cmd.Parameters.AddWithValue("@schema", fixture.SchemaName);
+                cmd.Parameters.AddWithValue("@fkName", FkConstraintName);
+
+                await using var reader = await cmd.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.True(reader.GetBoolean(0), "La clave foránea debe crearse como validada.");
+                Assert.Equal("f", reader.GetString(1));
+                Assert.Equal("n", reader.GetString(2));
+            }
+            finally
+            {
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
+            }
+        }
+
+        // =========================================================================
+        // GRUPO 2: COMPATIBILIDAD CON RENDER Y EJECUCIÓN REPETIDA (PUNTO 3)
+        // =========================================================================
+
+        [SkippableFact]
+        public async Task Point3_Migration_WhenUpgradingFromExistingDatabaseWithPriorMigration_CompletesCleanly()
+        {
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
+
+            try
+            {
+                await using var db = fixture.CreateDbContext();
+                var migrator = db.GetInfrastructure().GetRequiredService<IMigrator>();
+
+                // 1. Simular base de datos existente en Render migrada hasta 20261116203628
+                await migrator.MigrateAsync(PriorMigrationName);
+
+                // Verificar que la migración previa está registrada y la nueva está pendiente
+                var pendingBefore = (await db.Database.GetPendingMigrationsAsync()).ToList();
+                Assert.Contains(pendingBefore, m => m.Contains(HardenedMigrationShortName));
+
+                // 2. Aplicar la actualización completa
+                await migrator.MigrateAsync();
+
+                // 3. Verificar que no quedan migraciones pendientes
+                var pendingAfter = (await db.Database.GetPendingMigrationsAsync()).ToList();
+                Assert.Empty(pendingAfter);
+
+                // 4. Verificar que la clave foránea existe y está validada
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(fixture.ConnectionString);
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT c.convalidated FROM pg_constraint c
+                    JOIN pg_class t ON t.oid = c.conrelid
+                    JOIN pg_namespace n ON n.oid = t.relnamespace
+                    WHERE t.relname = 'ElectronicReceipts' AND n.nspname = @schema AND c.conname = @fkName;
+                ";
+                cmd.Parameters.AddWithValue("@schema", fixture.SchemaName);
+                cmd.Parameters.AddWithValue("@fkName", FkConstraintName);
+                var isValid = (bool?)await cmd.ExecuteScalarAsync();
+                Assert.True(isValid);
+            }
+            finally
+            {
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
+            }
+        }
+
+        [SkippableFact]
+        public async Task Point3_Migration_RepeatedExecution_ProducesZeroChangesAndZeroErrors()
+        {
+            var fixture = await PostgresIsolatedScenarioFixture.CreateEmptyAsync(_output);
+            if (fixture == null) return;
+
+            try
+            {
+                await using var db = fixture.CreateDbContext();
+
                 // Primera ejecución
                 await db.Database.MigrateAsync();
 
@@ -574,24 +627,83 @@ namespace SIGETOUR.Tests.Audit
                 // Tercera ejecución repetida
                 await db.Database.MigrateAsync();
 
-                // Comprobar que las tablas e índices siguen intactos
                 var pendingCount = (await db.Database.GetPendingMigrationsAsync()).Count();
                 Assert.Equal(0, pendingCount);
             }
             finally
             {
-                await DropTestSchemaAsync(baseConn, schema);
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture);
             }
         }
 
         // =========================================================================
-        // GRUPO 2: PRUEBAS DE LIMPIEZA DE FIXTURES AISLADAS
+        // GRUPO 3: PROTECCIÓN CENTRALIZADA DE LA BASE DE PRUEBAS (PUNTO 4)
+        // Verificaciones unitarias de seguridad sin conectar a base operativa
+        // =========================================================================
+
+        [Fact]
+        public void Point4_Safety_OperativeDatabaseName_IsRejectedBeforeConnection()
+        {
+            var forbiddenStrings = new[]
+            {
+                "Host=localhost;Database=sigetour_db;Username=postgres;Password=test",
+                "Host=render.com;Database=production_db;Username=admin;Password=secret",
+                "Host=remote.host;Database=sigetour_prod;Username=admin;Password=secret",
+                "Host=localhost;Database=live_tour_db;Username=postgres;Password=secret",
+                "Host=localhost;Database=operativa_db;Username=postgres;Password=secret"
+            };
+
+            foreach (var connStr in forbiddenStrings)
+            {
+                Assert.ThrowsAny<Xunit.Sdk.XunitException>(() =>
+                    PostgresTestHelper.EnsureSafeTestDatabase(connStr));
+            }
+        }
+
+        [Fact]
+        public void Point4_Safety_ExplicitTestDatabaseName_PassesValidation()
+        {
+            var safeStrings = new[]
+            {
+                "Host=localhost;Database=tests_db_sigetour;Username=postgres;Password=test",
+                "Host=localhost;Database=sigetour_test_db;Username=postgres;Password=test",
+                "Host=127.0.0.1;Port=5432;Database=ci_test;Username=postgres;Password=test"
+            };
+
+            foreach (var connStr in safeStrings)
+            {
+                PostgresTestHelper.EnsureSafeTestDatabase(connStr);
+            }
+        }
+
+        [Fact]
+        public async Task Point4_Safety_AbsenceOfConfiguration_ProducesRecognizableSkip()
+        {
+            await Assert.ThrowsAsync<Xunit.SkipException>(async () =>
+            {
+                await PostgresTestHelper.RequirePostgresAsync(_output, explicitConnectionString: "");
+            });
+        }
+
+        [Fact]
+        public void Point4_Safety_SanitizeConnectionString_NeverExposesPassword()
+        {
+            var connStr = "Host=myhost.com;Port=5432;Database=tests_db_sigetour;Username=myuser;Password=SuperSecretPassword123#";
+            var sanitized = PostgresTestHelper.SanitizeConnectionString(connStr);
+
+            Assert.DoesNotContain("SuperSecretPassword123#", sanitized);
+            Assert.DoesNotContain("myuser", sanitized);
+            Assert.Equal("myhost.com:5432/tests_db_sigetour", sanitized);
+        }
+
+        // =========================================================================
+        // GRUPO 4: LIMPIEZA SEGURA Y METADATA DE ESQUEMAS DE PRUEBA (PUNTO 5)
         // =========================================================================
 
         [SkippableFact]
-        public async Task FixtureCleanup_WhenSecondFixtureCreationFails_FirstFixtureIsCleanedUpSafely()
+        public async Task Point5_FixtureCleanup_WhenSecondFixtureCreationFails_FirstFixtureIsCleanedUpSafely()
         {
-            var baseConn = GetConn();
+            var baseConn = PostgresTestHelper.GetConfiguredConnectionString();
             if (string.IsNullOrWhiteSpace(baseConn))
             {
                 Skip.If(true, "PostgreSQL no configurado.");
@@ -608,20 +720,18 @@ namespace SIGETOUR.Tests.Audit
                 Assert.NotNull(fixture1);
                 schema1 = fixture1.SchemaName;
 
-                // Forzar fallo en la creación de fixture2 pasando cadena de conexión inválida
-                var invalidConn = "Host=localhost;Port=5432;Database=non_existent_db_12345;Username=postgres;Password=invalid";
-                var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
+                // Forzar fallo en la creación de fixture2 pasando cadena de conexión no alcanzable pero con nombre test
+                var invalidConn = "Host=localhost;Port=5432;Database=non_existent_test_db_999;Username=postgres;Password=invalid";
+                await Assert.ThrowsAnyAsync<Exception>(() =>
                     PostgresIsolatedScenarioFixture.CreateAsync(_output, explicitConnectionString: invalidConn));
-                Assert.NotNull(ex);
             }
             finally
             {
                 await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, fixture1, fixture2);
             }
 
-            // Verificar que el esquema 1 fue completamente eliminado tras el fallo de creación del 2
-            await using var conn = new NpgsqlConnection(baseConn);
-            await conn.OpenAsync();
+            // Verificar que el esquema 1 fue completamente eliminado
+            await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT count(*) FROM pg_namespace WHERE nspname = @name;";
             cmd.Parameters.AddWithValue("@name", schema1!);
@@ -630,9 +740,9 @@ namespace SIGETOUR.Tests.Audit
         }
 
         [SkippableFact]
-        public async Task FixtureCleanup_WhenTestThrowsDuringSeedingOrAssertions_AllFixturesAreCleanedUpSafely()
+        public async Task Point5_FixtureCleanup_WhenTestThrowsDuringSeedingOrAssertions_AllFixturesAreCleanedUpSafely()
         {
-            var baseConn = GetConn();
+            var baseConn = PostgresTestHelper.GetConfiguredConnectionString();
             if (string.IsNullOrWhiteSpace(baseConn))
             {
                 Skip.If(true, "PostgreSQL no configurado.");
@@ -655,7 +765,6 @@ namespace SIGETOUR.Tests.Audit
                 Assert.NotNull(f2);
                 schema2 = f2.SchemaName;
 
-                // Simular fallo durante aserción o siembra
                 throw new InvalidOperationException("Fallo intencional durante aserción de negocio");
             }
             catch (Exception ex)
@@ -670,9 +779,8 @@ namespace SIGETOUR.Tests.Audit
             Assert.NotNull(thrownTestEx);
             Assert.Equal("Fallo intencional durante aserción de negocio", thrownTestEx.Message);
 
-            // Comprobar que AMBOS esquemas fueron eliminados de PostgreSQL
-            await using var conn = new NpgsqlConnection(baseConn);
-            await conn.OpenAsync();
+            // Comprobar que AMBOS esquemas concretos fueron eliminados de PostgreSQL
+            await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn);
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT count(*) FROM pg_namespace WHERE nspname IN (@s1, @s2);";
             cmd.Parameters.AddWithValue("@s1", schema1!);
@@ -682,9 +790,9 @@ namespace SIGETOUR.Tests.Audit
         }
 
         [SkippableFact]
-        public async Task FixtureCleanup_WhenOneFixtureFailsToDispose_OtherFixtureIsStillCleanedUp()
+        public async Task Point5_FixtureCleanup_WhenOneFixtureFailsToDispose_OtherFixtureIsStillCleanedUp_AndControlledRestorationCleansAll()
         {
-            var baseConn = GetConn();
+            var baseConn = PostgresTestHelper.GetConfiguredConnectionString();
             if (string.IsNullOrWhiteSpace(baseConn))
             {
                 Skip.If(true, "PostgreSQL no configurado.");
@@ -706,47 +814,48 @@ namespace SIGETOUR.Tests.Audit
 
             try
             {
-                // Simular alteración del comentario de propiedad en f1 para que f1.DisposeAsync falle por verificación de seguridad
-                await using (var conn = new NpgsqlConnection(baseConn))
-                {
-                    await conn.OpenAsync();
-                    await using var cmd = conn.CreateCommand();
-                    cmd.CommandText = $@"COMMENT ON SCHEMA ""{schema1}"" IS 'tampered_metadata';";
-                    await cmd.ExecuteNonQueryAsync();
-                }
+                // Alterar el comentario en f1 para forzar fallo por verificación de seguridad
+                await f1.SetOwnershipCommentAsync("tampered_metadata");
 
-                // Llamar a DisposeAllAsync. f1 fallará, pero f2 DEBE ser limpiado de todas formas
-                var cleanupAggregateEx = await Assert.ThrowsAsync<AggregateException>(() =>
+                // DisposeAllAsync: f1 fallará pero f2 debe ser limpiado
+                var cleanupAggEx = await Assert.ThrowsAsync<AggregateException>(() =>
                     PostgresIsolatedScenarioFixture.DisposeAllAsync(null, f1, f2));
 
-                Assert.Contains(cleanupAggregateEx.InnerExceptions, e => e.Message.Contains("No se pudo demostrar la propiedad"));
+                Assert.Contains(cleanupAggEx.InnerExceptions, e => e.Message.Contains("No se pudo demostrar la propiedad"));
 
                 // Verificar que f2 fue eliminado a pesar del fallo en f1
-                await using (var conn = new NpgsqlConnection(baseConn))
+                await using (var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn))
                 {
-                    await conn.OpenAsync();
                     await using var cmd = conn.CreateCommand();
                     cmd.CommandText = "SELECT count(*) FROM pg_namespace WHERE nspname = @s2;";
-                    cmd.Parameters.AddWithValue("@s2", schema2);
+                    cmd.Parameters.AddWithValue("@s2", schema2!);
                     var count2 = (long?)await cmd.ExecuteScalarAsync();
                     Assert.Equal(0, count2);
                 }
             }
             finally
             {
-                // Limpiar f1 manualmente tras la prueba garantizando que no queden residuos
-                await using var conn = new NpgsqlConnection(baseConn);
-                await conn.OpenAsync();
+                // Restauración controlada de la marca de propiedad para limpiar verificadamente sin DROP desprotegido
+                if (f1 != null)
+                {
+                    await f1.RestoreOwnershipCommentAsync();
+                    await f1.DisposeAsync();
+                }
+
+                // Verificar que f1 fue finalmente eliminado tras la restauración legítima
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn);
                 await using var cmd = conn.CreateCommand();
-                cmd.CommandText = $@"DROP SCHEMA IF EXISTS ""{schema1}"" CASCADE; DROP SCHEMA IF EXISTS ""{schema2}"" CASCADE;";
-                await cmd.ExecuteNonQueryAsync();
+                cmd.CommandText = "SELECT count(*) FROM pg_namespace WHERE nspname = @s1;";
+                cmd.Parameters.AddWithValue("@s1", schema1!);
+                var count1 = (long?)await cmd.ExecuteScalarAsync();
+                Assert.Equal(0, count1);
             }
         }
 
         [SkippableFact]
-        public async Task FixtureCleanup_PreservesOriginalTestException_AndCleanupExceptionTogether()
+        public async Task Point5_FixtureCleanup_PreservesOriginalTestException_AndCleanupExceptionTogether()
         {
-            var baseConn = GetConn();
+            var baseConn = PostgresTestHelper.GetConfiguredConnectionString();
             if (string.IsNullOrWhiteSpace(baseConn))
             {
                 Skip.If(true, "PostgreSQL no configurado.");
@@ -760,51 +869,48 @@ namespace SIGETOUR.Tests.Audit
             try
             {
                 // Alterar metadata para forzar fallo de limpieza
-                await using (var conn = new NpgsqlConnection(baseConn))
-                {
-                    await conn.OpenAsync();
-                    await using var cmd = conn.CreateCommand();
-                    cmd.CommandText = $@"COMMENT ON SCHEMA ""{schema}"" IS 'tampered';";
-                    await cmd.ExecuteNonQueryAsync();
-                }
+                await f.SetOwnershipCommentAsync("tampered_comment");
 
                 var originalTestEx = new InvalidOperationException("Excepción original de negocio en prueba");
 
                 var aggEx = await Assert.ThrowsAsync<AggregateException>(() =>
                     PostgresIsolatedScenarioFixture.DisposeAllAsync(originalTestEx, f));
 
-                // Verificar que preserva AMBAS excepciones: la original de la prueba y la de limpieza
                 Assert.Contains(aggEx.InnerExceptions, e => e == originalTestEx);
                 Assert.Contains(aggEx.InnerExceptions, e => e.Message.Contains("No se pudo demostrar la propiedad"));
             }
             finally
             {
-                // Limpieza manual final garantizada
-                await using var conn = new NpgsqlConnection(baseConn);
-                await conn.OpenAsync();
+                await f.RestoreOwnershipCommentAsync();
+                await f.DisposeAsync();
+
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn);
                 await using var cmd = conn.CreateCommand();
-                cmd.CommandText = $@"DROP SCHEMA IF EXISTS ""{schema}"" CASCADE;";
-                await cmd.ExecuteNonQueryAsync();
+                cmd.CommandText = "SELECT count(*) FROM pg_namespace WHERE nspname = @s;";
+                cmd.Parameters.AddWithValue("@s", schema);
+                var count = (long?)await cmd.ExecuteScalarAsync();
+                Assert.Equal(0, count);
             }
         }
 
         [SkippableFact]
-        public async Task FixtureCleanup_PreservesForeignOrUnrelatedSchema_WithoutTouchingIt()
+        public async Task Point5_FixtureCleanup_RejectsDroppingForeignOrUnrelatedSchema()
         {
-            var baseConn = GetConn();
+            var baseConn = PostgresTestHelper.GetConfiguredConnectionString();
             if (string.IsNullOrWhiteSpace(baseConn))
             {
                 Skip.If(true, "PostgreSQL no configurado.");
                 return;
             }
 
+            // Crear un esquema ajeno con tabla propia
             var foreignSchema = $"foreign_schema_{Guid.NewGuid():N}";
-            await using (var conn = new NpgsqlConnection(baseConn))
+            await using (var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn))
             {
-                await conn.OpenAsync();
                 await using var cmd = conn.CreateCommand();
                 cmd.CommandText = $@"
                     CREATE SCHEMA ""{foreignSchema}"";
+                    COMMENT ON SCHEMA ""{foreignSchema}"" IS 'unrelated_owner';
                     CREATE TABLE ""{foreignSchema}"".""ForeignTable"" (id int);
                 ";
                 await cmd.ExecuteNonQueryAsync();
@@ -816,9 +922,8 @@ namespace SIGETOUR.Tests.Audit
                 Assert.NotNull(f);
                 await f.DisposeAsync();
 
-                // Comprobar que foreignSchema sigue intacto
-                await using var conn = new NpgsqlConnection(baseConn);
-                await conn.OpenAsync();
+                // Comprobar que foreignSchema sigue 100% intacto
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn);
                 await using var cmd = conn.CreateCommand();
                 cmd.CommandText = "SELECT count(*) FROM pg_tables WHERE schemaname = @fs;";
                 cmd.Parameters.AddWithValue("@fs", foreignSchema);
@@ -827,8 +932,8 @@ namespace SIGETOUR.Tests.Audit
             }
             finally
             {
-                await using var conn = new NpgsqlConnection(baseConn);
-                await conn.OpenAsync();
+                // Limpieza del esquema ajeno
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn);
                 await using var cmd = conn.CreateCommand();
                 cmd.CommandText = $@"DROP SCHEMA IF EXISTS ""{foreignSchema}"" CASCADE;";
                 await cmd.ExecuteNonQueryAsync();
@@ -836,9 +941,9 @@ namespace SIGETOUR.Tests.Audit
         }
 
         [SkippableFact]
-        public async Task FixtureCleanup_LeavesZeroResidualSchemas_WhenCleanupCompletesSuccessfully()
+        public async Task Point5_FixtureCleanup_LeavesZeroResidualSchemas_ForExactCreatedNames()
         {
-            var baseConn = GetConn();
+            var baseConn = PostgresTestHelper.GetConfiguredConnectionString();
             if (string.IsNullOrWhiteSpace(baseConn))
             {
                 Skip.If(true, "PostgreSQL no configurado.");
@@ -848,16 +953,25 @@ namespace SIGETOUR.Tests.Audit
             var f1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
             var f2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
             var f3 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            Assert.NotNull(f1);
+            Assert.NotNull(f2);
+            Assert.NotNull(f3);
+
+            var s1 = f1.SchemaName;
+            var s2 = f2.SchemaName;
+            var s3 = f3.SchemaName;
 
             await PostgresIsolatedScenarioFixture.DisposeAllAsync(null, f1, f2, f3);
 
-            // Verificar que no queda ningún esquema de aislamiento residual
-            await using var conn = new NpgsqlConnection(baseConn);
-            await conn.OpenAsync();
+            // Verificar específicamente que los 3 nombres exactos creados ya no existen
+            await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn);
             await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'sigetour_iso_%';";
-            var residualCount = (long?)await cmd.ExecuteScalarAsync();
-            Assert.Equal(0, residualCount);
+            cmd.CommandText = "SELECT count(*) FROM pg_namespace WHERE nspname IN (@s1, @s2, @s3);";
+            cmd.Parameters.AddWithValue("@s1", s1);
+            cmd.Parameters.AddWithValue("@s2", s2);
+            cmd.Parameters.AddWithValue("@s3", s3);
+            var count = (long?)await cmd.ExecuteScalarAsync();
+            Assert.Equal(0, count);
         }
     }
 }

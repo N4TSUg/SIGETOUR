@@ -33,6 +33,7 @@ namespace SIGETOUR.Tests.Helpers
         public string SchemaName => _schemaName;
         public string ConnectionString => _isolatedConnectionString;
         public Guid InstanceId => _instanceId;
+        public string ExpectedOwnershipComment => $"sigetour_fixture_instance:{_instanceId:D}";
 
         private PostgresIsolatedScenarioFixture(
             string baseConnectionString,
@@ -67,12 +68,14 @@ namespace SIGETOUR.Tests.Helpers
         }
 
         /// <summary>
-        /// Aprovisiona el esquema aislado en PostgreSQL, registra la metadata de propiedad y crea las tablas del modelo.
+        /// <summary>
+        /// Aprovisiona el esquema aislado en PostgreSQL, registra la metadata de propiedad y opcionalmente crea las tablas del modelo.
         /// Si no existe configuración de PostgreSQL de pruebas, emite SKIP explícito mediante PostgresTestHelper.
         /// </summary>
         public static async Task<PostgresIsolatedScenarioFixture?> CreateAsync(
             ITestOutputHelper? output = null,
-            string? explicitConnectionString = null)
+            string? explicitConnectionString = null,
+            bool createTables = true)
         {
             // 1. Validar entorno mediante PostgresTestHelper (emite Skip.If si no hay conexión configurada)
             var baseConn = explicitConnectionString ?? PostgresTestHelper.GetConfiguredConnectionString();
@@ -99,8 +102,7 @@ namespace SIGETOUR.Tests.Helpers
             // 4. Crear el esquema físico y estampar comentario de propiedad en el catálogo pg_namespace
             try
             {
-                await using var conn = new NpgsqlConnection(baseConn);
-                await conn.OpenAsync();
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(baseConn);
 
                 await using var cmd = conn.CreateCommand();
                 cmd.CommandText = $@"
@@ -115,40 +117,70 @@ namespace SIGETOUR.Tests.Helpers
                 throw;
             }
 
-            // 5. Inicializar el esquema creando las tablas del modelo EF Core dentro del espacio aislado
+            // 5. Inicializar el esquema (creando las tablas del modelo EF Core solo si fue solicitado)
             var fixture = new PostgresIsolatedScenarioFixture(baseConn, schemaName, isolatedConn, instanceId, output);
-            try
-            {
-                await using var initDb = fixture.CreateDbContext();
-                var creator = (RelationalDatabaseCreator)initDb.Database.GetService<IDatabaseCreator>();
-                await creator.CreateTablesAsync();
-
-                // 6. Verificar que la conexión apunta inequívocamente al esquema recién creado
-                await using var cmdCheck = initDb.Database.GetDbConnection().CreateCommand();
-                await initDb.Database.OpenConnectionAsync();
-                cmdCheck.CommandText = "SELECT current_schema();";
-                var currentSchema = (string?)await cmdCheck.ExecuteScalarAsync();
-                if (!string.Equals(currentSchema, schemaName, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException(
-                        $"[AISLAMIENTO CRÍTICO] La conexión no apuntó al esquema aislado '{schemaName}', sino a '{currentSchema}'. Se aborta por riesgo de contaminación.");
-                }
-            }
-            catch (Exception initEx)
+            if (createTables)
             {
                 try
                 {
-                    await fixture.DisposeAsync(initEx);
+                    await using var initDb = fixture.CreateDbContext();
+                    var creator = (RelationalDatabaseCreator)initDb.Database.GetService<IDatabaseCreator>();
+                    await creator.CreateTablesAsync();
+
+                    // 6. Verificar que la conexión apunta inequívocamente al esquema recién creado
+                    await using var cmdCheck = initDb.Database.GetDbConnection().CreateCommand();
+                    await initDb.Database.OpenConnectionAsync();
+                    cmdCheck.CommandText = "SELECT current_schema();";
+                    var currentSchema = (string?)await cmdCheck.ExecuteScalarAsync();
+                    if (!string.Equals(currentSchema, schemaName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"[AISLAMIENTO CRÍTICO] La conexión no apuntó al esquema aislado '{schemaName}', sino a '{currentSchema}'. Se aborta por riesgo de contaminación.");
+                    }
                 }
-                catch
+                catch (Exception initEx)
                 {
+                    try
+                    {
+                        await fixture.DisposeAsync(initEx);
+                    }
+                    catch
+                    {
+                        throw;
+                    }
                     throw;
                 }
-                throw;
             }
 
             return fixture;
         }
+
+        /// <summary>
+        /// Crea un esquema aislado completamente vacío (sin tablas preexistentes), ideal para
+        /// probar la ejecución real de migraciones con IMigrator o MigrateAsync().
+        /// </summary>
+        public static Task<PostgresIsolatedScenarioFixture?> CreateEmptyAsync(
+            ITestOutputHelper? output = null,
+            string? explicitConnectionString = null)
+            => CreateAsync(output, explicitConnectionString, createTables: false);
+
+        /// <summary>
+        /// Permite alterar el comentario de propiedad en el catálogo de PostgreSQL para pruebas negativas.
+        /// </summary>
+        public async Task SetOwnershipCommentAsync(string comment)
+        {
+            await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(_baseConnectionString);
+            await using var cmd = conn.CreateCommand();
+            var escapedComment = (comment ?? string.Empty).Replace("'", "''");
+            cmd.CommandText = $@"COMMENT ON SCHEMA ""{_schemaName}"" IS '{escapedComment}';";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        /// <summary>
+        /// Restaura el comentario legítimo de propiedad para que la limpieza verificada mediante DisposeAsync
+        /// pueda completarse sin necesidad de omitir la comprobación ni recurrir a DROP CASCADE desprotegido.
+        /// </summary>
+        public Task RestoreOwnershipCommentAsync() => SetOwnershipCommentAsync(ExpectedOwnershipComment);
 
         /// <summary>
         /// Libera el espacio aislado verificando la propiedad criptográfica/token en el catálogo de PostgreSQL.
@@ -175,8 +207,7 @@ namespace SIGETOUR.Tests.Helpers
 
             try
             {
-                await using var conn = new NpgsqlConnection(_baseConnectionString);
-                await conn.OpenAsync();
+                await using var conn = await PostgresTestHelper.OpenSafeConnectionAsync(_baseConnectionString);
 
                 // Validar propiedad real consultando el comentario registrado en pg_namespace
                 await using (var cmdCheck = conn.CreateCommand())
