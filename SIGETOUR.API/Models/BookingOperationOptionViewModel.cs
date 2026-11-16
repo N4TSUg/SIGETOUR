@@ -12,6 +12,8 @@ namespace SIGETOUR.API.Models
         public decimal Amount { get; set; }
         public string Status { get; set; } = string.Empty;
         public bool IsBilled { get; set; }
+        public bool IsConflict { get; set; }
+        public int ConflictCandidateCount { get; set; }
         public DateTime Date { get; set; }
         public string PaymentMethod { get; set; } = string.Empty;
         public string? ReferenceCode { get; set; }

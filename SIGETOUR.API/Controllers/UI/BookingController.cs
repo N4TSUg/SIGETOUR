@@ -590,7 +590,33 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction("Voucher", new { id = booking.Id, token = redirectToken });
         }
 
-        private async Task<ElectronicReceipt?> FindReceiptForCulqiOperationAsync(
+        private static ReceiptResolutionResult EvaluateCandidates(
+            IEnumerable<ElectronicReceipt> candidates,
+            string conflictMessage)
+        {
+            // Regla: Deduplicar candidatos por ElectronicReceipt.Id
+            // Un mismo documento que coincide por varios campos representa un solo candidato
+            var distinctCandidates = candidates
+                .GroupBy(r => r.Id)
+                .Select(g => g.First())
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .ToList();
+
+            if (distinctCandidates.Count == 0)
+            {
+                return ReceiptResolutionResult.None();
+            }
+
+            if (distinctCandidates.Count == 1)
+            {
+                return ReceiptResolutionResult.Exact(distinctCandidates[0]);
+            }
+
+            // Dos documentos con IDs diferentes no deben resolverse mediante prioridad, fecha, estado o FirstOrDefault
+            return ReceiptResolutionResult.Conflicted(distinctCandidates, conflictMessage);
+        }
+
+        private async Task<ReceiptResolutionResult> ResolveReceiptForCulqiOperationAsync(
             Guid bookingId,
             Guid culqiPaymentId,
             Guid? cashTransactionId = null)
@@ -607,33 +633,27 @@ namespace SIGETOUR.API.Controllers.UI
                      r.BillableOperationKey == culqiKey ||
                      (cashTransactionId.HasValue && r.CashTransactionId == cashTransactionId.Value) ||
                      (cashKey != null && r.BillableOperationKey == cashKey)))
-                .OrderByDescending(r => r.CreatedAtUtc)
                 .ToListAsync();
 
-            if (candidates.Count > 1)
-            {
-                var exact = candidates.FirstOrDefault(r => r.CulqiPaymentId == culqiPaymentId || r.BillableOperationKey == culqiKey);
-                if (exact != null) return exact;
-            }
-
-            return candidates.FirstOrDefault();
+            return EvaluateCandidates(candidates, "Se encontraron múltiples comprobantes fiscales asociados a esta operación de pago Culqi.");
         }
 
-        private async Task<ElectronicReceipt?> FindReceiptForManualCashOperationAsync(
+        private async Task<ReceiptResolutionResult> ResolveReceiptForManualCashOperationAsync(
             Guid bookingId,
             Guid cashTransactionId)
         {
             var cashKey = $"CASH:{cashTransactionId:N}";
 
-            return await _context.ElectronicReceipts
+            var candidates = await _context.ElectronicReceipts
                 .Include(r => r.Booking)
                 .ThenInclude(b => b.Items)
                 .ThenInclude(i => i.TourPackage)
                 .Where(r => r.BookingId == bookingId &&
                     (r.CashTransactionId == cashTransactionId ||
                      r.BillableOperationKey == cashKey))
-                .OrderByDescending(r => r.CreatedAtUtc)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
+
+            return EvaluateCandidates(candidates, "Se encontraron múltiples comprobantes fiscales asociados a este movimiento de caja.");
         }
 
         [HttpGet]
@@ -716,14 +736,32 @@ namespace SIGETOUR.API.Controllers.UI
                 }
 
                 // Requisito 1.d: Si el movimiento está vinculado a Culqi, resolver su comprobante canónico por CulqiPaymentId, CashTransactionId o BillableOperationKey
+                ReceiptResolutionResult resolution;
                 if (cashTx.CulqiPaymentId.HasValue)
                 {
                     ViewBag.PaymentId = cashTx.CulqiPaymentId.Value;
-                    receipt = await FindReceiptForCulqiOperationAsync(booking.Id, cashTx.CulqiPaymentId.Value, cashTx.Id);
+                    resolution = await ResolveReceiptForCulqiOperationAsync(booking.Id, cashTx.CulqiPaymentId.Value, cashTx.Id);
                 }
                 else
                 {
-                    receipt = await FindReceiptForManualCashOperationAsync(booking.Id, cashTx.Id);
+                    resolution = await ResolveReceiptForManualCashOperationAsync(booking.Id, cashTx.Id);
+                }
+
+                if (resolution.IsConflict)
+                {
+                    receipt = null;
+                    Response.StatusCode = StatusCodes.Status409Conflict;
+                    ViewBag.IsConflict = true;
+                    ViewBag.ConflictResolution = resolution;
+                    ViewBag.ConflictMessage = resolution.ConflictMessage;
+                }
+                else if (resolution.IsExact)
+                {
+                    receipt = resolution.Receipt;
+                }
+                else
+                {
+                    receipt = null;
                 }
 
                 // Si no existe comprobante para este movimiento, receipt queda null (no sustituir por el último de la reserva)
@@ -753,7 +791,23 @@ namespace SIGETOUR.API.Controllers.UI
                     ViewBag.SelectedCashTransactionId = linkedCash.Id;
                 }
 
-                receipt = await FindReceiptForCulqiOperationAsync(booking.Id, culqi.Id, linkedCash?.Id);
+                var resolution = await ResolveReceiptForCulqiOperationAsync(booking.Id, culqi.Id, linkedCash?.Id);
+                if (resolution.IsConflict)
+                {
+                    receipt = null;
+                    Response.StatusCode = StatusCodes.Status409Conflict;
+                    ViewBag.IsConflict = true;
+                    ViewBag.ConflictResolution = resolution;
+                    ViewBag.ConflictMessage = resolution.ConflictMessage;
+                }
+                else if (resolution.IsExact)
+                {
+                    receipt = resolution.Receipt;
+                }
+                else
+                {
+                    receipt = null;
+                }
 
                 ViewBag.PaymentId = culqi.Id;
                 ViewBag.SelectedOperationAmount = culqi.AmountCents / 100m;
@@ -799,14 +853,26 @@ namespace SIGETOUR.API.Controllers.UI
                     var culqiPayment = allCulqi.FirstOrDefault(p => p.Id == cId);
                     var linkedCashTx = allIncomeCash.FirstOrDefault(t => t.CulqiPaymentId == cId);
 
-                    var matchedReceipt = bookingReceipts.FirstOrDefault(r =>
-                        r.CulqiPaymentId == cId ||
-                        r.BillableOperationKey == $"CULQI:{cId:N}" ||
-                        (linkedCashTx != null && (r.CashTransactionId == linkedCashTx.Id || r.BillableOperationKey == $"CASH:{linkedCashTx.Id:N}")));
+                    var culqiKey = $"CULQI:{cId:N}";
+                    var cashKey = linkedCashTx != null ? $"CASH:{linkedCashTx.Id:N}" : null;
 
-                    if (matchedReceipt != null)
+                    var candidates = bookingReceipts.Where(r =>
+                        r.CulqiPaymentId == cId ||
+                        r.BillableOperationKey == culqiKey ||
+                        (linkedCashTx != null && (r.CashTransactionId == linkedCashTx.Id || r.BillableOperationKey == cashKey)));
+
+                    var resolution = EvaluateCandidates(candidates, "Se encontraron múltiples comprobantes fiscales asociados a esta operación de pago Culqi.");
+
+                    if (resolution.IsExact)
                     {
-                        associatedReceiptIds.Add(matchedReceipt.Id);
+                        associatedReceiptIds.Add(resolution.Receipt!.Id);
+                    }
+                    else if (resolution.IsConflict)
+                    {
+                        foreach (var c in resolution.Candidates)
+                        {
+                            associatedReceiptIds.Add(c.Id);
+                        }
                     }
 
                     decimal amount = culqiPayment != null
@@ -818,53 +884,71 @@ namespace SIGETOUR.API.Controllers.UI
 
                     normalizedOps.Add(new BookingOperationOptionViewModel
                     {
-                        Type = matchedReceipt != null ? "Receipt" : "CulqiPayment",
-                        ReceiptId = matchedReceipt?.Id,
+                        Type = resolution.IsExact ? "Receipt" : (resolution.IsConflict ? "Conflict" : "CulqiPayment"),
+                        ReceiptId = resolution.Receipt?.Id,
                         CulqiPaymentId = cId,
                         CashTransactionId = linkedCashTx?.Id,
-                        Title = matchedReceipt != null
-                            ? $"{matchedReceipt.ReceiptType} {matchedReceipt.FullNumber}"
-                            : "Pago Culqi (Confirmado)",
-                        Amount = matchedReceipt?.TotalAmount ?? amount,
-                        Status = matchedReceipt?.Status ?? "Sin Comprobante",
-                        IsBilled = matchedReceipt != null,
-                        Date = matchedReceipt?.IssuedAtUtc ?? date,
-                        PaymentMethod = matchedReceipt != null
-                            ? (matchedReceipt.CustomerDocType == "6" ? "Factura" : "Boleta")
+                        Title = resolution.IsExact
+                            ? $"{resolution.Receipt!.ReceiptType} {resolution.Receipt.FullNumber}"
+                            : (resolution.IsConflict ? "Pago Culqi (Conflicto de Comprobantes)" : "Pago Culqi (Confirmado)"),
+                        Amount = resolution.Receipt?.TotalAmount ?? amount,
+                        Status = resolution.IsExact
+                            ? resolution.Receipt!.Status
+                            : (resolution.IsConflict ? "En Conflicto (Requiere Revisión)" : "Sin Comprobante"),
+                        IsBilled = resolution.IsExact,
+                        IsConflict = resolution.IsConflict,
+                        ConflictCandidateCount = resolution.Candidates.Count,
+                        Date = resolution.Receipt?.IssuedAtUtc ?? date,
+                        PaymentMethod = resolution.IsExact
+                            ? (resolution.Receipt!.CustomerDocType == "6" ? "Factura" : "Boleta")
                             : "Culqi",
-                        ReferenceCode = matchedReceipt?.FullNumber ?? refCode
+                        ReferenceCode = resolution.Receipt?.FullNumber ?? refCode
                     });
                 }
 
                 // B. Resolver movimientos de caja manuales independientes (CulqiPaymentId == null)
                 foreach (var manualTx in allIncomeCash.Where(t => !t.CulqiPaymentId.HasValue))
                 {
-                    var matchedReceipt = bookingReceipts.FirstOrDefault(r =>
+                    var cashKey = $"CASH:{manualTx.Id:N}";
+                    var candidates = bookingReceipts.Where(r =>
                         r.CashTransactionId == manualTx.Id ||
-                        r.BillableOperationKey == $"CASH:{manualTx.Id:N}");
+                        r.BillableOperationKey == cashKey);
 
-                    if (matchedReceipt != null)
+                    var resolution = EvaluateCandidates(candidates, "Se encontraron múltiples comprobantes fiscales asociados a este movimiento de caja.");
+
+                    if (resolution.IsExact)
                     {
-                        associatedReceiptIds.Add(matchedReceipt.Id);
+                        associatedReceiptIds.Add(resolution.Receipt!.Id);
+                    }
+                    else if (resolution.IsConflict)
+                    {
+                        foreach (var c in resolution.Candidates)
+                        {
+                            associatedReceiptIds.Add(c.Id);
+                        }
                     }
 
                     normalizedOps.Add(new BookingOperationOptionViewModel
                     {
-                        Type = matchedReceipt != null ? "Receipt" : "CashTransaction",
-                        ReceiptId = matchedReceipt?.Id,
+                        Type = resolution.IsExact ? "Receipt" : (resolution.IsConflict ? "Conflict" : "CashTransaction"),
+                        ReceiptId = resolution.Receipt?.Id,
                         CashTransactionId = manualTx.Id,
                         CulqiPaymentId = null,
-                        Title = matchedReceipt != null
-                            ? $"{matchedReceipt.ReceiptType} {matchedReceipt.FullNumber}"
-                            : $"Movimiento de Caja ({manualTx.Category ?? "Cobro"})",
-                        Amount = matchedReceipt?.TotalAmount ?? manualTx.Amount,
-                        Status = matchedReceipt?.Status ?? "Sin Comprobante",
-                        IsBilled = matchedReceipt != null,
-                        Date = matchedReceipt?.IssuedAtUtc ?? manualTx.CreatedAt,
-                        PaymentMethod = matchedReceipt != null
-                            ? (matchedReceipt.CustomerDocType == "6" ? "Factura" : "Boleta")
+                        Title = resolution.IsExact
+                            ? $"{resolution.Receipt!.ReceiptType} {resolution.Receipt.FullNumber}"
+                            : (resolution.IsConflict ? $"Movimiento de Caja ({manualTx.Category ?? "Cobro"}) [Conflicto]" : $"Movimiento de Caja ({manualTx.Category ?? "Cobro"})"),
+                        Amount = resolution.Receipt?.TotalAmount ?? manualTx.Amount,
+                        Status = resolution.IsExact
+                            ? resolution.Receipt!.Status
+                            : (resolution.IsConflict ? "En Conflicto (Requiere Revisión)" : "Sin Comprobante"),
+                        IsBilled = resolution.IsExact,
+                        IsConflict = resolution.IsConflict,
+                        ConflictCandidateCount = resolution.Candidates.Count,
+                        Date = resolution.Receipt?.IssuedAtUtc ?? manualTx.CreatedAt,
+                        PaymentMethod = resolution.IsExact
+                            ? (resolution.Receipt!.CustomerDocType == "6" ? "Factura" : "Boleta")
                             : (manualTx.PaymentMethod ?? "Efectivo"),
-                        ReferenceCode = matchedReceipt?.FullNumber ?? manualTx.ReferenceCode
+                        ReferenceCode = resolution.Receipt?.FullNumber ?? manualTx.ReferenceCode
                     });
                 }
 
@@ -894,7 +978,30 @@ namespace SIGETOUR.API.Controllers.UI
                     if (totalOps == 1)
                     {
                         var singleOp = normalizedOps[0];
-                        if (singleOp.IsBilled && singleOp.ReceiptId.HasValue)
+                        if (singleOp.IsConflict)
+                        {
+                            receipt = null;
+                            Response.StatusCode = StatusCodes.Status409Conflict;
+                            ViewBag.IsConflict = true;
+                            ViewBag.SelectedCashTransactionId = singleOp.CashTransactionId;
+                            ViewBag.PaymentId = singleOp.CulqiPaymentId;
+                            ViewBag.SelectedOperationAmount = singleOp.Amount;
+                            ViewBag.SelectedPaymentMethod = singleOp.PaymentMethod;
+                            ViewBag.SelectedOperationNumber = singleOp.ReferenceCode;
+                            ViewBag.SelectedOperationDescription = singleOp.Title + $" - S/ {singleOp.Amount:N2}";
+                            ViewBag.SelectedOperationDate = singleOp.Date;
+
+                            if (singleOp.CulqiPaymentId.HasValue)
+                            {
+                                ViewBag.ConflictResolution = await ResolveReceiptForCulqiOperationAsync(booking.Id, singleOp.CulqiPaymentId.Value, singleOp.CashTransactionId);
+                            }
+                            else if (singleOp.CashTransactionId.HasValue)
+                            {
+                                ViewBag.ConflictResolution = await ResolveReceiptForManualCashOperationAsync(booking.Id, singleOp.CashTransactionId.Value);
+                            }
+                            ViewBag.ConflictMessage = (ViewBag.ConflictResolution as ReceiptResolutionResult)?.ConflictMessage ?? "Se requiere revisión administrativa: se detectaron múltiples comprobantes asociados a esta operación.";
+                        }
+                        else if (singleOp.IsBilled && singleOp.ReceiptId.HasValue)
                         {
                             receipt = bookingReceipts.FirstOrDefault(r => r.Id == singleOp.ReceiptId.Value);
                             ViewBag.SelectedCashTransactionId = singleOp.CashTransactionId;
@@ -1026,6 +1133,54 @@ namespace SIGETOUR.API.Controllers.UI
                     }
                 }
 
+                // Validación contra asociación ambigua / conflicto de identidad antes de llamadas externas
+                ReceiptResolutionResult? conflictCheck = null;
+                if (cashTransactionId.HasValue && cashTransactionId.Value != Guid.Empty)
+                {
+                    var cashTx = await _context.CashTransactions.FindAsync(cashTransactionId.Value);
+                    if (cashTx != null)
+                    {
+                        if (cashTx.CulqiPaymentId.HasValue)
+                        {
+                            conflictCheck = await ResolveReceiptForCulqiOperationAsync(bookingId.Value, cashTx.CulqiPaymentId.Value, cashTx.Id);
+                        }
+                        else
+                        {
+                            conflictCheck = await ResolveReceiptForManualCashOperationAsync(bookingId.Value, cashTx.Id);
+                        }
+                    }
+                }
+                else if (paymentId.HasValue && paymentId.Value != Guid.Empty)
+                {
+                    var linkedCash = await _context.CashTransactions.FirstOrDefaultAsync(t => t.CulqiPaymentId == paymentId.Value && t.BookingId == bookingId.Value);
+                    conflictCheck = await ResolveReceiptForCulqiOperationAsync(bookingId.Value, paymentId.Value, linkedCash?.Id);
+                }
+                else
+                {
+                    var allCulqi = await _context.CulqiPayments
+                        .Where(p => p.BookingId == bookingId.Value && p.Status == "paid")
+                        .ToListAsync();
+                    var allManualCash = await _context.CashTransactions
+                        .Where(t => t.BookingId == bookingId.Value && t.TransactionType == "Ingreso" && t.CulqiPaymentId == null)
+                        .ToListAsync();
+
+                    if (allCulqi.Count == 1 && allManualCash.Count == 0)
+                    {
+                        var culqi = allCulqi[0];
+                        var linkedCash = await _context.CashTransactions.FirstOrDefaultAsync(t => t.CulqiPaymentId == culqi.Id && t.BookingId == bookingId.Value);
+                        conflictCheck = await ResolveReceiptForCulqiOperationAsync(bookingId.Value, culqi.Id, linkedCash?.Id);
+                    }
+                    else if (allManualCash.Count == 1 && allCulqi.Count == 0)
+                    {
+                        conflictCheck = await ResolveReceiptForManualCashOperationAsync(bookingId.Value, allManualCash[0].Id);
+                    }
+                }
+
+                if (conflictCheck != null && conflictCheck.IsConflict)
+                {
+                    return StatusCode(StatusCodes.Status409Conflict, "Conflicto: la operación seleccionada presenta múltiples comprobantes asociados (conflicto de identidad) y requiere revisión administrativa antes de cualquier emisión.");
+                }
+
                 ElectronicReceipt result;
                 if (cashTransactionId.HasValue)
                 {
@@ -1045,8 +1200,12 @@ namespace SIGETOUR.API.Controllers.UI
             }
             catch (InvalidOperationException ex)
             {
-                // Error esperado de validación de negocio (ej. reserva con múltiples cobros sin seleccionar)
+                // Error esperado de validación de negocio (ej. reserva con múltiples cobros sin seleccionar o conflicto)
                 _logger?.LogWarning(ex, "Validación de facturación rechazada para reserva {BookingId}: {Message}", bookingId, ex.Message);
+                if (ex.Message.Contains("Conflicto de identidad") || ex.Message.Contains("múltiples comprobantes asociados"))
+                {
+                    return StatusCode(StatusCodes.Status409Conflict, ex.Message);
+                }
                 if (TempData != null)
                 {
                     TempData["ErrorMessage"] = ex.Message;

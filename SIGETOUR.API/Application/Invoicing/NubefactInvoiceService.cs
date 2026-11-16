@@ -648,9 +648,13 @@ namespace SIGETOUR.API.Application.Invoicing
                 var opKey = identity.OperationKey;
                 var cashId = identity.CashTransactionId;
                 var culqiId = identity.CulqiPaymentId;
+                var cashKey = cashId != null ? $"CASH:{cashId.Value:N}" : null;
+                var culqiKey = culqiId != null ? $"CULQI:{culqiId.Value:N}" : null;
 
                 query = query.Where(r =>
                     (!string.IsNullOrEmpty(opKey) && r.BillableOperationKey == opKey) ||
+                    (cashKey != null && r.BillableOperationKey == cashKey) ||
+                    (culqiKey != null && r.BillableOperationKey == culqiKey) ||
                     (cashId != null && r.CashTransactionId == cashId) ||
                     (culqiId != null && r.CulqiPaymentId == culqiId));
             }
@@ -660,7 +664,18 @@ namespace SIGETOUR.API.Application.Invoicing
                 query = query.Where(r => r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation");
             }
 
-            return await query.FirstOrDefaultAsync(ct);
+            var matches = await query.ToListAsync(ct);
+            var distinctMatches = matches
+                .GroupBy(r => r.Id)
+                .Select(g => g.First())
+                .ToList();
+
+            if (distinctMatches.Count > 1)
+            {
+                throw new InvalidOperationException($"Conflicto de identidad: la operación para la reserva {bookingId} tiene múltiples comprobantes asociados ({distinctMatches.Count} comprobantes distintos encontrados). Se requiere conciliación manual.");
+            }
+
+            return distinctMatches.FirstOrDefault();
         }
 
         public async Task<BillableOperationIdentity> ResolveBillableOperationAsync(
@@ -962,6 +977,41 @@ namespace SIGETOUR.API.Application.Invoicing
             }
             else
             {
+                // Validación previa: Si existen múltiples comprobantes distintos asociados a la misma operación, rechazar con conflicto
+                IQueryable<ElectronicReceipt> allCandidateQuery = _db.ElectronicReceipts
+                    .Where(r => r.BookingId == bookingId);
+
+                if (identity.IsHistoricalFallback)
+                {
+                    allCandidateQuery = allCandidateQuery.Where(r => r.CulqiPaymentId == null && r.CashTransactionId == null);
+                }
+                else
+                {
+                    var opKey = identity.OperationKey;
+                    var cashId = identity.CashTransactionId;
+                    var culqiId = identity.CulqiPaymentId;
+                    var cashKey = cashId != null ? $"CASH:{cashId.Value:N}" : null;
+                    var culqiKey = culqiId != null ? $"CULQI:{culqiId.Value:N}" : null;
+
+                    allCandidateQuery = allCandidateQuery.Where(r =>
+                        (!string.IsNullOrEmpty(opKey) && r.BillableOperationKey == opKey) ||
+                        (cashKey != null && r.BillableOperationKey == cashKey) ||
+                        (culqiKey != null && r.BillableOperationKey == culqiKey) ||
+                        (cashId != null && r.CashTransactionId == cashId) ||
+                        (culqiId != null && r.CulqiPaymentId == culqiId));
+                }
+
+                var allCandidates = await allCandidateQuery.ToListAsync(ct);
+                var distinctCandidates = allCandidates
+                    .GroupBy(r => r.Id)
+                    .Select(g => g.First())
+                    .ToList();
+
+                if (distinctCandidates.Count > 1)
+                {
+                    throw new InvalidOperationException($"Conflicto de identidad: la operación para la reserva {bookingId} tiene múltiples comprobantes asociados ({distinctCandidates.Count} comprobantes distintos encontrados). Se requiere conciliación manual antes de emitir.");
+                }
+
                 // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado, Demo o Simulado)
                 var existing = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: true, ct);
                 if (existing != null) return existing;

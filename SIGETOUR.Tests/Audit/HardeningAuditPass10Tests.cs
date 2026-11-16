@@ -164,10 +164,11 @@ namespace SIGETOUR.Tests.Audit
             var cfg = config ?? CreateConfig();
             var chk = checkoutAccess ?? new CheckoutAccess(cfg);
             var controller = new BookingController(context, chk, cfg);
+            var serviceProvider = sp ?? CreateRazorServiceProvider(cfg);
             var httpContext = new DefaultHttpContext
             {
                 User = user ?? new ClaimsPrincipal(new ClaimsIdentity()),
-                RequestServices = sp
+                RequestServices = serviceProvider
             };
             var routeData = new RouteData();
             routeData.Routers.Add(Mock.Of<IRouter>());
