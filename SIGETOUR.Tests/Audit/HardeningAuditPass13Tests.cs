@@ -81,29 +81,44 @@ namespace SIGETOUR.Tests.Audit
         {
             public List<Guid> ReceiptIds { get; } = new();
             public List<Guid> CashIds { get; } = new();
+            public List<Guid> ShiftIds { get; } = new();
             public List<Guid> CulqiIds { get; } = new();
             public List<Guid> BookingIds { get; } = new();
             public List<Guid> TourIds { get; } = new();
 
-            public async Task CleanupAsync(AppDbContext db)
+            public async Task CleanupAsync(AppDbContext db, ITestOutputHelper? output = null, Exception? testException = null)
             {
                 try
                 {
+                    // 1. Comprobantes electrónicos primero (claves foráneas hacia Booking, CulqiPayment, CashTransaction)
                     if (ReceiptIds.Count > 0)
                     {
                         var receipts = await db.ElectronicReceipts.Where(r => ReceiptIds.Contains(r.Id)).ToListAsync();
                         db.ElectronicReceipts.RemoveRange(receipts);
                     }
+
+                    // 2. Movimientos de caja (dependientes de Shift y Booking)
                     if (CashIds.Count > 0)
                     {
                         var cashes = await db.CashTransactions.Where(c => CashIds.Contains(c.Id)).ToListAsync();
                         db.CashTransactions.RemoveRange(cashes);
                     }
+
+                    // 3. Cajas de turno (una vez eliminados los movimientos dependientes)
+                    if (ShiftIds.Count > 0)
+                    {
+                        var shifts = await db.CashRegisterShifts.Where(s => ShiftIds.Contains(s.Id)).ToListAsync();
+                        db.CashRegisterShifts.RemoveRange(shifts);
+                    }
+
+                    // 4. Pagos Culqi
                     if (CulqiIds.Count > 0)
                     {
                         var culqis = await db.CulqiPayments.Where(p => CulqiIds.Contains(p.Id)).ToListAsync();
                         db.CulqiPayments.RemoveRange(culqis);
                     }
+
+                    // 5. Items y Reservas
                     if (BookingIds.Count > 0)
                     {
                         var items = await db.BookingItems.Where(bi => BookingIds.Contains(bi.BookingId)).ToListAsync();
@@ -111,17 +126,56 @@ namespace SIGETOUR.Tests.Audit
                         var bookings = await db.Bookings.Where(b => BookingIds.Contains(b.Id)).ToListAsync();
                         db.Bookings.RemoveRange(bookings);
                     }
+
+                    // 6. Paquetes turísticos
                     if (TourIds.Count > 0)
                     {
                         var tours = await db.TourPackages.Where(t => TourIds.Contains(t.Id)).ToListAsync();
                         db.TourPackages.RemoveRange(tours);
                     }
+
                     await db.SaveChangesAsync();
                 }
-                catch
+                catch (Exception cleanupEx)
                 {
-                    // Limpieza preventiva: no enmascarar excepciones principales
+                    output?.WriteLine($"[ERROR DE LIMPIEZA] Error eliminando datos de prueba propios: {cleanupEx}");
+                    if (testException != null)
+                    {
+                        // Preservar la excepción original de aserción combinándola con el fallo de limpieza
+                        throw new AggregateException("Fallo en la prueba y posterior fallo en la limpieza de datos de prueba.", testException, cleanupEx);
+                    }
+                    // Si la aserción pasó pero la limpieza falló, no permitir que la prueba parezca aprobada
+                    throw new InvalidOperationException($"La prueba dejó datos residuales porque la limpieza falló: {cleanupEx.Message}", cleanupEx);
                 }
+            }
+        }
+
+        private static void AssertHttpRequestsMatchReceipts(
+            InspectableHttpMessageHandler handler,
+            IEnumerable<Guid> expectedValidIds,
+            IEnumerable<Guid> expectedConflictedIds)
+        {
+            var valids = expectedValidIds.ToList();
+            var conflicts = expectedConflictedIds.ToList();
+
+            // 1. Cada solicitud debe ser de tipo generar_comprobante
+            foreach (var body in handler.RequestBodies)
+            {
+                Assert.Contains("\"operacion\":\"generar_comprobante\"", body);
+            }
+
+            // 2. Cada ID válido debe tener exactamente una solicitud correspondiente con su codigo_unico
+            foreach (var validId in valids)
+            {
+                var count = handler.RequestBodies.Count(b => b.Contains($"SIG-{validId:N}", StringComparison.OrdinalIgnoreCase));
+                Assert.Equal(1, count);
+            }
+
+            // 3. Ningún documento conflictivo debe haber generado solicitud externa
+            foreach (var conflictedId in conflicts)
+            {
+                var count = handler.RequestBodies.Count(b => b.Contains($"SIG-{conflictedId:N}", StringComparison.OrdinalIgnoreCase));
+                Assert.Equal(0, count);
             }
         }
 
@@ -157,6 +211,27 @@ namespace SIGETOUR.Tests.Audit
                 { "Company:Phone", "+51 901 195 392" }
             };
             return new ConfigurationBuilder().AddInMemoryCollection(dict).Build();
+        }
+
+        private static CashRegisterShift SeedCashRegisterShift(AppDbContext db, TestDataTracker? tracker = null)
+        {
+            var shift = new CashRegisterShift
+            {
+                Id = Guid.NewGuid(),
+                ShiftNumber = "TURNO-TEST-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+                OpenedByUserName = "auditor_p13",
+                OpenedAt = DateTime.UtcNow.AddHours(-2),
+                InitialAmount = 100m,
+                IsOpen = true
+            };
+            db.CashRegisterShifts.Add(shift);
+            db.SaveChanges();
+
+            if (tracker != null)
+            {
+                tracker.ShiftIds.Add(shift.Id);
+            }
+            return shift;
         }
 
         private static Booking SeedBooking(AppDbContext db, decimal total = 100m, decimal paid = 100m, TestDataTracker? tracker = null)
@@ -211,8 +286,18 @@ namespace SIGETOUR.Tests.Audit
             return booking;
         }
 
-        private static ElectronicReceipt SeedConflictedPendingReceipt(AppDbContext db, DateTime createdAtUtc, Guid? explicitDocAId = null, TestDataTracker? tracker = null)
+        private static ElectronicReceipt SeedConflictedPendingReceipt(
+            AppDbContext db,
+            DateTime createdAtUtc,
+            Guid? explicitDocAId = null,
+            TestDataTracker? tracker = null,
+            CashRegisterShift? shift = null)
         {
+            if (shift == null)
+            {
+                shift = SeedCashRegisterShift(db, tracker);
+            }
+
             var booking = SeedBooking(db, 100m, 100m, tracker);
 
             var culqi = new CulqiPayment
@@ -220,17 +305,25 @@ namespace SIGETOUR.Tests.Audit
                 Id = Guid.NewGuid(),
                 BookingId = booking.Id,
                 AmountCents = 10000,
+                Channel = "charge",
                 Status = "paid",
-                CreatedAtUtc = createdAtUtc.AddMinutes(-5)
+                ProviderId = "chr_test_" + Guid.NewGuid().ToString("N")[..16],
+                CreatedAtUtc = createdAtUtc.AddMinutes(-5),
+                ConfirmedAtUtc = createdAtUtc.AddMinutes(-5)
             };
 
             var cash = new CashTransaction
             {
                 Id = Guid.NewGuid(),
+                ShiftId = shift.Id,
                 BookingId = booking.Id,
                 CulqiPaymentId = culqi.Id,
                 TransactionType = "Ingreso",
+                Category = "Cobro de Reserva",
                 Amount = 100m,
+                PaymentMethod = "Tarjeta Web",
+                Description = "Cobro Culqi verificado",
+                RegisteredBy = "auditor_p13",
                 CreatedAt = createdAtUtc.AddMinutes(-5)
             };
 
@@ -279,7 +372,11 @@ namespace SIGETOUR.Tests.Audit
             return docA;
         }
 
-        private static ElectronicReceipt SeedHealthyPendingReceipt(AppDbContext db, DateTime createdAtUtc, Guid? explicitId = null, TestDataTracker? tracker = null)
+        private static ElectronicReceipt SeedHealthyPendingReceipt(
+            AppDbContext db,
+            DateTime createdAtUtc,
+            Guid? explicitId = null,
+            TestDataTracker? tracker = null)
         {
             var booking = SeedBooking(db, 100m, 100m, tracker);
 
@@ -288,8 +385,11 @@ namespace SIGETOUR.Tests.Audit
                 Id = Guid.NewGuid(),
                 BookingId = booking.Id,
                 AmountCents = 10000,
+                Channel = "charge",
                 Status = "paid",
-                CreatedAtUtc = createdAtUtc.AddMinutes(-5)
+                ProviderId = "chr_test_" + Guid.NewGuid().ToString("N")[..16],
+                CreatedAtUtc = createdAtUtc.AddMinutes(-5),
+                ConfirmedAtUtc = createdAtUtc.AddMinutes(-5)
             };
 
             var doc = new ElectronicReceipt
@@ -329,11 +429,13 @@ namespace SIGETOUR.Tests.Audit
             using var db = CreateInMemoryDb(dbName);
             var baseTime = DateTime.UtcNow.AddMinutes(-60);
 
+            var shift = SeedCashRegisterShift(db);
+
             // Sembrar exactamente 20 comprobantes pendientes en conflicto (lote 1 completo bloqueado)
             var conflictedList = new List<ElectronicReceipt>();
             for (int i = 0; i < 20; i++)
             {
-                var conflicted = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i));
+                var conflicted = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), shift: shift);
                 conflictedList.Add(conflicted);
             }
 
@@ -350,9 +452,10 @@ namespace SIGETOUR.Tests.Audit
 
             // Debe haber procesado exitosamente el documento 21
             Assert.Equal(1, processed);
-
-            // Debe haber realizado exactamente 1 llamada HTTP externa al proveedor
             Assert.Single(handler.Requests);
+
+            // Comprobación de solicitudes HTTP contra documentos
+            AssertHttpRequestsMatchReceipts(handler, new[] { healthy.Id }, conflictedList.Select(c => c.Id));
 
             // Comprobar que el documento 21 fue emitido
             var freshHealthy = await db.ElectronicReceipts.FindAsync(healthy.Id);
@@ -368,6 +471,7 @@ namespace SIGETOUR.Tests.Audit
                 Assert.Equal("Pending", freshConflicted.Status);
                 Assert.Null(freshConflicted.EmissionLeaseToken);
                 Assert.True(string.IsNullOrEmpty(freshConflicted.Number));
+                Assert.Equal(c.BillableOperationKey, freshConflicted.BillableOperationKey);
             }
         }
 
@@ -382,11 +486,13 @@ namespace SIGETOUR.Tests.Audit
             using var db = CreateInMemoryDb(dbName);
             var baseTime = DateTime.UtcNow.AddMinutes(-120);
 
+            var shift = SeedCashRegisterShift(db);
+
             // Sembrar 45 comprobantes en conflicto (> 2 lotes completos de 20)
             var conflictedList = new List<ElectronicReceipt>();
             for (int i = 0; i < 45; i++)
             {
-                var conflicted = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i));
+                var conflicted = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), shift: shift);
                 conflictedList.Add(conflicted);
             }
 
@@ -394,6 +500,7 @@ namespace SIGETOUR.Tests.Audit
             var healthy1 = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(50));
             var healthy2 = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(51));
             var healthy3 = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(52));
+            var healthyList = new[] { healthy1, healthy2, healthy3 };
 
             var config = CreateConfig();
             var handler = new InspectableHttpMessageHandler();
@@ -406,19 +513,24 @@ namespace SIGETOUR.Tests.Audit
             Assert.Equal(3, processed);
             Assert.Equal(3, handler.Requests.Count);
 
-            var fresh1 = await db.ElectronicReceipts.FindAsync(healthy1.Id);
-            var fresh2 = await db.ElectronicReceipts.FindAsync(healthy2.Id);
-            var fresh3 = await db.ElectronicReceipts.FindAsync(healthy3.Id);
-            Assert.True(fresh1!.Status is "Accepted" or "Demo");
-            Assert.True(fresh2!.Status is "Accepted" or "Demo");
-            Assert.True(fresh3!.Status is "Accepted" or "Demo");
+            AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
+
+            foreach (var h in healthyList)
+            {
+                var fresh = await db.ElectronicReceipts.FindAsync(h.Id);
+                Assert.NotNull(fresh);
+                Assert.True(fresh.Status is "Accepted" or "Demo");
+                Assert.False(string.IsNullOrWhiteSpace(fresh.Number));
+            }
 
             // Los 45 conflictivos permanecen intactos
             foreach (var c in conflictedList)
             {
                 var fresh = await db.ElectronicReceipts.FindAsync(c.Id);
-                Assert.Equal("Pending", fresh!.Status);
+                Assert.NotNull(fresh);
+                Assert.Equal("Pending", fresh.Status);
                 Assert.Null(fresh.EmissionLeaseToken);
+                Assert.True(string.IsNullOrEmpty(fresh.Number));
             }
         }
 
@@ -433,11 +545,13 @@ namespace SIGETOUR.Tests.Audit
             using var db = CreateInMemoryDb(dbName);
             var exactSameTime = new DateTime(2026, 11, 16, 12, 0, 0, DateTimeKind.Utc);
 
+            var shift = SeedCashRegisterShift(db);
+
             // 20 conflictivos y 5 sanos, todos con la misma fecha CreatedAtUtc
             var conflictedList = new List<ElectronicReceipt>();
             for (int i = 0; i < 20; i++)
             {
-                conflictedList.Add(SeedConflictedPendingReceipt(db, exactSameTime));
+                conflictedList.Add(SeedConflictedPendingReceipt(db, exactSameTime, shift: shift));
             }
 
             var healthyList = new List<ElectronicReceipt>();
@@ -457,16 +571,22 @@ namespace SIGETOUR.Tests.Audit
             Assert.Equal(5, processed);
             Assert.Equal(5, handler.Requests.Count);
 
+            AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
+
             foreach (var h in healthyList)
             {
                 var fresh = await db.ElectronicReceipts.FindAsync(h.Id);
-                Assert.True(fresh!.Status is "Accepted" or "Demo");
+                Assert.NotNull(fresh);
+                Assert.True(fresh.Status is "Accepted" or "Demo");
+                Assert.False(string.IsNullOrWhiteSpace(fresh.Number));
             }
 
             foreach (var c in conflictedList)
             {
                 var fresh = await db.ElectronicReceipts.FindAsync(c.Id);
-                Assert.Equal("Pending", fresh!.Status);
+                Assert.NotNull(fresh);
+                Assert.Equal("Pending", fresh.Status);
+                Assert.Null(fresh.EmissionLeaseToken);
             }
         }
 
@@ -481,6 +601,8 @@ namespace SIGETOUR.Tests.Audit
             using var db = CreateInMemoryDb(dbName);
             var baseTime = DateTime.UtcNow.AddMinutes(-50);
 
+            var shift = SeedCashRegisterShift(db);
+
             // Intercalados: 10 sanos, 10 conflictivos, 5 sanos
             var healthyList = new List<ElectronicReceipt>();
             var conflictedList = new List<ElectronicReceipt>();
@@ -491,7 +613,7 @@ namespace SIGETOUR.Tests.Audit
             }
             for (int i = 10; i < 20; i++)
             {
-                conflictedList.Add(SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i)));
+                conflictedList.Add(SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), shift: shift));
             }
             for (int i = 20; i < 25; i++)
             {
@@ -509,16 +631,21 @@ namespace SIGETOUR.Tests.Audit
             Assert.Equal(15, processed);
             Assert.Equal(15, handler.Requests.Count);
 
+            AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
+
             foreach (var h in healthyList)
             {
                 var fresh = await db.ElectronicReceipts.FindAsync(h.Id);
-                Assert.True(fresh!.Status is "Accepted" or "Demo");
+                Assert.NotNull(fresh);
+                Assert.True(fresh.Status is "Accepted" or "Demo");
             }
 
             foreach (var c in conflictedList)
             {
                 var fresh = await db.ElectronicReceipts.FindAsync(c.Id);
-                Assert.Equal("Pending", fresh!.Status);
+                Assert.NotNull(fresh);
+                Assert.Equal("Pending", fresh.Status);
+                Assert.Null(fresh.EmissionLeaseToken);
             }
         }
 
@@ -533,9 +660,11 @@ namespace SIGETOUR.Tests.Audit
             using var db = CreateInMemoryDb(dbName);
             var baseTime = DateTime.UtcNow.AddMinutes(-30);
 
+            var shift = SeedCashRegisterShift(db);
+
             // 5 conflictivos y 2 sanos
-            var c1 = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(1));
-            var c2 = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(2));
+            var c1 = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(1), shift: shift);
+            var c2 = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(2), shift: shift);
             var h1 = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(3));
             var h2 = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(4));
 
@@ -560,6 +689,8 @@ namespace SIGETOUR.Tests.Audit
             var freshC2 = await db.ElectronicReceipts.FindAsync(c2.Id);
             Assert.Equal("Pending", freshC1!.Status);
             Assert.Equal("Pending", freshC2!.Status);
+            Assert.Null(freshC1.EmissionLeaseToken);
+            Assert.Null(freshC2.EmissionLeaseToken);
         }
 
         // =========================================================================
@@ -607,6 +738,7 @@ namespace SIGETOUR.Tests.Audit
         {
             var dbName = Guid.NewGuid().ToString();
             using var db = CreateInMemoryDb(dbName);
+            var shift = SeedCashRegisterShift(db);
             var booking = SeedBooking(db, 100m, 100m);
 
             var culqi = new CulqiPayment
@@ -614,16 +746,24 @@ namespace SIGETOUR.Tests.Audit
                 Id = Guid.NewGuid(),
                 BookingId = booking.Id,
                 AmountCents = 10000,
+                Channel = "charge",
                 Status = "paid",
-                CreatedAtUtc = DateTime.UtcNow
+                ProviderId = "chr_test_" + Guid.NewGuid().ToString("N")[..16],
+                CreatedAtUtc = DateTime.UtcNow,
+                ConfirmedAtUtc = DateTime.UtcNow
             };
             var cash = new CashTransaction
             {
                 Id = Guid.NewGuid(),
+                ShiftId = shift.Id,
                 BookingId = booking.Id,
                 CulqiPaymentId = culqi.Id,
                 TransactionType = "Ingreso",
+                Category = "Cobro de Reserva",
                 Amount = 100m,
+                PaymentMethod = "Tarjeta Web",
+                Description = "Cobro Culqi verificado",
+                RegisteredBy = "auditor_p13",
                 CreatedAt = DateTime.UtcNow
             };
             var docA = new ElectronicReceipt
@@ -729,17 +869,29 @@ namespace SIGETOUR.Tests.Audit
             if (db == null) return;
 
             var tracker = new TestDataTracker();
+            Exception? testEx = null;
             try
             {
                 await using (db)
                 {
+                    // Limpiar residuos huérfanos de pruebas previas abortadas para evitar interferencia
+                    var residual = await db.ElectronicReceipts
+                        .Where(r => (r.Status == "Pending" || r.Status == "Submitted") && r.Booking != null && r.Booking.ReferenceCode.StartsWith("TC-"))
+                        .ToListAsync();
+                    if (residual.Count > 0)
+                    {
+                        db.ElectronicReceipts.RemoveRange(residual);
+                        await db.SaveChangesAsync();
+                    }
+
                     var baseTime = DateTime.UtcNow.AddMinutes(-60);
+                    var shift = SeedCashRegisterShift(db, tracker);
 
                     // 1. Sembrar exactamente 20 comprobantes pendientes en conflicto (Página 1: items 0 a 19)
                     var conflictedList = new List<ElectronicReceipt>();
                     for (int i = 0; i < 20; i++)
                     {
-                        var conflicted = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
+                        var conflicted = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
                         conflictedList.Add(conflicted);
                     }
 
@@ -765,7 +917,10 @@ namespace SIGETOUR.Tests.Audit
                     // Assert 2: Cero emisiones para los 20 conflictivos, exactamente 5 llamadas para los válidos
                     Assert.Equal(5, handler.Requests.Count);
 
-                    // Assert 3: Comprobación con contexto fresco sin seguimiento en PostgreSQL
+                    // Assert 3: Correspondencia exacta de cuerpos HTTP y documentos
+                    AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
+
+                    // Assert 4: Comprobación con contexto fresco sin seguimiento en PostgreSQL
                     await using var verifyDb = CreatePostgresDbContext();
 
                     foreach (var h in healthyList)
@@ -774,7 +929,11 @@ namespace SIGETOUR.Tests.Audit
                         Assert.NotNull(freshValid);
                         Assert.True(freshValid.Status is "Accepted" or "Demo");
                         Assert.False(string.IsNullOrWhiteSpace(freshValid.Number));
-                        Assert.Null(freshValid.EmissionLeaseToken);
+                        Assert.NotNull(freshValid.PdfUrl);
+
+                        // Demostrar contractualmente que el documento ya no puede ser reclamado
+                        var (claimed, _, _) = await service.TryAcquireEmissionAsync(freshValid.Id, requestedClaimToken: null, allowRejectedRetry: false);
+                        Assert.False(claimed);
                     }
 
                     foreach (var c in conflictedList)
@@ -783,15 +942,20 @@ namespace SIGETOUR.Tests.Audit
                         Assert.NotNull(freshConflicted);
                         Assert.Equal("Pending", freshConflicted.Status);
                         Assert.True(string.IsNullOrWhiteSpace(freshConflicted.Number));
-                        Assert.Null(freshConflicted.EmissionLeaseToken);
+                        Assert.Null(freshConflicted.EmissionLeaseToken); // El documento en conflicto NUNCA adquirió lease
                         Assert.Equal(c.BillableOperationKey, freshConflicted.BillableOperationKey);
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                testEx = ex;
+                throw;
+            }
             finally
             {
                 await using var cleanupDb = CreatePostgresDbContext();
-                await tracker.CleanupAsync(cleanupDb);
+                await tracker.CleanupAsync(cleanupDb, _output, testEx);
             }
         }
 
@@ -802,11 +966,22 @@ namespace SIGETOUR.Tests.Audit
             if (db == null) return;
 
             var tracker = new TestDataTracker();
+            Exception? testEx = null;
             try
             {
                 await using (db)
                 {
+                    var residual = await db.ElectronicReceipts
+                        .Where(r => (r.Status == "Pending" || r.Status == "Submitted") && r.Booking != null && r.Booking.ReferenceCode.StartsWith("TC-"))
+                        .ToListAsync();
+                    if (residual.Count > 0)
+                    {
+                        db.ElectronicReceipts.RemoveRange(residual);
+                        await db.SaveChangesAsync();
+                    }
+
                     var exactSameTime = DateTime.UtcNow.AddMinutes(-45);
+                    var shift = SeedCashRegisterShift(db, tracker);
 
                     // Generar 25 IDs deterministas: 00000000-0000-0000-0000-000000000001 a ...0025
                     // En PostgreSQL y en .NET, estos IDs ordenan idénticamente: Id 1 < Id 2 < ... < Id 25
@@ -828,7 +1003,7 @@ namespace SIGETOUR.Tests.Audit
                         }
                         else
                         {
-                            SeedConflictedPendingReceipt(db, exactSameTime, explicitDocAId: guid, tracker: tracker);
+                            SeedConflictedPendingReceipt(db, exactSameTime, explicitDocAId: guid, tracker: tracker, shift: shift);
                             conflictedIds.Add(guid);
                         }
                     }
@@ -845,6 +1020,8 @@ namespace SIGETOUR.Tests.Audit
                     Assert.Equal(8, processed);
                     Assert.Equal(8, handler.Requests.Count);
 
+                    AssertHttpRequestsMatchReceipts(handler, healthyIds, conflictedIds);
+
                     await using var verifyDb = CreatePostgresDbContext();
 
                     foreach (var id in healthyIds)
@@ -853,7 +1030,9 @@ namespace SIGETOUR.Tests.Audit
                         Assert.NotNull(fresh);
                         Assert.True(fresh.Status is "Accepted" or "Demo");
                         Assert.False(string.IsNullOrWhiteSpace(fresh.Number));
-                        Assert.Null(fresh.EmissionLeaseToken);
+
+                        var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
+                        Assert.False(claimed);
                     }
 
                     foreach (var id in conflictedIds)
@@ -866,10 +1045,15 @@ namespace SIGETOUR.Tests.Audit
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                testEx = ex;
+                throw;
+            }
             finally
             {
                 await using var cleanupDb = CreatePostgresDbContext();
-                await tracker.CleanupAsync(cleanupDb);
+                await tracker.CleanupAsync(cleanupDb, _output, testEx);
             }
         }
 
@@ -880,11 +1064,22 @@ namespace SIGETOUR.Tests.Audit
             if (db == null) return;
 
             var tracker = new TestDataTracker();
+            Exception? testEx = null;
             try
             {
                 await using (db)
                 {
+                    var residual = await db.ElectronicReceipts
+                        .Where(r => (r.Status == "Pending" || r.Status == "Submitted") && r.Booking != null && r.Booking.ReferenceCode.StartsWith("TC-"))
+                        .ToListAsync();
+                    if (residual.Count > 0)
+                    {
+                        db.ElectronicReceipts.RemoveRange(residual);
+                        await db.SaveChangesAsync();
+                    }
+
                     var baseTime = DateTime.UtcNow.AddMinutes(-55);
+                    var shift = SeedCashRegisterShift(db, tracker);
 
                     // Página 1 (0 a 19): 15 sanos (0 a 14) + 5 conflictivos (15 a 19)
                     // Página 2 (20 a 29): 5 sanos (20 a 24) + 5 conflictivos (25 a 29)
@@ -899,7 +1094,7 @@ namespace SIGETOUR.Tests.Audit
                     }
                     for (int i = 15; i < 20; i++)
                     {
-                        var c = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
+                        var c = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
                         conflictedIds.Add(c.Id);
                     }
                     for (int i = 20; i < 25; i++)
@@ -909,7 +1104,7 @@ namespace SIGETOUR.Tests.Audit
                     }
                     for (int i = 25; i < 30; i++)
                     {
-                        var c = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
+                        var c = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
                         conflictedIds.Add(c.Id);
                     }
 
@@ -925,6 +1120,8 @@ namespace SIGETOUR.Tests.Audit
                     Assert.Equal(20, processed);
                     Assert.Equal(20, handler.Requests.Count);
 
+                    AssertHttpRequestsMatchReceipts(handler, healthyIds, conflictedIds);
+
                     await using var verifyDb = CreatePostgresDbContext();
 
                     foreach (var id in healthyIds)
@@ -932,6 +1129,9 @@ namespace SIGETOUR.Tests.Audit
                         var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
                         Assert.NotNull(fresh);
                         Assert.True(fresh.Status is "Accepted" or "Demo");
+
+                        var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
+                        Assert.False(claimed);
                     }
 
                     foreach (var id in conflictedIds)
@@ -939,13 +1139,19 @@ namespace SIGETOUR.Tests.Audit
                         var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
                         Assert.NotNull(fresh);
                         Assert.Equal("Pending", fresh.Status);
+                        Assert.Null(fresh.EmissionLeaseToken);
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                testEx = ex;
+                throw;
             }
             finally
             {
                 await using var cleanupDb = CreatePostgresDbContext();
-                await tracker.CleanupAsync(cleanupDb);
+                await tracker.CleanupAsync(cleanupDb, _output, testEx);
             }
         }
 
@@ -956,17 +1162,28 @@ namespace SIGETOUR.Tests.Audit
             if (db == null) return;
 
             var tracker = new TestDataTracker();
+            Exception? testEx = null;
             try
             {
                 await using (db)
                 {
+                    var residual = await db.ElectronicReceipts
+                        .Where(r => (r.Status == "Pending" || r.Status == "Submitted") && r.Booking != null && r.Booking.ReferenceCode.StartsWith("TC-"))
+                        .ToListAsync();
+                    if (residual.Count > 0)
+                    {
+                        db.ElectronicReceipts.RemoveRange(residual);
+                        await db.SaveChangesAsync();
+                    }
+
                     var baseTime = DateTime.UtcNow.AddMinutes(-40);
+                    var shift = SeedCashRegisterShift(db, tracker);
 
                     // 20 conflictivos y 5 sanos
                     var conflictedList = new List<ElectronicReceipt>();
                     for (int i = 0; i < 20; i++)
                     {
-                        conflictedList.Add(SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker));
+                        conflictedList.Add(SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift));
                     }
                     var healthyList = new List<ElectronicReceipt>();
                     for (int i = 20; i < 25; i++)
@@ -984,6 +1201,8 @@ namespace SIGETOUR.Tests.Audit
                     Assert.Equal(5, run1);
                     Assert.Equal(5, handler.Requests.Count);
 
+                    AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
+
                     // Corrida 2 inmediata sobre la misma base de datos
                     var run2 = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
                     Assert.Equal(0, run2);
@@ -997,6 +1216,9 @@ namespace SIGETOUR.Tests.Audit
                         Assert.NotNull(fresh);
                         Assert.True(fresh.Status is "Accepted" or "Demo");
                         Assert.False(string.IsNullOrWhiteSpace(fresh.Number));
+
+                        var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
+                        Assert.False(claimed);
                     }
 
                     foreach (var c in conflictedList)
@@ -1009,10 +1231,15 @@ namespace SIGETOUR.Tests.Audit
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                testEx = ex;
+                throw;
+            }
             finally
             {
                 await using var cleanupDb = CreatePostgresDbContext();
-                await tracker.CleanupAsync(cleanupDb);
+                await tracker.CleanupAsync(cleanupDb, _output, testEx);
             }
         }
     }
