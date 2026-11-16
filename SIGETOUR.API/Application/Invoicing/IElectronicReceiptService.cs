@@ -26,11 +26,29 @@ namespace SIGETOUR.API.Application.Invoicing
         Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId = null, CancellationToken ct = default);
         Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, CancellationToken ct = default);
         Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, string? claimToken, CancellationToken ct = default);
+        Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, string? claimToken, Guid? cashTransactionId, string? billableOperationKey = null, CancellationToken ct = default);
         Task<ElectronicReceipt> RetryReceiptAsync(Guid receiptId, CancellationToken ct = default);
         Task<ElectronicReceipt?> QueryReceiptFromProviderAsync(Guid receiptId, CancellationToken ct = default);
         Task<NubefactReconciliationResult> ReconcileReceiptWithProviderAsync(Guid receiptId, CancellationToken ct = default);
         Task<(bool Acquired, string LeaseToken, ElectronicReceipt Receipt)> TryAcquireEmissionAsync(Guid receiptId, string? requestedClaimToken = null, bool allowRejectedRetry = false, CancellationToken ct = default);
         Task<bool> TryMarkEmissionStartedAsync(Guid receiptId, string leaseToken, CancellationToken ct = default);
+        Task<bool> TryRecoverUnsentInFlightAsync(Guid receiptId, string? observedLeaseToken, CancellationToken ct = default);
+        Task<bool> TryTransitionInFlightToReviewAsync(Guid receiptId, string? observedLeaseToken, string reason, CancellationToken ct = default);
+        Task<bool> TryCompleteEmissionAsync(
+            Guid receiptId,
+            string leaseToken,
+            string finalStatus,
+            string? number,
+            string? pdfUrl,
+            string? xmlUrl,
+            string? cdrUrl,
+            string? qrData,
+            string? digitalHash,
+            string? providerDescription,
+            string? providerResponseCode,
+            string? lastError,
+            DateTime? issuedAtUtc,
+            CancellationToken ct = default);
         Task<int> ProcessPendingReceiptsAsync(CancellationToken ct = default);
     }
 }

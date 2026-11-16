@@ -23,6 +23,7 @@ namespace SIGETOUR.API.Application.Invoicing
         private readonly HttpClient _http;
         private readonly ILogger<NubefactInvoiceService> _logger;
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim> _receiptLocks = new();
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _creationLocks = new();
 
         public NubefactInvoiceService(
             AppDbContext db,
@@ -276,6 +277,242 @@ namespace SIGETOUR.API.Application.Invoicing
             }
         }
 
+        public async Task<bool> TryRecoverUnsentInFlightAsync(Guid receiptId, string? observedLeaseToken, CancellationToken ct = default)
+        {
+            var nowUtc = DateTime.UtcNow;
+            var recoveryMsg = "Intención de emisión recuperada tras reinicio del sistema (nunca enviada al proveedor).";
+
+            if (_db.Database.IsRelational())
+            {
+                var rowsAffected = await _db.ElectronicReceipts
+                    .Where(r => r.Id == receiptId &&
+                                r.Status == "InFlight" &&
+                                r.EmissionStartedAtUtc == null &&
+                                (r.EmissionLeaseExpiresAtUtc == null || r.EmissionLeaseExpiresAtUtc < nowUtc) &&
+                                (observedLeaseToken == null ? r.EmissionLeaseToken == null : r.EmissionLeaseToken == observedLeaseToken))
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(r => r.Status, "Pending")
+                        .SetProperty(r => r.EmissionLeaseToken, (string?)null)
+                        .SetProperty(r => r.EmissionLeaseAcquiredAtUtc, (DateTime?)null)
+                        .SetProperty(r => r.EmissionLeaseExpiresAtUtc, (DateTime?)null)
+                        .SetProperty(r => r.EmissionStartedAtUtc, (DateTime?)null)
+                        .SetProperty(r => r.LastError, recoveryMsg), ct);
+
+                return rowsAffected == 1;
+            }
+            else
+            {
+                var semaphore = _receiptLocks.GetOrAdd(receiptId, _ => new SemaphoreSlim(1, 1));
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    var receipt = await _db.ElectronicReceipts.FirstOrDefaultAsync(r => r.Id == receiptId, ct);
+                    if (receipt != null &&
+                        receipt.Status == "InFlight" &&
+                        receipt.EmissionStartedAtUtc == null &&
+                        (receipt.EmissionLeaseExpiresAtUtc == null || receipt.EmissionLeaseExpiresAtUtc < nowUtc) &&
+                        (observedLeaseToken == null ? receipt.EmissionLeaseToken == null : receipt.EmissionLeaseToken == observedLeaseToken))
+                    {
+                        receipt.Status = "Pending";
+                        receipt.EmissionLeaseToken = null;
+                        receipt.EmissionLeaseAcquiredAtUtc = null;
+                        receipt.EmissionLeaseExpiresAtUtc = null;
+                        receipt.EmissionStartedAtUtc = null;
+                        receipt.LastError = recoveryMsg;
+                        await _db.SaveChangesAsync(ct);
+                        return true;
+                    }
+                    return false;
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }
+        }
+
+        public async Task<bool> TryTransitionInFlightToReviewAsync(Guid receiptId, string? observedLeaseToken, string reason, CancellationToken ct = default)
+        {
+            if (_db.Database.IsRelational())
+            {
+                var rowsAffected = await _db.ElectronicReceipts
+                    .Where(r => r.Id == receiptId &&
+                                r.Status == "InFlight" &&
+                                (observedLeaseToken == null ? r.EmissionLeaseToken == null : r.EmissionLeaseToken == observedLeaseToken))
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(r => r.Status, "RequiresReview")
+                        .SetProperty(r => r.LastError, reason), ct);
+
+                return rowsAffected == 1;
+            }
+            else
+            {
+                var semaphore = _receiptLocks.GetOrAdd(receiptId, _ => new SemaphoreSlim(1, 1));
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    var receipt = await _db.ElectronicReceipts.FirstOrDefaultAsync(r => r.Id == receiptId, ct);
+                    if (receipt != null &&
+                        receipt.Status == "InFlight" &&
+                        (observedLeaseToken == null ? receipt.EmissionLeaseToken == null : receipt.EmissionLeaseToken == observedLeaseToken))
+                    {
+                        receipt.Status = "RequiresReview";
+                        receipt.LastError = reason;
+                        await _db.SaveChangesAsync(ct);
+                        return true;
+                    }
+                    return false;
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }
+        }
+
+        public async Task<bool> TryCompleteEmissionAsync(
+            Guid receiptId,
+            string leaseToken,
+            string finalStatus,
+            string? number,
+            string? pdfUrl,
+            string? xmlUrl,
+            string? cdrUrl,
+            string? qrData,
+            string? digitalHash,
+            string? providerDescription,
+            string? providerResponseCode,
+            string? lastError,
+            DateTime? issuedAtUtc,
+            CancellationToken ct = default)
+        {
+            if (_db.Database.IsRelational())
+            {
+                var rowsAffected = await _db.ElectronicReceipts
+                    .Where(r => r.Id == receiptId &&
+                                r.Status == "InFlight" &&
+                                r.EmissionLeaseToken == leaseToken &&
+                                r.EmissionStartedAtUtc != null)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(r => r.Status, finalStatus)
+                        .SetProperty(r => r.Number, r => number ?? r.Number)
+                        .SetProperty(r => r.PdfUrl, r => pdfUrl ?? r.PdfUrl)
+                        .SetProperty(r => r.XmlUrl, r => xmlUrl ?? r.XmlUrl)
+                        .SetProperty(r => r.CdrUrl, r => cdrUrl ?? r.CdrUrl)
+                        .SetProperty(r => r.QrData, r => qrData ?? r.QrData)
+                        .SetProperty(r => r.DigitalHash, r => digitalHash ?? r.DigitalHash)
+                        .SetProperty(r => r.ProviderDescription, r => providerDescription ?? r.ProviderDescription)
+                        .SetProperty(r => r.ProviderResponseCode, r => providerResponseCode ?? r.ProviderResponseCode)
+                        .SetProperty(r => r.LastError, lastError)
+                        .SetProperty(r => r.IssuedAtUtc, r => issuedAtUtc ?? r.IssuedAtUtc), ct);
+
+                if (rowsAffected == 1)
+                {
+                    return true;
+                }
+
+                // rowsAffected == 0: El lease expiró, fue reclamado o completado por otro proceso
+                var current = await _db.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == receiptId, ct);
+                if (current == null) return false;
+
+                // 1. Si el comprobante ya está Aceptado, Demo o Simulado en base de datos, NUNCA degradarlo ni sobreescribir con error
+                if (current.Status is "Accepted" or "Demo" or "Simulation")
+                {
+                    _logger.LogInformation("Comprobante {ReceiptId} ya se encuentra confirmado como {Status}. Se descarta actualización tardía.", receiptId, current.Status);
+                    return false;
+                }
+
+                // 2. Si la respuesta tardía fue un éxito tributario (Accepted o Demo) y el registro en DB quedó en RequiresReview o InFlight:
+                if (finalStatus is "Accepted" or "Demo")
+                {
+                    _logger.LogInformation("Comprobante {ReceiptId} recibió confirmación tardía de emisión ({FinalStatus}). Rescatando comprobante desde estado {CurrentStatus}.", receiptId, finalStatus, current.Status);
+
+                    var updated = await _db.ElectronicReceipts
+                        .Where(r => r.Id == receiptId && (r.Status == "RequiresReview" || r.Status == "InFlight"))
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(r => r.Status, finalStatus)
+                            .SetProperty(r => r.Number, r => number ?? r.Number)
+                            .SetProperty(r => r.PdfUrl, r => pdfUrl ?? r.PdfUrl)
+                            .SetProperty(r => r.XmlUrl, r => xmlUrl ?? r.XmlUrl)
+                            .SetProperty(r => r.CdrUrl, r => cdrUrl ?? r.CdrUrl)
+                            .SetProperty(r => r.QrData, r => qrData ?? r.QrData)
+                            .SetProperty(r => r.DigitalHash, r => digitalHash ?? r.DigitalHash)
+                            .SetProperty(r => r.ProviderDescription, r => providerDescription ?? r.ProviderDescription)
+                            .SetProperty(r => r.ProviderResponseCode, r => providerResponseCode ?? r.ProviderResponseCode)
+                            .SetProperty(r => r.LastError, (string?)null)
+                            .SetProperty(r => r.IssuedAtUtc, r => issuedAtUtc ?? r.IssuedAtUtc), ct);
+                    return updated > 0;
+                }
+
+                // 3. Si la respuesta tardía fue un error (Rejected o RequiresReview) pero rowsAffected fue 0:
+                // Descartar el error tardío para no sobreescribir al nuevo dueño
+                _logger.LogWarning("Respuesta tardía con error ({FinalStatus}) descartada para comprobante {ReceiptId} porque el lease {LeaseToken} ya no era el dueño activo.", finalStatus, receiptId, leaseToken);
+                return false;
+            }
+            else
+            {
+                var semaphore = _receiptLocks.GetOrAdd(receiptId, _ => new SemaphoreSlim(1, 1));
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    var receipt = await _db.ElectronicReceipts.FirstOrDefaultAsync(r => r.Id == receiptId, ct);
+                    if (receipt == null) return false;
+
+                    if (receipt.Status == "InFlight" &&
+                        receipt.EmissionLeaseToken == leaseToken &&
+                        receipt.EmissionStartedAtUtc != null)
+                    {
+                        receipt.Status = finalStatus;
+                        receipt.Number = number ?? receipt.Number;
+                        receipt.PdfUrl = pdfUrl ?? receipt.PdfUrl;
+                        receipt.XmlUrl = xmlUrl ?? receipt.XmlUrl;
+                        receipt.CdrUrl = cdrUrl ?? receipt.CdrUrl;
+                        receipt.QrData = qrData ?? receipt.QrData;
+                        receipt.DigitalHash = digitalHash ?? receipt.DigitalHash;
+                        receipt.ProviderDescription = providerDescription ?? receipt.ProviderDescription;
+                        receipt.ProviderResponseCode = providerResponseCode ?? receipt.ProviderResponseCode;
+                        receipt.LastError = lastError;
+                        receipt.IssuedAtUtc = issuedAtUtc ?? receipt.IssuedAtUtc;
+                        await _db.SaveChangesAsync(ct);
+                        return true;
+                    }
+
+                    // Si ya está confirmado, nunca degradar
+                    if (receipt.Status is "Accepted" or "Demo" or "Simulation")
+                    {
+                        _logger.LogInformation("Comprobante {ReceiptId} ya se encuentra confirmado como {Status}. Se descarta actualización tardía.", receiptId, receipt.Status);
+                        return false;
+                    }
+
+                    // Si la respuesta tardía es confirmación exitosa, rescatar desde RequiresReview o InFlight
+                    if ((receipt.Status == "RequiresReview" || receipt.Status == "InFlight") && (finalStatus is "Accepted" or "Demo"))
+                    {
+                        receipt.Status = finalStatus;
+                        receipt.Number = number ?? receipt.Number;
+                        receipt.PdfUrl = pdfUrl ?? receipt.PdfUrl;
+                        receipt.XmlUrl = xmlUrl ?? receipt.XmlUrl;
+                        receipt.CdrUrl = cdrUrl ?? receipt.CdrUrl;
+                        receipt.QrData = qrData ?? receipt.QrData;
+                        receipt.DigitalHash = digitalHash ?? receipt.DigitalHash;
+                        receipt.ProviderDescription = providerDescription ?? receipt.ProviderDescription;
+                        receipt.ProviderResponseCode = providerResponseCode ?? receipt.ProviderResponseCode;
+                        receipt.LastError = null;
+                        receipt.IssuedAtUtc = issuedAtUtc ?? receipt.IssuedAtUtc;
+                        await _db.SaveChangesAsync(ct);
+                        return true;
+                    }
+
+                    // Descartar error tardío
+                    _logger.LogWarning("Respuesta tardía con error ({FinalStatus}) descartada para comprobante {ReceiptId} porque el lease {LeaseToken} ya no era el dueño activo.", finalStatus, receiptId, leaseToken);
+                    return false;
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }
+        }
+
         public static bool IsActiveClaim(string? lastError, out DateTime claimedAt)
         {
             claimedAt = DateTime.MinValue;
@@ -336,11 +573,27 @@ namespace SIGETOUR.API.Application.Invoicing
             return GenerateReceiptAsync(bookingId, culqiPaymentId, exactReceiptId, claimToken: null, ct);
         }
 
-        public async Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, string? claimToken, CancellationToken ct = default)
+        public Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, string? claimToken, CancellationToken ct = default)
+        {
+            return GenerateReceiptAsync(bookingId, culqiPaymentId, exactReceiptId, claimToken, cashTransactionId: null, billableOperationKey: null, ct);
+        }
+
+        public async Task<ElectronicReceipt> GenerateReceiptAsync(
+            Guid bookingId,
+            Guid? culqiPaymentId,
+            Guid? exactReceiptId,
+            string? claimToken,
+            Guid? cashTransactionId,
+            string? billableOperationKey = null,
+            CancellationToken ct = default)
         {
             var mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
             ElectronicReceipt? receipt = null;
             bool isNew = false;
+
+            Guid? resolvedCulqi = culqiPaymentId;
+            Guid? resolvedCash = cashTransactionId;
+            string? resolvedOpKey = billableOperationKey;
 
             if (exactReceiptId.HasValue && exactReceiptId.Value != Guid.Empty)
             {
@@ -353,26 +606,67 @@ namespace SIGETOUR.API.Application.Invoicing
                 {
                     return receipt;
                 }
-                if (culqiPaymentId == null && receipt.CulqiPaymentId != null)
+                if (resolvedCulqi == null && receipt.CulqiPaymentId != null)
                 {
-                    culqiPaymentId = receipt.CulqiPaymentId;
+                    resolvedCulqi = receipt.CulqiPaymentId;
+                }
+                if (resolvedCash == null && receipt.CashTransactionId != null)
+                {
+                    resolvedCash = receipt.CashTransactionId;
+                }
+                if (string.IsNullOrWhiteSpace(resolvedOpKey) && !string.IsNullOrWhiteSpace(receipt.BillableOperationKey))
+                {
+                    resolvedOpKey = receipt.BillableOperationKey;
                 }
                 isNew = false;
             }
             else
             {
+                if (resolvedCulqi.HasValue)
+                {
+                    resolvedOpKey ??= $"CULQI:{resolvedCulqi.Value:N}";
+                }
+                else if (resolvedCash.HasValue)
+                {
+                    resolvedOpKey ??= $"CASH:{resolvedCash.Value:N}";
+                }
+                else
+                {
+                    var unbilledCashTx = await _db.CashTransactions
+                        .Where(t => t.BookingId == bookingId && t.TransactionType == "Ingreso" && !_db.ElectronicReceipts.Any(r => r.CashTransactionId == t.Id))
+                        .OrderBy(t => t.CreatedAt)
+                        .FirstOrDefaultAsync(ct);
+
+                    if (unbilledCashTx != null)
+                    {
+                        resolvedCash = unbilledCashTx.Id;
+                        resolvedOpKey = $"CASH:{unbilledCashTx.Id:N}";
+                    }
+                    else
+                    {
+                        resolvedOpKey ??= $"MANUAL:BOOKING:{bookingId:N}";
+                    }
+                }
+
                 // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado, Demo o Simulado)
                 var existing = await _db.ElectronicReceipts
                     .OrderByDescending(r => r.CreatedAtUtc)
-                    .FirstOrDefaultAsync(r => ((culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId) || (culqiPaymentId == null && r.BookingId == bookingId && r.CulqiPaymentId == null))
+                    .FirstOrDefaultAsync(r =>
+                        ((!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
+                         (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
+                         (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
+                         (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)))
                         && (r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation"), ct);
                 if (existing != null) return existing;
 
                 // Reutilizar registro si quedó en estado fallido/rechazado para actualizarlo en vez de duplicarlo
                 receipt = await _db.ElectronicReceipts
                     .OrderByDescending(r => r.CreatedAtUtc)
-                    .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
-                        || (culqiPaymentId == null && r.BookingId == bookingId && r.CulqiPaymentId == null), ct);
+                    .FirstOrDefaultAsync(r =>
+                        (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
+                        (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
+                        (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
+                        (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
                 isNew = receipt == null;
             }
 
@@ -385,12 +679,12 @@ namespace SIGETOUR.API.Application.Invoicing
                 throw new InvalidOperationException($"No se encontró la reserva {bookingId} para facturación electrónica.");
 
             CulqiPayment? culqiPayment = null;
-            if (culqiPaymentId.HasValue)
+            if (resolvedCulqi.HasValue)
             {
-                culqiPayment = await _db.CulqiPayments.FindAsync(new object[] { culqiPaymentId.Value }, ct);
+                culqiPayment = await _db.CulqiPayments.FindAsync(new object[] { resolvedCulqi.Value }, ct);
                 if (culqiPayment == null || culqiPayment.BookingId != bookingId || culqiPayment.Status != "paid")
                 {
-                    throw new InvalidOperationException($"El pago Culqi {culqiPaymentId} no existe, no pertenece a la reserva o no se encuentra confirmado.");
+                    throw new InvalidOperationException($"El pago Culqi {resolvedCulqi} no existe, no pertenece a la reserva o no se encuentra confirmado.");
                 }
             }
             else
@@ -402,9 +696,20 @@ namespace SIGETOUR.API.Application.Invoicing
             }
 
             // 2. Determinación de importes, anticipos y saldos
-            var paymentAmount = culqiPayment != null
-                ? culqiPayment.AmountCents / 100m
-                : (receipt != null && receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.PaidAmount);
+            decimal paymentAmount;
+            if (culqiPayment != null)
+            {
+                paymentAmount = culqiPayment.AmountCents / 100m;
+            }
+            else if (resolvedCash.HasValue)
+            {
+                var cashTx = await _db.CashTransactions.FindAsync(new object[] { resolvedCash.Value }, ct);
+                paymentAmount = cashTx?.Amount ?? (receipt != null && receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.PaidAmount);
+            }
+            else
+            {
+                paymentAmount = (receipt != null && receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.PaidAmount);
+            }
 
             var isAdvance = (culqiPayment != null && booking.PaidAmount < booking.TotalAmount)
                 || (culqiPayment == null && paymentAmount < booking.TotalAmount);
@@ -487,10 +792,19 @@ namespace SIGETOUR.API.Application.Invoicing
                 receipt = new ElectronicReceipt
                 {
                     BookingId = booking.Id,
-                    CulqiPaymentId = culqiPaymentId,
+                    CulqiPaymentId = resolvedCulqi,
+                    CashTransactionId = resolvedCash,
+                    BillableOperationKey = resolvedOpKey,
                     Environment = effectiveEnvironment,
                     CreatedAtUtc = DateTime.UtcNow
                 };
+            }
+            else
+            {
+                if (receipt.CashTransactionId == null && resolvedCash != null)
+                    receipt.CashTransactionId = resolvedCash;
+                if (string.IsNullOrWhiteSpace(receipt.BillableOperationKey) && resolvedOpKey != null)
+                    receipt.BillableOperationKey = resolvedOpKey;
             }
 
             receipt.ReceiptType = receiptType;
@@ -564,31 +878,104 @@ namespace SIGETOUR.API.Application.Invoicing
 
                 if (isNew)
                 {
-                    _db.ElectronicReceipts.Add(receipt);
+                    var lockKey = resolvedOpKey ?? $"MANUAL:BOOKING:{bookingId:N}";
+                    var creationSemaphore = _creationLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
+                    await creationSemaphore.WaitAsync(ct);
+                    try
+                    {
+                        var doubleCheck = await _db.ElectronicReceipts
+                            .OrderByDescending(r => r.CreatedAtUtc)
+                            .FirstOrDefaultAsync(r =>
+                                (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
+                                (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
+                                (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
+                                (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+                        if (doubleCheck != null)
+                        {
+                            return doubleCheck;
+                        }
+                        _db.ElectronicReceipts.Add(receipt);
+                        await _db.SaveChangesAsync(ct);
+                        isNew = false;
+                    }
+                    catch (DbUpdateException)
+                    {
+                        _db.Entry(receipt).State = EntityState.Detached;
+                        var winner = await _db.ElectronicReceipts
+                            .OrderByDescending(r => r.CreatedAtUtc)
+                            .FirstOrDefaultAsync(r =>
+                                (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
+                                (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
+                                (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
+                                (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+                        if (winner != null) return winner;
+                        throw;
+                    }
+                    finally
+                    {
+                        creationSemaphore.Release();
+                    }
+                }
+                else
+                {
+                    await _db.SaveChangesAsync(ct);
                 }
                 booking.InvoiceNumber = receipt.FullNumber;
-                await _db.SaveChangesAsync(ct);
+                try { await _db.SaveChangesAsync(ct); } catch {}
                 return receipt;
             }
 
             // 6. Conciliación previa y protección contra reemisiones a ciegas
             if (isNew)
             {
-                receipt.Status = "Pending";
-                _db.ElectronicReceipts.Add(receipt);
+                var lockKey = resolvedOpKey ?? $"MANUAL:BOOKING:{bookingId:N}";
+                var creationSemaphore = _creationLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
+                await creationSemaphore.WaitAsync(ct);
                 try
                 {
-                    await _db.SaveChangesAsync(ct);
-                    isNew = false;
-                }
-                catch (DbUpdateException)
-                {
-                    receipt = await _db.ElectronicReceipts
+                    var doubleCheck = await _db.ElectronicReceipts
                         .OrderByDescending(r => r.CreatedAtUtc)
-                        .FirstOrDefaultAsync(r => (culqiPaymentId != null && r.CulqiPaymentId == culqiPaymentId)
-                            || (culqiPaymentId == null && r.BookingId == bookingId && r.CulqiPaymentId == null), ct);
-                    if (receipt == null) throw;
-                    isNew = false;
+                        .FirstOrDefaultAsync(r =>
+                            (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
+                            (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
+                            (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
+                            (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+
+                    if (doubleCheck != null)
+                    {
+                        receipt = doubleCheck;
+                        isNew = false;
+                    }
+                    else
+                    {
+                        receipt.Status = "Pending";
+                        _db.ElectronicReceipts.Add(receipt);
+                        try
+                        {
+                            await _db.SaveChangesAsync(ct);
+                            isNew = false;
+                        }
+                        catch (DbUpdateException ex)
+                        {
+                            _logger.LogInformation(ex, "Colisión concurrente al insertar ElectronicReceipt para {OpKey}. Desasociando entidad y recargando ganador.", resolvedOpKey);
+                            _db.Entry(receipt).State = EntityState.Detached;
+
+                            receipt = await _db.ElectronicReceipts
+                                .OrderByDescending(r => r.CreatedAtUtc)
+                                .FirstOrDefaultAsync(r =>
+                                    (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
+                                    (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
+                                    (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
+                                    (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+
+                            if (receipt == null) throw;
+                            isNew = false;
+                        }
+                    }
+                }
+                finally
+                {
+                    creationSemaphore.Release();
                 }
             }
             else
@@ -622,19 +1009,34 @@ namespace SIGETOUR.API.Application.Invoicing
                         return rec.Receipt;
                     }
 
-                    _logger.LogWarning("Comprobante {ReceiptId} en InFlight sin evidencia concluyente de no haber sido enviado al proveedor. Se retiene en RequiresReview.", receipt.Id);
-                    receipt.Status = "RequiresReview";
-                    receipt.LastError = "Comprobante en vuelo histórico sin evidencia concluyente de no haber sido enviado al proveedor. Se retiene en revisión manual para no duplicar comprobantes en SUNAT.";
-                    await _db.SaveChangesAsync(ct);
+                    _logger.LogWarning("Comprobante {ReceiptId} en InFlight sin evidencia concluyente de no haber sido enviado al proveedor. Se retiene en RequiresReview de forma condicional.", receipt.Id);
+                    var reviewReason = "Comprobante en vuelo histórico sin evidencia concluyente de no haber sido enviado al proveedor. Se retiene en revisión manual para no duplicar comprobantes en SUNAT.";
+                    await TryTransitionInFlightToReviewAsync(receipt.Id, receipt.EmissionLeaseToken, reviewReason, ct);
+                    if (_db.Database.IsRelational())
+                    {
+                        try { await _db.Entry(receipt).ReloadAsync(ct); } catch { }
+                    }
+                    else
+                    {
+                        receipt.Status = "RequiresReview";
+                        receipt.LastError = reviewReason;
+                    }
                     return receipt;
                 }
 
                 if (classification == InFlightClassification.ReliablyUnsentExpired)
                 {
-                    receipt.Status = "Pending";
-                    receipt.EmissionLeaseToken = null;
-                    receipt.EmissionStartedAtUtc = null;
-                    await _db.SaveChangesAsync(ct);
+                    await TryRecoverUnsentInFlightAsync(receipt.Id, receipt.EmissionLeaseToken, ct);
+                    if (_db.Database.IsRelational())
+                    {
+                        try { await _db.Entry(receipt).ReloadAsync(ct); } catch { }
+                    }
+                    else
+                    {
+                        receipt.Status = "Pending";
+                        receipt.EmissionLeaseToken = null;
+                        receipt.EmissionStartedAtUtc = null;
+                    }
                 }
             }
 
@@ -880,11 +1282,9 @@ namespace SIGETOUR.API.Application.Invoicing
             };
 
             // 8. Invocación a API REST de NubeFact y comprobación tributaria estricta
-            try
-            {
-                using var requestMsg = new HttpRequestMessage(HttpMethod.Post, ruta);
-                requestMsg.Headers.TryAddWithoutValidation("Authorization", $"Token token=\"{token}\"");
-                requestMsg.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            using var requestMsg = new HttpRequestMessage(HttpMethod.Post, ruta);
+            requestMsg.Headers.TryAddWithoutValidation("Authorization", $"Token token=\"{token}\"");
+            requestMsg.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
                 // Persistir inicio de envío de forma condicional y atómica inmediatamente antes de invocar HTTP
                 bool canSend = await TryMarkEmissionStartedAsync(receipt.Id, acquiredToken, ct);
@@ -898,126 +1298,178 @@ namespace SIGETOUR.API.Application.Invoicing
                     return receipt;
                 }
 
-                var response = await _http.SendAsync(requestMsg, ct);
-                var jsonStr = await response.Content.ReadAsStringAsync(ct);
-                using var doc = JsonDocument.Parse(jsonStr);
-                var root = doc.RootElement;
+                string finalStatus;
+                string? providerDescription = null;
+                string? providerResponseCode = null;
+                string? lastError = null;
+                string? number = receipt.Number;
+                string? pdfUrl = receipt.PdfUrl;
+                string? xmlUrl = receipt.XmlUrl;
+                string? cdrUrl = receipt.CdrUrl;
+                string? qrData = receipt.QrData;
+                string? digitalHash = receipt.DigitalHash;
+                DateTime? issuedAtUtc = null;
 
-                if (response.IsSuccessStatusCode)
+                try
                 {
-                    // No interpretar automáticamente HTTP 200 como aceptación tributaria
-                    if (root.TryGetProperty("errors", out var errProp) && !string.IsNullOrWhiteSpace(errProp.GetString()))
+                    var response = await _http.SendAsync(requestMsg, ct);
+                    var jsonStr = await response.Content.ReadAsStringAsync(ct);
+                    using var doc = JsonDocument.Parse(jsonStr);
+                    var root = doc.RootElement;
+
+                    if (response.IsSuccessStatusCode)
                     {
-                        receipt.Status = "Rejected";
-                        receipt.LastError = errProp.GetString();
-                        _logger.LogWarning("NubeFact devolvió errores en HTTP 200 para reserva {RefCode}: {Errors}", booking.ReferenceCode, errProp.GetString());
+                        // No interpretar automáticamente HTTP 200 como aceptación tributaria
+                        if (root.TryGetProperty("errors", out var errProp) && !string.IsNullOrWhiteSpace(errProp.GetString()))
+                        {
+                            finalStatus = "Rejected";
+                            lastError = errProp.GetString();
+                            providerDescription = lastError;
+                            _logger.LogWarning("NubeFact devolvió errores en HTTP 200 para reserva {RefCode}: {Errors}", booking.ReferenceCode, lastError);
+                        }
+                        else
+                        {
+                            // Comprobar explícitamente aceptación tributaria SUNAT
+                            bool isSunatAccepted = false;
+                            if (root.TryGetProperty("aceptada_por_sunat", out var asp) && asp.ValueKind == JsonValueKind.True)
+                            {
+                                isSunatAccepted = true;
+                            }
+                            else if (root.TryGetProperty("sunat_responsecode", out var src) && IsSunatSuccessResponseCode(src))
+                            {
+                                isSunatAccepted = true;
+                            }
+
+                            var sunatDesc = root.TryGetProperty("sunat_description", out var descProp) ? descProp.GetString() : null;
+                            providerDescription = sunatDesc;
+
+                            if (isSunatAccepted)
+                            {
+                                finalStatus = "Accepted";
+                                providerDescription ??= "Aceptado por SUNAT";
+                            }
+                            else if (string.Equals(effectiveEnvironment, "Demo", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // En modo DEMO, la disponibilidad de un PDF no equivale a aceptación tributaria SUNAT
+                                finalStatus = "Demo";
+                                providerDescription ??= "Documento generado en DEMO NubeFact (sin aceptación tributaria SUNAT)";
+                            }
+                            else if (!sendToSunat)
+                            {
+                                finalStatus = "Submitted";
+                                providerDescription ??= "Generado internamente (Envío a SUNAT pendiente)";
+                            }
+                            else
+                            {
+                                finalStatus = "Submitted";
+                                providerDescription ??= "Enviado a SUNAT (pendiente de respuesta)";
+                            }
+
+                            if (root.TryGetProperty("numero", out var numProp))
+                            {
+                                number = numProp.ValueKind == JsonValueKind.Number
+                                    ? numProp.GetInt64().ToString()
+                                    : numProp.GetString() ?? number;
+                            }
+
+                            pdfUrl = root.TryGetProperty("enlace_del_pdf", out var pdfProp) ? pdfProp.GetString() : pdfUrl;
+                            xmlUrl = root.TryGetProperty("enlace_del_xml", out var xmlProp) ? xmlProp.GetString() : xmlUrl;
+                            cdrUrl = root.TryGetProperty("enlace_del_cdr", out var cdrProp) ? cdrProp.GetString() : cdrUrl;
+                            digitalHash = root.TryGetProperty("codigo_hash", out var hashProp) ? hashProp.GetString() : digitalHash;
+
+                            if (root.TryGetProperty("cadena_para_codigo_qr", out var qrProp) && !string.IsNullOrWhiteSpace(qrProp.GetString()))
+                            {
+                                qrData = qrProp.GetString();
+                            }
+                            else
+                            {
+                                qrData = null; // No fabricar QR ficticio
+                            }
+
+                            issuedAtUtc = DateTime.UtcNow;
+                            lastError = null;
+                        }
                     }
                     else
                     {
-                        // Comprobar explícitamente aceptación tributaria SUNAT
-                        bool isSunatAccepted = false;
-                        if (root.TryGetProperty("aceptada_por_sunat", out var asp) && asp.ValueKind == JsonValueKind.True)
+                        // HTTP != 200: diferenciar error de cliente vs error temporal de servidor
+                        var httpCode = (int)response.StatusCode;
+                        if (httpCode >= 500)
                         {
-                            isSunatAccepted = true;
-                        }
-                        else if (root.TryGetProperty("sunat_responsecode", out var src) && IsSunatSuccessResponseCode(src))
-                        {
-                            isSunatAccepted = true;
-                        }
-
-                        var sunatDesc = root.TryGetProperty("sunat_description", out var descProp) ? descProp.GetString() : null;
-                        if (string.IsNullOrWhiteSpace(receipt.Environment))
-                        {
-                            receipt.Environment = effectiveEnvironment;
-                        }
-
-                        if (isSunatAccepted)
-                        {
-                            receipt.Status = "Accepted";
-                            receipt.ProviderDescription = sunatDesc ?? "Aceptado por SUNAT";
-                        }
-                        else if (string.Equals(receipt.Environment, "Demo", StringComparison.OrdinalIgnoreCase))
-                        {
-                            // En modo DEMO, la disponibilidad de un PDF no equivale a aceptación tributaria SUNAT
-                            receipt.Status = "Demo";
-                            receipt.ProviderDescription = sunatDesc ?? "Documento generado en DEMO NubeFact (sin aceptación tributaria SUNAT)";
-                        }
-                        else if (!sendToSunat)
-                        {
-                            receipt.Status = "Submitted";
-                            receipt.ProviderDescription = sunatDesc ?? "Generado internamente (Envío a SUNAT pendiente)";
+                            finalStatus = "RequiresReview"; // Error temporal en gateway o servidor NubeFact tras envío: resultado incierto
+                            lastError = $"Error temporal del proveedor NubeFact (HTTP {httpCode}). Solicitud enviada con resultado incierto; requiere conciliación antes de reintentar para no duplicar comprobantes.";
                         }
                         else
                         {
-                            receipt.Status = "Submitted";
-                            receipt.ProviderDescription = sunatDesc ?? "Enviado a SUNAT (pendiente de respuesta)";
+                            finalStatus = "Rejected"; // 4xx: Parámetros inválidos o rechazo de negocio
+                            lastError = jsonStr;
+                            try
+                            {
+                                using var errDoc = JsonDocument.Parse(jsonStr);
+                                if (errDoc.RootElement.TryGetProperty("errors", out var errProp))
+                                    providerDescription = errProp.GetString();
+                                if (errDoc.RootElement.TryGetProperty("codigo", out var codProp))
+                                    providerResponseCode = codProp.ToString();
+                            }
+                            catch {}
                         }
-
-                        if (root.TryGetProperty("numero", out var numProp))
-                        {
-                            receipt.Number = numProp.ValueKind == JsonValueKind.Number
-                                ? numProp.GetInt64().ToString()
-                                : numProp.GetString() ?? receipt.Number;
-                        }
-
-                        receipt.PdfUrl = root.TryGetProperty("enlace_del_pdf", out var pdfProp) ? pdfProp.GetString() : null;
-                        receipt.XmlUrl = root.TryGetProperty("enlace_del_xml", out var xmlProp) ? xmlProp.GetString() : null;
-                        receipt.CdrUrl = root.TryGetProperty("enlace_del_cdr", out var cdrProp) ? cdrProp.GetString() : null;
-                        receipt.DigitalHash = root.TryGetProperty("codigo_hash", out var hashProp) ? hashProp.GetString() : null;
-
-                        if (root.TryGetProperty("cadena_para_codigo_qr", out var qrProp) && !string.IsNullOrWhiteSpace(qrProp.GetString()))
-                        {
-                            receipt.QrData = qrProp.GetString();
-                        }
-                        else
-                        {
-                            receipt.QrData = null; // No fabricar QR ficticio
-                        }
-
-                        receipt.IssuedAtUtc = DateTime.UtcNow;
+                        _logger.LogWarning("NubeFact respondió HTTP {StatusCode} para {RefCode}: {Response}", response.StatusCode, booking.ReferenceCode, jsonStr);
                     }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Excepción de red o timeout invocando API NubeFact para reserva {RefCode}", booking.ReferenceCode);
+                    // Timeout o fallo de red: resultado incierto tras envío; retener en RequiresReview
+                    finalStatus = "RequiresReview";
+                    lastError = $"Resultado incierto tras fallo de conexión o timeout con NubeFact: {ex.Message}. La solicitud fue enviada pero el resultado se desconoce; requiere verificación manual en el portal NubeFact antes de reintentar.";
+                }
+
+                await TryCompleteEmissionAsync(
+                    receipt.Id,
+                    acquiredToken,
+                    finalStatus,
+                    number,
+                    pdfUrl,
+                    xmlUrl,
+                    cdrUrl,
+                    qrData,
+                    digitalHash,
+                    providerDescription,
+                    providerResponseCode,
+                    lastError,
+                    issuedAtUtc,
+                    ct);
+
+                if (_db.Database.IsRelational())
+                {
+                    try { await _db.Entry(receipt).ReloadAsync(ct); } catch {}
                 }
                 else
                 {
-                    // HTTP != 200: diferenciar error de cliente vs error temporal de servidor
-                    var httpCode = (int)response.StatusCode;
-                    if (httpCode >= 500)
+                    var reloaded = await _db.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == receipt.Id, ct);
+                    if (reloaded != null)
                     {
-                        receipt.Status = "RequiresReview"; // Error temporal en gateway o servidor NubeFact tras envío: resultado incierto
-                        receipt.LastError = $"Error temporal del proveedor NubeFact (HTTP {httpCode}). Solicitud enviada con resultado incierto; requiere conciliación antes de reintentar para no duplicar comprobantes.";
+                        receipt.Status = reloaded.Status;
+                        receipt.Number = reloaded.Number;
+                        receipt.PdfUrl = reloaded.PdfUrl;
+                        receipt.XmlUrl = reloaded.XmlUrl;
+                        receipt.CdrUrl = reloaded.CdrUrl;
+                        receipt.QrData = reloaded.QrData;
+                        receipt.DigitalHash = reloaded.DigitalHash;
+                        receipt.ProviderDescription = reloaded.ProviderDescription;
+                        receipt.ProviderResponseCode = reloaded.ProviderResponseCode;
+                        receipt.LastError = reloaded.LastError;
+                        receipt.IssuedAtUtc = reloaded.IssuedAtUtc;
                     }
-                    else
-                    {
-                        receipt.Status = "Rejected"; // 4xx: Parámetros inválidos o rechazo de negocio
-                        receipt.LastError = jsonStr;
-                        try
-                        {
-                            using var errDoc = JsonDocument.Parse(jsonStr);
-                            if (errDoc.RootElement.TryGetProperty("errors", out var errProp))
-                                receipt.ProviderDescription = errProp.GetString();
-                            if (errDoc.RootElement.TryGetProperty("codigo", out var codProp))
-                                receipt.ProviderResponseCode = codProp.ToString();
-                        }
-                        catch {}
-                    }
-                    _logger.LogWarning("NubeFact respondió HTTP {StatusCode} para {RefCode}: {Response}", response.StatusCode, booking.ReferenceCode, jsonStr);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Excepción de red o timeout invocando API NubeFact para reserva {RefCode}", booking.ReferenceCode);
-                // Timeout o fallo de red: resultado incierto tras envío; retener en RequiresReview
-                receipt.Status = "RequiresReview";
-                receipt.LastError = $"Resultado incierto tras fallo de conexión o timeout con NubeFact: {ex.Message}. La solicitud fue enviada pero el resultado se desconoce; requiere verificación manual en el portal NubeFact antes de reintentar.";
-            }
 
-            if (receipt.Status == "Accepted" || receipt.Status == "Demo" || receipt.Status == "Simulation")
-            {
-                receipt.LastError = null;
-            }
-            booking.InvoiceNumber = receipt.FullNumber;
-            await _db.SaveChangesAsync(ct);
-            return receipt;
+                if (!string.IsNullOrWhiteSpace(receipt.Number))
+                {
+                    booking.InvoiceNumber = receipt.FullNumber;
+                    try { await _db.SaveChangesAsync(ct); } catch {}
+                }
+
+                return receipt;
         }
 
         public async Task<ElectronicReceipt> RetryReceiptAsync(Guid receiptId, CancellationToken ct = default)
@@ -1098,15 +1550,40 @@ namespace SIGETOUR.API.Application.Invoicing
                             if (classification == InFlightClassification.UncertainOrSent)
                             {
                                 _logger.LogWarning("Reintento detenido para comprobante {ReceiptId} en InFlight sin evidencia de no haber sido enviado.", receiptId);
-                                receipt.Status = "RequiresReview";
-                                receipt.LastError = "Comprobante en vuelo histórico sin evidencia concluyente de no haber sido enviado al proveedor. Se retiene en revisión manual para no duplicar comprobantes en SUNAT.";
-                                await _db.SaveChangesAsync(ct);
+                                var reason = "Comprobante en vuelo histórico sin evidencia concluyente de no haber sido enviado al proveedor. Se retiene en revisión manual para no duplicar comprobantes en SUNAT.";
+                                await TryTransitionInFlightToReviewAsync(receipt.Id, receipt.EmissionLeaseToken, reason, ct);
+                                if (_db.Database.IsRelational())
+                                {
+                                    try { await _db.Entry(receipt).ReloadAsync(ct); } catch {}
+                                }
+                                else
+                                {
+                                    receipt.Status = "RequiresReview";
+                                    receipt.LastError = reason;
+                                }
                                 return receipt;
+                            }
+                            if (classification == InFlightClassification.ReliablyUnsentExpired)
+                            {
+                                await TryRecoverUnsentInFlightAsync(receipt.Id, receipt.EmissionLeaseToken, ct);
+                                if (_db.Database.IsRelational())
+                                {
+                                    try { await _db.Entry(receipt).ReloadAsync(ct); } catch {}
+                                }
+                                else
+                                {
+                                    receipt.Status = "Pending";
+                                    receipt.EmissionLeaseToken = null;
+                                    receipt.EmissionStartedAtUtc = null;
+                                }
                             }
                         }
 
-                        _logger.LogWarning("Comprobante {ReceiptId} en estado {Status} sin correlativo asignado. No se reemite a ciegas para evitar duplicación tributaria en SUNAT; requiere verificación en el portal NubeFact.", receiptId, receipt.Status);
-                        return receipt;
+                        if (receipt.Status == "RequiresReview")
+                        {
+                            _logger.LogWarning("Comprobante {ReceiptId} en estado {Status} sin correlativo asignado. No se reemite a ciegas para evitar duplicación tributaria en SUNAT; requiere verificación en el portal NubeFact.", receiptId, receipt.Status);
+                            return receipt;
+                        }
                     }
                 }
 
@@ -1125,7 +1602,9 @@ namespace SIGETOUR.API.Application.Invoicing
             var currentMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
 
             // 1. Limpieza y conciliación de comprobantes en vuelo ('InFlight') abandonados tras reinicio del servidor
+            // Se leen sin seguimiento (AsNoTracking) para evitar SaveChangesAsync desactualizados
             var inFlightList = await _db.ElectronicReceipts
+                .AsNoTracking()
                 .Where(r => r.Status == "InFlight")
                 .ToListAsync(ct);
 
@@ -1140,24 +1619,15 @@ namespace SIGETOUR.API.Application.Invoicing
 
                 if (classification == InFlightClassification.ReliablyUnsentExpired)
                 {
-                    // Intención reservada pero comprobablemente NUNCA enviada -> recuperar a Pending
-                    inFlight.Status = "Pending";
-                    inFlight.EmissionLeaseToken = null;
-                    inFlight.EmissionLeaseAcquiredAtUtc = null;
-                    inFlight.EmissionLeaseExpiresAtUtc = null;
-                    inFlight.EmissionStartedAtUtc = null;
-                    inFlight.LastError = "Intención de emisión recuperada tras reinicio del sistema (nunca enviada al proveedor).";
+                    // Intención reservada pero comprobablemente NUNCA enviada -> recuperar a Pending condicionalmente
+                    await TryRecoverUnsentInFlightAsync(inFlight.Id, inFlight.EmissionLeaseToken, ct);
                 }
                 else // UncertainOrSent
                 {
-                    // Marca ausente, texto no estructurado, fecha inválida, o envío iniciado -> REQUIRES REVIEW
-                    inFlight.Status = "RequiresReview";
-                    inFlight.LastError = "La emisión quedó interrumpida o en vuelo tras reinicio del servidor. Se requiere revisión manual antes de reintentar para no duplicar comprobantes en SUNAT.";
+                    // Marca ausente, texto no estructurado, fecha inválida, o envío iniciado -> REQUIRES REVIEW condicionalmente
+                    var reason = "La emisión quedó interrumpida o en vuelo tras reinicio del servidor. Se requiere revisión manual antes de reintentar para no duplicar comprobantes en SUNAT.";
+                    await TryTransitionInFlightToReviewAsync(inFlight.Id, inFlight.EmissionLeaseToken, reason, ct);
                 }
-            }
-            if (inFlightList.Count > 0)
-            {
-                await _db.SaveChangesAsync(ct);
             }
 
             // 2. Solo recuperar comprobantes pendientes no despachados ("Pending") o enviados con número que requieran consulta
@@ -1208,7 +1678,7 @@ namespace SIGETOUR.API.Application.Invoicing
 
                 try
                 {
-                    await GenerateReceiptAsync(refreshed.BookingId, refreshed.CulqiPaymentId, refreshed.Id, claimToken: workerClaimToken, ct: ct);
+                    await GenerateReceiptAsync(refreshed.BookingId, refreshed.CulqiPaymentId, refreshed.Id, claimToken: workerClaimToken, cashTransactionId: refreshed.CashTransactionId, billableOperationKey: refreshed.BillableOperationKey, ct: ct);
                     processedCount++;
                 }
                 catch (Exception ex)

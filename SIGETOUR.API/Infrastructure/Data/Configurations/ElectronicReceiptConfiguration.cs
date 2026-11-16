@@ -25,6 +25,7 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
             builder.Property(r => r.EmissionLeaseAcquiredAtUtc);
             builder.Property(r => r.EmissionLeaseExpiresAtUtc);
             builder.Property(r => r.EmissionStartedAtUtc);
+            builder.Property(r => r.BillableOperationKey).HasMaxLength(128);
 
             builder.Property(r => r.SubtotalAmount).HasPrecision(12, 2);
             builder.Property(r => r.IgvAmount).HasPrecision(12, 2);
@@ -37,6 +38,12 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
             builder.HasIndex(r => r.CulqiPaymentId)
                 .IsUnique()
                 .HasFilter("\"CulqiPaymentId\" IS NOT NULL");
+            builder.HasIndex(r => r.CashTransactionId)
+                .IsUnique()
+                .HasFilter("\"CashTransactionId\" IS NOT NULL");
+            builder.HasIndex(r => r.BillableOperationKey)
+                .IsUnique()
+                .HasFilter("\"BillableOperationKey\" IS NOT NULL");
 
             builder.HasOne(r => r.Booking)
                 .WithMany()
@@ -46,6 +53,11 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
             builder.HasOne(r => r.CulqiPayment)
                 .WithMany()
                 .HasForeignKey(r => r.CulqiPaymentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.HasOne(r => r.CashTransaction)
+                .WithMany()
+                .HasForeignKey(r => r.CashTransactionId)
                 .OnDelete(DeleteBehavior.SetNull);
         }
     }

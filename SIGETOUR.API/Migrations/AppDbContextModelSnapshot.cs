@@ -606,7 +606,14 @@ namespace SIGETOUR.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BillableOperationKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CashTransactionId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("CdrUrl")
@@ -719,7 +726,15 @@ namespace SIGETOUR.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BillableOperationKey")
+                        .IsUnique()
+                        .HasFilter("\"BillableOperationKey\" IS NOT NULL");
+
                     b.HasIndex("BookingId");
+
+                    b.HasIndex("CashTransactionId")
+                        .IsUnique()
+                        .HasFilter("\"CashTransactionId\" IS NOT NULL");
 
                     b.HasIndex("CulqiPaymentId")
                         .IsUnique()
@@ -1488,12 +1503,19 @@ namespace SIGETOUR.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("SIGETOUR.API.Core.Entities.CashTransaction", "CashTransaction")
+                        .WithMany()
+                        .HasForeignKey("CashTransactionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SIGETOUR.API.Core.Entities.CulqiPayment", "CulqiPayment")
                         .WithMany()
                         .HasForeignKey("CulqiPaymentId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Booking");
+
+                    b.Navigation("CashTransaction");
 
                     b.Navigation("CulqiPayment");
                 });

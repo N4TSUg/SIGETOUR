@@ -354,5 +354,188 @@ namespace SIGETOUR.Tests.Payments
             if (toDeleteTour != null) db1.TourPackages.Remove(toDeleteTour);
             await db1.SaveChangesAsync();
         }
+
+        [SkippableFact]
+        public async Task Postgres_ManualPayment_UniqueConstraint_DbUpdateException_RecoversWinner()
+        {
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
+
+            await using var db1 = CreatePostgresDbContext();
+            await using var db2 = CreatePostgresDbContext();
+            var config = CreateConfig();
+
+            var tour = new TourPackage
+            {
+                Id = Guid.NewGuid(),
+                Title = "Tour PG Manual",
+                Slug = "tour-pg-man-" + Guid.NewGuid().ToString("N")[..6],
+                BasePrice = 80m,
+                IsActive = true
+            };
+            db1.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-MAN-" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant(),
+                CustomerName = "Carlos Concurrente",
+                CustomerDni = "72345678",
+                TravelDate = DateTime.UtcNow.Date.AddDays(2),
+                ShiftName = "Mañana",
+                TotalPassengers = 1,
+                TotalAmount = 80m,
+                PaidAmount = 80m,
+                InvoiceType = "boleta",
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                TourPackageId = tour.Id,
+                TourPackage = tour,
+                Passengers = 1,
+                UnitPrice = 80m,
+                SubTotal = 80m
+            });
+            db1.Bookings.Add(booking);
+            await db1.SaveChangesAsync();
+
+            var opKey = $"MANUAL:BOOKING:{booking.Id:N}";
+
+            // Dos comprobantes creados concurrentemente con la misma BillableOperationKey
+            var rec1 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Status = "Pending",
+                BillableOperationKey = opKey,
+                TotalAmount = 80m,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            var rec2 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Status = "Pending",
+                BillableOperationKey = opKey,
+                TotalAmount = 80m,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            db1.ElectronicReceipts.Add(rec1);
+            await db1.SaveChangesAsync();
+
+            // En db2, intentar insertar rec2 con el mismo opKey debe lanzar DbUpdateException por unicidad PostgreSQL
+            db2.ElectronicReceipts.Add(rec2);
+            var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db2.SaveChangesAsync());
+            Assert.NotNull(ex);
+
+            // Verificar que al desasociar y recargar se obtiene rec1
+            db2.Entry(rec2).State = EntityState.Detached;
+            var winner = await db2.ElectronicReceipts.FirstOrDefaultAsync(r => r.BillableOperationKey == opKey);
+            Assert.NotNull(winner);
+            Assert.Equal(rec1.Id, winner.Id);
+
+            // Cleanup
+            db1.ElectronicReceipts.Remove(rec1);
+            db1.Bookings.Remove(booking);
+            db1.TourPackages.Remove(tour);
+            await db1.SaveChangesAsync();
+        }
+
+        [SkippableFact]
+        public async Task Postgres_InFlightRecovery_ConditionalUpdate_DoesNotOverwriteNewLease()
+        {
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
+
+            await using var db1 = CreatePostgresDbContext();
+            await using var db2 = CreatePostgresDbContext();
+            var config = CreateConfig();
+
+            var tour = new TourPackage
+            {
+                Id = Guid.NewGuid(),
+                Title = "Tour PG Recovery",
+                Slug = "tour-pg-rec-" + Guid.NewGuid().ToString("N")[..6],
+                BasePrice = 90m,
+                IsActive = true
+            };
+            db1.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-REC-" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant(),
+                CustomerName = "Maria Recovery",
+                CustomerDni = "87654321",
+                TravelDate = DateTime.UtcNow.Date.AddDays(2),
+                ShiftName = "Tarde",
+                TotalPassengers = 1,
+                TotalAmount = 90m,
+                PaidAmount = 90m,
+                InvoiceType = "boleta",
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                TourPackageId = tour.Id,
+                TourPackage = tour,
+                Passengers = 1,
+                UnitPrice = 90m,
+                SubTotal = 90m
+            });
+            db1.Bookings.Add(booking);
+
+            var oldToken = Guid.NewGuid().ToString("N");
+            var receipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Status = "InFlight",
+                EmissionLeaseToken = oldToken,
+                EmissionLeaseAcquiredAtUtc = DateTime.UtcNow.AddMinutes(-5),
+                EmissionLeaseExpiresAtUtc = DateTime.UtcNow.AddMinutes(-4), // Expirado
+                EmissionStartedAtUtc = null,
+                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5)
+            };
+            db1.ElectronicReceipts.Add(receipt);
+            await db1.SaveChangesAsync();
+
+            var service1 = new NubefactInvoiceService(db1, config, new HttpClient(), NullLogger<NubefactInvoiceService>.Instance);
+            var service2 = new NubefactInvoiceService(db2, config, new HttpClient(), NullLogger<NubefactInvoiceService>.Instance);
+
+            // Context 2 adquiere el lease nuevo en PostgreSQL y marca inicio
+            var newToken = Guid.NewGuid().ToString("N");
+            var (acquired, token, _) = await service2.TryAcquireEmissionAsync(receipt.Id, requestedClaimToken: newToken);
+            Assert.True(acquired);
+            var started = await service2.TryMarkEmissionStartedAsync(receipt.Id, newToken);
+            Assert.True(started);
+
+            // Context 1 (recuperador) intenta recuperar con oldToken en PostgreSQL
+            var recovered = await service1.TryRecoverUnsentInFlightAsync(receipt.Id, oldToken);
+            Assert.False(recovered);
+
+            // Comprobar que en PostgreSQL sigue en InFlight con newToken y no volvió a Pending
+            var current = await db1.ElectronicReceipts.FindAsync(receipt.Id);
+            await db1.Entry(current!).ReloadAsync();
+            Assert.Equal("InFlight", current!.Status);
+            Assert.Equal(newToken, current.EmissionLeaseToken);
+            Assert.NotNull(current.EmissionStartedAtUtc);
+
+            // Cleanup
+            db1.ElectronicReceipts.Remove(current);
+            db1.Bookings.Remove(booking);
+            db1.TourPackages.Remove(tour);
+            await db1.SaveChangesAsync();
+        }
     }
 }

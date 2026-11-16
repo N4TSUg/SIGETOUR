@@ -9,6 +9,9 @@ namespace SIGETOUR.API.Core.Entities
         public Booking Booking { get; set; } = null!;
         public Guid? CulqiPaymentId { get; set; }
         public CulqiPayment? CulqiPayment { get; set; }
+        public Guid? CashTransactionId { get; set; }
+        public CashTransaction? CashTransaction { get; set; }
+        public string? BillableOperationKey { get; set; }
 
         public string ReceiptType { get; set; } = "Boleta"; // "Boleta", "Factura", "NotaCredito"
         public string Series { get; set; } = string.Empty; // e.g. "BBB1", "FFF1"
