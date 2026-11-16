@@ -260,6 +260,46 @@
     <partial name="_AdminPagination" model="ViewBag.Pagination as SIGETOUR.API.Models.PaginationViewModel" />
 </div>
 
+@if (isLoggedAsSuperAdmin)
+{
+    <!-- Matriz de Roles y Permisos de Seguridad -->
+    <div class="bg-surface rounded-2xl border border-outline-variant shadow-sm p-6 mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 pb-3 border-b border-outline-variant">
+            <div>
+                <h2 class="text-title-md font-bold text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">security</span>
+                    <span>Roles del Sistema y Matriz de Permisos</span>
+                </h2>
+                <p class="text-body-sm text-on-surface-variant">Configure las capacidades y políticas de autorización en el servidor para cada rol.</p>
+            </div>
+            <button type="button" onclick="openCreateRoleModal()" class="px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-body-sm border border-outline-variant flex items-center gap-1.5 transition-all shadow-xs cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">add</span>
+                <span>Nuevo Rol</span>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach (var r in availableRoles)
+            {
+                <div class="p-4 rounded-xl border border-outline-variant/70 bg-surface-container-low flex flex-col justify-between gap-3">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-body-md text-on-surface">@r</span>
+                        <span class="text-label-sm px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-bold">
+                            @(r == "SuperAdmin" ? "Auditoría / Control" : (r == "Admin" ? "Comercial / Operativo" : "Operación"))
+                        </span>
+                    </div>
+                    <div class="pt-2 border-t border-outline-variant/40 flex items-center justify-end">
+                        <a asp-action="RolePermissions" asp-route-roleName="@r" class="px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary/90 text-body-sm font-bold flex items-center gap-1.5 transition-all shadow-xs">
+                            <span class="material-symbols-outlined text-[16px]">tune</span>
+                            <span>Gestionar Permisos</span>
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
 <!-- ======================================================== -->
 <!-- MODAL: REGISTRAR NUEVO USUARIO                           -->
 <!-- ======================================================== -->

@@ -199,9 +199,9 @@ builder.Services.AddAuthentication(options =>
                 }
 
                 var tokenStamp = context.Principal?.FindFirst("SecurityStamp")?.Value;
-                if (!string.IsNullOrEmpty(tokenStamp) && !string.Equals(user.SecurityStamp, tokenStamp, StringComparison.Ordinal))
+                if (string.IsNullOrEmpty(tokenStamp) || !string.Equals(user.SecurityStamp, tokenStamp, StringComparison.Ordinal))
                 {
-                    context.Fail("La sesión o permisos del token han sido revocados.");
+                    context.Fail("El token no cuenta con un sello de seguridad válido o su sesión ha sido revocada.");
                     return;
                 }
             }
@@ -214,16 +214,8 @@ builder.Services.AddAuthorization(options =>
 {
     foreach (var permission in SIGETOUR.API.Core.Security.AppPermissions.AllPermissions)
     {
-        options.AddPolicy(permission, policy => policy.RequireAssertion(ctx =>
-        {
-            if (ctx.User.HasClaim("Permission", permission)) return true;
-            foreach (var role in ctx.User.FindAll(System.Security.Claims.ClaimTypes.Role).Select(c => c.Value))
-            {
-                if (SIGETOUR.API.Core.Security.AppPermissions.GetDefaultPermissionsForRole(role).Contains(permission))
-                    return true;
-            }
-            return false;
-        }));
+        // La fuente única de verdad son las claims efectivas asignadas al usuario y a sus roles en base de datos
+        options.AddPolicy(permission, policy => policy.RequireClaim("Permission", permission));
     }
 });
 
@@ -264,63 +256,42 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SIGETOUR.API.Infrastructure.Data.AppDbContext>();
-    try
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    if (db.Database.IsRelational())
     {
-        if (db.Database.IsRelational())
+        try
         {
             var pendingMigrations = db.Database.GetPendingMigrations().ToList();
             if (pendingMigrations.Any())
             {
-                Console.WriteLine($"[DB Diagnostic] Migraciones pendientes detectadas ({pendingMigrations.Count}): {string.Join(", ", pendingMigrations)}");
-                try
-                {
-                    db.Database.Migrate();
-                    Console.WriteLine("[DB Diagnostic] Migraciones aplicadas exitosamente.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[DB Diagnostic Notice] No se aplicaron todas las migraciones automáticamente (posible correspondencia con esquema previo o tablas existentes): {ex.Message}");
-                }
+                logger.LogInformation("[DB Diagnostic] Migraciones pendientes detectadas ({Count}): {Migrations}", pendingMigrations.Count, string.Join(", ", pendingMigrations));
+                db.Database.Migrate();
+                logger.LogInformation("[DB Diagnostic] Migraciones aplicadas exitosamente.");
             }
             else
             {
-                Console.WriteLine("[DB Diagnostic] Base de datos relacional al día: sin migraciones pendientes.");
+                logger.LogInformation("[DB Diagnostic] Base de datos relacional al día: sin migraciones pendientes.");
             }
+
+            SIGETOUR.API.Infrastructure.Data.DatabaseReadiness.IsReady = true;
+        }
+        catch (Exception ex)
+        {
+            SIGETOUR.API.Infrastructure.Data.DatabaseReadiness.IsReady = false;
+            SIGETOUR.API.Infrastructure.Data.DatabaseReadiness.InitializationError = ex.Message;
+            logger.LogCritical(ex, "[DB Diagnostic Error] Fallo crítico al aplicar o verificar migraciones de base de datos en el arranque: {Message}. Se detiene la operación para prevenir inconsistencias de esquema.", ex.Message);
+            throw new InvalidOperationException($"Error fatal en el arranque del sistema: la migración de la base de datos no pudo completarse exitosamente. Operaciones suspendidas para prevenir inconsistencias financieras. Detalle: {ex.Message}", ex);
         }
     }
-    catch (Exception ex)
+    else
     {
-        Console.WriteLine($"[DB Connection Diagnostic] No se pudo verificar migraciones en el arranque: {ex.Message}");
+        // Proveedor en memoria o pruebas unitarias
+        SIGETOUR.API.Infrastructure.Data.DatabaseReadiness.IsReady = true;
     }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"ItineraryStops\" ADD COLUMN IF NOT EXISTS \"EstimatedTime\" text;"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"ShiftName\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"PaidAmount\" numeric NOT NULL DEFAULT 0;"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"PaymentMethod\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"OperationNumber\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"InvoiceType\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Bookings\" ADD COLUMN IF NOT EXISTS \"InvoiceNumber\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"Category\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"ManufactureYear\" integer NOT NULL DEFAULT 2020;"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"ChassisNumber\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"EngineNumber\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"Color\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"FuelType\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"SoatNumber\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"SoatProvider\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"SoatIssueDate\" timestamp with time zone NULL;"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"SoatExpiryDate\" timestamp with time zone NULL;"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"CitvNumber\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"CitvProvider\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"CitvExpiryDate\" timestamp with time zone NULL;"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"TucNumber\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"ResolutionNumber\" text NOT NULL DEFAULT '';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"EquipmentJson\" text NOT NULL DEFAULT '[]';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"Status\" text NOT NULL DEFAULT 'Operativo en Ruta (En Servicio)';"); } catch { }
-    try { db.Database.ExecuteSqlRaw("ALTER TABLE \"Vehicles\" ADD COLUMN IF NOT EXISTS \"IsFlagship\" boolean NOT NULL DEFAULT false;"); } catch { }
-    try { db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS \"VehicleImages\" (\"Id\" uuid NOT NULL PRIMARY KEY, \"VehicleId\" uuid NOT NULL REFERENCES \"Vehicles\"(\"Id\") ON DELETE CASCADE, \"ImageUrl\" text NOT NULL DEFAULT '', \"IsCover\" boolean NOT NULL DEFAULT false);"); } catch { }
-    try { db.Database.ExecuteSqlRaw("UPDATE \"Vehicles\" SET \"IsActive\" = true WHERE \"Status\" != 'Baja Operativa';"); } catch { }
-    try { db.Database.ExecuteSqlRaw(@"UPDATE ""Vehicles"" SET ""EquipmentJson"" = '[""Aire Acondicionado / Climatizador"", ""Asientos Reclinables Confort"", ""Puertos de Carga USB"", ""Botiquín de Primeros Auxilios""]' WHERE ""EquipmentJson"" = '[]' OR ""EquipmentJson"" IS NULL OR ""EquipmentJson"" = '';"); } catch { }
-    try {
+
+    try
+    {
         if (!db.Vehicles.Any(v => v.IsFlagship))
         {
             var defaultFlagship = db.Vehicles.OrderByDescending(v => v.SeatCapacity).FirstOrDefault(v => v.IsActive && v.Status != "Baja Operativa");
@@ -331,59 +302,6 @@ using (var scope = app.Services.CreateScope())
             }
         }
     } catch { }
-    try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""FeaturedPackages"" (""Id"" uuid NOT NULL PRIMARY KEY, ""TourPackageId"" uuid NOT NULL REFERENCES ""TourPackages""(""Id"") ON DELETE CASCADE, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CommercialTitle"" text NOT NULL DEFAULT '', ""CommercialSubtitle"" text NOT NULL DEFAULT '', ""PromoBadge"" text NOT NULL DEFAULT '', ""PromoPrice"" numeric, ""SyncInventory"" boolean NOT NULL DEFAULT true);"); } catch { }
-    try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Categories"" (""Id"" uuid NOT NULL PRIMARY KEY, ""Name"" text NOT NULL, ""Description"" text, ""Icon"" text, ""IsActive"" boolean NOT NULL DEFAULT true, ""DisplayOrder"" integer NOT NULL DEFAULT 1, ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP);"); } catch { }
-    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" DROP COLUMN IF EXISTS ""Category"";"); } catch { }
-    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" ADD COLUMN IF NOT EXISTS ""CategoryId"" uuid REFERENCES ""Categories""(""Id"") ON DELETE SET NULL;"); } catch { }
-    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""TourPackages"" ADD COLUMN IF NOT EXISTS ""IsFlagship"" boolean NOT NULL DEFAULT false;"); } catch { }
-    try {
-        db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE IF NOT EXISTS ""TourReviews"" (
-                ""Id"" uuid NOT NULL PRIMARY KEY,
-                ""TourPackageId"" uuid NOT NULL REFERENCES ""TourPackages""(""Id"") ON DELETE CASCADE,
-                ""AuthorName"" text NOT NULL DEFAULT '',
-                ""AuthorCity"" text NOT NULL DEFAULT '',
-                ""Comment"" text NOT NULL DEFAULT '',
-                ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                ""IsApproved"" boolean NOT NULL DEFAULT false,
-                ""IsVisibleOnHome"" boolean NOT NULL DEFAULT false
-            );
-            CREATE INDEX IF NOT EXISTS ""IX_TourReviews_TourPackageId"" ON ""TourReviews"" (""TourPackageId"");
-        ");
-    } catch { }
-    try {
-        db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE IF NOT EXISTS ""CulqiPayments"" (
-                ""Id"" uuid NOT NULL PRIMARY KEY,
-                ""BookingId"" uuid NOT NULL REFERENCES ""Bookings""(""Id"") ON DELETE RESTRICT,
-                ""AmountCents"" bigint NOT NULL,
-                ""Channel"" character varying(32) NOT NULL,
-                ""Status"" character varying(32) NOT NULL,
-                ""ProviderId"" character varying(100),
-                ""CreatedAtUtc"" timestamp with time zone NOT NULL,
-                ""ConfirmedAtUtc"" timestamp with time zone NULL,
-                CONSTRAINT ""CK_CulqiPayment_Positive"" CHECK (""AmountCents"" > 0)
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_ProviderId"" ON ""CulqiPayments"" (""ProviderId"");
-            DROP INDEX IF EXISTS ""IX_CulqiPayments_BookingId"";
-            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId"" ON ""CulqiPayments"" (""BookingId"") WHERE ""Status"" IN ('created', 'processing', 'verification', '3ds_required');
-            CREATE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId_CreatedAtUtc"" ON ""CulqiPayments"" (""BookingId"", ""CreatedAtUtc"");
-        ");
-    } catch { }
-    try { db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Drivers"" (
-        ""Id"" uuid NOT NULL PRIMARY KEY,
-        ""FullName"" text NOT NULL DEFAULT '',
-        ""Dni"" text NOT NULL DEFAULT '',
-        ""LicenseNumber"" text NOT NULL DEFAULT '',
-        ""LicenseCategory"" text NOT NULL DEFAULT 'A-IIIa (Especial Transporte Turístico)',
-        ""LicenseExpiryDate"" timestamp with time zone NULL,
-        ""Phone"" text NOT NULL DEFAULT '',
-        ""IsActive"" boolean NOT NULL DEFAULT true,
-        ""AssignedVehicleId"" uuid REFERENCES ""Vehicles""(""Id"") ON DELETE SET NULL,
-        ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );"); } catch { }
-    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""AssignedVehicleId"" uuid REFERENCES ""Vehicles""(""Id"") ON DELETE SET NULL;"); } catch { }
-    try { db.Database.ExecuteSqlRaw(@"ALTER TABLE ""Bookings"" ADD COLUMN IF NOT EXISTS ""AssignedDriverId"" uuid REFERENCES ""Drivers""(""Id"") ON DELETE SET NULL;"); } catch { }
     try
     {
         if (!db.Drivers.Any())
@@ -595,61 +513,7 @@ using (var scope = app.Services.CreateScope())
     }
     catch { }
 
-    try
-    {
-        db.Database.ExecuteSqlRaw(@"
-            CREATE TABLE IF NOT EXISTS ""CashRegisterShifts"" (
-                ""Id"" uuid NOT NULL PRIMARY KEY,
-                ""ShiftNumber"" text NOT NULL DEFAULT '',
-                ""OpenedByUserName"" text NOT NULL DEFAULT '',
-                ""OpenedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                ""InitialAmount"" numeric NOT NULL DEFAULT 0,
-                ""ClosedByUserName"" text,
-                ""ClosedAt"" timestamp with time zone,
-                ""IsOpen"" boolean NOT NULL DEFAULT true,
-                ""ActualCash"" numeric,
-                ""Notes"" text
-            );
 
-            CREATE TABLE IF NOT EXISTS ""CashTransactions"" (
-                ""Id"" uuid NOT NULL PRIMARY KEY,
-                ""ShiftId"" uuid NOT NULL REFERENCES ""CashRegisterShifts""(""Id"") ON DELETE CASCADE,
-                ""TransactionType"" text NOT NULL DEFAULT 'Ingreso',
-                ""Category"" text NOT NULL DEFAULT 'Cobro de Reserva',
-                ""Amount"" numeric NOT NULL DEFAULT 0,
-                ""PaymentMethod"" text NOT NULL DEFAULT 'Efectivo',
-                ""ReferenceCode"" text,
-                ""BookingId"" uuid REFERENCES ""Bookings""(""Id"") ON DELETE SET NULL,
-                ""Description"" text NOT NULL DEFAULT '',
-                ""RegisteredBy"" text NOT NULL DEFAULT '',
-                ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS ""PettyCashAccounts"" (
-                ""Id"" uuid NOT NULL PRIMARY KEY,
-                ""Name"" text NOT NULL DEFAULT 'Caja Chica Principal - Oficina Cajamarca',
-                ""TotalFundAmount"" numeric NOT NULL DEFAULT 4220.00,
-                ""ResponsiblePerson"" text NOT NULL DEFAULT 'Administrador Central',
-                ""IsActive"" boolean NOT NULL DEFAULT true,
-                ""LastReplenishedAt"" timestamp with time zone
-            );
-
-            CREATE TABLE IF NOT EXISTS ""PettyCashMovements"" (
-                ""Id"" uuid NOT NULL PRIMARY KEY,
-                ""AccountId"" uuid NOT NULL REFERENCES ""PettyCashAccounts""(""Id"") ON DELETE CASCADE,
-                ""MovementType"" text NOT NULL DEFAULT 'Egreso',
-                ""ExpenseCategory"" text NOT NULL DEFAULT 'Combustible',
-                ""VoucherType"" text NOT NULL DEFAULT 'Boleta',
-                ""VoucherNumber"" text,
-                ""Supplier"" text,
-                ""Amount"" numeric NOT NULL DEFAULT 0,
-                ""ResponsiblePerson"" text NOT NULL DEFAULT '',
-                ""Concept"" text NOT NULL DEFAULT '',
-                ""RegisteredAt"" timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP
-            );
-        ");
-    }
-    catch { }
 
     var allowDemoFinancialData = app.Environment.IsDevelopment() || 
         string.Equals(builder.Configuration["DatabaseSettings:SeedDemoData"], "true", StringComparison.OrdinalIgnoreCase);

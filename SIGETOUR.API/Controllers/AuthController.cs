@@ -67,24 +67,45 @@ namespace SIGETOUR.API.Controllers
             foreach (var userRole in userRoles)
             {
                 authClaims.Add(new Claim(ClaimTypes.Role, userRole));
-                var permissions = AppPermissions.GetDefaultPermissionsForRole(userRole);
-                foreach (var perm in permissions)
-                {
-                    if (!authClaims.Any(c => c.Type == "Permission" && c.Value == perm))
-                    {
-                        authClaims.Add(new Claim("Permission", perm));
-                    }
-                }
 
                 var identityRole = await _roleManager.FindByNameAsync(userRole);
                 if (identityRole != null)
                 {
                     var roleClaims = await _roleManager.GetClaimsAsync(identityRole);
-                    foreach (var claim in roleClaims.Where(c => c.Type == "Permission"))
+                    var permClaims = roleClaims.Where(c => c.Type == "Permission").ToList();
+
+                    if (permClaims.Count == 0)
                     {
-                        if (!authClaims.Any(c => c.Type == "Permission" && c.Value == claim.Value))
+                        var defaults = AppPermissions.GetDefaultPermissionsForRole(userRole);
+                        foreach (var def in defaults)
                         {
-                            authClaims.Add(new Claim("Permission", claim.Value));
+                            await _roleManager.AddClaimAsync(identityRole, new Claim("Permission", def));
+                            if (!authClaims.Any(c => c.Type == "Permission" && c.Value == def))
+                            {
+                                authClaims.Add(new Claim("Permission", def));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        foreach (var claim in permClaims)
+                        {
+                            if (!authClaims.Any(c => c.Type == "Permission" && c.Value == claim.Value))
+                            {
+                                authClaims.Add(new Claim("Permission", claim.Value));
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Fallback para entornos donde RoleManager no contiene la entidad (ej. mocks unitarios en pruebas)
+                    var defaults = AppPermissions.GetDefaultPermissionsForRole(userRole);
+                    foreach (var def in defaults)
+                    {
+                        if (!authClaims.Any(c => c.Type == "Permission" && c.Value == def))
+                        {
+                            authClaims.Add(new Claim("Permission", def));
                         }
                     }
                 }

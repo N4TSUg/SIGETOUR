@@ -386,6 +386,8 @@ namespace SIGETOUR.API.Controllers.UI
             return View(vm);
         }
 
+        [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursView)]
         public async Task<IActionResult> Tours(string? search, Guid? categoryId, string? status, int page = 1)
         {
             var query = _context.TourPackages
@@ -451,11 +453,14 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ManifestView)]
         public IActionResult Despacho()
         {
             return RedirectToAction(nameof(Bookings));
         }
 
+        [HttpGet]
+        [Authorize(Policy = AppPermissions.BookingsView)]
         public async Task<IActionResult> Bookings(string? search, string? status, DateTime? date, Guid? tourId, int page = 1)
         {
             var query = _context.Bookings
@@ -569,6 +574,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ManifestView)]
         public async Task<IActionResult> GetManifestPreview(DateTime date, Guid tourId, Guid? vehicleId, string? shift)
         {
             if (tourId == Guid.Empty) return BadRequest("Debe seleccionar un tour.");
@@ -585,6 +591,7 @@ namespace SIGETOUR.API.Controllers.UI
 
         [HttpGet]
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ManifestManage)]
         public async Task<IActionResult> ExportManifestExcel([FromForm] ManifestExportRequest? formRequest, [FromQuery] ManifestExportRequest? queryRequest)
         {
             var req = formRequest ?? queryRequest;
@@ -681,6 +688,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> EditVehicle(Guid? id)
         {
             if (id == null)
@@ -722,6 +730,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> EditVehicle(SIGETOUR.API.Models.VehicleDto dto, List<IFormFile> VehicleImages, string[]? SelectedEquipment = null, string? SelectedEquipmentSubmitted = null)
         {
             ModelState.Remove("ExistingImages");
@@ -896,6 +905,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> SetCoverVehicleImage(Guid vehicleId, Guid imageId)
         {
             var vehicle = await _context.Vehicles
@@ -923,6 +933,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> SetFlagshipVehicle(Guid id)
         {
             var vehicle = await _context.Vehicles.FindAsync(id);
@@ -942,6 +953,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> DeleteVehicleImage(Guid id, Guid vehicleId)
         {
             var image = await _context.VehicleImages.FindAsync(id);
@@ -985,6 +997,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
         
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> DeleteVehicle(Guid id)
         {
             var vehicle = await _context.Vehicles.FindAsync(id);
@@ -1001,6 +1014,7 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpGet]
         [Route("Admin/Fleet")]
         [Route("Admin/Vehicles")]
+        [Authorize(Policy = AppPermissions.ToursView)]
         public async Task<IActionResult> Fleet(string? search, string? status, int page = 1)
         {
             var query = _context.Vehicles
@@ -1061,6 +1075,7 @@ namespace SIGETOUR.API.Controllers.UI
         // GESTIÓN DE CONDUCTORES (MTC TURISMO)
         // ==========================================
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursView)]
         public async Task<IActionResult> Drivers(string? search, int page = 1)
         {
             var query = _context.Drivers
@@ -1111,6 +1126,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> EditDriver(Guid? id)
         {
             ViewBag.Vehicles = await _context.Vehicles.Where(v => v.IsActive).OrderBy(v => v.LicensePlate).ToListAsync();
@@ -1128,6 +1144,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditDriver(Driver model)
         {
@@ -1214,6 +1231,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteDriver(Guid id)
         {
@@ -1236,7 +1254,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.UsersManage)]
         public async Task<IActionResult> Users(string? search, int page = 1)
         {
             var query = _userManager.Users.AsQueryable();
@@ -1312,7 +1330,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.UsersManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateUser(CreateUserViewModel model)
         {
@@ -1390,7 +1408,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.UsersManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditUser(EditUserViewModel model)
         {
@@ -1540,7 +1558,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.RolesManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateRole(string roleName)
         {
@@ -1570,7 +1588,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.RolesManage)]
         public async Task<IActionResult> RolePermissions(string roleName)
         {
             if (string.IsNullOrWhiteSpace(roleName))
@@ -1587,9 +1605,17 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             var claims = await _roleManager.GetClaimsAsync(role);
-            var assigned = claims.Where(c => c.Type == "Permission").Select(c => c.Value).OfType<string>().ToHashSet();
-            var defaults = AppPermissions.GetDefaultPermissionsForRole(roleName).ToHashSet();
-            var effective = assigned.Union(defaults).ToList();
+            var permClaims = claims.Where(c => c.Type == "Permission").Select(c => c.Value).OfType<string>().ToList();
+
+            List<string> effective;
+            if (permClaims.Count == 0)
+            {
+                effective = AppPermissions.GetDefaultPermissionsForRole(roleName).ToList();
+            }
+            else
+            {
+                effective = permClaims;
+            }
 
             ViewBag.RoleName = role.Name;
             ViewBag.AllPermissions = AppPermissions.AllPermissions;
@@ -1598,7 +1624,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.RolesManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateRolePermissions(string roleName, List<string>? permissions)
         {
@@ -1615,20 +1641,44 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(Users));
             }
 
+            // Protección de SuperAdmin: no permitir despojar a SuperAdmin de RolesManage o UsersManage
+            if (string.Equals(role.Name, "SuperAdmin", StringComparison.OrdinalIgnoreCase))
+            {
+                if (permissions == null || !permissions.Contains(AppPermissions.RolesManage) || !permissions.Contains(AppPermissions.UsersManage))
+                {
+                    TempData["ErrorMessage"] = "No es posible retirar los permisos de administración de usuarios o roles al rol SuperAdmin para prevenir bloqueos de seguridad del sistema.";
+                    return RedirectToAction(nameof(RolePermissions), new { roleName });
+                }
+            }
+
+            // Validar que los permisos existan en el catálogo oficial
+            if (permissions != null && permissions.Any(p => !AppPermissions.AllPermissions.Contains(p)))
+            {
+                TempData["ErrorMessage"] = "Se enviaron permisos inválidos o no reconocidos en el catálogo del sistema.";
+                return RedirectToAction(nameof(RolePermissions), new { roleName });
+            }
+
             var currentClaims = await _roleManager.GetClaimsAsync(role);
             var permClaims = currentClaims.Where(c => c.Type == "Permission").ToList();
             foreach (var c in permClaims)
             {
-                await _roleManager.RemoveClaimAsync(role, c);
+                var removeResult = await _roleManager.RemoveClaimAsync(role, c);
+                if (!removeResult.Succeeded)
+                {
+                    TempData["ErrorMessage"] = "Ocurrió un error al actualizar los permisos del rol. No se aplicaron cambios parciales.";
+                    return RedirectToAction(nameof(RolePermissions), new { roleName });
+                }
             }
 
             if (permissions != null)
             {
-                foreach (var p in permissions)
+                foreach (var p in permissions.Distinct())
                 {
-                    if (AppPermissions.AllPermissions.Contains(p))
+                    var addResult = await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", p));
+                    if (!addResult.Succeeded)
                     {
-                        await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", p));
+                        TempData["ErrorMessage"] = "Ocurrió un error al asignar los permisos al rol.";
+                        return RedirectToAction(nameof(RolePermissions), new { roleName });
                     }
                 }
             }
@@ -1642,11 +1692,11 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             TempData["SuccessMessage"] = $"Permisos actualizados exitosamente para el rol '{role.Name}'. Sesiones activas sincronizadas.";
-            return RedirectToAction(nameof(Users));
+            return RedirectToAction(nameof(RolePermissions), new { roleName });
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.UsersManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteUser(string id)
         {
@@ -1691,6 +1741,7 @@ namespace SIGETOUR.API.Controllers.UI
         // --- NEW CRUD METHODS FOR TOURS --- //
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> CreateTour()
         {
             ViewBag.Categories = await _context.Categories.Where(c => c.IsActive).OrderBy(c => c.DisplayOrder).ToListAsync();
@@ -1698,6 +1749,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> CreateTour(SIGETOUR.API.Models.TourPackageDto dto, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds)
         {
             if (!ModelState.IsValid)
@@ -1817,6 +1869,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> EditTour(string id)
         {
             if (string.IsNullOrWhiteSpace(id)) return NotFound();
@@ -1894,6 +1947,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> EditTour(SIGETOUR.API.Models.TourPackageDto dto, IFormFileCollection ImageFiles, string[] Stops, string[] StopTimes, string[] Inclusions, string[] ShiftNames, string[] ShiftStarts, string[] ShiftEnds, Guid? SelectedMainImageId = null)
         {
             // Respaldo para resolver el Id en caso de que en la ruta o formulario viniera como slug
@@ -2106,6 +2160,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> DeleteTour(Guid id)
         {
             var tour = await _context.TourPackages
@@ -2139,6 +2194,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> DeleteTourImage(Guid id)
         {
             var image = await _context.Set<TourImage>().FindAsync(id);
@@ -2177,6 +2233,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> SetMainTourImage(Guid tourId, Guid imageId)
         {
             var tour = await _context.TourPackages
@@ -2204,6 +2261,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> SetFlagshipTour(Guid id)
         {
             var tour = await _context.TourPackages.FindAsync(id);
@@ -2223,6 +2281,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursView)]
         public async Task<IActionResult> Reviews(string? status, Guid? tourId, string? search, int page = 1)
         {
             var query = _context.TourReviews
@@ -2298,6 +2357,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> ToggleReviewApproval(Guid id)
         {
             var review = await _context.TourReviews.FindAsync(id);
@@ -2317,6 +2377,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> ToggleReviewHomeVisibility(Guid id)
         {
             var review = await _context.TourReviews.FindAsync(id);
@@ -2336,6 +2397,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> DeleteReview(Guid id)
         {
             var review = await _context.TourReviews.FindAsync(id);
@@ -2349,6 +2411,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> CreateReview(Guid tourId, string authorName, string? authorCity, string comment, bool isVisibleOnHome)
         {
             if (string.IsNullOrWhiteSpace(authorName) || string.IsNullOrWhiteSpace(comment))
@@ -2439,6 +2502,20 @@ namespace SIGETOUR.API.Controllers.UI
                 ?? await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber, ct);
             if (activeShift != null) return activeShift;
 
+            if (_context.Database.IsRelational())
+            {
+                // Bloqueo transaccional en PostgreSQL (pg_advisory_xact_lock): asegura que solicitudes concurrentes esperen
+                // la confirmación del turno en base de datos antes de consultar o intentar crear uno nuevo.
+                try
+                {
+                    await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({shiftNumber}))", ct);
+                }
+                catch { }
+
+                activeShift = await _context.CashRegisterShifts.OrderByDescending(s => s.OpenedAt).FirstOrDefaultAsync(s => s.ShiftNumber == shiftNumber, ct);
+                if (activeShift != null) return activeShift;
+            }
+
             await _shiftLock.WaitAsync(ct);
             try
             {
@@ -2457,8 +2534,7 @@ namespace SIGETOUR.API.Controllers.UI
                     Notes = "Turno administrativo automático para abonos y movimientos de reservas."
                 };
                 _context.CashRegisterShifts.Add(activeShift);
-                // NOTA: Se elimina SaveChangesAsync() prematuro de este helper auxiliar para que el turno,
-                // la reserva y el movimiento de caja se persistan en una única transacción atómica en el llamador.
+                // NOTA: Se mantiene la persistencia dentro de la transacción atómica del llamador (reserva, turno y caja)
                 return activeShift;
             }
             finally
@@ -2468,6 +2544,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
         public async Task<IActionResult> CreateBooking()
         {
             var tours = await _context.TourPackages.Include(t => t.Shifts).Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
@@ -2501,6 +2578,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
         public async Task<IActionResult> CreateBooking(SIGETOUR.API.Models.EditBookingViewModel model, [FromServices] IEmailService? emailService = null)
         {
             var activeFeatured = await _context.FeaturedPackages
@@ -2679,6 +2757,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
         public async Task<IActionResult> EditBooking(Guid id)
         {
             var booking = await _context.Bookings
@@ -2769,6 +2848,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
         public async Task<IActionResult> EditBooking(SIGETOUR.API.Models.EditBookingViewModel model)
         {
             var activeFeatured = await _context.FeaturedPackages
@@ -2788,57 +2868,70 @@ namespace SIGETOUR.API.Controllers.UI
                 return View(model);
             }
 
-            var booking = await _context.Bookings
-                .Include(b => b.Items)
-                .FirstOrDefaultAsync(b => b.Id == model.Id);
-
-            if (booking == null) return NotFound();
-
-            var originalPaidAmount = booking.PaidAmount;
-            var paidDelta = model.PaidAmount - originalPaidAmount;
-
-            // Bloque 3: Validación contra cobros confirmados por Culqi y reducciones no autorizadas
-            var culqiPaidAmount = await _context.CulqiPayments
-                .Where(p => p.BookingId == booking.Id && (p.Status == "paid" || p.Status == "paid_excess"))
-                .SumAsync(p => (decimal?)p.AmountCents / 100m) ?? 0m;
-
-            if (model.PaidAmount < culqiPaidAmount)
-            {
-                TempData["ErrorMessage"] = $"No es posible reducir el monto pagado por debajo del total cobrado por pasarela Culqi (S/ {culqiPaidAmount:N2}). No se admiten devoluciones de pasarela sin autorización de gerencia.";
-                return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
-            }
-
-            if (paidDelta < 0)
-            {
-                TempData["ErrorMessage"] = $"No se permite reducir el monto pagado directamente desde el formulario de edición (reducción de S/ {Math.Abs(paidDelta):N2}). Para registrar una devolución o ajuste justificado, utilice la operación trazable de Devolución de Reserva.";
-                return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
-            }
-
-            var targetTourId = model.TourPackageId != Guid.Empty
-                ? model.TourPackageId
-                : (booking.Items.FirstOrDefault()?.TourPackageId ?? Guid.Empty);
-
-            var targetPassengers = model.TotalPassengers > 0
-                ? model.TotalPassengers
-                : (booking.TotalPassengers > 0 ? booking.TotalPassengers : 1);
-
-            var targetTravelDate = model.TravelDate != default
-                ? model.TravelDate
-                : (booking.TravelDate != default ? booking.TravelDate : PeruTime.Today);
-
-            var targetShiftName = !string.IsNullOrWhiteSpace(model.ShiftName)
-                ? model.ShiftName
-                : (!string.IsNullOrWhiteSpace(booking.ShiftName) ? booking.ShiftName : "Mañana");
-
-            var selectedTour = targetTourId != Guid.Empty
-                ? await _context.TourPackages.FindAsync(targetTourId)
-                : null;
+            string updatedRefCode = model.ReferenceCode ?? string.Empty;
 
             if (_context.Database.IsRelational())
             {
                 await using var dbTx = await _context.Database.BeginTransactionAsync();
                 try
                 {
+                    // Bloqueo a nivel de fila (FOR UPDATE) en PostgreSQL para lectura atómica y consistente del saldo
+                    await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"Bookings\" WHERE \"Id\" = {model.Id} FOR UPDATE");
+
+                    var booking = await _context.Bookings
+                        .Include(b => b.Items)
+                        .FirstOrDefaultAsync(b => b.Id == model.Id);
+
+                    if (booking == null)
+                    {
+                        await dbTx.RollbackAsync();
+                        return NotFound();
+                    }
+
+                    updatedRefCode = booking.ReferenceCode;
+
+                    var originalPaidAmount = booking.PaidAmount;
+                    var paidDelta = model.PaidAmount - originalPaidAmount;
+
+                    // Validación contra cobros confirmados por Culqi y reducciones no autorizadas
+                    var culqiPaidAmount = await _context.CulqiPayments
+                        .Where(p => p.BookingId == booking.Id && (p.Status == "paid" || p.Status == "paid_excess"))
+                        .SumAsync(p => (decimal?)p.AmountCents / 100m) ?? 0m;
+
+                    if (model.PaidAmount < culqiPaidAmount)
+                    {
+                        await dbTx.RollbackAsync();
+                        TempData["ErrorMessage"] = $"No es posible reducir el monto pagado por debajo del total cobrado por pasarela Culqi (S/ {culqiPaidAmount:N2}). No se admiten devoluciones de pasarela sin autorización de gerencia.";
+                        return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                    }
+
+                    if (paidDelta < 0)
+                    {
+                        await dbTx.RollbackAsync();
+                        TempData["ErrorMessage"] = $"No se permite reducir el monto pagado directamente desde el formulario de edición (reducción de S/ {Math.Abs(paidDelta):N2}). Para registrar una devolución o ajuste justificado, utilice la operación trazable de Devolución de Reserva.";
+                        return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                    }
+
+                    var targetTourId = model.TourPackageId != Guid.Empty
+                        ? model.TourPackageId
+                        : (booking.Items.FirstOrDefault()?.TourPackageId ?? Guid.Empty);
+
+                    var targetPassengers = model.TotalPassengers > 0
+                        ? model.TotalPassengers
+                        : (booking.TotalPassengers > 0 ? booking.TotalPassengers : 1);
+
+                    var targetTravelDate = model.TravelDate != default
+                        ? model.TravelDate
+                        : (booking.TravelDate != default ? booking.TravelDate : PeruTime.Today);
+
+                    var targetShiftName = !string.IsNullOrWhiteSpace(model.ShiftName)
+                        ? model.ShiftName
+                        : (!string.IsNullOrWhiteSpace(booking.ShiftName) ? booking.ShiftName : "Mañana");
+
+                    var selectedTour = targetTourId != Guid.Empty
+                        ? await _context.TourPackages.FindAsync(targetTourId)
+                        : null;
+
                     if (selectedTour != null)
                     {
                         var capacityResult = await _capacityService.ValidateCapacityAsync(
@@ -2907,7 +3000,7 @@ namespace SIGETOUR.API.Controllers.UI
 
                     _context.Bookings.Update(booking);
 
-                    // Registrar abono incremental dentro de una transacción atómica con el movimiento de caja
+                    // Registrar abono incremental dentro de la transacción atómica
                     if (paidDelta > 0)
                     {
                         var shift = await GetOrCreateActiveOrAdminShiftAsync();
@@ -2936,11 +3029,57 @@ namespace SIGETOUR.API.Controllers.UI
                 {
                     await dbTx.RollbackAsync();
                     TempData["ErrorMessage"] = "Ocurrió un error al actualizar la reserva y su movimiento de caja. No se aplicaron cambios parciales.";
-                    return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                    return RedirectToAction(nameof(EditBooking), new { id = model.Id });
                 }
             }
             else
             {
+                var booking = await _context.Bookings
+                    .Include(b => b.Items)
+                    .FirstOrDefaultAsync(b => b.Id == model.Id);
+
+                if (booking == null) return NotFound();
+
+                updatedRefCode = booking.ReferenceCode;
+
+                var originalPaidAmount = booking.PaidAmount;
+                var paidDelta = model.PaidAmount - originalPaidAmount;
+
+                var culqiPaidAmount = await _context.CulqiPayments
+                    .Where(p => p.BookingId == booking.Id && (p.Status == "paid" || p.Status == "paid_excess"))
+                    .SumAsync(p => (decimal?)p.AmountCents / 100m) ?? 0m;
+
+                if (model.PaidAmount < culqiPaidAmount)
+                {
+                    TempData["ErrorMessage"] = $"No es posible reducir el monto pagado por debajo del total cobrado por pasarela Culqi (S/ {culqiPaidAmount:N2}). No se admiten devoluciones de pasarela sin autorización de gerencia.";
+                    return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                }
+
+                if (paidDelta < 0)
+                {
+                    TempData["ErrorMessage"] = $"No se permite reducir el monto pagado directamente desde el formulario de edición (reducción de S/ {Math.Abs(paidDelta):N2}). Para registrar una devolución o ajuste justificado, utilice la operación trazable de Devolución de Reserva.";
+                    return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                }
+
+                var targetTourId = model.TourPackageId != Guid.Empty
+                    ? model.TourPackageId
+                    : (booking.Items.FirstOrDefault()?.TourPackageId ?? Guid.Empty);
+
+                var targetPassengers = model.TotalPassengers > 0
+                    ? model.TotalPassengers
+                    : (booking.TotalPassengers > 0 ? booking.TotalPassengers : 1);
+
+                var targetTravelDate = model.TravelDate != default
+                    ? model.TravelDate
+                    : (booking.TravelDate != default ? booking.TravelDate : PeruTime.Today);
+
+                var targetShiftName = !string.IsNullOrWhiteSpace(model.ShiftName)
+                    ? model.ShiftName
+                    : (!string.IsNullOrWhiteSpace(booking.ShiftName) ? booking.ShiftName : "Mañana");
+
+                var selectedTour = targetTourId != Guid.Empty
+                    ? await _context.TourPackages.FindAsync(targetTourId)
+                    : null;
                 if (selectedTour != null)
                 {
                     var capacityResult = await _capacityService.ValidateCapacityAsync(
@@ -3031,12 +3170,12 @@ namespace SIGETOUR.API.Controllers.UI
                 await _context.SaveChangesAsync();
             }
 
-            TempData["SuccessMessage"] = $"Reserva {booking.ReferenceCode} actualizada con éxito.";
+            TempData["SuccessMessage"] = $"Reserva {updatedRefCode} actualizada con éxito.";
             return RedirectToAction(nameof(Bookings));
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelBooking(Guid id)
         {
@@ -3052,7 +3191,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReactivateBooking(Guid id)
         {
@@ -3123,7 +3262,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RefundBookingPayment(Guid id, decimal refundAmount, string reason, string? paymentMethod = "Efectivo")
         {
@@ -3164,12 +3303,39 @@ namespace SIGETOUR.API.Controllers.UI
                 await using var dbTx = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    booking.PaidAmount -= refundAmount;
-                    if (booking.PaidAmount < booking.TotalAmount && booking.Status == BookingStatus.Confirmed)
+                    // Bloqueo de fila (FOR UPDATE) en PostgreSQL para evitar devoluciones concurrentes que excedan el saldo
+                    await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"Bookings\" WHERE \"Id\" = {id} FOR UPDATE");
+                    var lockedBooking = await _context.Bookings.FindAsync(id);
+                    if (lockedBooking == null)
                     {
-                        booking.Status = BookingStatus.Pending;
+                        await dbTx.RollbackAsync();
+                        return NotFound();
                     }
-                    _context.Bookings.Update(booking);
+
+                    if (refundAmount > lockedBooking.PaidAmount)
+                    {
+                        await dbTx.RollbackAsync();
+                        TempData["ErrorMessage"] = $"El monto a devolver (S/ {refundAmount:N2}) no puede exceder el total pagado actual (S/ {lockedBooking.PaidAmount:N2}).";
+                        return RedirectToAction(nameof(EditBooking), new { id });
+                    }
+
+                    var currentCulqiPaidAmount = await _context.CulqiPayments
+                        .Where(p => p.BookingId == lockedBooking.Id && (p.Status == "paid" || p.Status == "paid_excess"))
+                        .SumAsync(p => (decimal?)p.AmountCents / 100m) ?? 0m;
+
+                    if (lockedBooking.PaidAmount - refundAmount < currentCulqiPaidAmount)
+                    {
+                        await dbTx.RollbackAsync();
+                        TempData["ErrorMessage"] = $"No es posible realizar la devolución: S/ {currentCulqiPaidAmount:N2} corresponden a cobros confirmados por pasarela Culqi. No se permiten devoluciones automáticas de pasarela sin autorización de gerencia.";
+                        return RedirectToAction(nameof(EditBooking), new { id });
+                    }
+
+                    lockedBooking.PaidAmount -= refundAmount;
+                    if (lockedBooking.PaidAmount < lockedBooking.TotalAmount && lockedBooking.Status == BookingStatus.Confirmed)
+                    {
+                        lockedBooking.Status = BookingStatus.Pending;
+                    }
+                    _context.Bookings.Update(lockedBooking);
 
                     var shift = await GetOrCreateActiveOrAdminShiftAsync();
                     _context.CashTransactions.Add(new CashTransaction
@@ -3180,9 +3346,9 @@ namespace SIGETOUR.API.Controllers.UI
                         Category = "Devolución de Reserva",
                         Amount = refundAmount,
                         PaymentMethod = !string.IsNullOrWhiteSpace(paymentMethod) ? paymentMethod : "Efectivo",
-                        ReferenceCode = booking.ReferenceCode,
-                        BookingId = booking.Id,
-                        Description = $"Devolución / Ajuste de reserva {booking.ReferenceCode}. Motivo: {reason.Trim()}. Autorizado por: {User.Identity?.Name ?? "Admin"}",
+                        ReferenceCode = lockedBooking.ReferenceCode,
+                        BookingId = lockedBooking.Id,
+                        Description = $"Devolución / Ajuste de reserva {lockedBooking.ReferenceCode}. Motivo: {reason.Trim()}. Autorizado por: {User.Identity?.Name ?? "Admin"}",
                         RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
                         CreatedAt = DateTime.UtcNow
                     });
@@ -3230,6 +3396,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.BookingsView)]
         public async Task<IActionResult> ResendBookingEmail(Guid id, [FromForm] string? email = null, [FromServices] IEmailService? emailService = null)
         {
             if (emailService == null)
@@ -3282,6 +3449,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.BookingsView)]
         public async Task<IActionResult> GetBookingWhatsAppShareData(Guid id, [FromServices] CheckoutAccess checkoutAccess)
         {
             var booking = await _context.Bookings
@@ -3331,6 +3499,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.BookingsView)]
         public async Task<IActionResult> DownloadVoucherPdf(Guid id)
         {
             var booking = await _context.Bookings
@@ -3353,6 +3522,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ReceiptsView)]
         public async Task<IActionResult> DownloadReceiptPdf(Guid id)
         {
             var receipt = await _context.ElectronicReceipts
@@ -3385,7 +3555,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.ReceiptsManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RecoverPendingReceipts([FromServices] IElectronicReceiptService receiptService, CancellationToken ct)
         {
@@ -3395,7 +3565,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteBooking(Guid id)
         {
@@ -3423,6 +3593,8 @@ namespace SIGETOUR.API.Controllers.UI
 
         // --- FEATURED PACKAGES CRUD --- //
 
+        [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursView)]
         public async Task<IActionResult> Featured(int page = 1)
         {
             var query = _context.FeaturedPackages
@@ -3461,6 +3633,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> EditFeatured(Guid? id)
         {
             ViewBag.Tours = await _context.TourPackages.Where(t => t.IsActive).OrderBy(t => t.Title).ToListAsync();
@@ -3489,6 +3662,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditFeatured(SIGETOUR.API.Models.FeaturedPackageDto dto)
         {
@@ -3538,6 +3712,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleFeaturedStatus(Guid id)
         {
@@ -3558,6 +3733,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteFeatured(Guid id)
         {
@@ -3577,6 +3753,7 @@ namespace SIGETOUR.API.Controllers.UI
         // --- CRUD DE CATEGORÍAS DE TOURS --- //
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursView)]
         public async Task<IActionResult> Categories(string? search, int page = 1)
         {
             var query = _context.Categories
@@ -3822,6 +3999,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public IActionResult CreateCategory()
         {
             return View("EditCategory", new SIGETOUR.API.Models.CategoryDto
@@ -3833,6 +4011,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         public async Task<IActionResult> EditCategory(Guid? id)
         {
             if (id == null || id == Guid.Empty)
@@ -3866,6 +4045,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditCategory(SIGETOUR.API.Models.CategoryDto dto)
         {
@@ -3908,6 +4088,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.ToursManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteCategory(Guid id)
         {
@@ -3930,6 +4111,7 @@ namespace SIGETOUR.API.Controllers.UI
         // --- MÓDULOS DE CAJA Y CAJA CHICA --- //
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.CashView)]
         public async Task<IActionResult> Cash(string? tab = "general", string? search = null, string? filterType = null, int page = 1)
         {
             tab = string.IsNullOrWhiteSpace(tab) ? "general" : tab.ToLower();
@@ -4091,6 +4273,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> OpenCashShift(decimal initialAmount, string? notes)
         {
@@ -4126,6 +4309,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CloseCashShift(Guid shiftId, decimal actualCash, string? notes)
         {
@@ -4161,6 +4345,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RegisterCashTransaction(Guid shiftId, string type, string category, decimal amount, string paymentMethod, string? referenceCode, string description)
         {
@@ -4199,6 +4384,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RegisterPettyCashExpense(Guid accountId, string expenseCategory, string voucherType, string? voucherNumber, string? supplier, decimal amount, string responsiblePerson, string concept)
         {
@@ -4247,6 +4433,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReplenishPettyCash(Guid accountId, decimal amount, string concept)
         {
@@ -4288,6 +4475,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdatePettyCashFund(Guid accountId, decimal newFundAmount)
         {
@@ -4311,7 +4499,7 @@ namespace SIGETOUR.API.Controllers.UI
         // --- EDICIÓN Y ANULACIÓN DE REGISTROS DE CAJA Y CAJA CHICA --- //
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateCashTransaction(Guid id, string type, string category, decimal amount, string paymentMethod, string? referenceCode, string description)
         {
@@ -4355,7 +4543,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteCashTransaction(Guid id)
         {
@@ -4386,7 +4574,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdatePettyCashMovement(Guid id, string movementType, string expenseCategory, string voucherType, string? voucherNumber, string? supplier, decimal amount, string responsiblePerson, string concept)
         {
@@ -4420,7 +4608,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePettyCashMovement(Guid id)
         {
@@ -4439,7 +4627,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin,Admin")]
+        [Authorize(Policy = AppPermissions.CashManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateCashShift(Guid shiftId, decimal initialAmount, decimal? actualCash, string? notes)
         {
@@ -4464,6 +4652,7 @@ namespace SIGETOUR.API.Controllers.UI
         // --- EXPORTACIÓN DE REPORTES EN HOJAS DE CÁLCULO (EXCEL .XLSX) --- //
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.CashView)]
         public async Task<IActionResult> ExportDailyCashReport(DateTime? date)
         {
             var targetDate = date ?? DateTime.Today;
@@ -4481,6 +4670,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.CashView)]
         public async Task<IActionResult> ExportMonthlyCashReport(int? year, int? month)
         {
             int y = year ?? DateTime.Today.Year;
@@ -4499,6 +4689,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
+        [Authorize(Policy = AppPermissions.CashView)]
         public async Task<IActionResult> ExportShiftReport(Guid shiftId)
         {
             try
@@ -4697,7 +4888,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.SupervisionView)]
         public async Task<IActionResult> Supervision(string? status)
         {
             var query = _context.PaymentIncidents
@@ -4715,7 +4906,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpPost]
-        [Authorize(Roles = "SuperAdmin")]
+        [Authorize(Policy = AppPermissions.IncidentsManage)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ResolveIncident(Guid id, string? resolutionNotes, string status = "Resolved")
         {

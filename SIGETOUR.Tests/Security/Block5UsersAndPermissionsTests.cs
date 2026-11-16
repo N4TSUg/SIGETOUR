@@ -545,7 +545,7 @@ namespace SIGETOUR.Tests.Security
             // Arrange & Act
             var adminType = typeof(AdminController);
 
-            // 1. Acciones exclusivas de SuperAdmin
+            // 1. Acciones exclusivas de SuperAdmin / Gestión de Usuarios y Roles
             var superAdminActions = new[] { "Users", "CreateUser", "EditUser", "DeleteUser", "CreateRole", "Supervision", "ResolveIncident" };
             foreach (var actionName in superAdminActions)
             {
@@ -557,11 +557,17 @@ namespace SIGETOUR.Tests.Security
                 {
                     var authorizeAttr = method.GetCustomAttribute<AuthorizeAttribute>();
                     Assert.True(authorizeAttr != null, $"El método {actionName} en AdminController debe contar con [Authorize]");
-                    Assert.Equal("SuperAdmin", authorizeAttr.Roles);
+                    Assert.True(
+                        authorizeAttr.Roles == "SuperAdmin" ||
+                        authorizeAttr.Policy == AppPermissions.UsersManage ||
+                        authorizeAttr.Policy == AppPermissions.RolesManage ||
+                        authorizeAttr.Policy == AppPermissions.SupervisionView ||
+                        authorizeAttr.Policy == AppPermissions.IncidentsManage,
+                        $"El método {actionName} debe requerir rol SuperAdmin o una política efectiva de seguridad/supervisión.");
                 }
             }
 
-            // 2. Acciones operativas y financieras permitidas para Gerente (Admin) y SuperAdmin
+            // 2. Acciones operativas y financieras protegidas mediante permisos y políticas
             var operationalActions = new[]
             {
                 "RefundBookingPayment",
@@ -584,7 +590,12 @@ namespace SIGETOUR.Tests.Security
                 {
                     var authorizeAttr = method.GetCustomAttribute<AuthorizeAttribute>();
                     Assert.True(authorizeAttr != null, $"El método operativo sensible {actionName} debe contar con [Authorize]");
-                    Assert.Equal("SuperAdmin,Admin", authorizeAttr.Roles);
+                    Assert.True(
+                        authorizeAttr.Roles == "SuperAdmin,Admin" ||
+                        authorizeAttr.Policy == AppPermissions.BookingsManage ||
+                        authorizeAttr.Policy == AppPermissions.CashManage ||
+                        authorizeAttr.Policy == AppPermissions.ReceiptsManage,
+                        $"El método {actionName} debe requerir roles autorizados o políticas efectivas de gestión.");
                 }
             }
         }

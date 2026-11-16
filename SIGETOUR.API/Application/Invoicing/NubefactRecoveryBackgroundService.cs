@@ -44,6 +44,13 @@ namespace SIGETOUR.API.Application.Invoicing
             {
                 try
                 {
+                    if (!SIGETOUR.API.Infrastructure.Data.DatabaseReadiness.IsReady)
+                    {
+                        _logger.LogWarning("El servicio de fondo NubeFact pospone el ciclo de conciliación: la base de datos aún no ha completado sus migraciones exitosamente.");
+                        await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                        continue;
+                    }
+
                     using (var scope = _serviceProvider.CreateScope())
                     {
                         var receiptService = scope.ServiceProvider.GetRequiredService<IElectronicReceiptService>();

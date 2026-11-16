@@ -1,0 +1,172 @@
+@{
+    ViewData["Title"] = $"Permisos del Rol: {ViewBag.RoleName} - Turismo Chilón";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var roleName = ViewBag.RoleName as string ?? "";
+    var assigned = ViewBag.AssignedPermissions as IEnumerable<string> ?? Enumerable.Empty<string>();
+    var assignedSet = assigned.ToHashSet();
+    bool isSuperAdminRole = string.Equals(roleName, "SuperAdmin", StringComparison.OrdinalIgnoreCase);
+
+    var permissionModules = new[]
+    {
+        new {
+            Module = "Reservas y Venta Comercial",
+            Icon = "book_online",
+            Permissions = new[]
+            {
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.BookingsView, Name: "Consultar Reservas", Desc: "Visualizar el listado general, detalles de reservas, vouchers y tickets."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.BookingsManage, Name: "Gestionar Reservas y Cobros", Desc: "Crear, editar, cancelar, reactivar reservas, modificar saldos y registrar devoluciones.")
+            }
+        },
+        new {
+            Module = "Tours y Catálogo",
+            Icon = "tour",
+            Permissions = new[]
+            {
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.ToursView, Name: "Consultar Catálogo", Desc: "Ver tours, categorías, flota de vehículos, conductores y testimonios."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.ToursManage, Name: "Gestionar Catálogo de Tours", Desc: "Crear, editar o eliminar paquetes turísticos, categorías, fotos, flota y choferes.")
+            }
+        },
+        new {
+            Module = "Caja y Movimientos Financieros",
+            Icon = "point_of_sale",
+            Permissions = new[]
+            {
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.CashView, Name: "Consultar Caja", Desc: "Ver balances de turnos, arqueos, caja chica y reportes de liquidación."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.CashManage, Name: "Gestionar Movimientos de Caja", Desc: "Abrir y cerrar turnos de caja, registrar ingresos/egresos y reponer caja chica.")
+            }
+        },
+        new {
+            Module = "Facturación y Comprobantes",
+            Icon = "receipt_long",
+            Permissions = new[]
+            {
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.ReceiptsView, Name: "Consultar Comprobantes", Desc: "Ver y descargar boletas y facturas electrónicas emitidas."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.ReceiptsManage, Name: "Gestionar Emisión Tributaria", Desc: "Emitir comprobantes ante NubeFact/SUNAT y ejecutar conciliaciones tributarias.")
+            }
+        },
+        new {
+            Module = "Despacho y Manifiestos de Ruta",
+            Icon = "commute",
+            Permissions = new[]
+            {
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.ManifestView, Name: "Consultar Despacho", Desc: "Ver listas de pasajeros y asignaciones diarias de transporte."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.ManifestManage, Name: "Gestionar Manifiestos", Desc: "Exportar a Excel y cerrar manifiestos oficiales de pasajeros.")
+            }
+        },
+        new {
+            Module = "Seguridad, Auditoría y Supervisión",
+            Icon = "security",
+            Permissions = new[]
+            {
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.UsersManage, Name: "Administrar Usuarios", Desc: "Crear, modificar roles, desactivar usuarios y reiniciar contraseñas."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.RolesManage, Name: "Administrar Roles y Permisos", Desc: "Crear roles personalizados y configurar la matriz de capacidades de acceso."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.IncidentsManage, Name: "Gestionar Incidencias", Desc: "Revisar y resolver incidencias de cobro y conciliación de pasarelas."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.SupervisionView, Name: "Consultar Supervisión", Desc: "Acceso al panel de monitoreo, estadísticas y métricas del sistema."),
+                (Code: SIGETOUR.API.Core.Security.AppPermissions.SupervisionManage, Name: "Control de Supervisión", Desc: "Realizar acciones críticas de mantenimiento y auditoría global.")
+            }
+        }
+    };
+}
+
+<!-- Mensajes de Notificación -->
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="mb-5 p-4 rounded-xl bg-green-50 border border-green-200 text-green-800 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-green-600 text-[22px]">check_circle</span>
+            <span class="font-medium text-body-sm">@TempData["SuccessMessage"]</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="text-green-600 hover:text-green-800 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+    </div>
+}
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 flex items-center justify-between shadow-xs">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-red-600 text-[22px]">error</span>
+            <span class="font-medium text-body-sm">@TempData["ErrorMessage"]</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="text-red-600 hover:text-red-800 cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+    </div>
+}
+
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+        <div class="flex items-center gap-2 text-body-sm text-on-surface-variant mb-1">
+            <a asp-action="Users" class="hover:text-primary transition-colors flex items-center gap-1">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+                <span>Usuarios y Roles</span>
+            </a>
+            <span>/</span>
+            <span class="text-on-surface font-semibold">Permisos del Rol</span>
+        </div>
+        <h1 class="text-display-sm font-bold text-on-surface flex items-center gap-3">
+            <span>Matriz de Permisos:</span>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-title-sm font-bold bg-primary/10 text-primary border border-primary/20">
+                @roleName
+            </span>
+        </h1>
+        <p class="text-body-md text-on-surface-variant mt-1">Configure los privilegios efectivos en el servidor para las operaciones del rol @roleName.</p>
+    </div>
+</div>
+
+<form asp-action="UpdateRolePermissions" method="post" id="permissionsForm">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="roleName" value="@roleName" />
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        @foreach (var mod in permissionModules)
+        {
+            <div class="bg-surface rounded-2xl border border-outline-variant shadow-xs overflow-hidden flex flex-col">
+                <div class="p-4 bg-surface-container-low border-b border-outline-variant flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary text-[24px]">@mod.Icon</span>
+                    <h2 class="text-title-md font-bold text-on-surface">@mod.Module</h2>
+                </div>
+                <div class="p-4 space-y-4 flex-1">
+                    @foreach (var perm in mod.Permissions)
+                    {
+                        bool isChecked = assignedSet.Contains(perm.Code);
+                        bool isLocked = isSuperAdminRole && (perm.Code == SIGETOUR.API.Core.Security.AppPermissions.RolesManage || perm.Code == SIGETOUR.API.Core.Security.AppPermissions.UsersManage);
+
+                        <label class="flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer @(isChecked ? "border-primary/40 bg-primary/5" : "border-outline-variant/60 hover:bg-surface-container-lowest")">
+                            <input type="checkbox"
+                                   name="permissions"
+                                   value="@perm.Code"
+                                   @(isChecked ? "checked" : "")
+                                   @(isLocked ? "onclick=\"return false;\"" : "")
+                                   class="mt-1 h-4 w-4 text-primary rounded border-outline-variant focus:ring-primary cursor-pointer" />
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-body-md text-on-surface">@perm.Name</span>
+                                    <code class="text-label-sm font-mono text-on-surface-variant px-1.5 py-0.5 rounded bg-surface-container">@perm.Code</code>
+                                    @if (isLocked)
+                                    {
+                                        <span class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                            <span class="material-symbols-outlined text-[13px]">lock</span>
+                                            Protegido
+                                        </span>
+                                    }
+                                </div>
+                                <p class="text-body-sm text-on-surface-variant mt-0.5">@perm.Desc</p>
+                            </div>
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="p-4 bg-surface rounded-2xl border border-outline-variant shadow-xs flex items-center justify-between gap-4 sticky bottom-4 z-20">
+        <a asp-action="Users" class="px-5 py-2.5 rounded-xl border border-outline-variant text-on-surface hover:bg-surface-container-high transition-colors font-bold text-body-md">
+            Cancelar
+        </a>
+        <button type="submit" class="px-6 py-2.5 rounded-xl bg-primary text-on-primary hover:bg-primary/90 transition-all font-bold text-body-md shadow-sm flex items-center gap-2 cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">save</span>
+            <span>Guardar Permisos Efectivos</span>
+        </button>
+    </div>
+</form>

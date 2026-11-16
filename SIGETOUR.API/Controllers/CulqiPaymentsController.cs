@@ -1073,6 +1073,11 @@ public sealed class CulqiPaymentsController : ControllerBase
             return true;
         }
 
+        if (_db.Database.IsRelational())
+        {
+            await _db.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"Bookings\" WHERE \"Id\" = {current.BookingId} FOR UPDATE", safeCt);
+        }
+
         var booking = await _db.Bookings
             .Include(b => b.Items)
             .ThenInclude(i => i.TourPackage)

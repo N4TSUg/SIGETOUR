@@ -148,27 +148,27 @@ namespace SIGETOUR.Tests.Invoicing
         }
 
         [Fact]
-        public async Task TimeoutAfterSendingEmission_TransitionsToPendingAndRetryReconcilesViaExactReceiptId()
+        public async Task TimeoutAfterSendingEmission_TransitionsToRequiresReviewAndPreventsBlindReemission()
         {
             using var context = TestDbContextFactory.Create();
             var config = CreateConfig();
             var booking = CreateTestBooking(context, total: 80m, paid: 80m);
 
-            // 1. Simulación de timeout o fallo de conexión en la emisión inicial
+            // 1. Simulación de timeout o fallo de conexión en la emisión inicial tras iniciar el envío
             var timeoutHttp = new HttpClient(new MockCulqiHttpHandler(req =>
             {
                 throw new HttpRequestException("The operation was canceled due to timeout.");
             }));
 
             var serviceTimeout = new NubefactInvoiceService(context, config, timeoutHttp, NullLogger<NubefactInvoiceService>.Instance);
-            var pendingReceipt = await serviceTimeout.GenerateReceiptAsync(booking.Id, null, CancellationToken.None);
+            var reviewReceipt = await serviceTimeout.GenerateReceiptAsync(booking.Id, null, CancellationToken.None);
 
-            // Assert 1: Queda en Pending con detalle del fallo, no se marca como rechazado definitivo
-            Assert.NotNull(pendingReceipt);
-            Assert.Equal("Pending", pendingReceipt.Status);
-            Assert.Contains("Fallo de conexión", pendingReceipt.LastError);
+            // Assert 1: Queda en RequiresReview (resultado incierto) con detalle del fallo, no en Pending
+            Assert.NotNull(reviewReceipt);
+            Assert.Equal("RequiresReview", reviewReceipt.Status);
+            Assert.Contains("fallo de conexión", reviewReceipt.LastError, StringComparison.OrdinalIgnoreCase);
 
-            // 2. Reintento exitoso con exactReceiptId
+            // 2. Intento de reintento o recuperación sin número correlativo: NO debe reemitir a ciegas hacia el proveedor
             string capturedPayload = "";
             var successHttp = new HttpClient(new MockCulqiHttpHandler(req =>
             {
@@ -180,17 +180,13 @@ namespace SIGETOUR.Tests.Invoicing
             }));
 
             var serviceSuccess = new NubefactInvoiceService(context, config, successHttp, NullLogger<NubefactInvoiceService>.Instance);
-            var retried = await serviceSuccess.RetryReceiptAsync(pendingReceipt.Id, CancellationToken.None);
+            var retried = await serviceSuccess.RetryReceiptAsync(reviewReceipt.Id, CancellationToken.None);
 
-            // Assert 2: Reintento exitoso sobre el MISMO comprobante
+            // Assert 2: Se retiene en RequiresReview sin reemisión automática externa (0 llamadas a NubeFact)
             Assert.NotNull(retried);
-            Assert.Equal(pendingReceipt.Id, retried.Id);
-            Assert.Equal("Demo", retried.Status);
-            Assert.Equal("888", retried.Number);
-            Assert.Null(retried.LastError);
-
-            // Verificar que el payload utilizó el código único determinístico basado en receipt.Id
-            Assert.Contains($"\"codigo_unico\":\"SIG-{pendingReceipt.Id:N}\"", capturedPayload);
+            Assert.Equal(reviewReceipt.Id, retried.Id);
+            Assert.Equal("RequiresReview", retried.Status);
+            Assert.True(string.IsNullOrEmpty(capturedPayload), "No debe dispararse llamada de emisión externa a ciegas para un comprobante en RequiresReview sin número correlativo.");
         }
 
         [Fact]

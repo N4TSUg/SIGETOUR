@@ -17,9 +17,21 @@ namespace SIGETOUR.API.Infrastructure.Data
             string[] roleNames = { "SuperAdmin", "Admin", "Operador" };
             foreach (var roleName in roleNames)
             {
-                if (!await roleManager.RoleExistsAsync(roleName))
+                var role = await roleManager.FindByNameAsync(roleName);
+                if (role == null)
                 {
-                    await roleManager.CreateAsync(new IdentityRole(roleName));
+                    role = new IdentityRole(roleName);
+                    await roleManager.CreateAsync(role);
+                }
+
+                var existingClaims = await roleManager.GetClaimsAsync(role);
+                if (!existingClaims.Any(c => c.Type == "Permission"))
+                {
+                    var defaults = SIGETOUR.API.Core.Security.AppPermissions.GetDefaultPermissionsForRole(roleName);
+                    foreach (var perm in defaults)
+                    {
+                        await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", perm));
+                    }
                 }
             }
 

@@ -36,6 +36,23 @@ namespace SIGETOUR.API.Application.Invoicing
             _logger = logger;
         }
 
+        private (string? ruta, string? token) ResolveEnvironmentCredentials(string environment, string currentMode)
+        {
+            if (string.Equals(environment, currentMode, StringComparison.OrdinalIgnoreCase))
+            {
+                return (_config["Nubefact:Ruta"]?.Trim(), _config["Nubefact:Token"]?.Trim());
+            }
+
+            var envRuta = _config[$"Nubefact:{environment}:Ruta"]?.Trim();
+            var envToken = _config[$"Nubefact:{environment}:Token"]?.Trim();
+            if (!string.IsNullOrWhiteSpace(envRuta) && !string.IsNullOrWhiteSpace(envToken))
+            {
+                return (envRuta, envToken);
+            }
+
+            return (null, null);
+        }
+
         public static bool IsSunatSuccessResponseCode(JsonElement prop)
         {
             if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt32(out var code))
@@ -250,15 +267,28 @@ namespace SIGETOUR.API.Application.Invoicing
             }
 
             // 5. Separación estricta de Modos: Mock, Demo y Production
+            var currentConfigMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
             mode = effectiveEnvironment;
             var isMock = string.Equals(mode, "Mock", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Simulation", StringComparison.OrdinalIgnoreCase);
-            var ruta = _config["Nubefact:Ruta"]?.Trim();
-            var token = _config["Nubefact:Token"]?.Trim();
+            var isCurrentMock = string.Equals(currentConfigMode, "Mock", StringComparison.OrdinalIgnoreCase) || string.Equals(currentConfigMode, "Simulation", StringComparison.OrdinalIgnoreCase);
+
+            // Validar incompatibilidad entre simulación y ambientes externos
+            if (!isNew && receipt != null && !string.IsNullOrWhiteSpace(receipt.Environment))
+            {
+                if ((isMock && !isCurrentMock) || (!isMock && isCurrentMock))
+                {
+                    _logger.LogWarning("Incompatibilidad de ambiente para comprobante {ReceiptId}: documento histórico en '{DocEnv}', pero configuración actual en '{CurrentMode}'. Se bloquea la operación para evitar mezclar simulación con externo.", receipt.Id, receipt.Environment, currentConfigMode);
+                    throw new InvalidOperationException($"Incompatibilidad de ambiente para comprobante {receipt.Id}: el documento pertenece a '{receipt.Environment}', mientras que el sistema está en '{currentConfigMode}'. No se permite alternar entre simulación y ambientes externos.");
+                }
+            }
+
+            var (ruta, token) = ResolveEnvironmentCredentials(mode, currentConfigMode);
 
             // No pasar silenciosamente a Mock cuando falten credenciales en Demo o Production
             if (!isMock && (string.IsNullOrWhiteSpace(ruta) || string.IsNullOrWhiteSpace(token)))
             {
-                throw new InvalidOperationException($"Configuración de NubeFact incompleta para el modo '{mode}'. Se requiere 'Ruta' y 'Token' válidos en la configuración.");
+                _logger.LogWarning("Incompatibilidad de ambiente para modo '{Mode}' frente a configuración actual '{CurrentMode}'. Se bloquea la emisión externa.", mode, currentConfigMode);
+                throw new InvalidOperationException($"Incompatibilidad de ambiente para el modo '{mode}': el sistema está configurado en '{currentConfigMode}' y no dispone de credenciales aisladas para '{mode}'. Se bloquea la operación para evitar mezclar ambientes.");
             }
 
             // Modo Mock explícito (solo cuando mode == 'Mock')
@@ -296,14 +326,29 @@ namespace SIGETOUR.API.Application.Invoicing
                 return receipt;
             }
 
-            // 6. Conciliación previa: Si el comprobante ya existía en estado Pending o con resultado desconocido, consultar antes de reintentar emisión
-            if (!isNew && receipt.Status == "Pending" && !string.IsNullOrWhiteSpace(receipt.Number))
+            // 6. Conciliación previa y protección contra reemisiones a ciegas
+            if (!isNew && receipt != null)
             {
-                var queried = await QueryReceiptFromProviderAsync(receipt.Id, ct);
-                if (queried != null && (queried.Status == "Accepted" || queried.Status == "Submitted"))
+                if (receipt.Status == "RequiresReview" && string.IsNullOrWhiteSpace(receipt.Number))
                 {
-                    _logger.LogInformation("Comprobante {FullNumber} recuperado y confirmado tras consulta previa con el proveedor.", queried.FullNumber);
-                    return queried;
+                    _logger.LogWarning("Comprobante {ReceiptId} en estado 'RequiresReview' sin número correlativo asignado. No se reemite a ciegas para evitar duplicación tributaria en SUNAT; requiere verificación en el portal NubeFact.", receipt.Id);
+                    return receipt;
+                }
+
+                if (exactReceiptId == null && receipt.Status == "InFlight" && string.IsNullOrWhiteSpace(receipt.Number))
+                {
+                    _logger.LogWarning("Comprobante {ReceiptId} ya se encuentra en vuelo ('InFlight'). Se reutiliza el registro para evitar emisiones simultáneas.", receipt.Id);
+                    return receipt;
+                }
+
+                if (!string.IsNullOrWhiteSpace(receipt.Number))
+                {
+                    var queried = await QueryReceiptFromProviderAsync(receipt.Id, ct);
+                    if (queried != null && (queried.Status == "Accepted" || queried.Status == "Submitted" || queried.Status == "Demo"))
+                    {
+                        _logger.LogInformation("Comprobante {FullNumber} recuperado y confirmado tras consulta previa con el proveedor.", queried.FullNumber);
+                        return queried;
+                    }
                 }
             }
 
@@ -480,7 +525,9 @@ namespace SIGETOUR.API.Application.Invoicing
                 receipt.Environment = effectiveEnvironment;
             }
             receipt.SnapshotJson = JsonSerializer.Serialize(snapshot);
-            receipt.Status = "Pending";
+            // Persistir InFlight antes de la llamada de red: si el proceso se interrumpe, se reinicia o sufre timeout,
+            // el registro no queda falsamente como intención no enviada ('Pending').
+            receipt.Status = "InFlight";
             if (isNew)
             {
                 _db.ElectronicReceipts.Add(receipt);
@@ -636,9 +683,10 @@ namespace SIGETOUR.API.Application.Invoicing
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Excepción de red invocando API NubeFact para reserva {RefCode}", booking.ReferenceCode);
-                receipt.Status = "Pending"; // Timeout o fallo de red: no asumir rechazo ni emisión
-                receipt.LastError = $"Fallo de conexión con NubeFact: {ex.Message}";
+                _logger.LogError(ex, "Excepción de red o timeout invocando API NubeFact para reserva {RefCode}", booking.ReferenceCode);
+                // Timeout o fallo de red: resultado incierto tras envío; retener en RequiresReview
+                receipt.Status = "RequiresReview";
+                receipt.LastError = $"Resultado incierto tras fallo de conexión o timeout con NubeFact: {ex.Message}. La solicitud fue enviada pero el resultado se desconoce; requiere verificación manual en el portal NubeFact antes de reintentar.";
             }
 
             if (receipt.Status == "Accepted" || receipt.Status == "Demo" || receipt.Status == "Simulation")
@@ -673,6 +721,17 @@ namespace SIGETOUR.API.Application.Invoicing
                     return receipt;
                 }
 
+                // Validar compatibilidad de ambiente antes de cualquier acción
+                var currentMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
+                var docEnv = !string.IsNullOrWhiteSpace(receipt.Environment) ? receipt.Environment : currentMode;
+                var (envRuta, envToken) = ResolveEnvironmentCredentials(docEnv, currentMode);
+                if (!string.Equals(docEnv, "Simulation", StringComparison.OrdinalIgnoreCase) &&
+                    (string.IsNullOrWhiteSpace(envRuta) || string.IsNullOrWhiteSpace(envToken)))
+                {
+                    _logger.LogWarning("Incompatibilidad de ambiente para comprobante {ReceiptId}: pertenece a '{DocEnv}', pero el sistema está configurado en '{CurrentMode}'. Operación bloqueada.", receipt.Id, docEnv, currentMode);
+                    throw new InvalidOperationException($"Incompatibilidad de ambiente para comprobante {receipt.Id}: pertenece a '{docEnv}', pero el sistema está configurado en '{currentMode}'. No existen credenciales configuradas para '{docEnv}'. Operación bloqueada.");
+                }
+
                 // Documentos ya enviados a SUNAT (Submitted) no deben reemitirse a ciegas; consultar si tienen número
                 if (receipt.Status == "Submitted")
                 {
@@ -687,8 +746,8 @@ namespace SIGETOUR.API.Application.Invoicing
                     return receipt;
                 }
 
-                // Documentos con resultado incierto (RequiresReview): si no tienen correlativo, NO reemitir a ciegas para evitar duplicados en SUNAT
-                if (receipt.Status == "RequiresReview")
+                // Documentos con resultado incierto (RequiresReview) o en vuelo (InFlight): si no tienen correlativo, NO reemitir a ciegas para evitar duplicados en SUNAT
+                if (receipt.Status is "RequiresReview" or "InFlight")
                 {
                     if (!string.IsNullOrWhiteSpace(receipt.Number))
                     {
@@ -700,7 +759,7 @@ namespace SIGETOUR.API.Application.Invoicing
                     }
                     else
                     {
-                        _logger.LogWarning("Comprobante {ReceiptId} en estado RequiresReview sin correlativo asignado. No se reemite a ciegas para evitar duplicación tributaria en SUNAT; requiere verificación en el portal NubeFact.", receiptId);
+                        _logger.LogWarning("Comprobante {ReceiptId} en estado {Status} sin correlativo asignado. No se reemite a ciegas para evitar duplicación tributaria en SUNAT; requiere verificación en el portal NubeFact.", receiptId, receipt.Status);
                         return receipt;
                     }
                 }
@@ -727,8 +786,27 @@ namespace SIGETOUR.API.Application.Invoicing
         public async Task<int> ProcessPendingReceiptsAsync(CancellationToken ct = default)
         {
             var cutoff = DateTime.UtcNow.AddSeconds(-15);
-            // Solo recuperar comprobantes pendientes no despachados o enviados con número que requieran consulta
-            // No procesar automáticamente comprobantes en RequiresReview sin número para no generar duplicados en SUNAT
+            var currentMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
+
+            // 1. Limpieza de comprobantes en vuelo ('InFlight') abandonados tras reinicio del servidor
+            var abandonedInFlight = await _db.ElectronicReceipts
+                .Where(r => r.Status == "InFlight" && r.CreatedAtUtc <= cutoff)
+                .ToListAsync(ct);
+            foreach (var abandoned in abandonedInFlight)
+            {
+                if (string.IsNullOrWhiteSpace(abandoned.Number))
+                {
+                    abandoned.Status = "RequiresReview";
+                    abandoned.LastError = "La emisión quedó interrumpida o en vuelo tras reinicio o desconexión del servidor. Dado que NubeFact no permite consultar sin número correlativo, el comprobante se retiene en revisión manual para no duplicar comprobantes en SUNAT.";
+                }
+            }
+            if (abandonedInFlight.Count > 0)
+            {
+                await _db.SaveChangesAsync(ct);
+            }
+
+            // 2. Solo recuperar comprobantes pendientes no despachados ("Pending") o enviados con número que requieran consulta
+            // No procesar automáticamente comprobantes en RequiresReview o InFlight sin número para no generar duplicados en SUNAT
             var pendingReceipts = await _db.ElectronicReceipts
                 .Where(r => (r.Status == "Pending" || (r.Status == "Submitted" && !string.IsNullOrWhiteSpace(r.Number))) && r.CreatedAtUtc <= cutoff)
                 .OrderBy(r => r.CreatedAtUtc)
@@ -738,10 +816,47 @@ namespace SIGETOUR.API.Application.Invoicing
             int processedCount = 0;
             foreach (var receipt in pendingReceipts)
             {
+                // Comprobar compatibilidad de ambiente antes de cualquier acción
+                var docEnv = !string.IsNullOrWhiteSpace(receipt.Environment) ? receipt.Environment : currentMode;
+                var (envRuta, envToken) = ResolveEnvironmentCredentials(docEnv, currentMode);
+                if (!string.Equals(docEnv, "Simulation", StringComparison.OrdinalIgnoreCase) &&
+                    (string.IsNullOrWhiteSpace(envRuta) || string.IsNullOrWhiteSpace(envToken)))
+                {
+                    _logger.LogWarning("Comprobante {ReceiptId} pertenece al ambiente '{DocEnv}', incompatible con la configuración actual '{CurrentMode}'. Se omite en recuperación automática.", receipt.Id, docEnv, currentMode);
+                    continue;
+                }
+
+                // Reclamo atómico en base de datos para impedir procesamiento simultáneo entre múltiples procesos
+                if (receipt.Status == "Pending")
+                {
+                    int claimed = 0;
+                    if (_db.Database.IsRelational())
+                    {
+                        claimed = await _db.ElectronicReceipts
+                            .Where(r => r.Id == receipt.Id && r.Status == "Pending")
+                            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, "InFlight"), ct);
+                    }
+                    else
+                    {
+                        if (receipt.Status == "Pending")
+                        {
+                            receipt.Status = "InFlight";
+                            await _db.SaveChangesAsync(ct);
+                            claimed = 1;
+                        }
+                    }
+
+                    if (claimed == 0)
+                    {
+                        // Ya fue reclamado por la emisión inicial o por otro hilo/proceso recuperador
+                        continue;
+                    }
+                }
+
                 var semaphore = _receiptLocks.GetOrAdd(receipt.Id, _ => new SemaphoreSlim(1, 1));
                 if (!await semaphore.WaitAsync(TimeSpan.FromMilliseconds(100), ct))
                 {
-                    // Otro hilo o tarea ya está procesando este comprobante
+                    // Otro hilo ya está procesando este comprobante en memoria
                     continue;
                 }
 
@@ -781,17 +896,19 @@ namespace SIGETOUR.API.Application.Invoicing
             if (receipt == null) return null;
 
             var currentMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
-            if (!string.IsNullOrWhiteSpace(receipt.Environment) && !string.Equals(receipt.Environment, currentMode, StringComparison.OrdinalIgnoreCase))
+            var docEnv = !string.IsNullOrWhiteSpace(receipt.Environment) ? receipt.Environment : currentMode;
+            if (string.Equals(docEnv, "Simulation", StringComparison.OrdinalIgnoreCase) || string.Equals(docEnv, "Mock", StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogWarning("El comprobante {ReceiptId} pertenece al ambiente histórico '{DocEnv}', pero el sistema está configurado en '{CurrentMode}'. Se aborta la consulta para evitar mezclar credenciales de distintos ambientes.",
-                    receiptId, receipt.Environment, currentMode);
                 return receipt;
             }
 
-            var ruta = _config["Nubefact:Ruta"]?.Trim();
-            var token = _config["Nubefact:Token"]?.Trim();
+            var (ruta, token) = ResolveEnvironmentCredentials(docEnv, currentMode);
             if (string.IsNullOrWhiteSpace(ruta) || string.IsNullOrWhiteSpace(token))
+            {
+                _logger.LogWarning("El comprobante {ReceiptId} pertenece al ambiente histórico '{DocEnv}', pero el sistema está configurado en '{CurrentMode}'. Se aborta la consulta para evitar mezclar credenciales de distintos ambientes.",
+                    receiptId, docEnv, currentMode);
                 return receipt;
+            }
 
             // No consultar documento número 1 como respaldo si no tiene un correlativo válido
             if (string.IsNullOrWhiteSpace(receipt.Number) || !int.TryParse(receipt.Number, out var numInt) || numInt <= 0)
