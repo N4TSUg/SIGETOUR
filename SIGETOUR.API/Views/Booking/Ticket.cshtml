@@ -106,7 +106,11 @@
     <header class="w-full bg-slate-900 text-white shadow-md py-3 px-4 sm:px-8 no-print sticky top-0 z-50">
         <div class="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
             <div class="flex items-center gap-2">
-                <a href="/Booking/Voucher/@(booking?.Id)" class="inline-flex items-center gap-1 text-gray-300 hover:text-white text-xs font-semibold py-1.5 px-3 rounded-lg bg-slate-800 transition-colors">
+                @{
+                    var nav = ViewBag.NavigationContext as SIGETOUR.API.Models.TicketNavigationContext;
+                    var voucherUrl = nav != null ? nav.GetUrlForVoucher(Url) : $"/Booking/Voucher/{booking?.Id}";
+                }
+                <a href="@voucherUrl" class="inline-flex items-center gap-1 text-gray-300 hover:text-white text-xs font-semibold py-1.5 px-3 rounded-lg bg-slate-800 transition-colors">
                     <span class="material-symbols-outlined text-[16px]">arrow_back</span>
                     <span>Volver al Boleto</span>
                 </a>
@@ -119,10 +123,14 @@
             <!-- Selector de formato térmico (80mm vs 58mm) -->
             <div class="flex items-center gap-2 bg-slate-800 p-1 rounded-xl">
                 <span class="text-xs text-gray-400 font-semibold pl-2">Ancho:</span>
-                <a href="?size=80" class="px-3 py-1 rounded-lg text-xs font-bold transition-all @(ticketSize == "80" ? "bg-emerald-500 text-slate-950 shadow-sm" : "text-gray-300 hover:text-white")">
+                @{
+                    var url80 = nav != null ? nav.GetUrlForSize(Url, "80") : "?size=80";
+                    var url58 = nav != null ? nav.GetUrlForSize(Url, "58") : "?size=58";
+                }
+                <a href="@url80" class="px-3 py-1 rounded-lg text-xs font-bold transition-all @(ticketSize == "80" ? "bg-emerald-500 text-slate-950 shadow-sm" : "text-gray-300 hover:text-white")">
                     80 mm (Estándar)
                 </a>
-                <a href="?size=58" class="px-3 py-1 rounded-lg text-xs font-bold transition-all @(ticketSize == "58" ? "bg-emerald-500 text-slate-950 shadow-sm" : "text-gray-300 hover:text-white")">
+                <a href="@url58" class="px-3 py-1 rounded-lg text-xs font-bold transition-all @(ticketSize == "58" ? "bg-emerald-500 text-slate-950 shadow-sm" : "text-gray-300 hover:text-white")">
                     58 mm (Mini)
                 </a>
             </div>
@@ -177,11 +185,11 @@
             <div class="divide-y divide-slate-100 text-xs">
                 @foreach (var op in availableOps)
                 {
-                    var linkUrl = op.ReceiptId.HasValue
+                    var linkUrl = nav != null ? nav.GetUrlForOperation(Url, op) : (op.ReceiptId.HasValue
                         ? Url.Action("Ticket", "Booking", new { id = op.ReceiptId.Value })
                         : (op.CashTransactionId.HasValue
                             ? Url.Action("Ticket", "Booking", new { id = booking?.Id, cashTransactionId = op.CashTransactionId.Value })
-                            : Url.Action("Ticket", "Booking", new { id = booking?.Id, paymentId = op.CulqiPaymentId }));
+                            : Url.Action("Ticket", "Booking", new { id = booking?.Id, paymentId = op.CulqiPaymentId })));
 
                     <div class="py-2.5 flex items-center justify-between gap-3">
                         <div>

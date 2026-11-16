@@ -630,9 +630,30 @@ namespace SIGETOUR.API.Controllers.UI
 
             if (booking == null) return NotFound("Comprobante o reserva no encontrada");
 
+            // Si se especificó receiptId explícito y la ruta id era un bookingId, validar pertenencia
+            if (effectiveReceiptId.HasValue && id != effectiveReceiptId.Value && receipt != null && receipt.BookingId != id)
+            {
+                return BadRequest("El comprobante especificado no pertenece a la reserva solicitada.");
+            }
+
+            bool isTokenAuthorized = !string.IsNullOrWhiteSpace(token) && _checkoutAccess.Verify(booking.Id, token);
+
             if (!IsAuthorizedForBooking(booking, token))
             {
                 return Unauthorized("Se requiere autorización o token válido para acceder al comprobante.");
+            }
+
+            // Si se abrió directamente un comprobante existente, asociar sus identificadores de operación
+            if (receipt != null)
+            {
+                if (receipt.CashTransactionId.HasValue)
+                {
+                    ViewBag.SelectedCashTransactionId = receipt.CashTransactionId.Value;
+                }
+                if (receipt.CulqiPaymentId.HasValue)
+                {
+                    ViewBag.PaymentId = receipt.CulqiPaymentId.Value;
+                }
             }
 
             // 2. Si se solicitó un cashTransactionId específico:
@@ -651,6 +672,7 @@ namespace SIGETOUR.API.Controllers.UI
                 // Requisito 1.d: Si el movimiento está vinculado a Culqi, resolver su comprobante canónico por CulqiPaymentId o CashTransactionId
                 if (cashTx.CulqiPaymentId.HasValue)
                 {
+                    ViewBag.PaymentId = cashTx.CulqiPaymentId.Value;
                     receipt = await _context.ElectronicReceipts
                         .Include(r => r.Booking)
                         .ThenInclude(b => b.Items)
@@ -687,6 +709,12 @@ namespace SIGETOUR.API.Controllers.UI
                     return BadRequest("El pago Culqi no pertenece a la reserva especificada.");
                 }
 
+                var linkedCash = await _context.CashTransactions.FirstOrDefaultAsync(t => t.CulqiPaymentId == culqi.Id);
+                if (linkedCash != null)
+                {
+                    ViewBag.SelectedCashTransactionId = linkedCash.Id;
+                }
+
                 receipt = await _context.ElectronicReceipts
                     .Include(r => r.Booking)
                     .ThenInclude(b => b.Items)
@@ -716,106 +744,163 @@ namespace SIGETOUR.API.Controllers.UI
                     .OrderBy(t => t.CreatedAt)
                     .ToListAsync();
 
-                var unbilledCash = allIncomeCash
-                    .Where(t => !bookingReceipts.Any(r => r.CashTransactionId == t.Id || (t.CulqiPaymentId != null && r.CulqiPaymentId == t.CulqiPaymentId)))
-                    .ToList();
-
                 var allCulqi = await _context.CulqiPayments
                     .Where(p => p.BookingId == booking.Id && p.Status == "paid")
                     .OrderBy(p => p.CreatedAtUtc)
                     .ToListAsync();
 
-                var unbilledCulqi = allCulqi
-                    .Where(p => !bookingReceipts.Any(r => r.CulqiPaymentId == p.Id))
-                    .ToList();
+                // Normalización de operaciones (Hallazgo 3: Un pago Culqi y su movimiento representan la misma operación)
+                var associatedReceiptIds = new HashSet<Guid>();
+                var normalizedOps = new List<BookingOperationOptionViewModel>();
 
-                int totalOps = bookingReceipts.Count + unbilledCash.Count + unbilledCulqi.Count;
+                // A. Resolver pagos Culqi canónicos (reuniendo IDs de allCulqi y de movimientos de caja vinculados)
+                var culqiIds = new HashSet<Guid>(allCulqi.Select(p => p.Id));
+                foreach (var txWithCulqi in allIncomeCash.Where(t => t.CulqiPaymentId.HasValue))
+                {
+                    culqiIds.Add(txWithCulqi.CulqiPaymentId!.Value);
+                }
+
+                foreach (var cId in culqiIds)
+                {
+                    var culqiPayment = allCulqi.FirstOrDefault(p => p.Id == cId);
+                    var linkedCashTx = allIncomeCash.FirstOrDefault(t => t.CulqiPaymentId == cId);
+
+                    var matchedReceipt = bookingReceipts.FirstOrDefault(r =>
+                        r.CulqiPaymentId == cId ||
+                        r.BillableOperationKey == $"CULQI:{cId:N}" ||
+                        (linkedCashTx != null && (r.CashTransactionId == linkedCashTx.Id || r.BillableOperationKey == $"CASH:{linkedCashTx.Id:N}")));
+
+                    if (matchedReceipt != null)
+                    {
+                        associatedReceiptIds.Add(matchedReceipt.Id);
+                    }
+
+                    decimal amount = culqiPayment != null
+                        ? culqiPayment.AmountCents / 100m
+                        : (linkedCashTx?.Amount ?? 0m);
+
+                    DateTime date = culqiPayment?.CreatedAtUtc ?? linkedCashTx?.CreatedAt ?? DateTime.UtcNow;
+                    string refCode = culqiPayment?.ProviderId ?? linkedCashTx?.ReferenceCode ?? "---";
+
+                    normalizedOps.Add(new BookingOperationOptionViewModel
+                    {
+                        Type = matchedReceipt != null ? "Receipt" : "CulqiPayment",
+                        ReceiptId = matchedReceipt?.Id,
+                        CulqiPaymentId = cId,
+                        CashTransactionId = linkedCashTx?.Id,
+                        Title = matchedReceipt != null
+                            ? $"{matchedReceipt.ReceiptType} {matchedReceipt.FullNumber}"
+                            : "Pago Culqi (Confirmado)",
+                        Amount = matchedReceipt?.TotalAmount ?? amount,
+                        Status = matchedReceipt?.Status ?? "Sin Comprobante",
+                        IsBilled = matchedReceipt != null,
+                        Date = matchedReceipt?.IssuedAtUtc ?? date,
+                        PaymentMethod = matchedReceipt != null
+                            ? (matchedReceipt.CustomerDocType == "6" ? "Factura" : "Boleta")
+                            : "Culqi",
+                        ReferenceCode = matchedReceipt?.FullNumber ?? refCode
+                    });
+                }
+
+                // B. Resolver movimientos de caja manuales independientes (CulqiPaymentId == null)
+                foreach (var manualTx in allIncomeCash.Where(t => !t.CulqiPaymentId.HasValue))
+                {
+                    var matchedReceipt = bookingReceipts.FirstOrDefault(r =>
+                        r.CashTransactionId == manualTx.Id ||
+                        r.BillableOperationKey == $"CASH:{manualTx.Id:N}");
+
+                    if (matchedReceipt != null)
+                    {
+                        associatedReceiptIds.Add(matchedReceipt.Id);
+                    }
+
+                    normalizedOps.Add(new BookingOperationOptionViewModel
+                    {
+                        Type = matchedReceipt != null ? "Receipt" : "CashTransaction",
+                        ReceiptId = matchedReceipt?.Id,
+                        CashTransactionId = manualTx.Id,
+                        CulqiPaymentId = null,
+                        Title = matchedReceipt != null
+                            ? $"{matchedReceipt.ReceiptType} {matchedReceipt.FullNumber}"
+                            : $"Movimiento de Caja ({manualTx.Category ?? "Cobro"})",
+                        Amount = matchedReceipt?.TotalAmount ?? manualTx.Amount,
+                        Status = matchedReceipt?.Status ?? "Sin Comprobante",
+                        IsBilled = matchedReceipt != null,
+                        Date = matchedReceipt?.IssuedAtUtc ?? manualTx.CreatedAt,
+                        PaymentMethod = matchedReceipt != null
+                            ? (matchedReceipt.CustomerDocType == "6" ? "Factura" : "Boleta")
+                            : (manualTx.PaymentMethod ?? "Efectivo"),
+                        ReferenceCode = matchedReceipt?.FullNumber ?? manualTx.ReferenceCode
+                    });
+                }
+
+                // C. Conservar comprobantes históricos no asociados como documentos consultables
+                foreach (var unlinkedReceipt in bookingReceipts.Where(r => !associatedReceiptIds.Contains(r.Id)))
+                {
+                    normalizedOps.Add(new BookingOperationOptionViewModel
+                    {
+                        Type = "Receipt",
+                        ReceiptId = unlinkedReceipt.Id,
+                        CulqiPaymentId = unlinkedReceipt.CulqiPaymentId,
+                        CashTransactionId = unlinkedReceipt.CashTransactionId,
+                        Title = $"{unlinkedReceipt.ReceiptType} {unlinkedReceipt.FullNumber}",
+                        Amount = unlinkedReceipt.TotalAmount,
+                        Status = unlinkedReceipt.Status,
+                        IsBilled = true,
+                        Date = unlinkedReceipt.IssuedAtUtc ?? unlinkedReceipt.CreatedAtUtc,
+                        PaymentMethod = unlinkedReceipt.CustomerDocType == "6" ? "Factura" : "Boleta",
+                        ReferenceCode = unlinkedReceipt.FullNumber
+                    });
+                }
+
+                int totalOps = normalizedOps.Count;
 
                 if (totalOps <= 1)
                 {
-                    if (bookingReceipts.Count == 1)
+                    if (totalOps == 1)
                     {
-                        receipt = bookingReceipts[0];
-                    }
-                    else if (unbilledCash.Count == 1)
-                    {
-                        var tx = unbilledCash[0];
-                        ViewBag.SelectedCashTransactionId = tx.Id;
-                        ViewBag.SelectedOperationAmount = tx.Amount;
-                        ViewBag.SelectedPaymentMethod = tx.PaymentMethod ?? booking.PaymentMethod;
-                        ViewBag.SelectedOperationNumber = tx.ReferenceCode;
-                        ViewBag.SelectedOperationDescription = $"{tx.Category ?? "Cobro"} - S/ {tx.Amount:N2}";
-                        ViewBag.SelectedOperationDate = tx.CreatedAt;
-                    }
-                    else if (unbilledCulqi.Count == 1)
-                    {
-                        var c = unbilledCulqi[0];
-                        ViewBag.PaymentId = c.Id;
-                        ViewBag.SelectedOperationAmount = c.AmountCents / 100m;
-                        ViewBag.SelectedPaymentMethod = "Culqi";
-                        ViewBag.SelectedOperationNumber = c.ProviderId;
-                        ViewBag.SelectedOperationDescription = $"Pago Culqi - S/ {(c.AmountCents / 100m):N2}";
-                        ViewBag.SelectedOperationDate = c.CreatedAtUtc;
+                        var singleOp = normalizedOps[0];
+                        if (singleOp.IsBilled && singleOp.ReceiptId.HasValue)
+                        {
+                            receipt = bookingReceipts.FirstOrDefault(r => r.Id == singleOp.ReceiptId.Value);
+                            ViewBag.SelectedCashTransactionId = singleOp.CashTransactionId;
+                            ViewBag.PaymentId = singleOp.CulqiPaymentId;
+                        }
+                        else
+                        {
+                            receipt = null;
+                            ViewBag.SelectedCashTransactionId = singleOp.CashTransactionId;
+                            ViewBag.PaymentId = singleOp.CulqiPaymentId;
+                            ViewBag.SelectedOperationAmount = singleOp.Amount;
+                            ViewBag.SelectedPaymentMethod = singleOp.PaymentMethod;
+                            ViewBag.SelectedOperationNumber = singleOp.ReferenceCode;
+                            ViewBag.SelectedOperationDescription = singleOp.Title + $" - S/ {singleOp.Amount:N2}";
+                            ViewBag.SelectedOperationDate = singleOp.Date;
+                        }
                     }
                 }
                 else
                 {
-                    // Requisito 1.f: No elegir arbitrariamente; presentar opciones de selección explícita
+                    // Requisito 1.f: No elegir arbitrariamente; presentar opciones de selección normalizadas
                     receipt = null;
-                    var availableOps = new List<BookingOperationOptionViewModel>();
-
-                    foreach (var r in bookingReceipts)
-                    {
-                        availableOps.Add(new BookingOperationOptionViewModel
-                        {
-                            Type = "Receipt",
-                            ReceiptId = r.Id,
-                            Title = $"{r.ReceiptType} {r.FullNumber}",
-                            Amount = r.TotalAmount,
-                            Status = r.Status,
-                            IsBilled = true,
-                            Date = r.IssuedAtUtc ?? r.CreatedAtUtc,
-                            PaymentMethod = r.CustomerDocType == "6" ? "Factura" : "Boleta",
-                            ReferenceCode = r.FullNumber
-                        });
-                    }
-
-                    foreach (var tx in unbilledCash)
-                    {
-                        availableOps.Add(new BookingOperationOptionViewModel
-                        {
-                            Type = "CashTransaction",
-                            CashTransactionId = tx.Id,
-                            Title = $"Movimiento de Caja ({tx.Category ?? "Cobro"})",
-                            Amount = tx.Amount,
-                            Status = "Sin Comprobante",
-                            IsBilled = false,
-                            Date = tx.CreatedAt,
-                            PaymentMethod = tx.PaymentMethod ?? "Efectivo",
-                            ReferenceCode = tx.ReferenceCode
-                        });
-                    }
-
-                    foreach (var c in unbilledCulqi)
-                    {
-                        availableOps.Add(new BookingOperationOptionViewModel
-                        {
-                            Type = "CulqiPayment",
-                            CulqiPaymentId = c.Id,
-                            Title = "Pago Culqi (Confirmado)",
-                            Amount = c.AmountCents / 100m,
-                            Status = "Sin Comprobante",
-                            IsBilled = false,
-                            Date = c.CreatedAtUtc,
-                            PaymentMethod = "Culqi",
-                            ReferenceCode = c.ProviderId
-                        });
-                    }
-
-                    ViewBag.AvailableOperations = availableOps;
+                    ViewBag.AvailableOperations = normalizedOps;
                 }
             }
 
+            var navContext = new TicketNavigationContext
+            {
+                RouteId = id,
+                BookingId = booking.Id,
+                ReceiptId = receipt?.Id ?? effectiveReceiptId,
+                CashTransactionId = ViewBag.SelectedCashTransactionId as Guid?,
+                PaymentId = ViewBag.PaymentId as Guid?,
+                Size = (size == "58") ? "58" : "80",
+                Token = token,
+                IsTokenAuthorized = isTokenAuthorized
+            };
+
+            ViewBag.NavigationContext = navContext;
+            ViewBag.AccessToken = isTokenAuthorized ? token : null;
             ViewBag.Booking = booking;
             ViewBag.TicketSize = (size == "58") ? "58" : "80";
             return View("Ticket", receipt);
