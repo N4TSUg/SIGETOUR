@@ -632,5 +632,87 @@ namespace SIGETOUR.Tests.Payments
             db1.TourPackages.Remove(tour);
             await db1.SaveChangesAsync();
         }
+
+        [SkippableFact]
+        public async Task Postgres_DbUpdateException_CorrelativeCollision_IsNotRecoverable()
+        {
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
+
+            await using var db = CreatePostgresDbContext();
+
+            var tour = new TourPackage
+            {
+                Id = Guid.NewGuid(),
+                Title = "Tour Correlative Check",
+                Slug = "tour-correl-" + Guid.NewGuid().ToString("N")[..6],
+                BasePrice = 80m,
+                IsActive = true
+            };
+            db.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-CORR-" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant(),
+                CustomerName = "Correlative User",
+                CustomerDni = "76543211",
+                TravelDate = DateTime.UtcNow.Date.AddDays(2),
+                ShiftName = "Mañana",
+                TotalPassengers = 1,
+                TotalAmount = 80m,
+                PaidAmount = 80m,
+                InvoiceType = "boleta",
+                Status = BookingStatus.Confirmed
+            };
+            db.Bookings.Add(booking);
+
+            var r1 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "COR1",
+                Number = "00000001",
+                TotalAmount = 80m,
+                Status = "Accepted",
+                BillableOperationKey = $"MANUAL:{Guid.NewGuid():N}",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.ElectronicReceipts.Add(r1);
+            await db.SaveChangesAsync();
+
+            // Intentar insertar un segundo comprobante con el MISMO correlativo (Series + Number + ReceiptType)
+            // pero para una operación billable distinta
+            var r2 = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "COR1",
+                Number = "00000001",
+                TotalAmount = 80m,
+                Status = "Accepted",
+                BillableOperationKey = $"MANUAL:{Guid.NewGuid():N}",
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.ElectronicReceipts.Add(r2);
+
+            var dbEx = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+
+            // Validar que el helper IsRecoverableBillableOperationCollision rechaza esta colisión de correlativo
+            var method = typeof(NubefactInvoiceService).GetMethod("IsRecoverableBillableOperationCollision",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.NotNull(method);
+
+            var args = new object?[] { dbEx, null };
+            var isRecoverable = (bool)method.Invoke(null, args)!;
+            Assert.False(isRecoverable);
+
+            // Cleanup
+            db.ElectronicReceipts.Remove(r1);
+            db.Bookings.Remove(booking);
+            db.TourPackages.Remove(tour);
+            await db.SaveChangesAsync();
+        }
     }
 }

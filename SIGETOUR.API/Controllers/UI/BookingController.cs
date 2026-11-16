@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using SIGETOUR.API.Application.Invoicing;
 using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Application.Payments;
@@ -27,17 +28,20 @@ namespace SIGETOUR.API.Controllers.UI
         private readonly CheckoutAccess _checkoutAccess;
         private readonly IConfiguration _configuration;
         private readonly ICapacityValidationService _capacityService;
+        private readonly ILogger<BookingController>? _logger;
 
         public BookingController(
             AppDbContext context,
             CheckoutAccess? checkoutAccess = null,
             IConfiguration? configuration = null,
-            ICapacityValidationService? capacityService = null)
+            ICapacityValidationService? capacityService = null,
+            ILogger<BookingController>? logger = null)
         {
             _context = context;
             _configuration = configuration ?? new ConfigurationBuilder().Build();
             _checkoutAccess = checkoutAccess ?? CreateDefaultCheckoutAccess(_configuration);
             _capacityService = capacityService ?? new CapacityValidationService(_context);
+            _logger = logger;
         }
 
         private static CheckoutAccess CreateDefaultCheckoutAccess(IConfiguration config)
@@ -587,54 +591,32 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null, string? token = null, Guid? cashTransactionId = null)
+        public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null, string? token = null, Guid? cashTransactionId = null, Guid? receiptId = null)
         {
             // Solo consultar y mostrar datos existentes (operación GET estrictamente idempotente y de solo lectura)
-            // 1. Búsqueda por identificador exacto de comprobante (receiptId)
-            ElectronicReceipt? receipt = await _context.ElectronicReceipts
-                .Include(r => r.Booking)
-                .ThenInclude(b => b.Items)
-                .ThenInclude(i => i.TourPackage)
-                .FirstOrDefaultAsync(r => r.Id == id);
+            
+            // 1. Identificar comprobante exacto si 'receiptId' fue provisto o si 'id' coincide con un comprobante existente
+            ElectronicReceipt? receipt = null;
+            Guid? effectiveReceiptId = receiptId.HasValue && receiptId.Value != Guid.Empty ? receiptId.Value : null;
 
-            // 2. Búsqueda por identificador exacto de pago (paymentId o id como paymentId)
-            if (receipt == null && paymentId.HasValue)
+            if (effectiveReceiptId.HasValue)
             {
                 receipt = await _context.ElectronicReceipts
                     .Include(r => r.Booking)
                     .ThenInclude(b => b.Items)
                     .ThenInclude(i => i.TourPackage)
-                    .FirstOrDefaultAsync(r => r.CulqiPaymentId == paymentId.Value);
+                    .FirstOrDefaultAsync(r => r.Id == effectiveReceiptId.Value);
+
+                if (receipt == null) return NotFound("El comprobante especificado no existe.");
             }
-
-            if (receipt == null && cashTransactionId.HasValue)
+            else
             {
+                // Comprobar si 'id' es un ReceiptId directo
                 receipt = await _context.ElectronicReceipts
                     .Include(r => r.Booking)
                     .ThenInclude(b => b.Items)
                     .ThenInclude(i => i.TourPackage)
-                    .FirstOrDefaultAsync(r => r.CashTransactionId == cashTransactionId.Value);
-            }
-
-            if (receipt == null)
-            {
-                receipt = await _context.ElectronicReceipts
-                    .Include(r => r.Booking)
-                    .ThenInclude(b => b.Items)
-                    .ThenInclude(i => i.TourPackage)
-                    .FirstOrDefaultAsync(r => r.CulqiPaymentId == id);
-            }
-
-            // 3. Respaldo por BookingId si id coincide con una reserva (priorizando el comprobante más reciente)
-            if (receipt == null)
-            {
-                receipt = await _context.ElectronicReceipts
-                    .Include(r => r.Booking)
-                    .ThenInclude(b => b.Items)
-                    .ThenInclude(i => i.TourPackage)
-                    .Where(r => r.BookingId == id)
-                    .OrderByDescending(r => r.CreatedAtUtc)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefaultAsync(r => r.Id == id);
             }
 
             Booking? booking = receipt?.Booking;
@@ -653,10 +635,189 @@ namespace SIGETOUR.API.Controllers.UI
                 return Unauthorized("Se requiere autorización o token válido para acceder al comprobante.");
             }
 
+            // 2. Si se solicitó un cashTransactionId específico:
+            if (cashTransactionId.HasValue && cashTransactionId.Value != Guid.Empty)
+            {
+                var cashTx = await _context.CashTransactions.FirstOrDefaultAsync(t => t.Id == cashTransactionId.Value);
+                if (cashTx == null)
+                {
+                    return NotFound("El movimiento de caja especificado no existe.");
+                }
+                if (cashTx.BookingId != booking.Id)
+                {
+                    return BadRequest("El movimiento de caja no pertenece a la reserva especificada.");
+                }
+
+                // Requisito 1.d: Si el movimiento está vinculado a Culqi, resolver su comprobante canónico por CulqiPaymentId o CashTransactionId
+                if (cashTx.CulqiPaymentId.HasValue)
+                {
+                    receipt = await _context.ElectronicReceipts
+                        .Include(r => r.Booking)
+                        .ThenInclude(b => b.Items)
+                        .ThenInclude(i => i.TourPackage)
+                        .FirstOrDefaultAsync(r => r.CulqiPaymentId == cashTx.CulqiPaymentId.Value || r.CashTransactionId == cashTx.Id);
+                }
+                else
+                {
+                    receipt = await _context.ElectronicReceipts
+                        .Include(r => r.Booking)
+                        .ThenInclude(b => b.Items)
+                        .ThenInclude(i => i.TourPackage)
+                        .FirstOrDefaultAsync(r => r.CashTransactionId == cashTx.Id || r.BillableOperationKey == $"CASH:{cashTx.Id:N}");
+                }
+
+                // Si no existe comprobante para este movimiento, receipt queda null (no sustituir por el último de la reserva)
+                ViewBag.SelectedCashTransactionId = cashTx.Id;
+                ViewBag.SelectedOperationAmount = cashTx.Amount;
+                ViewBag.SelectedPaymentMethod = cashTx.PaymentMethod ?? booking.PaymentMethod;
+                ViewBag.SelectedOperationNumber = cashTx.ReferenceCode ?? booking.OperationNumber;
+                ViewBag.SelectedOperationDescription = $"{cashTx.Category ?? "Cobro"} - S/ {cashTx.Amount:N2}";
+                ViewBag.SelectedOperationDate = cashTx.CreatedAt;
+            }
+            // 3. Si se solicitó un paymentId (Culqi) específico:
+            else if (paymentId.HasValue && paymentId.Value != Guid.Empty)
+            {
+                var culqi = await _context.CulqiPayments.FirstOrDefaultAsync(p => p.Id == paymentId.Value);
+                if (culqi == null)
+                {
+                    return NotFound("El pago Culqi especificado no existe.");
+                }
+                if (culqi.BookingId != booking.Id)
+                {
+                    return BadRequest("El pago Culqi no pertenece a la reserva especificada.");
+                }
+
+                receipt = await _context.ElectronicReceipts
+                    .Include(r => r.Booking)
+                    .ThenInclude(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .FirstOrDefaultAsync(r => r.CulqiPaymentId == culqi.Id || r.BillableOperationKey == $"CULQI:{culqi.Id:N}");
+
+                ViewBag.PaymentId = culqi.Id;
+                ViewBag.SelectedOperationAmount = culqi.AmountCents / 100m;
+                ViewBag.SelectedPaymentMethod = "Culqi";
+                ViewBag.SelectedOperationNumber = culqi.ProviderId ?? booking.OperationNumber;
+                ViewBag.SelectedOperationDescription = $"Pago Culqi - S/ {(culqi.AmountCents / 100m):N2}";
+                ViewBag.SelectedOperationDate = culqi.CreatedAtUtc;
+            }
+            // 4. Si se accedió por reserva sin operación seleccionada (y 'id' no era un receiptId):
+            else if (receipt == null)
+            {
+                var bookingReceipts = await _context.ElectronicReceipts
+                    .Include(r => r.Booking)
+                    .ThenInclude(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .Where(r => r.BookingId == booking.Id)
+                    .OrderByDescending(r => r.CreatedAtUtc)
+                    .ToListAsync();
+
+                var allIncomeCash = await _context.CashTransactions
+                    .Where(t => t.BookingId == booking.Id && t.TransactionType == "Ingreso")
+                    .OrderBy(t => t.CreatedAt)
+                    .ToListAsync();
+
+                var unbilledCash = allIncomeCash
+                    .Where(t => !bookingReceipts.Any(r => r.CashTransactionId == t.Id || (t.CulqiPaymentId != null && r.CulqiPaymentId == t.CulqiPaymentId)))
+                    .ToList();
+
+                var allCulqi = await _context.CulqiPayments
+                    .Where(p => p.BookingId == booking.Id && p.Status == "paid")
+                    .OrderBy(p => p.CreatedAtUtc)
+                    .ToListAsync();
+
+                var unbilledCulqi = allCulqi
+                    .Where(p => !bookingReceipts.Any(r => r.CulqiPaymentId == p.Id))
+                    .ToList();
+
+                int totalOps = bookingReceipts.Count + unbilledCash.Count + unbilledCulqi.Count;
+
+                if (totalOps <= 1)
+                {
+                    if (bookingReceipts.Count == 1)
+                    {
+                        receipt = bookingReceipts[0];
+                    }
+                    else if (unbilledCash.Count == 1)
+                    {
+                        var tx = unbilledCash[0];
+                        ViewBag.SelectedCashTransactionId = tx.Id;
+                        ViewBag.SelectedOperationAmount = tx.Amount;
+                        ViewBag.SelectedPaymentMethod = tx.PaymentMethod ?? booking.PaymentMethod;
+                        ViewBag.SelectedOperationNumber = tx.ReferenceCode;
+                        ViewBag.SelectedOperationDescription = $"{tx.Category ?? "Cobro"} - S/ {tx.Amount:N2}";
+                        ViewBag.SelectedOperationDate = tx.CreatedAt;
+                    }
+                    else if (unbilledCulqi.Count == 1)
+                    {
+                        var c = unbilledCulqi[0];
+                        ViewBag.PaymentId = c.Id;
+                        ViewBag.SelectedOperationAmount = c.AmountCents / 100m;
+                        ViewBag.SelectedPaymentMethod = "Culqi";
+                        ViewBag.SelectedOperationNumber = c.ProviderId;
+                        ViewBag.SelectedOperationDescription = $"Pago Culqi - S/ {(c.AmountCents / 100m):N2}";
+                        ViewBag.SelectedOperationDate = c.CreatedAtUtc;
+                    }
+                }
+                else
+                {
+                    // Requisito 1.f: No elegir arbitrariamente; presentar opciones de selección explícita
+                    receipt = null;
+                    var availableOps = new List<BookingOperationOptionViewModel>();
+
+                    foreach (var r in bookingReceipts)
+                    {
+                        availableOps.Add(new BookingOperationOptionViewModel
+                        {
+                            Type = "Receipt",
+                            ReceiptId = r.Id,
+                            Title = $"{r.ReceiptType} {r.FullNumber}",
+                            Amount = r.TotalAmount,
+                            Status = r.Status,
+                            IsBilled = true,
+                            Date = r.IssuedAtUtc ?? r.CreatedAtUtc,
+                            PaymentMethod = r.CustomerDocType == "6" ? "Factura" : "Boleta",
+                            ReferenceCode = r.FullNumber
+                        });
+                    }
+
+                    foreach (var tx in unbilledCash)
+                    {
+                        availableOps.Add(new BookingOperationOptionViewModel
+                        {
+                            Type = "CashTransaction",
+                            CashTransactionId = tx.Id,
+                            Title = $"Movimiento de Caja ({tx.Category ?? "Cobro"})",
+                            Amount = tx.Amount,
+                            Status = "Sin Comprobante",
+                            IsBilled = false,
+                            Date = tx.CreatedAt,
+                            PaymentMethod = tx.PaymentMethod ?? "Efectivo",
+                            ReferenceCode = tx.ReferenceCode
+                        });
+                    }
+
+                    foreach (var c in unbilledCulqi)
+                    {
+                        availableOps.Add(new BookingOperationOptionViewModel
+                        {
+                            Type = "CulqiPayment",
+                            CulqiPaymentId = c.Id,
+                            Title = "Pago Culqi (Confirmado)",
+                            Amount = c.AmountCents / 100m,
+                            Status = "Sin Comprobante",
+                            IsBilled = false,
+                            Date = c.CreatedAtUtc,
+                            PaymentMethod = "Culqi",
+                            ReferenceCode = c.ProviderId
+                        });
+                    }
+
+                    ViewBag.AvailableOperations = availableOps;
+                }
+            }
+
             ViewBag.Booking = booking;
             ViewBag.TicketSize = (size == "58") ? "58" : "80";
-            ViewBag.PaymentId = paymentId;
-            ViewBag.SelectedCashTransactionId = cashTransactionId;
             return View("Ticket", receipt);
         }
 
@@ -670,55 +831,109 @@ namespace SIGETOUR.API.Controllers.UI
             [FromServices] IElectronicReceiptService receiptService,
             Guid? cashTransactionId = null)
         {
-            // Bloque 2 Item 9: Trabajar con el identificador exacto del comprobante y rechazar identificadores incompatibles
-            if (receiptId.HasValue && receiptId.Value != Guid.Empty)
+            try
             {
-                var existingReceipt = await _context.ElectronicReceipts.FindAsync(receiptId.Value);
-                if (existingReceipt == null)
+                // Bloque 2 Item 9: Trabajar con el identificador exacto del comprobante y rechazar identificadores incompatibles
+                if (receiptId.HasValue && receiptId.Value != Guid.Empty)
                 {
-                    return NotFound("El comprobante especificado no existe.");
+                    var existingReceipt = await _context.ElectronicReceipts.FindAsync(receiptId.Value);
+                    if (existingReceipt == null)
+                    {
+                        return NotFound("El comprobante especificado no existe.");
+                    }
+
+                    if (bookingId.HasValue && bookingId.Value != existingReceipt.BookingId)
+                    {
+                        return BadRequest("El identificador de reserva no coincide con el comprobante.");
+                    }
+                    if (paymentId.HasValue && existingReceipt.CulqiPaymentId.HasValue && paymentId.Value != existingReceipt.CulqiPaymentId.Value)
+                    {
+                        return BadRequest("El identificador de pago no coincide con el comprobante.");
+                    }
+                    if (cashTransactionId.HasValue && existingReceipt.CashTransactionId.HasValue && cashTransactionId.Value != existingReceipt.CashTransactionId.Value)
+                    {
+                        return BadRequest("El identificador de transacción de caja no coincide con el comprobante.");
+                    }
+
+                    var retried = await receiptService.RetryReceiptAsync(receiptId.Value)
+                        ?? (existingReceipt.CashTransactionId.HasValue
+                            ? await receiptService.GenerateReceiptAsync(
+                                existingReceipt.BookingId,
+                                existingReceipt.CulqiPaymentId,
+                                exactReceiptId: existingReceipt.Id,
+                                claimToken: null,
+                                cashTransactionId: existingReceipt.CashTransactionId,
+                                billableOperationKey: existingReceipt.BillableOperationKey)
+                            : await receiptService.GenerateReceiptAsync(existingReceipt.BookingId, existingReceipt.CulqiPaymentId));
+                    return RedirectToAction("Ticket", new { id = retried?.Id ?? receiptId.Value });
                 }
 
-                if (bookingId.HasValue && bookingId.Value != existingReceipt.BookingId)
+                if (!bookingId.HasValue || bookingId.Value == Guid.Empty)
                 {
-                    return BadRequest("El identificador de reserva no coincide con el comprobante.");
-                }
-                if (paymentId.HasValue && existingReceipt.CulqiPaymentId.HasValue && paymentId.Value != existingReceipt.CulqiPaymentId.Value)
-                {
-                    return BadRequest("El identificador de pago no coincide con el comprobante.");
-                }
-                if (cashTransactionId.HasValue && existingReceipt.CashTransactionId.HasValue && cashTransactionId.Value != existingReceipt.CashTransactionId.Value)
-                {
-                    return BadRequest("El identificador de transacción de caja no coincide con el comprobante.");
+                    return BadRequest("Se requiere el identificador exacto del comprobante o de la reserva.");
                 }
 
-                var retried = await receiptService.RetryReceiptAsync(receiptId.Value)
-                    ?? (existingReceipt.CashTransactionId.HasValue
-                        ? await receiptService.GenerateReceiptAsync(
-                            existingReceipt.BookingId,
-                            existingReceipt.CulqiPaymentId,
-                            exactReceiptId: existingReceipt.Id,
-                            claimToken: null,
-                            cashTransactionId: existingReceipt.CashTransactionId,
-                            billableOperationKey: existingReceipt.BillableOperationKey)
-                        : await receiptService.GenerateReceiptAsync(existingReceipt.BookingId, existingReceipt.CulqiPaymentId));
-                return RedirectToAction("Ticket", new { id = retried?.Id ?? receiptId.Value });
+                var booking = await _context.Bookings.FindAsync(bookingId.Value);
+                if (booking == null)
+                {
+                    return NotFound("La reserva especificada no existe.");
+                }
+
+                // Validación estricta de cashTransactionId antes de llamar al servicio
+                if (cashTransactionId.HasValue && cashTransactionId.Value != Guid.Empty)
+                {
+                    var cashTx = await _context.CashTransactions.FindAsync(cashTransactionId.Value);
+                    if (cashTx == null)
+                    {
+                        return NotFound("El movimiento de caja especificado no existe.");
+                    }
+                    if (cashTx.BookingId != bookingId.Value)
+                    {
+                        return BadRequest("El movimiento de caja no pertenece a la reserva especificada.");
+                    }
+                }
+
+                // Validación estricta de paymentId antes de llamar al servicio
+                if (paymentId.HasValue && paymentId.Value != Guid.Empty)
+                {
+                    var culqi = await _context.CulqiPayments.FindAsync(paymentId.Value);
+                    if (culqi == null)
+                    {
+                        return NotFound("El pago Culqi especificado no existe.");
+                    }
+                    if (culqi.BookingId != bookingId.Value)
+                    {
+                        return BadRequest("El pago Culqi no pertenece a la reserva especificada.");
+                    }
+                }
+
+                ElectronicReceipt result;
+                if (cashTransactionId.HasValue)
+                {
+                    result = await receiptService.GenerateReceiptAsync(
+                        bookingId.Value,
+                        culqiPaymentId: paymentId,
+                        exactReceiptId: null,
+                        claimToken: null,
+                        cashTransactionId: cashTransactionId);
+                }
+                else
+                {
+                    result = await receiptService.GenerateReceiptAsync(bookingId.Value, paymentId);
+                }
+
+                return RedirectToAction("Ticket", new { id = result.Id });
             }
-
-            if (!bookingId.HasValue || bookingId.Value == Guid.Empty)
+            catch (InvalidOperationException ex)
             {
-                return BadRequest("Se requiere el identificador exacto del comprobante o de la reserva.");
+                // Error esperado de validación de negocio (ej. reserva con múltiples cobros sin seleccionar)
+                _logger?.LogWarning(ex, "Validación de facturación rechazada para reserva {BookingId}: {Message}", bookingId, ex.Message);
+                if (TempData != null)
+                {
+                    TempData["ErrorMessage"] = ex.Message;
+                }
+                return RedirectToAction("Ticket", new { id = bookingId, cashTransactionId = cashTransactionId, paymentId = paymentId });
             }
-
-            var result = cashTransactionId.HasValue
-                ? await receiptService.GenerateReceiptAsync(
-                    bookingId.Value,
-                    culqiPaymentId: paymentId,
-                    exactReceiptId: null,
-                    claimToken: null,
-                    cashTransactionId: cashTransactionId)
-                : await receiptService.GenerateReceiptAsync(bookingId.Value, paymentId);
-            return RedirectToAction("Ticket", new { id = result.Id });
         }
 
         [HttpPost]

@@ -17,10 +17,12 @@
 
     var title = (receipt?.ReceiptType == "Factura" ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA");
     var fullNumber = receipt?.FullNumber ?? (booking != null ? $"PROV-{booking.ReferenceCode}" : "---");
-    var totalAmount = receipt?.TotalAmount ?? (booking?.PaidAmount > 0 ? booking.PaidAmount : booking?.TotalAmount ?? 0m);
+    var selectedOpAmount = ViewBag.SelectedOperationAmount as decimal?;
+    var totalAmount = receipt?.TotalAmount ?? selectedOpAmount ?? (booking?.PaidAmount > 0 ? booking.PaidAmount : booking?.TotalAmount ?? 0m);
     var subtotalAmount = receipt?.SubtotalAmount ?? Math.Round(totalAmount / 1.18m, 2);
     var igvAmount = receipt?.IgvAmount ?? (totalAmount - subtotalAmount);
-    var issuedDate = receipt?.IssuedAtUtc ?? booking?.BookingDate ?? DateTime.UtcNow;
+    var selectedOpDate = ViewBag.SelectedOperationDate as DateTime?;
+    var issuedDate = receipt?.IssuedAtUtc ?? selectedOpDate ?? booking?.BookingDate ?? DateTime.UtcNow;
 
     // Snapshot inmutable si está disponible para reimpresión histórica desacoplada
     bool hasSnapshot = false;
@@ -152,6 +154,62 @@
         </div>
     </header>
 
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="w-full max-w-4xl mx-auto my-3 px-4 no-print">
+            <div class="p-3 bg-red-600 text-white rounded-lg shadow font-medium text-xs flex items-center gap-2">
+                <span class="material-symbols-outlined text-lg">error</span>
+                <span>@TempData["ErrorMessage"]</span>
+            </div>
+        </div>
+    }
+
+    @{
+        var availableOps = ViewBag.AvailableOperations as List<SIGETOUR.API.Models.BookingOperationOptionViewModel>;
+    }
+    @if (availableOps != null && availableOps.Count > 1)
+    {
+        <div class="w-full max-w-2xl mx-auto my-4 p-4 bg-white rounded-xl shadow border border-slate-300 no-print">
+            <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5 mb-2">
+                <span class="material-symbols-outlined text-emerald-600 text-base">receipt_long</span>
+                Esta reserva tiene múltiples operaciones. Seleccione una para ver o emitir su comprobante:
+            </h3>
+            <div class="divide-y divide-slate-100 text-xs">
+                @foreach (var op in availableOps)
+                {
+                    var linkUrl = op.ReceiptId.HasValue
+                        ? Url.Action("Ticket", "Booking", new { id = op.ReceiptId.Value })
+                        : (op.CashTransactionId.HasValue
+                            ? Url.Action("Ticket", "Booking", new { id = booking?.Id, cashTransactionId = op.CashTransactionId.Value })
+                            : Url.Action("Ticket", "Booking", new { id = booking?.Id, paymentId = op.CulqiPaymentId }));
+
+                    <div class="py-2.5 flex items-center justify-between gap-3">
+                        <div>
+                            <div class="font-bold text-slate-900">@op.Title</div>
+                            <div class="text-[11px] text-slate-500">
+                                @op.Date.ToString("dd/MM/yyyy HH:mm") - Ref: @(op.ReferenceCode ?? "---")
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="font-bold text-slate-900">S/ @op.Amount.ToString("N2")</span>
+                            @if (op.IsBilled)
+                            {
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">Facturado</span>
+                            }
+                            else
+                            {
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">Pendiente</span>
+                            }
+                            <a href="@linkUrl" class="px-2.5 py-1 rounded bg-slate-900 text-white font-medium hover:bg-slate-800 text-[11px]">
+                                Ver Ticket
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
     <!-- 2. LIENZO / CONTENEDOR DEL TICKET TÉRMICO -->
     <main class="my-6 px-2 flex justify-center w-full">
         <div class="ticket-container bg-white text-black shadow-xl border border-gray-300 ticket-font leading-tight @(is58 ? "w-[54mm] max-w-[54mm] p-2 text-[9px]" : "w-[80mm] max-w-[80mm] p-4 text-[11px]")">
@@ -218,9 +276,10 @@
                 <div class="text-center font-bold text-[8.5px] bg-red-100 text-red-900 p-1.5 border border-red-500 rounded mb-1.5 break-words uppercase">
                     *** COMPROBANTE RECHAZADO ***<br />
                     <span class="normal-case font-medium block mt-0.5 text-[8px]">@cleanErr</span>
-                    @if (booking != null || receipt != null)
+                    @if ((booking != null || receipt != null) && User?.Identity?.IsAuthenticated == true && User.HasClaim("Permission", SIGETOUR.API.Core.Security.AppPermissions.ReceiptsManage))
                     {
                         <form asp-controller="Booking" asp-action="RetryReceipt" method="post" class="mt-1 no-print">
+                            @Html.AntiForgeryToken()
                             @if (receipt != null)
                             {
                                 <input type="hidden" name="receiptId" value="@receipt.Id" />
@@ -254,9 +313,14 @@
                 <div class="text-center font-bold text-[8.5px] bg-amber-50 text-amber-900 p-1.5 border border-amber-400 rounded mb-1.5 uppercase">
                     *** VOUCHER PROVISIONAL ***<br />
                     COMPROBANTE AÚN NO EMITIDO
-                    @if (booking != null && booking.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed)
+                    @if (ViewBag.SelectedOperationDescription != null)
+                    {
+                        <span class="normal-case font-medium block mt-0.5 text-[8px]">@ViewBag.SelectedOperationDescription</span>
+                    }
+                    @if (booking != null && booking.Status == SIGETOUR.API.Core.Entities.BookingStatus.Confirmed && User?.Identity?.IsAuthenticated == true && User.HasClaim("Permission", SIGETOUR.API.Core.Security.AppPermissions.ReceiptsManage))
                     {
                         <form asp-controller="Booking" asp-action="RetryReceipt" method="post" class="mt-1 no-print">
+                            @Html.AntiForgeryToken()
                             <input type="hidden" name="bookingId" value="@booking.Id" />
                             @if (ViewBag.PaymentId != null)
                             {
@@ -456,12 +520,18 @@
                     var snapshotPaymentMethod = hasSnapshot && snapshotRoot.TryGetProperty("Documento", out var sDocMp) && sDocMp.TryGetProperty("MedioPago", out var sMpVal)
                         ? sMpVal.GetString()
                         : null;
-                    var displayPaymentMethod = !string.IsNullOrWhiteSpace(snapshotPaymentMethod) ? snapshotPaymentMethod : (booking?.PaymentMethod ?? "Tarjeta Culqi / Online");
+                    var selectedPaymentMethod = ViewBag.SelectedPaymentMethod as string;
+                    var displayPaymentMethod = !string.IsNullOrWhiteSpace(snapshotPaymentMethod) 
+                        ? snapshotPaymentMethod 
+                        : (!string.IsNullOrWhiteSpace(selectedPaymentMethod) ? selectedPaymentMethod : (booking?.PaymentMethod ?? "Tarjeta Culqi / Online"));
 
                     var snapshotOpNumber = hasSnapshot && snapshotRoot.TryGetProperty("Documento", out var sDocOp) && sDocOp.TryGetProperty("OperacionNumero", out var sOpVal)
                         ? sOpVal.GetString()
                         : null;
-                    var displayOpNumber = !string.IsNullOrWhiteSpace(snapshotOpNumber) ? snapshotOpNumber : booking?.OperationNumber;
+                    var selectedOpNumber = ViewBag.SelectedOperationNumber as string;
+                    var displayOpNumber = !string.IsNullOrWhiteSpace(snapshotOpNumber) 
+                        ? snapshotOpNumber 
+                        : (!string.IsNullOrWhiteSpace(selectedOpNumber) ? selectedOpNumber : booking?.OperationNumber);
 
                     var snapshotModalidad = hasSnapshot && snapshotRoot.TryGetProperty("Documento", out var sDocMod) && sDocMod.TryGetProperty("Modalidad", out var sModVal)
                         ? sModVal.GetString()

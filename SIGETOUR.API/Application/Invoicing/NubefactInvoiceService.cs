@@ -578,7 +578,14 @@ namespace SIGETOUR.API.Application.Invoicing
             return GenerateReceiptAsync(bookingId, culqiPaymentId, exactReceiptId, claimToken, cashTransactionId: null, billableOperationKey: null, ct);
         }
 
-        private static bool IsPostgresUniqueViolation(DbUpdateException ex, out string? constraintName)
+        private static readonly HashSet<string> AllowedBillableOperationConstraints = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "IX_ElectronicReceipts_BillableOperationKey",
+            "IX_ElectronicReceipts_CashTransactionId",
+            "IX_ElectronicReceipts_CulqiPaymentId"
+        };
+
+        private static bool IsRecoverableBillableOperationCollision(DbUpdateException ex, out string? constraintName)
         {
             constraintName = null;
 
@@ -586,10 +593,13 @@ namespace SIGETOUR.API.Application.Invoicing
             {
                 if (curr is Npgsql.PostgresException pgEx)
                 {
-                    if (pgEx.SqlState == "23505")
+                    if (pgEx.SqlState == "23505" && !string.IsNullOrWhiteSpace(pgEx.ConstraintName))
                     {
-                        constraintName = pgEx.ConstraintName;
-                        return true;
+                        if (AllowedBillableOperationConstraints.Contains(pgEx.ConstraintName))
+                        {
+                            constraintName = pgEx.ConstraintName;
+                            return true;
+                        }
                     }
                     return false;
                 }
@@ -598,29 +608,27 @@ namespace SIGETOUR.API.Application.Invoicing
             var msg = ex.InnerException?.Message ?? ex.Message;
             if (msg.Contains("23503", StringComparison.OrdinalIgnoreCase) ||
                 msg.Contains("foreign key", StringComparison.OrdinalIgnoreCase) ||
-                msg.Contains("violates foreign key constraint", StringComparison.OrdinalIgnoreCase))
+                msg.Contains("violates foreign key constraint", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("IX_ElectronicReceipts_Series_Number_ReceiptType", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("PK_ElectronicReceipts", StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
 
-            if (msg.Contains("23505", StringComparison.OrdinalIgnoreCase) ||
-                msg.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
-                msg.Contains("unique constraint", StringComparison.OrdinalIgnoreCase) ||
-                msg.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase))
+            foreach (var allowed in AllowedBillableOperationConstraints)
             {
-                if (msg.Contains("IX_ElectronicReceipts_BillableOperationKey", StringComparison.OrdinalIgnoreCase))
-                    constraintName = "IX_ElectronicReceipts_BillableOperationKey";
-                else if (msg.Contains("IX_ElectronicReceipts_CashTransactionId", StringComparison.OrdinalIgnoreCase))
-                    constraintName = "IX_ElectronicReceipts_CashTransactionId";
-                else if (msg.Contains("IX_ElectronicReceipts_CulqiPaymentId", StringComparison.OrdinalIgnoreCase))
-                    constraintName = "IX_ElectronicReceipts_CulqiPaymentId";
-                else
-                    constraintName = "UNIQUE";
-                return true;
+                if (msg.Contains(allowed, StringComparison.OrdinalIgnoreCase))
+                {
+                    constraintName = allowed;
+                    return true;
+                }
             }
 
             return false;
         }
+
+        private static bool IsPostgresUniqueViolation(DbUpdateException ex, out string? constraintName)
+            => IsRecoverableBillableOperationCollision(ex, out constraintName);
 
         private async Task<ElectronicReceipt?> FindExistingReceiptAsync(
             Guid bookingId,
@@ -1158,11 +1166,11 @@ namespace SIGETOUR.API.Application.Invoicing
                     }
                     catch (DbUpdateException ex)
                     {
-                        if (!IsPostgresUniqueViolation(ex, out var constraintName))
+                        if (!IsRecoverableBillableOperationCollision(ex, out var constraintName))
                         {
                             throw;
                         }
-                        _logger.LogInformation(ex, "Colisión de unicidad ({Constraint}) al insertar ElectronicReceipt para {OpKey}. Desasociando entidad y recargando ganador.", constraintName, identity.OperationKey);
+                        _logger.LogInformation(ex, "Colisión recuperable de identidad de operación ({Constraint}) al insertar ElectronicReceipt para {OpKey}. Desasociando entidad y recargando ganador.", constraintName, identity.OperationKey);
                         _db.Entry(receipt).State = EntityState.Detached;
                         var winner = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: false, ct);
                         if (winner != null) return winner;
@@ -1208,11 +1216,11 @@ namespace SIGETOUR.API.Application.Invoicing
                         }
                         catch (DbUpdateException ex)
                         {
-                            if (!IsPostgresUniqueViolation(ex, out var constraintName))
+                            if (!IsRecoverableBillableOperationCollision(ex, out var constraintName))
                             {
                                 throw;
                             }
-                            _logger.LogInformation(ex, "Colisión concurrente ({Constraint}) al insertar ElectronicReceipt para {OpKey}. Desasociando entidad y recargando ganador.", constraintName, identity.OperationKey);
+                            _logger.LogInformation(ex, "Colisión concurrente recuperable ({Constraint}) al insertar ElectronicReceipt para {OpKey}. Desasociando entidad y recargando ganador.", constraintName, identity.OperationKey);
                             _db.Entry(receipt).State = EntityState.Detached;
 
                             receipt = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: false, ct);
