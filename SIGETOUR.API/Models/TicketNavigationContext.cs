@@ -31,16 +31,24 @@ namespace SIGETOUR.API.Models
                 ["size"] = cleanSize
             };
 
-            // Si se accedió por un comprobante directo en la ruta:
-            if (ReceiptId.HasValue && ReceiptId.Value != Guid.Empty && RouteId == ReceiptId.Value)
+            // 1. Si ya se resolvió un comprobante válido, conservar su ReceiptId como identidad inequívoca del documento
+            if (ReceiptId.HasValue && ReceiptId.Value != Guid.Empty)
             {
-                routeValues["id"] = ReceiptId.Value;
+                if (RouteId == ReceiptId.Value)
+                {
+                    routeValues["id"] = ReceiptId.Value;
+                }
+                else
+                {
+                    routeValues["id"] = BookingId != Guid.Empty ? BookingId : RouteId;
+                    routeValues["receiptId"] = ReceiptId.Value;
+                }
             }
             else
             {
+                // 2. Si aún no existe comprobante emitido (ticket provisional o selector), conservar la operación seleccionada
                 routeValues["id"] = BookingId != Guid.Empty ? BookingId : RouteId;
 
-                // Conservar la operación seleccionada exactamente
                 if (CashTransactionId.HasValue && CashTransactionId.Value != Guid.Empty)
                 {
                     routeValues["cashTransactionId"] = CashTransactionId.Value;
@@ -49,13 +57,9 @@ namespace SIGETOUR.API.Models
                 {
                     routeValues["paymentId"] = PaymentId.Value;
                 }
-                else if (ReceiptId.HasValue && ReceiptId.Value != Guid.Empty)
-                {
-                    routeValues["receiptId"] = ReceiptId.Value;
-                }
             }
 
-            // Propagar el token de acceso únicamente si fue validado positivamente para esta reserva
+            // 3. Propagar el token de acceso únicamente si fue validado positivamente para esta reserva
             if (IsTokenAuthorized && !string.IsNullOrWhiteSpace(Token))
             {
                 routeValues["token"] = Token.Trim();

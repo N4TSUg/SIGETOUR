@@ -590,6 +590,52 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction("Voucher", new { id = booking.Id, token = redirectToken });
         }
 
+        private async Task<ElectronicReceipt?> FindReceiptForCulqiOperationAsync(
+            Guid bookingId,
+            Guid culqiPaymentId,
+            Guid? cashTransactionId = null)
+        {
+            var culqiKey = $"CULQI:{culqiPaymentId:N}";
+            var cashKey = cashTransactionId.HasValue ? $"CASH:{cashTransactionId.Value:N}" : null;
+
+            var candidates = await _context.ElectronicReceipts
+                .Include(r => r.Booking)
+                .ThenInclude(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
+                .Where(r => r.BookingId == bookingId &&
+                    (r.CulqiPaymentId == culqiPaymentId ||
+                     r.BillableOperationKey == culqiKey ||
+                     (cashTransactionId.HasValue && r.CashTransactionId == cashTransactionId.Value) ||
+                     (cashKey != null && r.BillableOperationKey == cashKey)))
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .ToListAsync();
+
+            if (candidates.Count > 1)
+            {
+                var exact = candidates.FirstOrDefault(r => r.CulqiPaymentId == culqiPaymentId || r.BillableOperationKey == culqiKey);
+                if (exact != null) return exact;
+            }
+
+            return candidates.FirstOrDefault();
+        }
+
+        private async Task<ElectronicReceipt?> FindReceiptForManualCashOperationAsync(
+            Guid bookingId,
+            Guid cashTransactionId)
+        {
+            var cashKey = $"CASH:{cashTransactionId:N}";
+
+            return await _context.ElectronicReceipts
+                .Include(r => r.Booking)
+                .ThenInclude(b => b.Items)
+                .ThenInclude(i => i.TourPackage)
+                .Where(r => r.BookingId == bookingId &&
+                    (r.CashTransactionId == cashTransactionId ||
+                     r.BillableOperationKey == cashKey))
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+        }
+
         [HttpGet]
         public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null, string? token = null, Guid? cashTransactionId = null, Guid? receiptId = null)
         {
@@ -669,23 +715,15 @@ namespace SIGETOUR.API.Controllers.UI
                     return BadRequest("El movimiento de caja no pertenece a la reserva especificada.");
                 }
 
-                // Requisito 1.d: Si el movimiento está vinculado a Culqi, resolver su comprobante canónico por CulqiPaymentId o CashTransactionId
+                // Requisito 1.d: Si el movimiento está vinculado a Culqi, resolver su comprobante canónico por CulqiPaymentId, CashTransactionId o BillableOperationKey
                 if (cashTx.CulqiPaymentId.HasValue)
                 {
                     ViewBag.PaymentId = cashTx.CulqiPaymentId.Value;
-                    receipt = await _context.ElectronicReceipts
-                        .Include(r => r.Booking)
-                        .ThenInclude(b => b.Items)
-                        .ThenInclude(i => i.TourPackage)
-                        .FirstOrDefaultAsync(r => r.CulqiPaymentId == cashTx.CulqiPaymentId.Value || r.CashTransactionId == cashTx.Id);
+                    receipt = await FindReceiptForCulqiOperationAsync(booking.Id, cashTx.CulqiPaymentId.Value, cashTx.Id);
                 }
                 else
                 {
-                    receipt = await _context.ElectronicReceipts
-                        .Include(r => r.Booking)
-                        .ThenInclude(b => b.Items)
-                        .ThenInclude(i => i.TourPackage)
-                        .FirstOrDefaultAsync(r => r.CashTransactionId == cashTx.Id || r.BillableOperationKey == $"CASH:{cashTx.Id:N}");
+                    receipt = await FindReceiptForManualCashOperationAsync(booking.Id, cashTx.Id);
                 }
 
                 // Si no existe comprobante para este movimiento, receipt queda null (no sustituir por el último de la reserva)
@@ -715,11 +753,7 @@ namespace SIGETOUR.API.Controllers.UI
                     ViewBag.SelectedCashTransactionId = linkedCash.Id;
                 }
 
-                receipt = await _context.ElectronicReceipts
-                    .Include(r => r.Booking)
-                    .ThenInclude(b => b.Items)
-                    .ThenInclude(i => i.TourPackage)
-                    .FirstOrDefaultAsync(r => r.CulqiPaymentId == culqi.Id || r.BillableOperationKey == $"CULQI:{culqi.Id:N}");
+                receipt = await FindReceiptForCulqiOperationAsync(booking.Id, culqi.Id, linkedCash?.Id);
 
                 ViewBag.PaymentId = culqi.Id;
                 ViewBag.SelectedOperationAmount = culqi.AmountCents / 100m;
