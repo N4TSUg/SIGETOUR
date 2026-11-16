@@ -513,7 +513,7 @@ namespace SIGETOUR.Tests.Controllers
             var bFuturo = new Booking { Id = Guid.NewGuid(), ReferenceCode = "RES-FUT", TravelDate = tomorrowUtc, ShiftName = "Turno 09:30 AM", TotalPassengers = 2, Status = BookingStatus.Confirmed };
             bFuturo.Items.Add(new BookingItem { TourPackageId = tourFuturo.Id, Passengers = 2, SubTotal = 100 });
 
-            var bEspera = new Booking { Id = Guid.NewGuid(), ReferenceCode = "RES-ESP", TravelDate = todayUtc, ShiftName = $"Turno {timeEnEspera}", TotalPassengers = 3, Status = BookingStatus.Confirmed, AssignedVehicleId = veh.Id, AssignedDriverId = driver.Id };
+            var bEspera = new Booking { Id = Guid.NewGuid(), ReferenceCode = "RES-ESP", TravelDate = PeruTime.GetTravelDateRangeUtc(peruNow.AddHours(3).Date).Item1, ShiftName = $"Turno {timeEnEspera}", TotalPassengers = 3, Status = BookingStatus.Confirmed, AssignedVehicleId = veh.Id, AssignedDriverId = driver.Id };
             bEspera.Items.Add(new BookingItem { TourPackageId = tourEnEspera.Id, Passengers = 3, SubTotal = 150 });
 
             var bAbordando = new Booking { Id = Guid.NewGuid(), ReferenceCode = "RES-ABO", TravelDate = todayUtc, ShiftName = $"Turno {timeAbordando}", TotalPassengers = 4, Status = BookingStatus.Confirmed };

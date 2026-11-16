@@ -40,8 +40,10 @@ namespace SIGETOUR.API.Infrastructure.Security
                     var roleClaims = await RoleManager.GetClaimsAsync(identityRole);
                     var permClaims = roleClaims.Where(c => c.Type == "Permission").ToList();
 
-                    // Si el rol aún no tiene permisos administrados en base de datos, inicializar con sus defaults
-                    if (permClaims.Count == 0)
+                    var isConfigured = roleClaims.Any(c => c.Type == "PermissionConfigured");
+
+                    // Si el rol NUNCA ha sido inicializado o configurado, sembrar sus valores iniciales
+                    if (!isConfigured)
                     {
                         var defaults = AppPermissions.GetDefaultPermissionsForRole(role);
                         foreach (var def in defaults)
@@ -52,10 +54,11 @@ namespace SIGETOUR.API.Infrastructure.Security
                                 identity.AddClaim(new Claim("Permission", def));
                             }
                         }
+                        await RoleManager.AddClaimAsync(identityRole, new Claim("PermissionConfigured", "true"));
                     }
                     else
                     {
-                        // Respetar estrictamente la asignación administrada (incluyendo la retirada de permisos)
+                        // Respetar estrictamente la asignación administrada (incluyendo la retirada total de permisos)
                         foreach (var claim in permClaims)
                         {
                             if (!identity.HasClaim("Permission", claim.Value))

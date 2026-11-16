@@ -25,13 +25,15 @@ namespace SIGETOUR.API.Infrastructure.Data
                 }
 
                 var existingClaims = await roleManager.GetClaimsAsync(role);
-                if (!existingClaims.Any(c => c.Type == "Permission"))
+                // Distinguir un rol nunca inicializado de un rol al que se le retiraron deliberadamente los permisos
+                if (!existingClaims.Any(c => c.Type == "PermissionConfigured"))
                 {
                     var defaults = SIGETOUR.API.Core.Security.AppPermissions.GetDefaultPermissionsForRole(roleName);
                     foreach (var perm in defaults)
                     {
                         await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", perm));
                     }
+                    await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("PermissionConfigured", "true"));
                 }
             }
 

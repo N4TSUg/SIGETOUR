@@ -65,6 +65,35 @@ namespace SIGETOUR.API.Application.Invoicing
             return false;
         }
 
+        public static bool IsActiveClaim(string? lastError, out DateTime claimedAt)
+        {
+            claimedAt = DateTime.MinValue;
+            if (string.IsNullOrWhiteSpace(lastError)) return false;
+
+            var parts = lastError.Split(':');
+            if (parts.Length >= 3 && (parts[0] == "CLAIMED" || parts[0] == "SENT_AWAITING_RESPONSE"))
+            {
+                var dateStr = string.Join(":", parts.Skip(2));
+                if (DateTime.TryParse(dateStr, null, System.Globalization.DateTimeStyles.RoundtripKind, out claimedAt))
+                {
+                    var age = DateTime.UtcNow - claimedAt;
+                    return age >= TimeSpan.Zero && age < TimeSpan.FromSeconds(60);
+                }
+            }
+            return false;
+        }
+
+        public static string? ExtractClaimToken(string? lastError)
+        {
+            if (string.IsNullOrWhiteSpace(lastError)) return null;
+            var parts = lastError.Split(':');
+            if (parts.Length >= 3 && (parts[0] == "CLAIMED" || parts[0] == "SENT_AWAITING_RESPONSE"))
+            {
+                return parts[1];
+            }
+            return null;
+        }
+
         public async Task<ElectronicReceipt?> GetReceiptByIdAsync(Guid receiptId, CancellationToken ct = default)
         {
             return await _db.ElectronicReceipts
@@ -91,7 +120,12 @@ namespace SIGETOUR.API.Application.Invoicing
             return GenerateReceiptAsync(bookingId, culqiPaymentId, exactReceiptId: null, ct);
         }
 
-        public async Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, CancellationToken ct = default)
+        public Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, CancellationToken ct = default)
+        {
+            return GenerateReceiptAsync(bookingId, culqiPaymentId, exactReceiptId, claimToken: null, ct);
+        }
+
+        public async Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, string? claimToken, CancellationToken ct = default)
         {
             var mode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
             ElectronicReceipt? receipt = null;
@@ -273,7 +307,7 @@ namespace SIGETOUR.API.Application.Invoicing
             var isCurrentMock = string.Equals(currentConfigMode, "Mock", StringComparison.OrdinalIgnoreCase) || string.Equals(currentConfigMode, "Simulation", StringComparison.OrdinalIgnoreCase);
 
             // Validar incompatibilidad entre simulación y ambientes externos
-            if (!isNew && receipt != null && !string.IsNullOrWhiteSpace(receipt.Environment))
+            if (!isNew && !string.IsNullOrWhiteSpace(receipt.Environment))
             {
                 if ((isMock && !isCurrentMock) || (!isMock && isCurrentMock))
                 {
@@ -327,27 +361,68 @@ namespace SIGETOUR.API.Application.Invoicing
             }
 
             // 6. Conciliación previa y protección contra reemisiones a ciegas
-            if (!isNew && receipt != null)
+            if (!isNew)
             {
+                // Re-verificar estado fresco de la base de datos
+                if (_db.Database.IsRelational())
+                {
+                    try { await _db.Entry(receipt).ReloadAsync(ct); } catch { }
+                }
+
+                if (receipt.Status is "Accepted" or "Demo" or "Simulation")
+                {
+                    return receipt;
+                }
+
+                // Protección InFlight: solo el titular del claimToken activo tiene derecho a emitir
+                if (receipt.Status == "InFlight")
+                {
+                    bool active = IsActiveClaim(receipt.LastError, out _);
+                    var activeToken = ExtractClaimToken(receipt.LastError);
+
+                    if (active && (string.IsNullOrWhiteSpace(claimToken) || !string.Equals(claimToken, activeToken, StringComparison.Ordinal)))
+                    {
+                        _logger.LogWarning("Comprobante {ReceiptId} ya cuenta con una emisión activa en vuelo en otro proceso o hilo. Se bloquea la llamada para evitar emisiones simultáneas.", receipt.Id);
+                        return receipt;
+                    }
+
+                    if (!active)
+                    {
+                        // Abandonado tras envío -> resultado incierto -> RequiresReview (NO reemitir a ciegas)
+                        if (receipt.LastError != null && receipt.LastError.StartsWith("SENT_AWAITING_RESPONSE", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logger.LogWarning("Comprobante {ReceiptId} en vuelo fue interrumpido después de enviar solicitud externa. Resultado incierto; pasando a RequiresReview.", receipt.Id);
+                            receipt.Status = "RequiresReview";
+                            receipt.LastError = "La solicitud fue enviada pero el proceso se interrumpió antes de confirmar el resultado. Requiere verificación manual en portal NubeFact.";
+                            await _db.SaveChangesAsync(ct);
+                            return receipt;
+                        }
+                    }
+                }
+
                 if (receipt.Status == "RequiresReview" && string.IsNullOrWhiteSpace(receipt.Number))
                 {
                     _logger.LogWarning("Comprobante {ReceiptId} en estado 'RequiresReview' sin número correlativo asignado. No se reemite a ciegas para evitar duplicación tributaria en SUNAT; requiere verificación en el portal NubeFact.", receipt.Id);
                     return receipt;
                 }
 
-                if (exactReceiptId == null && receipt.Status == "InFlight" && string.IsNullOrWhiteSpace(receipt.Number))
-                {
-                    _logger.LogWarning("Comprobante {ReceiptId} ya se encuentra en vuelo ('InFlight'). Se reutiliza el registro para evitar emisiones simultáneas.", receipt.Id);
-                    return receipt;
-                }
-
                 if (!string.IsNullOrWhiteSpace(receipt.Number))
                 {
-                    var queried = await QueryReceiptFromProviderAsync(receipt.Id, ct);
-                    if (queried != null && (queried.Status == "Accepted" || queried.Status == "Submitted" || queried.Status == "Demo"))
+                    var reconciliation = await ReconcileReceiptWithProviderAsync(receipt.Id, ct);
+                    if (reconciliation.Status == NubefactReconciliationStatus.Confirmed)
                     {
-                        _logger.LogInformation("Comprobante {FullNumber} recuperado y confirmado tras consulta previa con el proveedor.", queried.FullNumber);
-                        return queried;
+                        _logger.LogInformation("Comprobante {FullNumber} recuperado y confirmado tras consulta previa con el proveedor.", receipt.FullNumber);
+                        return reconciliation.Receipt;
+                    }
+
+                    // Si el resultado es incierto (Unknown), pendiente o rechazado formalmente, TERMINAR sin emitir
+                    if (reconciliation.Status is NubefactReconciliationStatus.Unknown 
+                        or NubefactReconciliationStatus.PendingResponse 
+                        or NubefactReconciliationStatus.ConfirmedRejection 
+                        or NubefactReconciliationStatus.ConfirmedNonExistent)
+                    {
+                        _logger.LogWarning("Operación detenida para comprobante {ReceiptId}: consulta previa inconclusa o resultado no apto para emisión ({Status}).", receipt.Id, reconciliation.Status);
+                        return reconciliation.Receipt;
                     }
                 }
             }
@@ -525,9 +600,13 @@ namespace SIGETOUR.API.Application.Invoicing
                 receipt.Environment = effectiveEnvironment;
             }
             receipt.SnapshotJson = JsonSerializer.Serialize(snapshot);
-            // Persistir InFlight antes de la llamada de red: si el proceso se interrumpe, se reinicia o sufre timeout,
-            // el registro no queda falsamente como intención no enviada ('Pending').
+            // Persistir InFlight y derecho de emisión antes de la preparación y envío
+            if (string.IsNullOrWhiteSpace(claimToken))
+            {
+                claimToken = Guid.NewGuid().ToString("N");
+            }
             receipt.Status = "InFlight";
+            receipt.LastError = $"CLAIMED:{claimToken}:{DateTime.UtcNow:O}";
             if (isNew)
             {
                 _db.ElectronicReceipts.Add(receipt);
@@ -575,6 +654,11 @@ namespace SIGETOUR.API.Application.Invoicing
                 using var requestMsg = new HttpRequestMessage(HttpMethod.Post, ruta);
                 requestMsg.Headers.TryAddWithoutValidation("Authorization", $"Token token=\"{token}\"");
                 requestMsg.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+                // Persistir SENT_AWAITING_RESPONSE antes de la llamada de red: si el proceso se interrumpe
+                // tras el envío externo, el documento se identifica inequívocamente como enviado con resultado incierto
+                receipt.LastError = $"SENT_AWAITING_RESPONSE:{claimToken}:{DateTime.UtcNow:O}";
+                await _db.SaveChangesAsync(ct);
 
                 var response = await _http.SendAsync(requestMsg, ct);
                 var jsonStr = await response.Content.ReadAsStringAsync(ct);
@@ -715,7 +799,6 @@ namespace SIGETOUR.API.Application.Invoicing
                     throw new InvalidOperationException($"El comprobante con ID {receiptId} no existe.");
                 }
 
-                // Comprobantes en estado final no se vuelven a emitir
                 if (receipt.Status is "Accepted" or "Demo" or "Simulation")
                 {
                     return receipt;
@@ -729,53 +812,59 @@ namespace SIGETOUR.API.Application.Invoicing
                     (string.IsNullOrWhiteSpace(envRuta) || string.IsNullOrWhiteSpace(envToken)))
                 {
                     _logger.LogWarning("Incompatibilidad de ambiente para comprobante {ReceiptId}: pertenece a '{DocEnv}', pero el sistema está configurado en '{CurrentMode}'. Operación bloqueada.", receipt.Id, docEnv, currentMode);
-                    throw new InvalidOperationException($"Incompatibilidad de ambiente para comprobante {receipt.Id}: pertenece a '{docEnv}', pero el sistema está configurado en '{currentMode}'. No existen credenciales configuradas para '{docEnv}'. Operación bloqueada.");
+                    throw new InvalidOperationException($"Incompatibilidad de ambiente para el modo '{docEnv}': el sistema está configurado en '{currentMode}' y no dispone de credenciales aisladas para '{docEnv}'. Se bloquea la operación para evitar mezclar ambientes.");
                 }
 
-                // Documentos ya enviados a SUNAT (Submitted) no deben reemitirse a ciegas; consultar si tienen número
-                if (receipt.Status == "Submitted")
+                // Documentos con número asignado: intentar conciliación concluyente
+                if (!string.IsNullOrWhiteSpace(receipt.Number))
                 {
-                    if (!string.IsNullOrWhiteSpace(receipt.Number))
+                    var reconciliation = await ReconcileReceiptWithProviderAsync(receipt.Id, ct);
+                    if (reconciliation.Status == NubefactReconciliationStatus.Confirmed)
                     {
-                        var queried = await QueryReceiptFromProviderAsync(receipt.Id, ct);
-                        if (queried != null && (queried.Status == "Accepted" || queried.Status == "Demo"))
-                        {
-                            return queried;
-                        }
+                        return reconciliation.Receipt;
                     }
-                    return receipt;
+                    if (reconciliation.Status == NubefactReconciliationStatus.PendingResponse)
+                    {
+                        // Documento ya enviado a SUNAT y pendiente de respuesta
+                        return reconciliation.Receipt;
+                    }
+                    if (reconciliation.Status == NubefactReconciliationStatus.ConfirmedRejection)
+                    {
+                        // Rechazo formal por SUNAT
+                        return reconciliation.Receipt;
+                    }
+                    if (reconciliation.Status == NubefactReconciliationStatus.Unknown)
+                    {
+                        // Resultado incierto: terminar sin emitir y retener en revisión manual
+                        _logger.LogWarning("Reintento detenido para comprobante {ReceiptId}: consulta inconclusa con el proveedor. Se retiene en revisión manual para no duplicar comprobantes en SUNAT.", receipt.Id);
+                        return reconciliation.Receipt;
+                    }
+                    if (reconciliation.Status == NubefactReconciliationStatus.ConfirmedNonExistent)
+                    {
+                        _logger.LogWarning("NubeFact confirmó inexistencia previa de {FullNumber}. Se retiene para revisión operativa.", receipt.FullNumber);
+                        receipt.Status = "RequiresReview";
+                        receipt.LastError = "NubeFact confirmó que el correlativo no existe en su sistema. Se retiene para revisión operativa.";
+                        await _db.SaveChangesAsync(ct);
+                        return receipt;
+                    }
                 }
-
-                // Documentos con resultado incierto (RequiresReview) o en vuelo (InFlight): si no tienen correlativo, NO reemitir a ciegas para evitar duplicados en SUNAT
-                if (receipt.Status is "RequiresReview" or "InFlight")
+                else
                 {
-                    if (!string.IsNullOrWhiteSpace(receipt.Number))
-                    {
-                        var queried = await QueryReceiptFromProviderAsync(receipt.Id, ct);
-                        if (queried != null && (queried.Status == "Accepted" || queried.Status == "Demo" || queried.Status == "Submitted"))
-                        {
-                            return queried;
-                        }
-                    }
-                    else
+                    // Si no tiene número y está en RequiresReview o InFlight:
+                    if (receipt.Status is "RequiresReview" or "InFlight")
                     {
                         _logger.LogWarning("Comprobante {ReceiptId} en estado {Status} sin correlativo asignado. No se reemite a ciegas para evitar duplicación tributaria en SUNAT; requiere verificación en el portal NubeFact.", receiptId, receipt.Status);
                         return receipt;
                     }
                 }
 
-                // Si está en Pending y cuenta con número correlativo asignado, consultar con el proveedor
-                if (receipt.Status == "Pending" && !string.IsNullOrWhiteSpace(receipt.Number))
+                // Si está en Pending, Rejected o Failed (y no en revisión/in-flight), proceder a emitir
+                if (receipt.Status is "Pending" or "Rejected" or "Failed")
                 {
-                    var queried = await QueryReceiptFromProviderAsync(receipt.Id, ct);
-                    if (queried != null && (queried.Status == "Accepted" || queried.Status == "Demo" || queried.Status == "Submitted"))
-                    {
-                        return queried;
-                    }
+                    return await GenerateReceiptAsync(receipt.BookingId, receipt.CulqiPaymentId, receipt.Id, ct: ct);
                 }
 
-                // Reintentar la emisión únicamente para intentos pendientes de despacho o rechazados previamente
-                return await GenerateReceiptAsync(receipt.BookingId, receipt.CulqiPaymentId, receipt.Id, ct);
+                return receipt;
             }
             finally
             {
@@ -788,19 +877,31 @@ namespace SIGETOUR.API.Application.Invoicing
             var cutoff = DateTime.UtcNow.AddSeconds(-15);
             var currentMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
 
-            // 1. Limpieza de comprobantes en vuelo ('InFlight') abandonados tras reinicio del servidor
-            var abandonedInFlight = await _db.ElectronicReceipts
-                .Where(r => r.Status == "InFlight" && r.CreatedAtUtc <= cutoff)
+            // 1. Limpieza y conciliación de comprobantes en vuelo ('InFlight') abandonados tras reinicio del servidor
+            var inFlightList = await _db.ElectronicReceipts
+                .Where(r => r.Status == "InFlight")
                 .ToListAsync(ct);
-            foreach (var abandoned in abandonedInFlight)
+
+            foreach (var abandoned in inFlightList)
             {
-                if (string.IsNullOrWhiteSpace(abandoned.Number))
+                bool isActive = IsActiveClaim(abandoned.LastError, out _);
+                if (!isActive)
                 {
-                    abandoned.Status = "RequiresReview";
-                    abandoned.LastError = "La emisión quedó interrumpida o en vuelo tras reinicio o desconexión del servidor. Dado que NubeFact no permite consultar sin número correlativo, el comprobante se retiene en revisión manual para no duplicar comprobantes en SUNAT.";
+                    if (abandoned.LastError != null && abandoned.LastError.StartsWith("CLAIMED:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Abandonado antes de enviar externamente -> intención realmente no enviada, regresar a Pending para recuperarla
+                        abandoned.Status = "Pending";
+                        abandoned.LastError = "Intención de emisión recuperada tras reinicio del sistema (nunca enviada al proveedor).";
+                    }
+                    else
+                    {
+                        // La solicitud fue enviada o no se puede descartar su envío: retener en RequiresReview
+                        abandoned.Status = "RequiresReview";
+                        abandoned.LastError = "La emisión quedó interrumpida o en vuelo tras reinicio del servidor. Se requiere revisión manual antes de reintentar para no duplicar comprobantes en SUNAT.";
+                    }
                 }
             }
-            if (abandonedInFlight.Count > 0)
+            if (inFlightList.Count > 0)
             {
                 await _db.SaveChangesAsync(ct);
             }
@@ -826,6 +927,9 @@ namespace SIGETOUR.API.Application.Invoicing
                     continue;
                 }
 
+                var workerClaimToken = Guid.NewGuid().ToString("N");
+                var workerStamp = $"CLAIMED:{workerClaimToken}:{DateTime.UtcNow:O}";
+
                 // Reclamo atómico en base de datos para impedir procesamiento simultáneo entre múltiples procesos
                 if (receipt.Status == "Pending")
                 {
@@ -834,13 +938,16 @@ namespace SIGETOUR.API.Application.Invoicing
                     {
                         claimed = await _db.ElectronicReceipts
                             .Where(r => r.Id == receipt.Id && r.Status == "Pending")
-                            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, "InFlight"), ct);
+                            .ExecuteUpdateAsync(s => s
+                                .SetProperty(r => r.Status, "InFlight")
+                                .SetProperty(r => r.LastError, workerStamp), ct);
                     }
                     else
                     {
                         if (receipt.Status == "Pending")
                         {
                             receipt.Status = "InFlight";
+                            receipt.LastError = workerStamp;
                             await _db.SaveChangesAsync(ct);
                             claimed = 1;
                         }
@@ -864,15 +971,15 @@ namespace SIGETOUR.API.Application.Invoicing
                 {
                     if (!string.IsNullOrWhiteSpace(receipt.Number))
                     {
-                        var queried = await QueryReceiptFromProviderAsync(receipt.Id, ct);
-                        if (queried != null && (queried.Status == "Accepted" || queried.Status == "Demo" || queried.Status == "Submitted"))
+                        var queried = await ReconcileReceiptWithProviderAsync(receipt.Id, ct);
+                        if (queried.Status == NubefactReconciliationStatus.Confirmed)
                         {
                             processedCount++;
                             continue;
                         }
                     }
 
-                    await GenerateReceiptAsync(receipt.BookingId, receipt.CulqiPaymentId, receipt.Id, ct);
+                    await GenerateReceiptAsync(receipt.BookingId, receipt.CulqiPaymentId, receipt.Id, claimToken: workerClaimToken, ct: ct);
                     processedCount++;
                 }
                 catch (Exception ex)
@@ -890,16 +997,23 @@ namespace SIGETOUR.API.Application.Invoicing
 
         public async Task<ElectronicReceipt?> QueryReceiptFromProviderAsync(Guid receiptId, CancellationToken ct = default)
         {
+            var res = await ReconcileReceiptWithProviderAsync(receiptId, ct);
+            return res.Receipt;
+        }
+
+        public async Task<NubefactReconciliationResult> ReconcileReceiptWithProviderAsync(Guid receiptId, CancellationToken ct = default)
+        {
             var receipt = await _db.ElectronicReceipts
                 .Include(r => r.Booking)
                 .FirstOrDefaultAsync(r => r.Id == receiptId, ct);
-            if (receipt == null) return null;
+            if (receipt == null) 
+                throw new InvalidOperationException($"El comprobante con ID {receiptId} no existe.");
 
             var currentMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
             var docEnv = !string.IsNullOrWhiteSpace(receipt.Environment) ? receipt.Environment : currentMode;
             if (string.Equals(docEnv, "Simulation", StringComparison.OrdinalIgnoreCase) || string.Equals(docEnv, "Mock", StringComparison.OrdinalIgnoreCase))
             {
-                return receipt;
+                return new NubefactReconciliationResult(NubefactReconciliationStatus.Confirmed, receipt, "Modo Simulación");
             }
 
             var (ruta, token) = ResolveEnvironmentCredentials(docEnv, currentMode);
@@ -907,22 +1021,20 @@ namespace SIGETOUR.API.Application.Invoicing
             {
                 _logger.LogWarning("El comprobante {ReceiptId} pertenece al ambiente histórico '{DocEnv}', pero el sistema está configurado en '{CurrentMode}'. Se aborta la consulta para evitar mezclar credenciales de distintos ambientes.",
                     receiptId, docEnv, currentMode);
-                return receipt;
+                return new NubefactReconciliationResult(NubefactReconciliationStatus.Unknown, receipt, "Ambiente histórico sin credenciales configuradas");
             }
 
-            // No consultar documento número 1 como respaldo si no tiene un correlativo válido
             if (string.IsNullOrWhiteSpace(receipt.Number) || !int.TryParse(receipt.Number, out var numInt) || numInt <= 0)
             {
                 _logger.LogWarning("No es posible consultar el comprobante {ReceiptId} porque no posee un correlativo numérico válido ({Number}).", receiptId, receipt.Number);
-                return receipt;
+                return new NubefactReconciliationResult(NubefactReconciliationStatus.Unknown, receipt, "Sin correlativo válido");
             }
 
             try
             {
-                // Preservar el ambiente histórico del comprobante
                 var docEnvironment = !string.IsNullOrWhiteSpace(receipt.Environment)
                     ? receipt.Environment
-                    : (_config["Nubefact:Mode"]?.Trim() ?? "Demo");
+                    : currentMode;
 
                 var sendToSunat = string.Equals(docEnvironment, "Production", StringComparison.OrdinalIgnoreCase)
                     && string.Equals(_config["Nubefact:SendToSunat"], "true", StringComparison.OrdinalIgnoreCase);
@@ -933,7 +1045,7 @@ namespace SIGETOUR.API.Application.Invoicing
                     operacion = "consultar_comprobante",
                     tipo_de_comprobante = isFactura ? 1 : 2,
                     serie = receipt.Series,
-                    numero = numInt // Correlativo real, nunca número 1 ficticio
+                    numero = numInt
                 };
 
                 using var requestMsg = new HttpRequestMessage(HttpMethod.Post, ruta);
@@ -941,78 +1053,147 @@ namespace SIGETOUR.API.Application.Invoicing
                 requestMsg.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
                 var response = await _http.SendAsync(requestMsg, ct);
-                var jsonStr = await response.Content.ReadAsStringAsync(ct);
-                using var doc = JsonDocument.Parse(jsonStr);
-                var root = doc.RootElement;
+                var httpCode = (int)response.StatusCode;
 
-                if (response.IsSuccessStatusCode && !root.TryGetProperty("errors", out _))
+                if (httpCode == 401 || httpCode == 403)
                 {
-                    // No asumir aceptada_por_sunat = true si el campo falta
-                    bool sunatAccepted = false;
-                    if (root.TryGetProperty("aceptada_por_sunat", out var aProp) && aProp.ValueKind == JsonValueKind.True)
-                    {
-                        sunatAccepted = true;
-                    }
-                    else if (root.TryGetProperty("sunat_responsecode", out var rcProp) && IsSunatSuccessResponseCode(rcProp))
-                    {
-                        sunatAccepted = true;
-                    }
-
-                    var sunatQueryDesc = root.TryGetProperty("sunat_description", out var qDescProp) ? qDescProp.GetString() : null;
-
-                    // Preservar ambiente histórico sin sobreescribirlo si ya existía
-                    if (string.IsNullOrWhiteSpace(receipt.Environment))
-                    {
-                        receipt.Environment = docEnvironment;
-                    }
-
-                    if (sunatAccepted)
-                    {
-                        receipt.Status = "Accepted";
-                        receipt.ProviderDescription = sunatQueryDesc ?? "Aceptado por SUNAT";
-                    }
-                    else if (string.Equals(receipt.Environment, "Demo", StringComparison.OrdinalIgnoreCase))
-                    {
-                        receipt.Status = "Demo";
-                        receipt.ProviderDescription = sunatQueryDesc ?? "Documento generado en DEMO NubeFact (sin aceptación tributaria SUNAT)";
-                    }
-                    else if (!sendToSunat)
-                    {
-                        receipt.Status = "Submitted";
-                        receipt.ProviderDescription = sunatQueryDesc ?? "Generado internamente (Envío a SUNAT pendiente)";
-                    }
-                    else
-                    {
-                        receipt.Status = "Submitted";
-                        receipt.ProviderDescription = sunatQueryDesc ?? "Enviado a SUNAT";
-                    }
-                    receipt.PdfUrl = root.TryGetProperty("enlace_del_pdf", out var p) ? p.GetString() : receipt.PdfUrl;
-                    receipt.XmlUrl = root.TryGetProperty("enlace_del_xml", out var x) ? x.GetString() : receipt.XmlUrl;
-                    receipt.CdrUrl = root.TryGetProperty("enlace_del_cdr", out var c) ? c.GetString() : receipt.CdrUrl;
-                    receipt.DigitalHash = root.TryGetProperty("codigo_hash", out var h) ? h.GetString() : receipt.DigitalHash;
-                    if (root.TryGetProperty("cadena_para_codigo_qr", out var q) && !string.IsNullOrWhiteSpace(q.GetString()))
-                    {
-                        receipt.QrData = q.GetString();
-                    }
-                    if (receipt.Status == "Accepted" || receipt.Status == "Demo")
-                    {
-                        receipt.LastError = null;
-                    }
+                    var authErr = "Fallo de autenticación o credenciales inválidas al consultar NubeFact.";
+                    receipt.Status = "RequiresReview";
+                    receipt.LastError = authErr;
                     await _db.SaveChangesAsync(ct);
+                    return new NubefactReconciliationResult(NubefactReconciliationStatus.Unknown, receipt, authErr);
                 }
-                else if (root.TryGetProperty("errors", out var errProp))
+
+                if (httpCode >= 500)
                 {
-                    receipt.Status = "Rejected";
-                    receipt.LastError = errProp.GetString();
+                    var serverErr = $"Error temporal del servidor NubeFact (HTTP {httpCode}). Solicitud de consulta con resultado incierto.";
+                    receipt.Status = "RequiresReview";
+                    receipt.LastError = serverErr;
                     await _db.SaveChangesAsync(ct);
+                    return new NubefactReconciliationResult(NubefactReconciliationStatus.Unknown, receipt, serverErr);
+                }
+
+                var jsonStr = await response.Content.ReadAsStringAsync(ct);
+                JsonDocument doc;
+                try
+                {
+                    doc = JsonDocument.Parse(jsonStr);
+                }
+                catch (JsonException)
+                {
+                    var parseErr = "Respuesta incompleta o no interpretable devuelta por NubeFact.";
+                    receipt.Status = "RequiresReview";
+                    receipt.LastError = parseErr;
+                    await _db.SaveChangesAsync(ct);
+                    return new NubefactReconciliationResult(NubefactReconciliationStatus.Unknown, receipt, parseErr);
+                }
+
+                using (doc)
+                {
+                    var root = doc.RootElement;
+                    if (response.IsSuccessStatusCode && !root.TryGetProperty("errors", out _))
+                    {
+                        bool sunatAccepted = false;
+                        if (root.TryGetProperty("aceptada_por_sunat", out var aProp) && aProp.ValueKind == JsonValueKind.True)
+                        {
+                            sunatAccepted = true;
+                        }
+                        else if (root.TryGetProperty("sunat_responsecode", out var rcProp) && IsSunatSuccessResponseCode(rcProp))
+                        {
+                            sunatAccepted = true;
+                        }
+
+                        var sunatQueryDesc = root.TryGetProperty("sunat_description", out var qDescProp) ? qDescProp.GetString() : null;
+                        var sunatRespCode = root.TryGetProperty("sunat_responsecode", out var codeProp) ? codeProp.ToString() : null;
+
+                        // Comprobar si SUNAT lo rechazó formalmente
+                        bool isExplicitRejection = !sunatAccepted &&
+                            ((root.TryGetProperty("sunat_responsecode", out var rCode) && !IsSunatSuccessResponseCode(rCode) && rCode.ToString() != "0")
+                             || (sunatQueryDesc != null && (sunatQueryDesc.Contains("rechazad", StringComparison.OrdinalIgnoreCase) || sunatQueryDesc.Contains("excepcion", StringComparison.OrdinalIgnoreCase))));
+
+                        if (isExplicitRejection)
+                        {
+                            receipt.Status = "Rejected";
+                            receipt.ProviderResponseCode = sunatRespCode;
+                            receipt.ProviderDescription = sunatQueryDesc ?? "Comprobante rechazado formalmente por SUNAT";
+                            receipt.LastError = sunatQueryDesc;
+                            await _db.SaveChangesAsync(ct);
+                            return new NubefactReconciliationResult(NubefactReconciliationStatus.ConfirmedRejection, receipt, sunatQueryDesc);
+                        }
+
+                        if (string.IsNullOrWhiteSpace(receipt.Environment))
+                        {
+                            receipt.Environment = docEnvironment;
+                        }
+
+                        if (sunatAccepted)
+                        {
+                            receipt.Status = "Accepted";
+                            receipt.ProviderDescription = sunatQueryDesc ?? "Aceptado por SUNAT";
+                        }
+                        else if (string.Equals(receipt.Environment, "Demo", StringComparison.OrdinalIgnoreCase))
+                        {
+                            receipt.Status = "Demo";
+                            receipt.ProviderDescription = sunatQueryDesc ?? "Documento generado en DEMO NubeFact (sin aceptación tributaria SUNAT)";
+                        }
+                        else if (!sendToSunat)
+                        {
+                            receipt.Status = "Submitted";
+                            receipt.ProviderDescription = sunatQueryDesc ?? "Generado internamente (Envío a SUNAT pendiente)";
+                        }
+                        else
+                        {
+                            receipt.Status = "Submitted";
+                            receipt.ProviderDescription = sunatQueryDesc ?? "Enviado a SUNAT";
+                        }
+
+                        receipt.PdfUrl = root.TryGetProperty("enlace_del_pdf", out var p) ? p.GetString() : receipt.PdfUrl;
+                        receipt.XmlUrl = root.TryGetProperty("enlace_del_xml", out var x) ? x.GetString() : receipt.XmlUrl;
+                        receipt.CdrUrl = root.TryGetProperty("enlace_del_cdr", out var c) ? c.GetString() : receipt.CdrUrl;
+                        receipt.DigitalHash = root.TryGetProperty("codigo_hash", out var h) ? h.GetString() : receipt.DigitalHash;
+                        if (root.TryGetProperty("cadena_para_codigo_qr", out var q) && !string.IsNullOrWhiteSpace(q.GetString()))
+                        {
+                            receipt.QrData = q.GetString();
+                        }
+                        if (receipt.Status is "Accepted" or "Demo")
+                        {
+                            receipt.LastError = null;
+                        }
+                        await _db.SaveChangesAsync(ct);
+
+                        var resStatus = receipt.Status == "Submitted" ? NubefactReconciliationStatus.PendingResponse : NubefactReconciliationStatus.Confirmed;
+                        return new NubefactReconciliationResult(resStatus, receipt);
+                    }
+                    else if (root.TryGetProperty("errors", out var errProp))
+                    {
+                        var errStr = errProp.GetString() ?? string.Empty;
+                        bool isNonExistent = errStr.Contains("no existe", StringComparison.OrdinalIgnoreCase)
+                            || errStr.Contains("no encontrado", StringComparison.OrdinalIgnoreCase);
+
+                        if (isNonExistent)
+                        {
+                            _logger.LogInformation("NubeFact confirmó que el comprobante {FullNumber} no existe en su sistema: {Error}", receipt.FullNumber, errStr);
+                            return new NubefactReconciliationResult(NubefactReconciliationStatus.ConfirmedNonExistent, receipt, errStr);
+                        }
+
+                        // Error devuelto por NubeFact que no acredita rechazo SUNAT ni inexistencia (resultado incierto)
+                        receipt.Status = "RequiresReview";
+                        receipt.LastError = $"Consulta inconclusa con NubeFact: {errStr}. Requiere verificación manual en portal.";
+                        await _db.SaveChangesAsync(ct);
+                        return new NubefactReconciliationResult(NubefactReconciliationStatus.Unknown, receipt, errStr);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error al consultar estado en NubeFact para comprobante {FullNumber}", receipt.FullNumber);
+                _logger.LogWarning(ex, "Excepción de red o timeout al consultar comprobante {FullNumber} en NubeFact", receipt.FullNumber);
+                receipt.Status = "RequiresReview";
+                receipt.LastError = $"Resultado incierto tras fallo de conexión o timeout al consultar NubeFact: {ex.Message}";
+                await _db.SaveChangesAsync(ct);
+                return new NubefactReconciliationResult(NubefactReconciliationStatus.Unknown, receipt, ex.Message);
             }
 
-            return receipt;
+            return new NubefactReconciliationResult(NubefactReconciliationStatus.Unknown, receipt, "Resultado desconocido");
         }
     }
 }

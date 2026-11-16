@@ -1607,8 +1607,9 @@ namespace SIGETOUR.API.Controllers.UI
             var claims = await _roleManager.GetClaimsAsync(role);
             var permClaims = claims.Where(c => c.Type == "Permission").Select(c => c.Value).OfType<string>().ToList();
 
+            bool isConfigured = claims.Any(c => c.Type == "PermissionConfigured");
             List<string> effective;
-            if (permClaims.Count == 0)
+            if (!isConfigured)
             {
                 effective = AppPermissions.GetDefaultPermissionsForRole(roleName).ToList();
             }
@@ -1658,41 +1659,93 @@ namespace SIGETOUR.API.Controllers.UI
                 return RedirectToAction(nameof(RolePermissions), new { roleName });
             }
 
-            var currentClaims = await _roleManager.GetClaimsAsync(role);
-            var permClaims = currentClaims.Where(c => c.Type == "Permission").ToList();
-            foreach (var c in permClaims)
+            // Usar una transacción en la base de datos para garantizar atomicidad completa
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? dbTx = null;
+            if (_context.Database.IsRelational())
             {
-                var removeResult = await _roleManager.RemoveClaimAsync(role, c);
-                if (!removeResult.Succeeded)
+                dbTx = await _context.Database.BeginTransactionAsync();
+                try
                 {
-                    TempData["ErrorMessage"] = "Ocurrió un error al actualizar los permisos del rol. No se aplicaron cambios parciales.";
-                    return RedirectToAction(nameof(RolePermissions), new { roleName });
+                    // Bloqueo exclusivo del rol para serializar administraciones concurrentes
+                    await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"AspNetRoles\" WHERE \"Id\" = {role.Id} FOR UPDATE");
                 }
+                catch { }
             }
 
-            if (permissions != null)
+            try
             {
-                foreach (var p in permissions.Distinct())
+                var currentClaims = await _roleManager.GetClaimsAsync(role);
+                var permClaims = currentClaims.Where(c => c.Type == "Permission").ToList();
+                foreach (var c in permClaims)
                 {
-                    var addResult = await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", p));
-                    if (!addResult.Succeeded)
+                    var removeResult = await _roleManager.RemoveClaimAsync(role, c);
+                    if (!removeResult.Succeeded)
                     {
-                        TempData["ErrorMessage"] = "Ocurrió un error al asignar los permisos al rol.";
+                        if (dbTx != null) await dbTx.RollbackAsync();
+                        TempData["ErrorMessage"] = "Ocurrió un error al actualizar los permisos del rol. Se revirtieron todos los cambios parciales.";
                         return RedirectToAction(nameof(RolePermissions), new { roleName });
                     }
                 }
-            }
 
-            // Invalida inmediatamente el SecurityStamp de todos los usuarios de dicho rol para que sesiones
-            // previas (cookies y tokens JWT) no conserven privilegios retirados
-            var usersInRole = await _userManager.GetUsersInRoleAsync(role.Name!);
-            foreach (var u in usersInRole)
+                // Asegurar marcador PermissionConfigured para distinguir rol con 0 permisos de un rol no inicializado
+                if (!currentClaims.Any(c => c.Type == "PermissionConfigured"))
+                {
+                    var cfgResult = await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("PermissionConfigured", "true"));
+                    if (!cfgResult.Succeeded)
+                    {
+                        if (dbTx != null) await dbTx.RollbackAsync();
+                        TempData["ErrorMessage"] = "Ocurrió un error al inicializar la configuración de permisos del rol.";
+                        return RedirectToAction(nameof(RolePermissions), new { roleName });
+                    }
+                }
+
+                if (permissions != null)
+                {
+                    foreach (var p in permissions.Distinct())
+                    {
+                        var addResult = await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", p));
+                        if (!addResult.Succeeded)
+                        {
+                            if (dbTx != null) await dbTx.RollbackAsync();
+                            TempData["ErrorMessage"] = "Ocurrió un error al asignar los permisos al rol. Se revirtieron todos los cambios.";
+                            return RedirectToAction(nameof(RolePermissions), new { roleName });
+                        }
+                    }
+                }
+
+                // Invalida inmediatamente el SecurityStamp de todos los usuarios de dicho rol para que sesiones
+                // previas (cookies y tokens JWT) no conserven privilegios retirados
+                var usersInRole = await _userManager.GetUsersInRoleAsync(role.Name!);
+                foreach (var u in usersInRole)
+                {
+                    var stampResult = await _userManager.UpdateSecurityStampAsync(u);
+                    if (!stampResult.Succeeded)
+                    {
+                        if (dbTx != null) await dbTx.RollbackAsync();
+                        TempData["ErrorMessage"] = "Ocurrió un error al sincronizar las sesiones de los usuarios. Se revirtieron todos los cambios.";
+                        return RedirectToAction(nameof(RolePermissions), new { roleName });
+                    }
+                }
+
+                if (dbTx != null)
+                {
+                    await dbTx.CommitAsync();
+                }
+
+                TempData["SuccessMessage"] = $"Permisos actualizados exitosamente para el rol '{role.Name}'. Sesiones activas sincronizadas.";
+                return RedirectToAction(nameof(RolePermissions), new { roleName });
+            }
+            catch (Exception ex)
             {
-                await _userManager.UpdateSecurityStampAsync(u);
+                if (dbTx != null) await dbTx.RollbackAsync();
+                _logger?.LogError(ex, "Excepción al actualizar permisos para el rol {RoleName}", roleName);
+                TempData["ErrorMessage"] = "Ocurrió una excepción al procesar la actualización de permisos. Se revirtieron todos los cambios.";
+                return RedirectToAction(nameof(RolePermissions), new { roleName });
             }
-
-            TempData["SuccessMessage"] = $"Permisos actualizados exitosamente para el rol '{role.Name}'. Sesiones activas sincronizadas.";
-            return RedirectToAction(nameof(RolePermissions), new { roleName });
+            finally
+            {
+                if (dbTx != null) await dbTx.DisposeAsync();
+            }
         }
 
         [HttpPost]
@@ -3303,39 +3356,35 @@ namespace SIGETOUR.API.Controllers.UI
                 await using var dbTx = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    // Bloqueo de fila (FOR UPDATE) en PostgreSQL para evitar devoluciones concurrentes que excedan el saldo
+                    // Bloqueo de fila (FOR UPDATE) en PostgreSQL para serializar devoluciones y abonos concurrentes
                     await _context.Database.ExecuteSqlInterpolatedAsync($"SELECT \"Id\" FROM \"Bookings\" WHERE \"Id\" = {id} FOR UPDATE");
-                    var lockedBooking = await _context.Bookings.FindAsync(id);
-                    if (lockedBooking == null)
-                    {
-                        await dbTx.RollbackAsync();
-                        return NotFound();
-                    }
+                    // Refrescar explícitamente la entidad desde PostgreSQL bajo el bloqueo para descartar lecturas sucias
+                    await _context.Entry(booking).ReloadAsync();
 
-                    if (refundAmount > lockedBooking.PaidAmount)
+                    if (refundAmount > booking.PaidAmount)
                     {
                         await dbTx.RollbackAsync();
-                        TempData["ErrorMessage"] = $"El monto a devolver (S/ {refundAmount:N2}) no puede exceder el total pagado actual (S/ {lockedBooking.PaidAmount:N2}).";
+                        TempData["ErrorMessage"] = $"El monto a devolver (S/ {refundAmount:N2}) no puede exceder el total pagado actual (S/ {booking.PaidAmount:N2}).";
                         return RedirectToAction(nameof(EditBooking), new { id });
                     }
 
                     var currentCulqiPaidAmount = await _context.CulqiPayments
-                        .Where(p => p.BookingId == lockedBooking.Id && (p.Status == "paid" || p.Status == "paid_excess"))
+                        .Where(p => p.BookingId == booking.Id && (p.Status == "paid" || p.Status == "paid_excess"))
                         .SumAsync(p => (decimal?)p.AmountCents / 100m) ?? 0m;
 
-                    if (lockedBooking.PaidAmount - refundAmount < currentCulqiPaidAmount)
+                    if (booking.PaidAmount - refundAmount < currentCulqiPaidAmount)
                     {
                         await dbTx.RollbackAsync();
                         TempData["ErrorMessage"] = $"No es posible realizar la devolución: S/ {currentCulqiPaidAmount:N2} corresponden a cobros confirmados por pasarela Culqi. No se permiten devoluciones automáticas de pasarela sin autorización de gerencia.";
                         return RedirectToAction(nameof(EditBooking), new { id });
                     }
 
-                    lockedBooking.PaidAmount -= refundAmount;
-                    if (lockedBooking.PaidAmount < lockedBooking.TotalAmount && lockedBooking.Status == BookingStatus.Confirmed)
+                    booking.PaidAmount -= refundAmount;
+                    if (booking.PaidAmount < booking.TotalAmount && booking.Status == BookingStatus.Confirmed)
                     {
-                        lockedBooking.Status = BookingStatus.Pending;
+                        booking.Status = BookingStatus.Pending;
                     }
-                    _context.Bookings.Update(lockedBooking);
+                    _context.Bookings.Update(booking);
 
                     var shift = await GetOrCreateActiveOrAdminShiftAsync();
                     _context.CashTransactions.Add(new CashTransaction
@@ -3346,9 +3395,9 @@ namespace SIGETOUR.API.Controllers.UI
                         Category = "Devolución de Reserva",
                         Amount = refundAmount,
                         PaymentMethod = !string.IsNullOrWhiteSpace(paymentMethod) ? paymentMethod : "Efectivo",
-                        ReferenceCode = lockedBooking.ReferenceCode,
-                        BookingId = lockedBooking.Id,
-                        Description = $"Devolución / Ajuste de reserva {lockedBooking.ReferenceCode}. Motivo: {reason.Trim()}. Autorizado por: {User.Identity?.Name ?? "Admin"}",
+                        ReferenceCode = booking.ReferenceCode,
+                        BookingId = booking.Id,
+                        Description = $"Devolución / Ajuste de reserva {booking.ReferenceCode}. Motivo: {reason.Trim()}. Autorizado por: {User.Identity?.Name ?? "Admin"}",
                         RegisteredBy = User.Identity?.Name ?? "Counter / Admin",
                         CreatedAt = DateTime.UtcNow
                     });
@@ -3365,6 +3414,12 @@ namespace SIGETOUR.API.Controllers.UI
             }
             else
             {
+                if (refundAmount > booking.PaidAmount)
+                {
+                    TempData["ErrorMessage"] = $"El monto a devolver (S/ {refundAmount:N2}) no puede exceder el total pagado actual (S/ {booking.PaidAmount:N2}).";
+                    return RedirectToAction(nameof(EditBooking), new { id });
+                }
+
                 booking.PaidAmount -= refundAmount;
                 if (booking.PaidAmount < booking.TotalAmount && booking.Status == BookingStatus.Confirmed)
                 {
@@ -3819,78 +3874,95 @@ namespace SIGETOUR.API.Controllers.UI
 
             var term = q.Trim().ToLower();
 
-            var rawBookings = await _context.Bookings
-                .Where(b => b.ReferenceCode.ToLower().Contains(term) ||
-                            b.CustomerName.ToLower().Contains(term) ||
-                            b.CustomerDni.ToLower().Contains(term) ||
-                            b.OperationNumber.ToLower().Contains(term))
-                .OrderByDescending(b => b.BookingDate)
-                .Take(5)
-                .Select(b => new {
-                    b.Id,
-                    b.ReferenceCode,
-                    b.CustomerName,
-                    b.CustomerDni,
-                    b.Status,
-                    b.TotalAmount,
-                    b.TravelDate
-                })
-                .ToListAsync();
+            // Filtrado estricto por permisos efectivos del usuario autenticado:
+            // No exponer datos de clientes, DNI o finanzas a usuarios que carezcan de BookingsView
+            bool canViewBookings = User.HasClaim("Permission", AppPermissions.BookingsView);
+            bool canViewTours = User.HasClaim("Permission", AppPermissions.ToursView);
 
-            var bookings = rawBookings.Select(b => new {
-                id = b.Id,
-                reference = b.ReferenceCode,
-                customer = b.CustomerName,
-                dni = b.CustomerDni,
-                status = b.Status.ToString(),
-                amount = b.TotalAmount,
-                date = b.TravelDate.ToString("dd/MM/yyyy"),
-                url = Url.Action("EditBooking", "Admin", new { id = b.Id })
-            });
+            var rawBookings = canViewBookings
+                ? await _context.Bookings
+                    .Where(b => b.ReferenceCode.ToLower().Contains(term) ||
+                                b.CustomerName.ToLower().Contains(term) ||
+                                b.CustomerDni.ToLower().Contains(term) ||
+                                b.OperationNumber.ToLower().Contains(term))
+                    .OrderByDescending(b => b.BookingDate)
+                    .Take(5)
+                    .Select(b => new {
+                        b.Id,
+                        b.ReferenceCode,
+                        b.CustomerName,
+                        b.CustomerDni,
+                        b.Status,
+                        b.TotalAmount,
+                        b.TravelDate
+                    })
+                    .ToListAsync()
+                : null;
 
-            var rawTours = await _context.TourPackages
-                .Include(t => t.Images)
-                .Where(t => t.Title.ToLower().Contains(term) ||
-                            t.Subtitle.ToLower().Contains(term))
-                .OrderBy(t => t.Title)
-                .Take(5)
-                .Select(t => new {
-                    t.Id,
-                    t.Title,
-                    t.Slug,
-                    t.BasePrice,
-                    Images = t.Images.Select(i => new { i.ImageUrl, i.IsMain }).ToList()
-                })
-                .ToListAsync();
+            var bookings = rawBookings != null
+                ? rawBookings.Select(b => (object)new {
+                    id = b.Id,
+                    reference = b.ReferenceCode,
+                    customer = b.CustomerName,
+                    dni = b.CustomerDni,
+                    status = b.Status.ToString(),
+                    amount = b.TotalAmount,
+                    date = b.TravelDate.ToString("dd/MM/yyyy"),
+                    url = Url?.Action("EditBooking", "Admin", new { id = b.Id }) ?? $"/Admin/EditBooking/{b.Id}"
+                }).ToList()
+                : new List<object>();
 
-            var tours = rawTours.Select(t => new {
-                id = t.Id,
-                title = t.Title,
-                price = t.BasePrice,
-                image = t.Images.FirstOrDefault(i => i.IsMain)?.ImageUrl ?? t.Images.FirstOrDefault()?.ImageUrl ?? "/images/placeholder.jpg",
-                url = Url.Action("EditTour", "Admin", new { id = t.Id })
-            });
+            var rawTours = canViewTours
+                ? await _context.TourPackages
+                    .Include(t => t.Images)
+                    .Where(t => t.Title.ToLower().Contains(term) ||
+                                t.Subtitle.ToLower().Contains(term))
+                    .OrderBy(t => t.Title)
+                    .Take(5)
+                    .Select(t => new {
+                        t.Id,
+                        t.Title,
+                        t.Slug,
+                        t.BasePrice,
+                        Images = t.Images.Select(i => new { i.ImageUrl, i.IsMain }).ToList()
+                    })
+                    .ToListAsync()
+                : null;
 
-            var rawVehicles = await _context.Vehicles
-                .Where(v => v.LicensePlate.ToLower().Contains(term) ||
-                            v.Model.ToLower().Contains(term))
-                .OrderBy(v => v.LicensePlate)
-                .Take(5)
-                .Select(v => new {
-                    v.Id,
-                    v.LicensePlate,
-                    v.Model,
-                    v.Status
-                })
-                .ToListAsync();
+            var tours = rawTours != null
+                ? rawTours.Select(t => (object)new {
+                    id = t.Id,
+                    title = t.Title,
+                    price = t.BasePrice,
+                    image = t.Images.FirstOrDefault(i => i.IsMain)?.ImageUrl ?? t.Images.FirstOrDefault()?.ImageUrl ?? "/images/placeholder.jpg",
+                    url = Url?.Action("EditTour", "Admin", new { id = t.Id }) ?? $"/Admin/EditTour/{t.Id}"
+                }).ToList()
+                : new List<object>();
 
-            var vehicles = rawVehicles.Select(v => new {
-                id = v.Id,
-                plate = v.LicensePlate,
-                model = v.Model,
-                status = v.Status,
-                url = Url.Action("EditVehicle", "Admin", new { id = v.Id })
-            });
+            var rawVehicles = canViewTours
+                ? await _context.Vehicles
+                    .Where(v => v.LicensePlate.ToLower().Contains(term) ||
+                                v.Model.ToLower().Contains(term))
+                    .OrderBy(v => v.LicensePlate)
+                    .Take(5)
+                    .Select(v => new {
+                        v.Id,
+                        v.LicensePlate,
+                        v.Model,
+                        v.Status
+                    })
+                    .ToListAsync()
+                : null;
+
+            var vehicles = rawVehicles != null
+                ? rawVehicles.Select(v => (object)new {
+                    id = v.Id,
+                    plate = v.LicensePlate,
+                    model = v.Model,
+                    status = v.Status,
+                    url = Url?.Action("EditVehicle", "Admin", new { id = v.Id }) ?? $"/Admin/EditVehicle/{v.Id}"
+                }).ToList()
+                : new List<object>();
 
             return Json(new { bookings, tours, vehicles });
         }

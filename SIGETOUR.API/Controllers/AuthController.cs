@@ -74,7 +74,9 @@ namespace SIGETOUR.API.Controllers
                     var roleClaims = await _roleManager.GetClaimsAsync(identityRole);
                     var permClaims = roleClaims.Where(c => c.Type == "Permission").ToList();
 
-                    if (permClaims.Count == 0)
+                    var isConfigured = roleClaims.Any(c => c.Type == "PermissionConfigured");
+
+                    if (!isConfigured)
                     {
                         var defaults = AppPermissions.GetDefaultPermissionsForRole(userRole);
                         foreach (var def in defaults)
@@ -85,6 +87,7 @@ namespace SIGETOUR.API.Controllers
                                 authClaims.Add(new Claim("Permission", def));
                             }
                         }
+                        await _roleManager.AddClaimAsync(identityRole, new Claim("PermissionConfigured", "true"));
                     }
                     else
                     {
