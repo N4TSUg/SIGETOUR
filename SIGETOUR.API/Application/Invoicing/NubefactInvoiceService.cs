@@ -578,6 +578,346 @@ namespace SIGETOUR.API.Application.Invoicing
             return GenerateReceiptAsync(bookingId, culqiPaymentId, exactReceiptId, claimToken, cashTransactionId: null, billableOperationKey: null, ct);
         }
 
+        private static bool IsPostgresUniqueViolation(DbUpdateException ex, out string? constraintName)
+        {
+            constraintName = null;
+
+            for (Exception? curr = ex; curr != null; curr = curr.InnerException)
+            {
+                if (curr is Npgsql.PostgresException pgEx)
+                {
+                    if (pgEx.SqlState == "23505")
+                    {
+                        constraintName = pgEx.ConstraintName;
+                        return true;
+                    }
+                    return false;
+                }
+            }
+
+            var msg = ex.InnerException?.Message ?? ex.Message;
+            if (msg.Contains("23503", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("foreign key", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("violates foreign key constraint", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (msg.Contains("23505", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("unique constraint", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase))
+            {
+                if (msg.Contains("IX_ElectronicReceipts_BillableOperationKey", StringComparison.OrdinalIgnoreCase))
+                    constraintName = "IX_ElectronicReceipts_BillableOperationKey";
+                else if (msg.Contains("IX_ElectronicReceipts_CashTransactionId", StringComparison.OrdinalIgnoreCase))
+                    constraintName = "IX_ElectronicReceipts_CashTransactionId";
+                else if (msg.Contains("IX_ElectronicReceipts_CulqiPaymentId", StringComparison.OrdinalIgnoreCase))
+                    constraintName = "IX_ElectronicReceipts_CulqiPaymentId";
+                else
+                    constraintName = "UNIQUE";
+                return true;
+            }
+
+            return false;
+        }
+
+        private async Task<ElectronicReceipt?> FindExistingReceiptAsync(
+            Guid bookingId,
+            BillableOperationIdentity identity,
+            bool terminalOnly,
+            CancellationToken ct)
+        {
+            IQueryable<ElectronicReceipt> query = _db.ElectronicReceipts
+                .OrderByDescending(r => r.CreatedAtUtc);
+
+            if (identity.IsHistoricalFallback)
+            {
+                query = query.Where(r => r.BookingId == bookingId && r.CulqiPaymentId == null && r.CashTransactionId == null);
+            }
+            else
+            {
+                var opKey = identity.OperationKey;
+                var cashId = identity.CashTransactionId;
+                var culqiId = identity.CulqiPaymentId;
+
+                query = query.Where(r =>
+                    (!string.IsNullOrEmpty(opKey) && r.BillableOperationKey == opKey) ||
+                    (cashId != null && r.CashTransactionId == cashId) ||
+                    (culqiId != null && r.CulqiPaymentId == culqiId));
+            }
+
+            if (terminalOnly)
+            {
+                query = query.Where(r => r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation");
+            }
+
+            return await query.FirstOrDefaultAsync(ct);
+        }
+
+        public async Task<BillableOperationIdentity> ResolveBillableOperationAsync(
+            Guid bookingId,
+            Guid? culqiPaymentId = null,
+            Guid? exactReceiptId = null,
+            Guid? cashTransactionId = null,
+            string? billableOperationKey = null,
+            CancellationToken ct = default)
+        {
+            var booking = await _db.Bookings
+                .Include(b => b.Items)
+                .FirstOrDefaultAsync(b => b.Id == bookingId, ct);
+
+            if (booking == null)
+            {
+                throw new InvalidOperationException($"No se encontró la reserva {bookingId} para facturación electrónica.");
+            }
+
+            if (exactReceiptId.HasValue && exactReceiptId.Value != Guid.Empty)
+            {
+                var receipt = await _db.ElectronicReceipts.FirstOrDefaultAsync(r => r.Id == exactReceiptId.Value, ct);
+                if (receipt == null)
+                {
+                    throw new InvalidOperationException($"No se encontró el comprobante {exactReceiptId.Value} solicitado.");
+                }
+                if (receipt.BookingId != bookingId)
+                {
+                    throw new InvalidOperationException($"El comprobante solicitado pertenece a la reserva {receipt.BookingId}, no a {bookingId}.");
+                }
+                if (culqiPaymentId.HasValue && receipt.CulqiPaymentId.HasValue && receipt.CulqiPaymentId.Value != culqiPaymentId.Value)
+                {
+                    throw new InvalidOperationException("El comprobante solicitado pertenece a un pago Culqi diferente.");
+                }
+                if (cashTransactionId.HasValue && receipt.CashTransactionId.HasValue && receipt.CashTransactionId.Value != cashTransactionId.Value)
+                {
+                    throw new InvalidOperationException("El comprobante solicitado pertenece a una transacción de caja diferente.");
+                }
+
+                string key;
+                bool isHistFallback = false;
+                if (!string.IsNullOrWhiteSpace(receipt.BillableOperationKey))
+                {
+                    key = receipt.BillableOperationKey;
+                }
+                else if (receipt.CulqiPaymentId.HasValue)
+                {
+                    key = $"CULQI:{receipt.CulqiPaymentId.Value:N}";
+                }
+                else if (receipt.CashTransactionId.HasValue)
+                {
+                    key = $"CASH:{receipt.CashTransactionId.Value:N}";
+                }
+                else
+                {
+                    key = $"MANUAL:BOOKING:{bookingId:N}";
+                    isHistFallback = true;
+                }
+
+                return new BillableOperationIdentity(
+                    OperationKey: key,
+                    CulqiPaymentId: receipt.CulqiPaymentId,
+                    CashTransactionId: receipt.CashTransactionId,
+                    Amount: receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.PaidAmount,
+                    PaymentMethod: booking.PaymentMethod,
+                    OperationNumber: booking.OperationNumber,
+                    IsHistoricalFallback: isHistFallback);
+            }
+
+            if (cashTransactionId.HasValue && cashTransactionId.Value != Guid.Empty)
+            {
+                var cashTx = await _db.CashTransactions.FirstOrDefaultAsync(t => t.Id == cashTransactionId.Value, ct);
+                if (cashTx == null)
+                {
+                    throw new InvalidOperationException($"No se encontró la transacción de caja {cashTransactionId.Value}.");
+                }
+                if (cashTx.BookingId != bookingId)
+                {
+                    throw new InvalidOperationException($"La transacción de caja {cashTransactionId.Value} pertenece a la reserva {cashTx.BookingId}, no a {bookingId}.");
+                }
+                if (cashTx.TransactionType != "Ingreso")
+                {
+                    throw new InvalidOperationException($"La transacción de caja {cashTransactionId.Value} es de tipo '{cashTx.TransactionType}' y no puede ser facturada.");
+                }
+                if (cashTx.Amount <= 0)
+                {
+                    throw new InvalidOperationException($"La transacción de caja {cashTransactionId.Value} tiene un monto inválido ({cashTx.Amount}).");
+                }
+
+                if (cashTx.CulqiPaymentId.HasValue)
+                {
+                    if (culqiPaymentId.HasValue && culqiPaymentId.Value != cashTx.CulqiPaymentId.Value)
+                    {
+                        throw new InvalidOperationException("Conflicto de identidad: la transacción de caja pertenece a un pago Culqi distinto al solicitado.");
+                    }
+
+                    var culqiId = cashTx.CulqiPaymentId.Value;
+                    var culqiPayment = await _db.CulqiPayments.FirstOrDefaultAsync(p => p.Id == culqiId, ct);
+                    if (culqiPayment == null || culqiPayment.BookingId != bookingId || culqiPayment.Status != "paid")
+                    {
+                        throw new InvalidOperationException($"El pago Culqi {culqiId} asociado a la transacción de caja no existe, no pertenece a la reserva o no se encuentra confirmado.");
+                    }
+
+                    return new BillableOperationIdentity(
+                        OperationKey: $"CULQI:{culqiId:N}",
+                        CulqiPaymentId: culqiId,
+                        CashTransactionId: cashTx.Id,
+                        Amount: cashTx.Amount,
+                        PaymentMethod: cashTx.PaymentMethod ?? booking.PaymentMethod,
+                        OperationNumber: cashTx.ReferenceCode ?? culqiPayment.ProviderId ?? booking.OperationNumber,
+                        IsHistoricalFallback: false);
+                }
+                else
+                {
+                    if (culqiPaymentId.HasValue)
+                    {
+                        throw new InvalidOperationException("Conflicto de identidad: se especificó un pago Culqi junto con una transacción manual de caja.");
+                    }
+
+                    var expectedKey = $"CASH:{cashTx.Id:N}";
+                    if (!string.IsNullOrWhiteSpace(billableOperationKey) && billableOperationKey != expectedKey)
+                    {
+                        throw new InvalidOperationException($"Conflicto de clave de operación: '{billableOperationKey}' no coincide con '{expectedKey}'.");
+                    }
+
+                    return new BillableOperationIdentity(
+                        OperationKey: expectedKey,
+                        CulqiPaymentId: null,
+                        CashTransactionId: cashTx.Id,
+                        Amount: cashTx.Amount,
+                        PaymentMethod: cashTx.PaymentMethod ?? booking.PaymentMethod,
+                        OperationNumber: cashTx.ReferenceCode ?? booking.OperationNumber,
+                        IsHistoricalFallback: false);
+                }
+            }
+
+            if (culqiPaymentId.HasValue && culqiPaymentId.Value != Guid.Empty)
+            {
+                var culqi = await _db.CulqiPayments.FirstOrDefaultAsync(p => p.Id == culqiPaymentId.Value, ct);
+                if (culqi == null || culqi.BookingId != bookingId || culqi.Status != "paid")
+                {
+                    throw new InvalidOperationException($"El pago Culqi {culqiPaymentId.Value} no existe, no pertenece a la reserva o no se encuentra confirmado.");
+                }
+
+                var linkedCashTx = await _db.CashTransactions
+                    .FirstOrDefaultAsync(t => t.CulqiPaymentId == culqi.Id && t.BookingId == bookingId, ct);
+
+                var expectedCulqiKey = $"CULQI:{culqi.Id:N}";
+                if (!string.IsNullOrWhiteSpace(billableOperationKey) && billableOperationKey != expectedCulqiKey)
+                {
+                    throw new InvalidOperationException($"Conflicto de clave de operación: '{billableOperationKey}' no coincide con '{expectedCulqiKey}'.");
+                }
+
+                return new BillableOperationIdentity(
+                    OperationKey: expectedCulqiKey,
+                    CulqiPaymentId: culqi.Id,
+                    CashTransactionId: linkedCashTx?.Id,
+                    Amount: culqi.AmountCents / 100m,
+                    PaymentMethod: booking.PaymentMethod,
+                    OperationNumber: culqi.ProviderId ?? booking.OperationNumber,
+                    IsHistoricalFallback: false);
+            }
+
+            // Llamada sin identificadores específicos: resolución automática
+            var confirmedCulqiList = await _db.CulqiPayments
+                .Where(p => p.BookingId == bookingId && p.Status == "paid")
+                .OrderBy(p => p.CreatedAtUtc)
+                .ToListAsync(ct);
+
+            if (confirmedCulqiList.Count == 1)
+            {
+                var culqi = confirmedCulqiList[0];
+                var linkedCash = await _db.CashTransactions
+                    .FirstOrDefaultAsync(t => t.CulqiPaymentId == culqi.Id && t.BookingId == bookingId, ct);
+
+                return new BillableOperationIdentity(
+                    OperationKey: $"CULQI:{culqi.Id:N}",
+                    CulqiPaymentId: culqi.Id,
+                    CashTransactionId: linkedCash?.Id,
+                    Amount: culqi.AmountCents / 100m,
+                    PaymentMethod: booking.PaymentMethod,
+                    OperationNumber: culqi.ProviderId ?? booking.OperationNumber,
+                    IsHistoricalFallback: false);
+            }
+            else if (confirmedCulqiList.Count > 1)
+            {
+                throw new InvalidOperationException($"La reserva {booking.ReferenceCode} cuenta con múltiples pagos Culqi confirmados. Especifique el identificador de pago a facturar.");
+            }
+
+            var manualCashList = await _db.CashTransactions
+                .Where(t => t.BookingId == bookingId && t.TransactionType == "Ingreso" && t.CulqiPaymentId == null)
+                .OrderBy(t => t.CreatedAt)
+                .ToListAsync(ct);
+
+            if (manualCashList.Count == 1)
+            {
+                var cashTx = manualCashList[0];
+                return new BillableOperationIdentity(
+                    OperationKey: $"CASH:{cashTx.Id:N}",
+                    CulqiPaymentId: null,
+                    CashTransactionId: cashTx.Id,
+                    Amount: cashTx.Amount,
+                    PaymentMethod: cashTx.PaymentMethod ?? booking.PaymentMethod,
+                    OperationNumber: cashTx.ReferenceCode ?? booking.OperationNumber,
+                    IsHistoricalFallback: false);
+            }
+            else if (manualCashList.Count > 1)
+            {
+                var unbilledManual = manualCashList
+                    .Where(t => !_db.ElectronicReceipts.Any(r => r.CashTransactionId == t.Id || r.BillableOperationKey == $"CASH:{t.Id:N}"))
+                    .ToList();
+
+                if (unbilledManual.Count == 1)
+                {
+                    var cashTx = unbilledManual[0];
+                    return new BillableOperationIdentity(
+                        OperationKey: $"CASH:{cashTx.Id:N}",
+                        CulqiPaymentId: null,
+                        CashTransactionId: cashTx.Id,
+                        Amount: cashTx.Amount,
+                        PaymentMethod: cashTx.PaymentMethod ?? booking.PaymentMethod,
+                        OperationNumber: cashTx.ReferenceCode ?? booking.OperationNumber,
+                        IsHistoricalFallback: false);
+                }
+
+                throw new InvalidOperationException($"La reserva {booking.ReferenceCode} tiene múltiples movimientos de caja. Especifique el identificador del movimiento a facturar.");
+            }
+
+            var historicalReceipts = await _db.ElectronicReceipts
+                .Where(r => r.BookingId == bookingId && r.CulqiPaymentId == null && r.CashTransactionId == null)
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .ToListAsync(ct);
+
+            if (historicalReceipts.Count == 1)
+            {
+                var hist = historicalReceipts[0];
+                return new BillableOperationIdentity(
+                    OperationKey: !string.IsNullOrWhiteSpace(hist.BillableOperationKey) ? hist.BillableOperationKey : $"MANUAL:BOOKING:{bookingId:N}",
+                    CulqiPaymentId: null,
+                    CashTransactionId: null,
+                    Amount: hist.TotalAmount > 0 ? hist.TotalAmount : booking.PaidAmount,
+                    PaymentMethod: booking.PaymentMethod,
+                    OperationNumber: booking.OperationNumber,
+                    IsHistoricalFallback: true);
+            }
+            else if (historicalReceipts.Count > 1)
+            {
+                throw new InvalidOperationException($"La reserva {booking.ReferenceCode} cuenta con múltiples comprobantes históricos sin asociar. Se requiere conciliación explícita.");
+            }
+
+            if (booking.PaidAmount <= 0)
+            {
+                throw new InvalidOperationException($"La reserva {booking.ReferenceCode} no cuenta con ningún pago confirmado para emitir comprobante.");
+            }
+
+            return new BillableOperationIdentity(
+                OperationKey: $"MANUAL:BOOKING:{bookingId:N}",
+                CulqiPaymentId: null,
+                CashTransactionId: null,
+                Amount: booking.PaidAmount,
+                PaymentMethod: booking.PaymentMethod,
+                OperationNumber: booking.OperationNumber,
+                IsHistoricalFallback: false);
+        }
+
         public async Task<ElectronicReceipt> GenerateReceiptAsync(
             Guid bookingId,
             Guid? culqiPaymentId,
@@ -591,9 +931,13 @@ namespace SIGETOUR.API.Application.Invoicing
             ElectronicReceipt? receipt = null;
             bool isNew = false;
 
-            Guid? resolvedCulqi = culqiPaymentId;
-            Guid? resolvedCash = cashTransactionId;
-            string? resolvedOpKey = billableOperationKey;
+            var identity = await ResolveBillableOperationAsync(
+                bookingId,
+                culqiPaymentId,
+                exactReceiptId,
+                cashTransactionId,
+                billableOperationKey,
+                ct);
 
             if (exactReceiptId.HasValue && exactReceiptId.Value != Guid.Empty)
             {
@@ -606,67 +950,16 @@ namespace SIGETOUR.API.Application.Invoicing
                 {
                     return receipt;
                 }
-                if (resolvedCulqi == null && receipt.CulqiPaymentId != null)
-                {
-                    resolvedCulqi = receipt.CulqiPaymentId;
-                }
-                if (resolvedCash == null && receipt.CashTransactionId != null)
-                {
-                    resolvedCash = receipt.CashTransactionId;
-                }
-                if (string.IsNullOrWhiteSpace(resolvedOpKey) && !string.IsNullOrWhiteSpace(receipt.BillableOperationKey))
-                {
-                    resolvedOpKey = receipt.BillableOperationKey;
-                }
                 isNew = false;
             }
             else
             {
-                if (resolvedCulqi.HasValue)
-                {
-                    resolvedOpKey ??= $"CULQI:{resolvedCulqi.Value:N}";
-                }
-                else if (resolvedCash.HasValue)
-                {
-                    resolvedOpKey ??= $"CASH:{resolvedCash.Value:N}";
-                }
-                else
-                {
-                    var unbilledCashTx = await _db.CashTransactions
-                        .Where(t => t.BookingId == bookingId && t.TransactionType == "Ingreso" && !_db.ElectronicReceipts.Any(r => r.CashTransactionId == t.Id))
-                        .OrderBy(t => t.CreatedAt)
-                        .FirstOrDefaultAsync(ct);
-
-                    if (unbilledCashTx != null)
-                    {
-                        resolvedCash = unbilledCashTx.Id;
-                        resolvedOpKey = $"CASH:{unbilledCashTx.Id:N}";
-                    }
-                    else
-                    {
-                        resolvedOpKey ??= $"MANUAL:BOOKING:{bookingId:N}";
-                    }
-                }
-
                 // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado, Demo o Simulado)
-                var existing = await _db.ElectronicReceipts
-                    .OrderByDescending(r => r.CreatedAtUtc)
-                    .FirstOrDefaultAsync(r =>
-                        ((!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
-                         (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
-                         (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
-                         (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)))
-                        && (r.Status == "Accepted" || r.Status == "Demo" || r.Status == "Simulation"), ct);
+                var existing = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: true, ct);
                 if (existing != null) return existing;
 
-                // Reutilizar registro si quedó en estado fallido/rechazado para actualizarlo en vez de duplicarlo
-                receipt = await _db.ElectronicReceipts
-                    .OrderByDescending(r => r.CreatedAtUtc)
-                    .FirstOrDefaultAsync(r =>
-                        (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
-                        (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
-                        (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
-                        (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+                // Reutilizar registro si quedó en estado fallido/rechazado/pendiente para actualizarlo en vez de duplicarlo
+                receipt = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: false, ct);
                 isNew = receipt == null;
             }
 
@@ -678,43 +971,12 @@ namespace SIGETOUR.API.Application.Invoicing
             if (booking == null)
                 throw new InvalidOperationException($"No se encontró la reserva {bookingId} para facturación electrónica.");
 
-            CulqiPayment? culqiPayment = null;
-            if (resolvedCulqi.HasValue)
-            {
-                culqiPayment = await _db.CulqiPayments.FindAsync(new object[] { resolvedCulqi.Value }, ct);
-                if (culqiPayment == null || culqiPayment.BookingId != bookingId || culqiPayment.Status != "paid")
-                {
-                    throw new InvalidOperationException($"El pago Culqi {resolvedCulqi} no existe, no pertenece a la reserva o no se encuentra confirmado.");
-                }
-            }
-            else
-            {
-                if (booking.PaidAmount <= 0)
-                {
-                    throw new InvalidOperationException($"La reserva {booking.ReferenceCode} no cuenta con ningún pago confirmado para emitir comprobante.");
-                }
-            }
-
             // 2. Determinación de importes, anticipos y saldos
-            decimal paymentAmount;
-            if (culqiPayment != null)
-            {
-                paymentAmount = culqiPayment.AmountCents / 100m;
-            }
-            else if (resolvedCash.HasValue)
-            {
-                var cashTx = await _db.CashTransactions.FindAsync(new object[] { resolvedCash.Value }, ct);
-                paymentAmount = cashTx?.Amount ?? (receipt != null && receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.PaidAmount);
-            }
-            else
-            {
-                paymentAmount = (receipt != null && receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.PaidAmount);
-            }
+            decimal paymentAmount = identity.Amount;
 
-            var isAdvance = (culqiPayment != null && booking.PaidAmount < booking.TotalAmount)
-                || (culqiPayment == null && paymentAmount < booking.TotalAmount);
-            var isBalance = (culqiPayment != null && booking.PaidAmount >= booking.TotalAmount && (booking.PaidAmount - paymentAmount > 0))
-                || (culqiPayment == null && booking.PaidAmount >= booking.TotalAmount && paymentAmount < booking.TotalAmount);
+            var isAdvance = (booking.PaidAmount < booking.TotalAmount && paymentAmount < booking.TotalAmount);
+            var isBalance = (booking.PaidAmount >= booking.TotalAmount && paymentAmount < booking.TotalAmount)
+                || (booking.PaidAmount >= booking.TotalAmount && (booking.PaidAmount - paymentAmount > 0));
 
             // Preservar ambiente histórico si ya fue establecido en el comprobante
             var effectiveEnvironment = !string.IsNullOrWhiteSpace(receipt?.Environment)
@@ -792,19 +1054,21 @@ namespace SIGETOUR.API.Application.Invoicing
                 receipt = new ElectronicReceipt
                 {
                     BookingId = booking.Id,
-                    CulqiPaymentId = resolvedCulqi,
-                    CashTransactionId = resolvedCash,
-                    BillableOperationKey = resolvedOpKey,
+                    CulqiPaymentId = identity.CulqiPaymentId,
+                    CashTransactionId = identity.CashTransactionId,
+                    BillableOperationKey = identity.OperationKey,
                     Environment = effectiveEnvironment,
                     CreatedAtUtc = DateTime.UtcNow
                 };
             }
             else
             {
-                if (receipt.CashTransactionId == null && resolvedCash != null)
-                    receipt.CashTransactionId = resolvedCash;
-                if (string.IsNullOrWhiteSpace(receipt.BillableOperationKey) && resolvedOpKey != null)
-                    receipt.BillableOperationKey = resolvedOpKey;
+                if (receipt.CashTransactionId == null && identity.CashTransactionId != null)
+                    receipt.CashTransactionId = identity.CashTransactionId;
+                if (receipt.CulqiPaymentId == null && identity.CulqiPaymentId != null)
+                    receipt.CulqiPaymentId = identity.CulqiPaymentId;
+                if (string.IsNullOrWhiteSpace(receipt.BillableOperationKey) && identity.OperationKey != null)
+                    receipt.BillableOperationKey = identity.OperationKey;
             }
 
             receipt.ReceiptType = receiptType;
@@ -878,18 +1142,12 @@ namespace SIGETOUR.API.Application.Invoicing
 
                 if (isNew)
                 {
-                    var lockKey = resolvedOpKey ?? $"MANUAL:BOOKING:{bookingId:N}";
+                    var lockKey = identity.OperationKey ?? $"MANUAL:BOOKING:{bookingId:N}";
                     var creationSemaphore = _creationLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
                     await creationSemaphore.WaitAsync(ct);
                     try
                     {
-                        var doubleCheck = await _db.ElectronicReceipts
-                            .OrderByDescending(r => r.CreatedAtUtc)
-                            .FirstOrDefaultAsync(r =>
-                                (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
-                                (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
-                                (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
-                                (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+                        var doubleCheck = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: false, ct);
                         if (doubleCheck != null)
                         {
                             return doubleCheck;
@@ -898,16 +1156,15 @@ namespace SIGETOUR.API.Application.Invoicing
                         await _db.SaveChangesAsync(ct);
                         isNew = false;
                     }
-                    catch (DbUpdateException)
+                    catch (DbUpdateException ex)
                     {
+                        if (!IsPostgresUniqueViolation(ex, out var constraintName))
+                        {
+                            throw;
+                        }
+                        _logger.LogInformation(ex, "Colisión de unicidad ({Constraint}) al insertar ElectronicReceipt para {OpKey}. Desasociando entidad y recargando ganador.", constraintName, identity.OperationKey);
                         _db.Entry(receipt).State = EntityState.Detached;
-                        var winner = await _db.ElectronicReceipts
-                            .OrderByDescending(r => r.CreatedAtUtc)
-                            .FirstOrDefaultAsync(r =>
-                                (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
-                                (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
-                                (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
-                                (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+                        var winner = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: false, ct);
                         if (winner != null) return winner;
                         throw;
                     }
@@ -928,18 +1185,12 @@ namespace SIGETOUR.API.Application.Invoicing
             // 6. Conciliación previa y protección contra reemisiones a ciegas
             if (isNew)
             {
-                var lockKey = resolvedOpKey ?? $"MANUAL:BOOKING:{bookingId:N}";
+                var lockKey = identity.OperationKey ?? $"MANUAL:BOOKING:{bookingId:N}";
                 var creationSemaphore = _creationLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
                 await creationSemaphore.WaitAsync(ct);
                 try
                 {
-                    var doubleCheck = await _db.ElectronicReceipts
-                        .OrderByDescending(r => r.CreatedAtUtc)
-                        .FirstOrDefaultAsync(r =>
-                            (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
-                            (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
-                            (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
-                            (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+                    var doubleCheck = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: false, ct);
 
                     if (doubleCheck != null)
                     {
@@ -957,16 +1208,14 @@ namespace SIGETOUR.API.Application.Invoicing
                         }
                         catch (DbUpdateException ex)
                         {
-                            _logger.LogInformation(ex, "Colisión concurrente al insertar ElectronicReceipt para {OpKey}. Desasociando entidad y recargando ganador.", resolvedOpKey);
+                            if (!IsPostgresUniqueViolation(ex, out var constraintName))
+                            {
+                                throw;
+                            }
+                            _logger.LogInformation(ex, "Colisión concurrente ({Constraint}) al insertar ElectronicReceipt para {OpKey}. Desasociando entidad y recargando ganador.", constraintName, identity.OperationKey);
                             _db.Entry(receipt).State = EntityState.Detached;
 
-                            receipt = await _db.ElectronicReceipts
-                                .OrderByDescending(r => r.CreatedAtUtc)
-                                .FirstOrDefaultAsync(r =>
-                                    (!string.IsNullOrEmpty(resolvedOpKey) && r.BillableOperationKey == resolvedOpKey) ||
-                                    (resolvedCash != null && r.CashTransactionId == resolvedCash) ||
-                                    (resolvedCulqi != null && r.CulqiPaymentId == resolvedCulqi) ||
-                                    (resolvedCulqi == null && r.BookingId == bookingId && r.CulqiPaymentId == null && (resolvedCash == null || r.CashTransactionId == null)), ct);
+                            receipt = await FindExistingReceiptAsync(bookingId, identity, terminalOnly: false, ct);
 
                             if (receipt == null) throw;
                             isNew = false;
@@ -1590,7 +1839,14 @@ namespace SIGETOUR.API.Application.Invoicing
                 // Si está en Pending, Rejected o Failed (y no en revisión/in-flight), proceder a emitir
                 if (receipt.Status is "Pending" or "Rejected" or "Failed")
                 {
-                    return await GenerateReceiptAsync(receipt.BookingId, receipt.CulqiPaymentId, receipt.Id, ct: ct);
+                    return await GenerateReceiptAsync(
+                        receipt.BookingId,
+                        receipt.CulqiPaymentId,
+                        exactReceiptId: receipt.Id,
+                        claimToken: null,
+                        cashTransactionId: receipt.CashTransactionId,
+                        billableOperationKey: receipt.BillableOperationKey,
+                        ct: ct);
                 }
 
                 return receipt;

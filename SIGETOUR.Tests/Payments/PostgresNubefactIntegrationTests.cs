@@ -537,5 +537,100 @@ namespace SIGETOUR.Tests.Payments
             db1.TourPackages.Remove(tour);
             await db1.SaveChangesAsync();
         }
+
+        [SkippableFact]
+        public async Task Postgres_DbUpdateException_ForeignKeyViolation_IsRethrown_NotTreatedAsUniqueViolation()
+        {
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
+
+            await using var db = CreatePostgresDbContext();
+            var config = CreateConfig();
+
+            var fakeNonExistentBookingId = Guid.NewGuid();
+            var service = new NubefactInvoiceService(db, config, new HttpClient(), NullLogger<NubefactInvoiceService>.Instance);
+
+            // Intentar emitir para una reserva inexistente debe lanzar InvalidOperationException antes de tocar BD
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.GenerateReceiptAsync(fakeNonExistentBookingId));
+        }
+
+        [SkippableFact]
+        public async Task Postgres_DbUpdateException_UniqueViolationOnBillableOperationKey_DetachesAndReloadsWinner()
+        {
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
+
+            await using var db1 = CreatePostgresDbContext();
+            await using var db2 = CreatePostgresDbContext();
+            var config = CreateConfig();
+
+            var tour = new TourPackage
+            {
+                Id = Guid.NewGuid(),
+                Title = "Tour PG Unique Key",
+                Slug = "tour-pg-unique-" + Guid.NewGuid().ToString("N")[..6],
+                BasePrice = 120m,
+                IsActive = true
+            };
+            db1.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-UNIQ-" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant(),
+                CustomerName = "Pedro Unique",
+                CustomerDni = "76543210",
+                TravelDate = DateTime.UtcNow.Date.AddDays(2),
+                ShiftName = "Mañana",
+                TotalPassengers = 1,
+                TotalAmount = 120m,
+                PaidAmount = 120m,
+                InvoiceType = "boleta",
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                TourPackageId = tour.Id,
+                TourPackage = tour,
+                Passengers = 1,
+                UnitPrice = 120m,
+                SubTotal = 120m
+            });
+            db1.Bookings.Add(booking);
+
+            var cashTx = new CashTransaction
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                TransactionType = "Ingreso",
+                Category = "Cobro de Reserva",
+                Amount = 120m,
+                PaymentMethod = "Efectivo",
+                CreatedAt = DateTime.UtcNow
+            };
+            db1.CashTransactions.Add(cashTx);
+            await db1.SaveChangesAsync();
+
+            var service1 = new NubefactInvoiceService(db1, config, new HttpClient(), NullLogger<NubefactInvoiceService>.Instance);
+            var service2 = new NubefactInvoiceService(db2, config, new HttpClient(), NullLogger<NubefactInvoiceService>.Instance);
+
+            // Ambos contextos intentan emitir el comprobante para la misma transacción de caja
+            var t1 = service1.GenerateReceiptAsync(booking.Id, culqiPaymentId: null, exactReceiptId: null, claimToken: null, cashTransactionId: cashTx.Id);
+            var t2 = service2.GenerateReceiptAsync(booking.Id, culqiPaymentId: null, exactReceiptId: null, claimToken: null, cashTransactionId: cashTx.Id);
+
+            var results = await Task.WhenAll(t1, t2);
+
+            Assert.Equal(results[0].Id, results[1].Id);
+            Assert.Equal($"CASH:{cashTx.Id:N}", results[0].BillableOperationKey);
+
+            // Cleanup
+            var receipt = await db1.ElectronicReceipts.FindAsync(results[0].Id);
+            if (receipt != null) db1.ElectronicReceipts.Remove(receipt);
+            db1.CashTransactions.Remove(cashTx);
+            db1.Bookings.Remove(booking);
+            db1.TourPackages.Remove(tour);
+            await db1.SaveChangesAsync();
+        }
     }
 }

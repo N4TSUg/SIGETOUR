@@ -360,7 +360,7 @@
                                 <td class="p-3.5 text-right pr-6 whitespace-nowrap space-x-1">
                                     @if (tx.BookingId.HasValue)
                                     {
-                                        <a href="/Booking/Ticket/@tx.BookingId.Value" target="_blank"
+                                        <a href="/Booking/Ticket/@tx.BookingId.Value?cashTransactionId=@tx.Id" target="_blank"
                                            class="inline-flex items-center justify-center p-1.5 text-on-surface-variant hover:text-amber-600 rounded-lg hover:bg-amber-50 transition-colors cursor-pointer" 
                                            title="Imprimir Ticket POS (80mm / 58mm)">
                                             <span class="material-symbols-outlined text-[19px]">receipt_long</span>

@@ -19,10 +19,26 @@ namespace SIGETOUR.API.Application.Invoicing
         ElectronicReceipt Receipt,
         string? Details = null);
 
+    public sealed record BillableOperationIdentity(
+        string OperationKey,
+        Guid? CulqiPaymentId,
+        Guid? CashTransactionId,
+        decimal Amount,
+        string PaymentMethod,
+        string? OperationNumber,
+        bool IsHistoricalFallback);
+
     public interface IElectronicReceiptService
     {
         Task<ElectronicReceipt?> GetReceiptByIdAsync(Guid receiptId, CancellationToken ct = default);
         Task<ElectronicReceipt?> GetReceiptByBookingIdAsync(Guid bookingId, CancellationToken ct = default);
+        Task<BillableOperationIdentity> ResolveBillableOperationAsync(
+            Guid bookingId,
+            Guid? culqiPaymentId = null,
+            Guid? exactReceiptId = null,
+            Guid? cashTransactionId = null,
+            string? billableOperationKey = null,
+            CancellationToken ct = default);
         Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId = null, CancellationToken ct = default);
         Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, CancellationToken ct = default);
         Task<ElectronicReceipt> GenerateReceiptAsync(Guid bookingId, Guid? culqiPaymentId, Guid? exactReceiptId, string? claimToken, CancellationToken ct = default);

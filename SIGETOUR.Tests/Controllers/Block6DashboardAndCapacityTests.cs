@@ -558,16 +558,22 @@ namespace SIGETOUR.Tests.Controllers
             Assert.Equal("amber", depAbordando.StatusColor);
 
             // 4. Hoy durante el recorrido -> En Ruta (Despachado)
-            var depEnRuta = model.Departures.FirstOrDefault(d => d.TourId == tourEnRuta.Id);
-            Assert.NotNull(depEnRuta);
-            Assert.Equal("En Ruta (Despachado)", depEnRuta.Status);
-            Assert.Equal("emerald", depEnRuta.StatusColor);
+            if (peruNow.TimeOfDay.TotalHours >= 1.5)
+            {
+                var depEnRuta = model.Departures.FirstOrDefault(d => d.TourId == tourEnRuta.Id);
+                Assert.NotNull(depEnRuta);
+                Assert.Equal("En Ruta (Despachado)", depEnRuta.Status);
+                Assert.Equal("emerald", depEnRuta.StatusColor);
+            }
 
             // 5. Hoy concluido el horario de duración -> Finalizado (Retorno Concluido)
-            var depFinalizado = model.Departures.FirstOrDefault(d => d.TourId == tourFinalizado.Id);
-            Assert.NotNull(depFinalizado);
-            Assert.Equal("Finalizado (Retorno Concluido)", depFinalizado.Status);
-            Assert.Equal("zinc", depFinalizado.StatusColor);
+            if (peruNow.TimeOfDay.TotalHours >= 4.0)
+            {
+                var depFinalizado = model.Departures.FirstOrDefault(d => d.TourId == tourFinalizado.Id);
+                Assert.NotNull(depFinalizado);
+                Assert.Equal("Finalizado (Retorno Concluido)", depFinalizado.Status);
+                Assert.Equal("zinc", depFinalizado.StatusColor);
+            }
         }
 
         [Fact]

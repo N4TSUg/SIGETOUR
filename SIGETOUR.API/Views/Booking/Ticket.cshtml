@@ -230,6 +230,18 @@
                             {
                                 <input type="hidden" name="paymentId" value="@receipt.CulqiPaymentId.Value" />
                             }
+                            else if (ViewBag.PaymentId != null)
+                            {
+                                <input type="hidden" name="paymentId" value="@ViewBag.PaymentId" />
+                            }
+                            @if (receipt?.CashTransactionId.HasValue == true)
+                            {
+                                <input type="hidden" name="cashTransactionId" value="@receipt.CashTransactionId.Value" />
+                            }
+                            else if (ViewBag.SelectedCashTransactionId != null)
+                            {
+                                <input type="hidden" name="cashTransactionId" value="@ViewBag.SelectedCashTransactionId" />
+                            }
                             <button type="submit" class="px-2 py-0.5 bg-red-700 hover:bg-red-800 text-white rounded text-[8px] font-bold cursor-pointer transition-colors shadow-xs">
                                 ↻ Reintentar Emisión NubeFact
                             </button>
@@ -246,6 +258,14 @@
                     {
                         <form asp-controller="Booking" asp-action="RetryReceipt" method="post" class="mt-1 no-print">
                             <input type="hidden" name="bookingId" value="@booking.Id" />
+                            @if (ViewBag.PaymentId != null)
+                            {
+                                <input type="hidden" name="paymentId" value="@ViewBag.PaymentId" />
+                            }
+                            @if (ViewBag.SelectedCashTransactionId != null)
+                            {
+                                <input type="hidden" name="cashTransactionId" value="@ViewBag.SelectedCashTransactionId" />
+                            }
                             <button type="submit" class="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[8px] font-bold cursor-pointer transition-colors shadow-xs">
                                 Emitir Comprobante NubeFact
                             </button>

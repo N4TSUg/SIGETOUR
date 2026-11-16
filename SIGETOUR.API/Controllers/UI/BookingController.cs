@@ -587,7 +587,7 @@ namespace SIGETOUR.API.Controllers.UI
         }
 
         [HttpGet]
-        public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null, string? token = null)
+        public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null, string? token = null, Guid? cashTransactionId = null)
         {
             // Solo consultar y mostrar datos existentes (operación GET estrictamente idempotente y de solo lectura)
             // 1. Búsqueda por identificador exacto de comprobante (receiptId)
@@ -605,6 +605,15 @@ namespace SIGETOUR.API.Controllers.UI
                     .ThenInclude(b => b.Items)
                     .ThenInclude(i => i.TourPackage)
                     .FirstOrDefaultAsync(r => r.CulqiPaymentId == paymentId.Value);
+            }
+
+            if (receipt == null && cashTransactionId.HasValue)
+            {
+                receipt = await _context.ElectronicReceipts
+                    .Include(r => r.Booking)
+                    .ThenInclude(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .FirstOrDefaultAsync(r => r.CashTransactionId == cashTransactionId.Value);
             }
 
             if (receipt == null)
@@ -646,13 +655,20 @@ namespace SIGETOUR.API.Controllers.UI
 
             ViewBag.Booking = booking;
             ViewBag.TicketSize = (size == "58") ? "58" : "80";
+            ViewBag.PaymentId = paymentId;
+            ViewBag.SelectedCashTransactionId = cashTransactionId;
             return View("Ticket", receipt);
         }
 
         [HttpPost]
         [Authorize(Policy = AppPermissions.ReceiptsManage)]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RetryReceipt(Guid? receiptId, Guid? bookingId, Guid? paymentId, [FromServices] IElectronicReceiptService receiptService)
+        public async Task<IActionResult> RetryReceipt(
+            Guid? receiptId,
+            Guid? bookingId,
+            Guid? paymentId,
+            [FromServices] IElectronicReceiptService receiptService,
+            Guid? cashTransactionId = null)
         {
             // Bloque 2 Item 9: Trabajar con el identificador exacto del comprobante y rechazar identificadores incompatibles
             if (receiptId.HasValue && receiptId.Value != Guid.Empty)
@@ -671,9 +687,21 @@ namespace SIGETOUR.API.Controllers.UI
                 {
                     return BadRequest("El identificador de pago no coincide con el comprobante.");
                 }
+                if (cashTransactionId.HasValue && existingReceipt.CashTransactionId.HasValue && cashTransactionId.Value != existingReceipt.CashTransactionId.Value)
+                {
+                    return BadRequest("El identificador de transacción de caja no coincide con el comprobante.");
+                }
 
                 var retried = await receiptService.RetryReceiptAsync(receiptId.Value)
-                    ?? await receiptService.GenerateReceiptAsync(existingReceipt.BookingId, existingReceipt.CulqiPaymentId);
+                    ?? (existingReceipt.CashTransactionId.HasValue
+                        ? await receiptService.GenerateReceiptAsync(
+                            existingReceipt.BookingId,
+                            existingReceipt.CulqiPaymentId,
+                            exactReceiptId: existingReceipt.Id,
+                            claimToken: null,
+                            cashTransactionId: existingReceipt.CashTransactionId,
+                            billableOperationKey: existingReceipt.BillableOperationKey)
+                        : await receiptService.GenerateReceiptAsync(existingReceipt.BookingId, existingReceipt.CulqiPaymentId));
                 return RedirectToAction("Ticket", new { id = retried?.Id ?? receiptId.Value });
             }
 
@@ -682,7 +710,14 @@ namespace SIGETOUR.API.Controllers.UI
                 return BadRequest("Se requiere el identificador exacto del comprobante o de la reserva.");
             }
 
-            var result = await receiptService.GenerateReceiptAsync(bookingId.Value, paymentId);
+            var result = cashTransactionId.HasValue
+                ? await receiptService.GenerateReceiptAsync(
+                    bookingId.Value,
+                    culqiPaymentId: paymentId,
+                    exactReceiptId: null,
+                    claimToken: null,
+                    cashTransactionId: cashTransactionId)
+                : await receiptService.GenerateReceiptAsync(bookingId.Value, paymentId);
             return RedirectToAction("Ticket", new { id = result.Id });
         }
 
