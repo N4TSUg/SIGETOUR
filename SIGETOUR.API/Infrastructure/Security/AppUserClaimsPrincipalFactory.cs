@@ -40,37 +40,26 @@ namespace SIGETOUR.API.Infrastructure.Security
                     var roleClaims = await RoleManager.GetClaimsAsync(identityRole);
                     var permClaims = roleClaims.Where(c => c.Type == "Permission").ToList();
 
-                    var isConfigured = roleClaims.Any(c => c.Type == "PermissionConfigured");
-
-                    // Si el rol NUNCA ha sido inicializado o configurado, sembrar sus valores iniciales
-                    if (!isConfigured)
+                    // Lectura pura de permisos efectivos: CERO escrituras en base de datos durante la autenticación
+                    foreach (var claim in permClaims)
                     {
-                        var defaults = AppPermissions.GetDefaultPermissionsForRole(role);
-                        foreach (var def in defaults)
+                        if (!identity.HasClaim("Permission", claim.Value))
                         {
-                            await RoleManager.AddClaimAsync(identityRole, new Claim("Permission", def));
-                            if (!identity.HasClaim("Permission", def))
-                            {
-                                identity.AddClaim(new Claim("Permission", def));
-                            }
+                            identity.AddClaim(new Claim("Permission", claim.Value));
                         }
-                        await RoleManager.AddClaimAsync(identityRole, new Claim("PermissionConfigured", "true"));
                     }
-                    else
+
+                    if (roleClaims.Any(c => c.Type == "PermissionConfigured"))
                     {
-                        // Respetar estrictamente la asignación administrada (incluyendo la retirada total de permisos)
-                        foreach (var claim in permClaims)
+                        if (!identity.HasClaim("PermissionConfigured", "true"))
                         {
-                            if (!identity.HasClaim("Permission", claim.Value))
-                            {
-                                identity.AddClaim(new Claim("Permission", claim.Value));
-                            }
+                            identity.AddClaim(new Claim("PermissionConfigured", "true"));
                         }
                     }
                 }
                 else
                 {
-                    // Fallback para entornos donde RoleManager no contiene la entidad (ej. mocks unitarios en pruebas)
+                    // Fallback de solo lectura en memoria para entornos donde RoleManager no contiene la entidad (ej. mocks unitarios en pruebas)
                     var defaults = AppPermissions.GetDefaultPermissionsForRole(role);
                     foreach (var def in defaults)
                     {

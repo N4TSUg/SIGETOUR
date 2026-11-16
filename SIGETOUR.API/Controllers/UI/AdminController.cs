@@ -63,12 +63,23 @@ namespace SIGETOUR.API.Controllers.UI
 
         public async Task<IActionResult> Dashboard()
         {
-            var toursCount = await _context.TourPackages.CountAsync();
-            var usersCount = await _userManager.Users.CountAsync();
-            var vehicles = await _context.Vehicles.ToListAsync();
+            bool canViewBookings = User.HasClaim("Permission", AppPermissions.BookingsView);
+            bool canViewTours = User.HasClaim("Permission", AppPermissions.ToursView);
+            bool canViewCash = User.HasClaim("Permission", AppPermissions.CashView) || User.HasClaim("Permission", AppPermissions.CashManage);
+            bool canViewUsers = User.HasClaim("Permission", AppPermissions.UsersManage);
+
+            // Si el usuario no tiene ningún permiso sobre módulos administrativos, denegar acceso explícitamente con 403
+            if (!canViewBookings && !canViewTours && !canViewCash && !canViewUsers)
+            {
+                return Forbid();
+            }
+
+            var toursCount = canViewTours ? await _context.TourPackages.CountAsync() : 0;
+            var usersCount = canViewUsers ? await _userManager.Users.CountAsync() : 0;
+            var vehicles = canViewTours ? await _context.Vehicles.ToListAsync() : new List<Vehicle>();
             var vehiclesCount = vehicles.Count;
             var activeVehicles = vehicles.Count(v => v.IsActive);
-            var bookingsCount = await _context.Bookings.CountAsync();
+            var bookingsCount = canViewBookings ? await _context.Bookings.CountAsync() : 0;
 
             // Fecha local de Cajamarca / Perú (UTC-5)
             var peruNow = PeruTime.Now;
@@ -76,13 +87,15 @@ namespace SIGETOUR.API.Controllers.UI
             var todayPeruStr = todayPeru.ToString("yyyy-MM-dd");
 
             // Todas las reservas activas (no canceladas) con detalles de vehículo y conductor
-            var allActiveBookings = await _context.Bookings
-                .Include(b => b.Items)
-                .ThenInclude(i => i.TourPackage)
-                .Include(b => b.AssignedVehicle)
-                .Include(b => b.AssignedDriver)
-                .Where(b => b.Status != BookingStatus.Cancelled)
-                .ToListAsync();
+            var allActiveBookings = canViewBookings
+                ? await _context.Bookings
+                    .Include(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .Include(b => b.AssignedVehicle)
+                    .Include(b => b.AssignedDriver)
+                    .Where(b => b.Status != BookingStatus.Cancelled)
+                    .ToListAsync()
+                : new List<Booking>();
 
             // Reservas del día de viaje (evaluando fecha local de Perú)
             var todayBookings = allActiveBookings.Where(b =>
@@ -97,91 +110,105 @@ namespace SIGETOUR.API.Controllers.UI
 
             var totalDailyCapacity = vehicles.Where(v => v.IsActive).Sum(v => v.SeatCapacity);
             if (totalDailyCapacity <= 0) totalDailyCapacity = Math.Max(20, vehiclesCount * 18);
-            var occupancyRate = totalDailyCapacity > 0 ? (int)Math.Min(100, Math.Round((double)todayPax / totalDailyCapacity * 100)) : 0;
+            var occupancyRate = (canViewBookings && totalDailyCapacity > 0) ? (int)Math.Min(100, Math.Round((double)todayPax / totalDailyCapacity * 100)) : 0;
 
             // Recaudación del día (Caja / Reservas)
-            var todayTransactions = await _context.CashTransactions
-                .Where(t => t.TransactionType == "Ingreso" && t.CreatedAt >= todayPeru && t.CreatedAt < todayPeru.AddDays(1))
-                .ToListAsync();
-            var todayIncome = todayTransactions.Sum(t => t.Amount);
-            if (todayIncome == 0 && todayBookings.Any())
+            decimal todayIncome = 0m;
+            if (canViewCash)
             {
-                todayIncome = todayBookings.Sum(b => b.PaidAmount);
+                var todayTransactions = await _context.CashTransactions
+                    .Where(t => t.TransactionType == "Ingreso" && t.CreatedAt >= todayPeru && t.CreatedAt < todayPeru.AddDays(1))
+                    .ToListAsync();
+                todayIncome = todayTransactions.Sum(t => t.Amount);
+                if (todayIncome == 0 && todayBookings.Any())
+                {
+                    todayIncome = todayBookings.Sum(b => b.PaidAmount);
+                }
             }
-            var todayPending = todayBookings.Sum(b => Math.Max(0, b.TotalAmount - b.PaidAmount));
+            var todayPending = canViewBookings ? todayBookings.Sum(b => Math.Max(0, b.TotalAmount - b.PaidAmount)) : 0m;
 
             // Alertas Regulatorias y de Flota (SOAT y CITV a 30 días)
             var fleetAlerts = new List<FleetAlertItem>();
-            var nowUtc = DateTime.UtcNow;
-            foreach (var v in vehicles)
+            if (canViewTours)
             {
-                if (v.SoatExpiryDate.HasValue && v.SoatExpiryDate.Value <= nowUtc.AddDays(30))
+                var nowUtc = DateTime.UtcNow;
+                foreach (var v in vehicles)
                 {
-                    var days = (int)Math.Ceiling((v.SoatExpiryDate.Value.Date - nowUtc.Date).TotalDays);
-                    fleetAlerts.Add(new FleetAlertItem
+                    if (v.SoatExpiryDate.HasValue && v.SoatExpiryDate.Value <= nowUtc.AddDays(30))
                     {
-                        LicensePlate = v.LicensePlate,
-                        Model = v.Model,
-                        AlertType = "SOAT Turístico",
-                        ExpiryDate = v.SoatExpiryDate.Value,
-                        DaysRemaining = days,
-                        IsExpired = days < 0
-                    });
-                }
-                if (v.CitvExpiryDate.HasValue && v.CitvExpiryDate.Value <= nowUtc.AddDays(30))
-                {
-                    var days = (int)Math.Ceiling((v.CitvExpiryDate.Value.Date - nowUtc.Date).TotalDays);
-                    fleetAlerts.Add(new FleetAlertItem
+                        var days = (int)Math.Ceiling((v.SoatExpiryDate.Value.Date - nowUtc.Date).TotalDays);
+                        fleetAlerts.Add(new FleetAlertItem
+                        {
+                            LicensePlate = v.LicensePlate,
+                            Model = v.Model,
+                            AlertType = "SOAT Turístico",
+                            ExpiryDate = v.SoatExpiryDate.Value,
+                            DaysRemaining = days,
+                            IsExpired = days < 0
+                        });
+                    }
+                    if (v.CitvExpiryDate.HasValue && v.CitvExpiryDate.Value <= nowUtc.AddDays(30))
                     {
-                        LicensePlate = v.LicensePlate,
-                        Model = v.Model,
-                        AlertType = "CITV (Rev. Técnica)",
-                        ExpiryDate = v.CitvExpiryDate.Value,
-                        DaysRemaining = days,
-                        IsExpired = days < 0
-                    });
+                        var days = (int)Math.Ceiling((v.CitvExpiryDate.Value.Date - nowUtc.Date).TotalDays);
+                        fleetAlerts.Add(new FleetAlertItem
+                        {
+                            LicensePlate = v.LicensePlate,
+                            Model = v.Model,
+                            AlertType = "CITV (Rev. Técnica)",
+                            ExpiryDate = v.CitvExpiryDate.Value,
+                            DaysRemaining = days,
+                            IsExpired = days < 0
+                        });
+                    }
                 }
             }
 
             // Demanda por circuito (agrupación de reservas)
-            var allItems = await _context.BookingItems
-                .Include(i => i.TourPackage)
-                .ThenInclude(t => t.Category)
-                .ToListAsync();
-
-            var groupedDemand = allItems
-                .GroupBy(i => i.TourPackage?.Title ?? "Circuito Cajamarca")
-                .Select(g => new
-                {
-                    Title = g.Key,
-                    Category = g.FirstOrDefault()?.TourPackage?.Category?.Name ?? "Turismo Cultural",
-                    Pax = g.Sum(x => x.Passengers)
-                })
-                .OrderByDescending(x => x.Pax)
-                .Take(5)
-                .ToList();
-
-            var colorClasses = new[] { "bg-primary", "bg-secondary", "bg-emerald-600", "bg-amber-600", "bg-sky-600" };
-            var totalDemandedPax = Math.Max(1, groupedDemand.Sum(x => x.Pax));
-            var circuitDemands = groupedDemand.Select((x, idx) => new DashboardCircuitDemandItem
+            var circuitDemands = new List<DashboardCircuitDemandItem>();
+            if (canViewBookings)
             {
-                TourTitle = x.Title,
-                CategoryName = x.Category,
-                PassengerCount = x.Pax,
-                Percentage = (int)Math.Max(5, Math.Round((double)x.Pax / totalDemandedPax * 100)),
-                ColorClass = colorClasses[idx % colorClasses.Length]
-            }).ToList();
+                var allItems = await _context.BookingItems
+                    .Include(i => i.TourPackage)
+                    .ThenInclude(t => t.Category)
+                    .ToListAsync();
 
-            var activeToursList = await _context.TourPackages
-                .Include(t => t.Images)
-                .Include(t => t.Category)
-                .Include(t => t.Shifts)
-                .Where(t => t.IsActive)
-                .OrderBy(t => t.Title)
-                .ToListAsync();
+                var groupedDemand = allItems
+                    .GroupBy(i => i.TourPackage?.Title ?? "Circuito Cajamarca")
+                    .Select(g => new
+                    {
+                        Title = g.Key,
+                        Category = g.FirstOrDefault()?.TourPackage?.Category?.Name ?? "Turismo Cultural",
+                        Pax = g.Sum(x => x.Passengers)
+                    })
+                    .OrderByDescending(x => x.Pax)
+                    .Take(5)
+                    .ToList();
+
+                var colorClasses = new[] { "bg-primary", "bg-secondary", "bg-emerald-600", "bg-amber-600", "bg-sky-600" };
+                var totalDemandedPax = Math.Max(1, groupedDemand.Sum(x => x.Pax));
+                circuitDemands = groupedDemand.Select((x, idx) => new DashboardCircuitDemandItem
+                {
+                    TourTitle = x.Title,
+                    CategoryName = x.Category,
+                    PassengerCount = x.Pax,
+                    Percentage = (int)Math.Max(5, Math.Round((double)x.Pax / totalDemandedPax * 100)),
+                    ColorClass = colorClasses[idx % colorClasses.Length]
+                }).ToList();
+            }
+
+            var activeToursList = canViewTours
+                ? await _context.TourPackages
+                    .Include(t => t.Images)
+                    .Include(t => t.Category)
+                    .Include(t => t.Shifts)
+                    .Where(t => t.IsActive)
+                    .OrderBy(t => t.Title)
+                    .ToListAsync()
+                : new List<TourPackage>();
 
             if (!circuitDemands.Any() && activeToursList.Any())
             {
+                var colorClasses = new[] { "bg-primary", "bg-secondary", "bg-emerald-600", "bg-amber-600", "bg-sky-600" };
                 circuitDemands = activeToursList.Take(4).Select((t, idx) => new DashboardCircuitDemandItem
                 {
                     TourTitle = t.Title,
@@ -193,27 +220,29 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             // Tablero de Salidas y Despacho en Vivo con Datos Reales
-            // REGLA OPERATIVA: Solo deben figurar las salidas que cuentan con pasajeros reservados
+            // REGLA OPERATIVA: Solo deben figurar las salidas si el usuario posee permiso de reservas y tours
             var departures = new List<DashboardDepartureItem>();
-            var relevantBookings = allActiveBookings.Where(b => b.TravelDate.Date >= todayPeru).ToList();
-            if (!relevantBookings.Any()) relevantBookings = allActiveBookings;
-
-            var tourIdsWithBookings = relevantBookings
-                .SelectMany(b => b.Items)
-                .Where(i => i.Passengers > 0)
-                .Select(i => i.TourPackageId)
-                .Distinct()
-                .ToList();
-
-            var toursWithBookings = activeToursList
-                .Where(t => tourIdsWithBookings.Contains(t.Id))
-                .ToList();
-
-            foreach (var tour in toursWithBookings)
+            if (canViewBookings && canViewTours)
             {
-                var tourBookings = relevantBookings
-                    .Where(b => b.Items.Any(i => i.TourPackageId == tour.Id))
+                var relevantBookings = allActiveBookings.Where(b => b.TravelDate.Date >= todayPeru).ToList();
+                if (!relevantBookings.Any()) relevantBookings = allActiveBookings;
+
+                var tourIdsWithBookings = relevantBookings
+                    .SelectMany(b => b.Items)
+                    .Where(i => i.Passengers > 0)
+                    .Select(i => i.TourPackageId)
+                    .Distinct()
                     .ToList();
+
+                var toursWithBookings = activeToursList
+                    .Where(t => tourIdsWithBookings.Contains(t.Id))
+                    .ToList();
+
+                foreach (var tour in toursWithBookings)
+                {
+                    var tourBookings = relevantBookings
+                        .Where(b => b.Items.Any(i => i.TourPackageId == tour.Id))
+                        .ToList();
 
                 // Agrupar por FECHA DE VIAJE y TURNO para que cada salida operativa sea única por día y horario
                 var departureGroups = tourBookings
@@ -329,20 +358,26 @@ namespace SIGETOUR.API.Controllers.UI
                         TourId = tour.Id
                     });
                 }
+                }
             }
 
             // Ordenar las salidas de manera cronológica por fecha y hora
-            departures = departures
-                .OrderBy(d => d.DepartureDate)
-                .ThenBy(d => ParseTimeForSorting(d.Time))
-                .ToList();
+            if (canViewBookings && canViewTours)
+            {
+                departures = departures
+                    .OrderBy(d => d.DepartureDate)
+                    .ThenBy(d => ParseTimeForSorting(d.Time))
+                    .ToList();
+            }
 
-            var recentBookings = await _context.Bookings
-                .Include(b => b.Items)
-                .ThenInclude(i => i.TourPackage)
-                .OrderByDescending(b => b.BookingDate)
-                .Take(5)
-                .ToListAsync();
+            var recentBookings = canViewBookings
+                ? await _context.Bookings
+                    .Include(b => b.Items)
+                    .ThenInclude(i => i.TourPackage)
+                    .OrderByDescending(b => b.BookingDate)
+                    .Take(5)
+                    .ToListAsync()
+                : new List<Booking>();
 
             var todayDeparturesCount = departures.Count(d => d.DepartureDate.Date == todayPeru);
             var upcomingDeparturesCount = departures.Count(d => d.DepartureDate.Date > todayPeru);
@@ -1607,20 +1642,9 @@ namespace SIGETOUR.API.Controllers.UI
             var claims = await _roleManager.GetClaimsAsync(role);
             var permClaims = claims.Where(c => c.Type == "Permission").Select(c => c.Value).OfType<string>().ToList();
 
-            bool isConfigured = claims.Any(c => c.Type == "PermissionConfigured");
-            List<string> effective;
-            if (!isConfigured)
-            {
-                effective = AppPermissions.GetDefaultPermissionsForRole(roleName).ToList();
-            }
-            else
-            {
-                effective = permClaims;
-            }
-
             ViewBag.RoleName = role.Name;
             ViewBag.AllPermissions = AppPermissions.AllPermissions;
-            ViewBag.AssignedPermissions = effective;
+            ViewBag.AssignedPermissions = permClaims;
             return View();
         }
 
@@ -3973,94 +3997,111 @@ namespace SIGETOUR.API.Controllers.UI
             var allNotifs = new List<object>();
             try
             {
+                bool canViewBookings = User.HasClaim("Permission", AppPermissions.BookingsView);
+                bool canViewTours = User.HasClaim("Permission", AppPermissions.ToursView);
+
+                if (!canViewBookings && !canViewTours)
+                {
+                    return Json(new { count = 0, notifications = allNotifs });
+                }
+
                 var peruNow = DateTime.UtcNow.AddHours(-5);
                 var startDate = DateTime.SpecifyKind(peruNow.Date, DateTimeKind.Utc);
                 var endDate = DateTime.SpecifyKind(peruNow.Date.AddDays(3), DateTimeKind.Utc);
 
-                // 1. Alertas de salidas próximas sin asignación
-                try
+                // 1. Alertas de salidas próximas sin asignación (solo con permiso de reservas)
+                if (canViewBookings)
                 {
-                    var rawUnassigned = await _context.Bookings
-                        .AsNoTracking()
-                        .Include(b => b.Items).ThenInclude(i => i.TourPackage)
-                        .Where(b => b.Status != BookingStatus.Cancelled && b.TravelDate >= startDate && b.TravelDate < endDate)
-                        .Where(b => b.AssignedVehicleId == null || b.AssignedDriverId == null)
-                        .OrderBy(b => b.TravelDate)
-                        .Take(3)
-                        .ToListAsync();
+                    try
+                    {
+                        var rawUnassigned = await _context.Bookings
+                            .AsNoTracking()
+                            .Include(b => b.Items).ThenInclude(i => i.TourPackage)
+                            .Where(b => b.Status != BookingStatus.Cancelled && b.TravelDate >= startDate && b.TravelDate < endDate)
+                            .Where(b => b.AssignedVehicleId == null || b.AssignedDriverId == null)
+                            .OrderBy(b => b.TravelDate)
+                            .Take(3)
+                            .ToListAsync();
 
-                    var unassignedDepartures = rawUnassigned.Select(b => new {
-                        id = b.Id,
-                        type = "alert",
-                        title = $"Salida sin asignación: {b.ReferenceCode}",
-                        detail = $"{b.ShiftName} • {b.TravelDate:dd MMM} • {(b.Items.FirstOrDefault()?.TourPackage?.Title ?? "Circuito")}",
-                        date = "Pendiente de asignar van o conductor",
-                        url = "/Admin/Bookings",
-                        badge = "Despacho"
-                    });
-                    allNotifs.AddRange(unassignedDepartures);
+                        var unassignedDepartures = rawUnassigned.Select(b => new {
+                            id = b.Id,
+                            type = "alert",
+                            title = $"Salida sin asignación: {b.ReferenceCode}",
+                            detail = $"{b.ShiftName} • {b.TravelDate:dd MMM} • {(b.Items.FirstOrDefault()?.TourPackage?.Title ?? "Circuito")}",
+                            date = "Pendiente de asignar van o conductor",
+                            url = "/Admin/Bookings",
+                            badge = "Despacho"
+                        });
+                        allNotifs.AddRange(unassignedDepartures);
+                    }
+                    catch { }
                 }
-                catch { }
 
-                // 2. Alertas de SOAT / CITV a 30 días
-                try
+                // 2. Alertas de SOAT / CITV a 30 días (solo con permiso de catálogo/flota)
+                if (canViewTours)
                 {
-                    var nowUtc = DateTime.UtcNow;
-                    var thirtyDaysUtc = nowUtc.AddDays(30);
-                    var rawFleet = await _context.Vehicles
-                        .AsNoTracking()
-                        .Where(v => v.IsActive && ((v.SoatExpiryDate != null && v.SoatExpiryDate <= thirtyDaysUtc) || (v.CitvExpiryDate != null && v.CitvExpiryDate <= thirtyDaysUtc)))
-                        .Take(2)
-                        .Select(v => new {
-                            v.Id,
-                            v.LicensePlate,
-                            v.Model
-                        })
-                        .ToListAsync();
+                    try
+                    {
+                        var nowUtc = DateTime.UtcNow;
+                        var thirtyDaysUtc = nowUtc.AddDays(30);
+                        var rawFleet = await _context.Vehicles
+                            .AsNoTracking()
+                            .Where(v => v.IsActive && ((v.SoatExpiryDate != null && v.SoatExpiryDate <= thirtyDaysUtc) || (v.CitvExpiryDate != null && v.CitvExpiryDate <= thirtyDaysUtc)))
+                            .Take(2)
+                            .Select(v => new {
+                                v.Id,
+                                v.LicensePlate,
+                                v.Model
+                            })
+                            .ToListAsync();
 
-                    var fleetAlerts = rawFleet.Select(v => new {
-                        id = v.Id,
-                        type = "fleet",
-                        title = $"Documentación: {v.LicensePlate}",
-                        detail = $"{v.Model} • Revisar póliza SOAT / CITV",
-                        date = "Revisión preventiva SUTRAN",
-                        url = "/Admin/Vehicles",
-                        badge = "MTC"
-                    });
-                    allNotifs.AddRange(fleetAlerts);
+                        var fleetAlerts = rawFleet.Select(v => new {
+                            id = v.Id,
+                            type = "fleet",
+                            title = $"Documentación: {v.LicensePlate}",
+                            detail = $"{v.Model} • Revisar póliza SOAT / CITV",
+                            date = "Revisión preventiva SUTRAN",
+                            url = "/Admin/Vehicles",
+                            badge = "MTC"
+                        });
+                        allNotifs.AddRange(fleetAlerts);
+                    }
+                    catch { }
                 }
-                catch { }
 
-                // 3. Reservas recientes (últimas 5)
-                try
+                // 3. Reservas recientes (últimas 5) (solo con permiso de reservas)
+                if (canViewBookings)
                 {
-                    var rawBookings = await _context.Bookings
-                        .AsNoTracking()
-                        .OrderByDescending(b => b.BookingDate)
-                        .Take(5)
-                        .Select(b => new {
-                            b.Id,
-                            b.ReferenceCode,
-                            b.CustomerName,
-                            b.TotalPassengers,
-                            b.TotalAmount,
-                            b.BookingDate,
-                            b.Status
-                        })
-                        .ToListAsync();
+                    try
+                    {
+                        var rawBookings = await _context.Bookings
+                            .AsNoTracking()
+                            .OrderByDescending(b => b.BookingDate)
+                            .Take(5)
+                            .Select(b => new {
+                                b.Id,
+                                b.ReferenceCode,
+                                b.CustomerName,
+                                b.TotalPassengers,
+                                b.TotalAmount,
+                                b.BookingDate,
+                                b.Status
+                            })
+                            .ToListAsync();
 
-                    var recentBookings = rawBookings.Select(b => new {
-                        id = b.Id,
-                        type = "booking",
-                        title = $"Reserva {b.ReferenceCode}",
-                        detail = $"{b.CustomerName} • {b.TotalPassengers} pax • S/ {b.TotalAmount:F2}",
-                        date = b.BookingDate.ToString("dd/MM/yyyy HH:mm"),
-                        url = $"/Admin/EditBooking/{b.Id}",
-                        badge = b.Status.ToString()
-                    });
-                    allNotifs.AddRange(recentBookings);
+                        var recentBookings = rawBookings.Select(b => new {
+                            id = b.Id,
+                            type = "booking",
+                            title = $"Reserva {b.ReferenceCode}",
+                            detail = $"{b.CustomerName} • {b.TotalPassengers} pax • S/ {b.TotalAmount:F2}",
+                            date = b.BookingDate.ToString("dd/MM/yyyy HH:mm"),
+                            url = $"/Admin/EditBooking/{b.Id}",
+                            badge = b.Status.ToString()
+                        });
+                        allNotifs.AddRange(recentBookings);
+                    }
+                    catch { }
                 }
-                catch { }
 
                 return Json(new { count = allNotifs.Count, notifications = allNotifs });
             }

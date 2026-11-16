@@ -59,17 +59,9 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (User?.Identity?.IsAuthenticated == true)
             {
-                // El acceso de personal administrativo depende de permisos efectivos de consulta
+                // El acceso de personal administrativo exige estrictamente permisos efectivos de consulta
                 if (User.HasClaim("Permission", AppPermissions.BookingsView) ||
                     User.HasClaim("Permission", AppPermissions.ReceiptsView))
-                {
-                    return true;
-                }
-
-                // Compatibilidad: si el principal autenticado NO contiene ningún claim de tipo "Permission" ni "PermissionConfigured"
-                // (por ejemplo, contexto de prueba unitaria sintética donde solo se asignó rol Admin/SuperAdmin/Operador sin fábrica de claims)
-                var hasAnyPermissionClaim = User.HasClaim(c => c.Type == "Permission" || c.Type == "PermissionConfigured");
-                if (!hasAnyPermissionClaim && (User.IsInRole("SuperAdmin") || User.IsInRole("Admin") || User.IsInRole("Operador")))
                 {
                     return true;
                 }

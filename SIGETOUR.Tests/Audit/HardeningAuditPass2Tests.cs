@@ -345,7 +345,8 @@ namespace SIGETOUR.Tests.Audit
             var identity = new ClaimsIdentity(new[]
             {
                 new Claim(ClaimTypes.Name, "gerente"),
-                new Claim(ClaimTypes.Role, "Admin")
+                new Claim(ClaimTypes.Role, "Admin"),
+                new Claim("Permission", AppPermissions.BookingsView)
             }, "TestAuthScheme");
 
             controller.ControllerContext = new ControllerContext

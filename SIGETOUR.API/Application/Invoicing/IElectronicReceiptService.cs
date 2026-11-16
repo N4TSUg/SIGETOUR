@@ -29,6 +29,8 @@ namespace SIGETOUR.API.Application.Invoicing
         Task<ElectronicReceipt> RetryReceiptAsync(Guid receiptId, CancellationToken ct = default);
         Task<ElectronicReceipt?> QueryReceiptFromProviderAsync(Guid receiptId, CancellationToken ct = default);
         Task<NubefactReconciliationResult> ReconcileReceiptWithProviderAsync(Guid receiptId, CancellationToken ct = default);
+        Task<(bool Acquired, string LeaseToken, ElectronicReceipt Receipt)> TryAcquireEmissionAsync(Guid receiptId, string? requestedClaimToken = null, bool allowRejectedRetry = false, CancellationToken ct = default);
+        Task<bool> TryMarkEmissionStartedAsync(Guid receiptId, string leaseToken, CancellationToken ct = default);
         Task<int> ProcessPendingReceiptsAsync(CancellationToken ct = default);
     }
 }

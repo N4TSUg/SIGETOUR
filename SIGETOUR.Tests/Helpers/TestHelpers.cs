@@ -12,6 +12,7 @@ using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Application.Services;
 using SIGETOUR.API.Controllers.UI;
 using SIGETOUR.API.Core.Entities;
+using SIGETOUR.API.Core.Security;
 using SIGETOUR.API.Infrastructure.Data;
 
 namespace SIGETOUR.Tests.Helpers
@@ -121,12 +122,17 @@ namespace SIGETOUR.Tests.Helpers
                 imageStorageService,
                 capacityService);
 
-            var user = new ClaimsPrincipal(new ClaimsIdentity(new[]
+            var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, currentUserId),
                 new Claim(ClaimTypes.Name, currentUserName),
                 new Claim(ClaimTypes.Role, "SuperAdmin")
-            }, "TestAuth"));
+            };
+            foreach (var perm in AppPermissions.GetDefaultPermissionsForRole("SuperAdmin"))
+            {
+                claims.Add(new Claim("Permission", perm));
+            }
+            var user = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"));
 
             var httpContext = new DefaultHttpContext { User = user };
             var tempData = new TempDataDictionary(httpContext, Mock.Of<ITempDataProvider>());

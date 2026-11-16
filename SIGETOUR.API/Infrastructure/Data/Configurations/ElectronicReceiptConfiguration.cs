@@ -21,6 +21,10 @@ namespace SIGETOUR.API.Infrastructure.Data.Configurations
             builder.Property(r => r.Status).HasMaxLength(30).IsRequired();
             builder.Property(r => r.Environment).HasMaxLength(30).HasDefaultValue("Demo").IsRequired();
             builder.Property(r => r.SnapshotJson).HasColumnType("text");
+            builder.Property(r => r.EmissionLeaseToken).HasMaxLength(64);
+            builder.Property(r => r.EmissionLeaseAcquiredAtUtc);
+            builder.Property(r => r.EmissionLeaseExpiresAtUtc);
+            builder.Property(r => r.EmissionStartedAtUtc);
 
             builder.Property(r => r.SubtotalAmount).HasPrecision(12, 2);
             builder.Property(r => r.IgvAmount).HasPrecision(12, 2);

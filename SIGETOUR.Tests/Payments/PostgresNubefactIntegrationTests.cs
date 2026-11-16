@@ -263,5 +263,96 @@ namespace SIGETOUR.Tests.Payments
             db.TourPackages.Remove(tour);
             await db.SaveChangesAsync();
         }
+
+        [SkippableFact]
+        public async Task Postgres_TryAcquireEmissionAsync_TwoIndependentDbContexts_OnlyOneSucceedsViaExecuteUpdate()
+        {
+            await using (var dbCheck = await PostgresTestHelper.RequirePostgresAsync(_output)) { }
+
+            await using var db1 = CreatePostgresDbContext();
+            await using var db2 = CreatePostgresDbContext();
+            var config = CreateConfig();
+
+            var tour = new TourPackage
+            {
+                Id = Guid.NewGuid(),
+                Title = "Tour Postgres Concurrency",
+                Slug = "postgres-conc-" + Guid.NewGuid().ToString("N")[..6],
+                BasePrice = 100m,
+                IsActive = true
+            };
+            db1.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "PG-CONC-" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant(),
+                CustomerName = "Postgres Concurrent",
+                CustomerDni = "12345678",
+                TravelDate = DateTime.UtcNow.Date.AddDays(2),
+                ShiftName = "Mañana",
+                TotalPassengers = 1,
+                TotalAmount = 100m,
+                PaidAmount = 100m,
+                InvoiceType = "boleta",
+                Status = BookingStatus.Confirmed
+            };
+            booking.Items.Add(new BookingItem
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                TourPackageId = tour.Id,
+                TourPackage = tour,
+                Passengers = 1,
+                UnitPrice = 100m,
+                SubTotal = 100m
+            });
+            db1.Bookings.Add(booking);
+
+            var receipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Status = "Pending",
+                Environment = "Demo",
+                TotalAmount = 100m,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db1.ElectronicReceipts.Add(receipt);
+            await db1.SaveChangesAsync();
+
+            var service1 = new NubefactInvoiceService(db1, config, new HttpClient(), NullLogger<NubefactInvoiceService>.Instance);
+            var service2 = new NubefactInvoiceService(db2, config, new HttpClient(), NullLogger<NubefactInvoiceService>.Instance);
+
+            var barrier = new Barrier(2);
+            var task1 = Task.Run(async () =>
+            {
+                barrier.SignalAndWait();
+                return await service1.TryAcquireEmissionAsync(receipt.Id);
+            });
+            var task2 = Task.Run(async () =>
+            {
+                barrier.SignalAndWait();
+                return await service2.TryAcquireEmissionAsync(receipt.Id);
+            });
+
+            var results = await Task.WhenAll(task1, task2);
+            int winners = results.Count(r => r.Acquired);
+            int losers = results.Count(r => !r.Acquired);
+
+            Assert.Equal(1, winners);
+            Assert.Equal(1, losers);
+
+            // Cleanup
+            var toDeleteReceipt = await db1.ElectronicReceipts.FindAsync(receipt.Id);
+            if (toDeleteReceipt != null) db1.ElectronicReceipts.Remove(toDeleteReceipt);
+            var toDeleteBooking = await db1.Bookings.FindAsync(booking.Id);
+            if (toDeleteBooking != null) db1.Bookings.Remove(toDeleteBooking);
+            var toDeleteTour = await db1.TourPackages.FindAsync(tour.Id);
+            if (toDeleteTour != null) db1.TourPackages.Remove(toDeleteTour);
+            await db1.SaveChangesAsync();
+        }
     }
 }

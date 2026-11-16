@@ -641,6 +641,19 @@ namespace SIGETOUR.API.Migrations
                     b.Property<string>("DigitalHash")
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("EmissionLeaseAcquiredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EmissionLeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmissionLeaseToken")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("EmissionStartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Environment")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

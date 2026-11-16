@@ -11,6 +11,7 @@ using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Application.Payments;
 using SIGETOUR.API.Controllers.UI;
 using SIGETOUR.API.Core.Entities;
+using SIGETOUR.API.Core.Security;
 using SIGETOUR.Tests.Helpers;
 using Xunit;
 
@@ -312,7 +313,9 @@ namespace SIGETOUR.Tests.Security
             var staffPrincipal = new ClaimsPrincipal(new ClaimsIdentity(new[]
             {
                 new Claim(ClaimTypes.Name, "gerente@turismochilon.com"),
-                new Claim(ClaimTypes.Role, "Admin")
+                new Claim(ClaimTypes.Role, "Admin"),
+                new Claim("Permission", AppPermissions.BookingsView),
+                new Claim("Permission", AppPermissions.ReceiptsView)
             }, "CookieAuth"));
 
             // Controller running in authenticated staff context (no query tokens, no customer cookies)

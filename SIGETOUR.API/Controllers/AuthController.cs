@@ -74,35 +74,26 @@ namespace SIGETOUR.API.Controllers
                     var roleClaims = await _roleManager.GetClaimsAsync(identityRole);
                     var permClaims = roleClaims.Where(c => c.Type == "Permission").ToList();
 
-                    var isConfigured = roleClaims.Any(c => c.Type == "PermissionConfigured");
-
-                    if (!isConfigured)
+                    // Lectura pura de permisos asignados: CERO escrituras en BD durante el login
+                    foreach (var claim in permClaims)
                     {
-                        var defaults = AppPermissions.GetDefaultPermissionsForRole(userRole);
-                        foreach (var def in defaults)
+                        if (!authClaims.Any(c => c.Type == "Permission" && c.Value == claim.Value))
                         {
-                            await _roleManager.AddClaimAsync(identityRole, new Claim("Permission", def));
-                            if (!authClaims.Any(c => c.Type == "Permission" && c.Value == def))
-                            {
-                                authClaims.Add(new Claim("Permission", def));
-                            }
+                            authClaims.Add(new Claim("Permission", claim.Value));
                         }
-                        await _roleManager.AddClaimAsync(identityRole, new Claim("PermissionConfigured", "true"));
                     }
-                    else
+
+                    if (roleClaims.Any(c => c.Type == "PermissionConfigured"))
                     {
-                        foreach (var claim in permClaims)
+                        if (!authClaims.Any(c => c.Type == "PermissionConfigured"))
                         {
-                            if (!authClaims.Any(c => c.Type == "Permission" && c.Value == claim.Value))
-                            {
-                                authClaims.Add(new Claim("Permission", claim.Value));
-                            }
+                            authClaims.Add(new Claim("PermissionConfigured", "true"));
                         }
                     }
                 }
                 else
                 {
-                    // Fallback para entornos donde RoleManager no contiene la entidad (ej. mocks unitarios en pruebas)
+                    // Fallback de solo lectura en memoria para entornos donde RoleManager no contiene la entidad (ej. mocks unitarios en pruebas)
                     var defaults = AppPermissions.GetDefaultPermissionsForRole(userRole);
                     foreach (var def in defaults)
                     {

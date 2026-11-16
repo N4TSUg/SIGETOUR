@@ -36,6 +36,10 @@ namespace SIGETOUR.API.Core.Entities
         public string? DigitalHash { get; set; }
 
         public string? LastError { get; set; }
+        public string? EmissionLeaseToken { get; set; }
+        public DateTime? EmissionLeaseAcquiredAtUtc { get; set; }
+        public DateTime? EmissionLeaseExpiresAtUtc { get; set; }
+        public DateTime? EmissionStartedAtUtc { get; set; }
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime? IssuedAtUtc { get; set; }
     }

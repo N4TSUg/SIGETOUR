@@ -20,20 +20,30 @@ namespace SIGETOUR.API.Infrastructure.Data
                 var role = await roleManager.FindByNameAsync(roleName);
                 if (role == null)
                 {
+                    // A. Creación por primera vez de un rol del sistema: sembrar defaults y marcar como configurado
                     role = new IdentityRole(roleName);
-                    await roleManager.CreateAsync(role);
-                }
-
-                var existingClaims = await roleManager.GetClaimsAsync(role);
-                // Distinguir un rol nunca inicializado de un rol al que se le retiraron deliberadamente los permisos
-                if (!existingClaims.Any(c => c.Type == "PermissionConfigured"))
-                {
-                    var defaults = SIGETOUR.API.Core.Security.AppPermissions.GetDefaultPermissionsForRole(roleName);
-                    foreach (var perm in defaults)
+                    var createResult = await roleManager.CreateAsync(role);
+                    if (createResult.Succeeded)
                     {
-                        await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", perm));
+                        var defaults = SIGETOUR.API.Core.Security.AppPermissions.GetDefaultPermissionsForRole(roleName);
+                        foreach (var perm in defaults)
+                        {
+                            await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", perm));
+                        }
+                        await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("PermissionConfigured", "true"));
                     }
-                    await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("PermissionConfigured", "true"));
+                }
+                else
+                {
+                    // B. Conservar asignación histórica en actualización / reinicio:
+                    // Si el rol ya existía, NUNCA agregar defaults silenciosamente.
+                    var existingClaims = await roleManager.GetClaimsAsync(role);
+                    bool hasConfigured = existingClaims.Any(c => c.Type == "PermissionConfigured");
+                    if (!hasConfigured)
+                    {
+                        // Estampar el marcador de inicialización sin alterar los permisos existentes (sean muchos, pocos o ninguno)
+                        await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("PermissionConfigured", "true"));
+                    }
                 }
             }
 
