@@ -134,9 +134,16 @@ namespace SIGETOUR.Tests.Helpers
                         $"[AISLAMIENTO CRÍTICO] La conexión no apuntó al esquema aislado '{schemaName}', sino a '{currentSchema}'. Se aborta por riesgo de contaminación.");
                 }
             }
-            catch
+            catch (Exception initEx)
             {
-                await fixture.DisposeAsync();
+                try
+                {
+                    await fixture.DisposeAsync(initEx);
+                }
+                catch
+                {
+                    throw;
+                }
                 throw;
             }
 
@@ -149,10 +156,10 @@ namespace SIGETOUR.Tests.Helpers
         public async Task DisposeAsync(Exception? testException = null)
         {
             if (_isDisposed) return;
-            _isDisposed = true;
 
             if (!_isCreatedByThisInstance || string.IsNullOrWhiteSpace(_schemaName))
             {
+                _isDisposed = true;
                 return;
             }
 
@@ -198,6 +205,7 @@ namespace SIGETOUR.Tests.Helpers
                     await cmdDrop.ExecuteNonQueryAsync();
                 }
                 _isCreatedByThisInstance = false;
+                _isDisposed = true;
             }
             catch (Exception cleanupEx)
             {
@@ -213,6 +221,46 @@ namespace SIGETOUR.Tests.Helpers
         public async ValueTask DisposeAsync()
         {
             await DisposeAsync(null);
+        }
+
+        /// <summary>
+        /// Garantiza el intento de limpieza de todos los recursos aprovisionados, incluso si uno de ellos
+        /// falla al liberarse. Preserva fielmente la excepción original de prueba junto con las excepciones
+        /// de limpieza mediante AggregateException.
+        /// </summary>
+        public static async Task DisposeAllAsync(Exception? testException, params PostgresIsolatedScenarioFixture?[] fixtures)
+        {
+            if (fixtures == null || fixtures.Length == 0)
+            {
+                return;
+            }
+
+            var cleanupExceptions = new System.Collections.Generic.List<Exception>();
+
+            foreach (var f in fixtures)
+            {
+                if (f == null) continue;
+                try
+                {
+                    await f.DisposeAsync(null);
+                }
+                catch (Exception ex)
+                {
+                    cleanupExceptions.Add(ex);
+                }
+            }
+
+            if (cleanupExceptions.Count > 0)
+            {
+                var all = new System.Collections.Generic.List<Exception>();
+                if (testException != null)
+                {
+                    all.Add(testException);
+                }
+                all.AddRange(cleanupExceptions);
+
+                throw new AggregateException("Fallo durante la ejecución de la prueba y/o durante la limpieza de esquemas aislados PostgreSQL.", all);
+            }
         }
     }
 }

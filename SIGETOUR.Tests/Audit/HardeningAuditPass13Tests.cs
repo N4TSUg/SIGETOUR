@@ -1271,12 +1271,14 @@ namespace SIGETOUR.Tests.Audit
         [SkippableFact]
         public async Task Postgres_Isolation_ScenarioA_TwoIndependentSpaces_WorkerInOneDoesNotAffectOther()
         {
-            var fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
-            if (fixture1 == null) return;
+            PostgresIsolatedScenarioFixture? fixture1 = null;
             PostgresIsolatedScenarioFixture? fixture2 = null;
+            Exception? testEx = null;
 
             try
             {
+                fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+                if (fixture1 == null) return;
                 fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
                 if (fixture2 == null) return;
 
@@ -1315,22 +1317,28 @@ namespace SIGETOUR.Tests.Audit
                 Assert.True(string.IsNullOrWhiteSpace(fresh2.Number));
                 Assert.Null(fresh2.EmissionLeaseToken);
             }
+            catch (Exception ex)
+            {
+                testEx = ex;
+                throw;
+            }
             finally
             {
-                if (fixture1 != null) await fixture1.DisposeAsync();
-                if (fixture2 != null) await fixture2.DisposeAsync();
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(testEx, fixture1, fixture2);
             }
         }
 
         [SkippableFact]
         public async Task Postgres_Isolation_ScenarioB_CleanupOfOneSpace_DoesNotAffectOther_AndLeavesNoResources()
         {
-            var fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
-            if (fixture1 == null) return;
+            PostgresIsolatedScenarioFixture? fixture1 = null;
             PostgresIsolatedScenarioFixture? fixture2 = null;
+            Exception? testEx = null;
 
             try
             {
+                fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+                if (fixture1 == null) return;
                 fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
                 if (fixture2 == null) return;
 
@@ -1360,27 +1368,31 @@ namespace SIGETOUR.Tests.Audit
                 Assert.NotNull(fresh2);
                 Assert.Equal("Pending", fresh2.Status);
             }
+            catch (Exception ex)
+            {
+                testEx = ex;
+                throw;
+            }
             finally
             {
-                if (fixture1 != null) await fixture1.DisposeAsync();
-                if (fixture2 != null) await fixture2.DisposeAsync();
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(testEx, fixture1, fixture2);
             }
         }
 
         [SkippableFact]
         public async Task Postgres_Isolation_ScenarioC_ControlledTestFailure_PreservesOriginalDiagnostic_AndCleansUpSafely()
         {
-            var fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
-            if (fixture1 == null) return;
-            var fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
-            if (fixture2 == null)
-            {
-                await fixture1.DisposeAsync();
-                return;
-            }
+            PostgresIsolatedScenarioFixture? fixture1 = null;
+            PostgresIsolatedScenarioFixture? fixture2 = null;
+            Exception? testEx = null;
 
             try
             {
+                fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+                if (fixture1 == null) return;
+                fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+                if (fixture2 == null) return;
+
                 await using var db1 = fixture1.CreateDbContext();
                 await using var db2 = fixture2.CreateDbContext();
 
@@ -1411,9 +1423,14 @@ namespace SIGETOUR.Tests.Audit
                 Assert.NotNull(fresh2);
                 Assert.Equal("Pending", fresh2.Status);
             }
+            catch (Exception ex)
+            {
+                testEx = ex;
+                throw;
+            }
             finally
             {
-                await fixture2.DisposeAsync();
+                await PostgresIsolatedScenarioFixture.DisposeAllAsync(testEx, fixture1, fixture2);
             }
         }
 
