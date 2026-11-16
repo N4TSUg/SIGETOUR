@@ -599,9 +599,21 @@ namespace SIGETOUR.Tests.Payments
             });
             db1.Bookings.Add(booking);
 
+            var shift = new CashRegisterShift
+            {
+                Id = Guid.NewGuid(),
+                IsOpen = true,
+                OpenedAt = DateTime.UtcNow,
+                ShiftNumber = $"SH-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}",
+                InitialAmount = 100m,
+                OpenedByUserName = "TestOperator"
+            };
+            db1.CashRegisterShifts.Add(shift);
+
             var cashTx = new CashTransaction
             {
                 Id = Guid.NewGuid(),
+                ShiftId = shift.Id,
                 BookingId = booking.Id,
                 TransactionType = "Ingreso",
                 Category = "Cobro de Reserva",
@@ -628,6 +640,7 @@ namespace SIGETOUR.Tests.Payments
             var receipt = await db1.ElectronicReceipts.FindAsync(results[0].Id);
             if (receipt != null) db1.ElectronicReceipts.Remove(receipt);
             db1.CashTransactions.Remove(cashTx);
+            db1.CashRegisterShifts.Remove(shift);
             db1.Bookings.Remove(booking);
             db1.TourPackages.Remove(tour);
             await db1.SaveChangesAsync();
@@ -640,6 +653,7 @@ namespace SIGETOUR.Tests.Payments
 
             await using var db = CreatePostgresDbContext();
 
+            var uniqueSeries = "C" + Guid.NewGuid().ToString("N")[..3].ToUpperInvariant();
             var tour = new TourPackage
             {
                 Id = Guid.NewGuid(),
@@ -671,7 +685,7 @@ namespace SIGETOUR.Tests.Payments
                 Id = Guid.NewGuid(),
                 BookingId = booking.Id,
                 ReceiptType = "Boleta",
-                Series = "COR1",
+                Series = uniqueSeries,
                 Number = "00000001",
                 TotalAmount = 80m,
                 Status = "Accepted",
@@ -681,38 +695,43 @@ namespace SIGETOUR.Tests.Payments
             db.ElectronicReceipts.Add(r1);
             await db.SaveChangesAsync();
 
-            // Intentar insertar un segundo comprobante con el MISMO correlativo (Series + Number + ReceiptType)
-            // pero para una operación billable distinta
             var r2 = new ElectronicReceipt
             {
                 Id = Guid.NewGuid(),
                 BookingId = booking.Id,
                 ReceiptType = "Boleta",
-                Series = "COR1",
+                Series = uniqueSeries,
                 Number = "00000001",
                 TotalAmount = 80m,
                 Status = "Accepted",
                 BillableOperationKey = $"MANUAL:{Guid.NewGuid():N}",
                 CreatedAtUtc = DateTime.UtcNow
             };
-            db.ElectronicReceipts.Add(r2);
 
-            var dbEx = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+            try
+            {
+                db.ElectronicReceipts.Add(r2);
 
-            // Validar que el helper IsRecoverableBillableOperationCollision rechaza esta colisión de correlativo
-            var method = typeof(NubefactInvoiceService).GetMethod("IsRecoverableBillableOperationCollision",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-            Assert.NotNull(method);
+                var dbEx = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
 
-            var args = new object?[] { dbEx, null };
-            var isRecoverable = (bool)method.Invoke(null, args)!;
-            Assert.False(isRecoverable);
+                // Validar que el helper IsRecoverableBillableOperationCollision rechaza esta colisión de correlativo
+                var method = typeof(NubefactInvoiceService).GetMethod("IsRecoverableBillableOperationCollision",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+                Assert.NotNull(method);
 
-            // Cleanup
-            db.ElectronicReceipts.Remove(r1);
-            db.Bookings.Remove(booking);
-            db.TourPackages.Remove(tour);
-            await db.SaveChangesAsync();
+                var args = new object?[] { dbEx, null };
+                var isRecoverable = (bool)method.Invoke(null, args)!;
+                Assert.False(isRecoverable);
+            }
+            finally
+            {
+                // Cleanup
+                db.Entry(r2).State = EntityState.Detached;
+                db.ElectronicReceipts.Remove(r1);
+                db.Bookings.Remove(booking);
+                db.TourPackages.Remove(tour);
+                await db.SaveChangesAsync();
+            }
         }
     }
 }

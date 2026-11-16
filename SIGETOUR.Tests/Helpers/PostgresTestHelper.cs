@@ -40,7 +40,15 @@ namespace SIGETOUR.Tests.Helpers
             var conn = Environment.GetEnvironmentVariable(EnvVarName);
             if (string.IsNullOrWhiteSpace(conn))
             {
+                conn = Environment.GetEnvironmentVariable(EnvVarName, EnvironmentVariableTarget.User);
+            }
+            if (string.IsNullOrWhiteSpace(conn))
+            {
                 conn = Environment.GetEnvironmentVariable(FallbackEnvVarName);
+            }
+            if (string.IsNullOrWhiteSpace(conn))
+            {
+                conn = Environment.GetEnvironmentVariable(FallbackEnvVarName, EnvironmentVariableTarget.User);
             }
             return string.IsNullOrWhiteSpace(conn) ? null : conn.Trim();
         }

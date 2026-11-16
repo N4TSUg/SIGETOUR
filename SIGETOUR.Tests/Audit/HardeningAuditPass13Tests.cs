@@ -1273,15 +1273,13 @@ namespace SIGETOUR.Tests.Audit
         {
             var fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
             if (fixture1 == null) return;
-            var fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
-            if (fixture2 == null)
-            {
-                await fixture1.DisposeAsync();
-                return;
-            }
+            PostgresIsolatedScenarioFixture? fixture2 = null;
 
             try
             {
+                fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+                if (fixture2 == null) return;
+
                 await using var db1 = fixture1.CreateDbContext();
                 await using var db2 = fixture2.CreateDbContext();
 
@@ -1319,8 +1317,8 @@ namespace SIGETOUR.Tests.Audit
             }
             finally
             {
-                await fixture1.DisposeAsync();
-                await fixture2.DisposeAsync();
+                if (fixture1 != null) await fixture1.DisposeAsync();
+                if (fixture2 != null) await fixture2.DisposeAsync();
             }
         }
 
@@ -1329,15 +1327,13 @@ namespace SIGETOUR.Tests.Audit
         {
             var fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
             if (fixture1 == null) return;
-            var fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
-            if (fixture2 == null)
-            {
-                await fixture1.DisposeAsync();
-                return;
-            }
+            PostgresIsolatedScenarioFixture? fixture2 = null;
 
             try
             {
+                fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+                if (fixture2 == null) return;
+
                 await using var db1 = fixture1.CreateDbContext();
                 await using var db2 = fixture2.CreateDbContext();
 
@@ -1366,7 +1362,8 @@ namespace SIGETOUR.Tests.Audit
             }
             finally
             {
-                await fixture2.DisposeAsync();
+                if (fixture1 != null) await fixture1.DisposeAsync();
+                if (fixture2 != null) await fixture2.DisposeAsync();
             }
         }
 

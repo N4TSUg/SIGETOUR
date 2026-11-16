@@ -1,6 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using SIGETOUR.API.Infrastructure.Data;
 using Xunit;
@@ -118,7 +120,8 @@ namespace SIGETOUR.Tests.Helpers
             try
             {
                 await using var initDb = fixture.CreateDbContext();
-                await initDb.Database.EnsureCreatedAsync();
+                var creator = (RelationalDatabaseCreator)initDb.Database.GetService<IDatabaseCreator>();
+                await creator.CreateTablesAsync();
 
                 // 6. Verificar que la conexión apunta inequívocamente al esquema recién creado
                 await using var cmdCheck = initDb.Database.GetDbConnection().CreateCommand();
