@@ -2040,89 +2040,128 @@ namespace SIGETOUR.API.Application.Invoicing
             }
 
             // 2. Solo recuperar comprobantes pendientes no despachados ("Pending") o enviados con número que requieran consulta
-            // No procesar automáticamente comprobantes en RequiresReview o InFlight sin número para no generar duplicados en SUNAT
-            var pendingReceipts = await _db.ElectronicReceipts
-                .Where(r => (r.Status == "Pending" || (r.Status == "Submitted" && !string.IsNullOrWhiteSpace(r.Number))) && r.CreatedAtUtc <= cutoff)
-                .OrderBy(r => r.CreatedAtUtc)
-                .Take(20)
-                .ToListAsync(ct);
-
+            // Paginación estable por cursor (CreatedAtUtc, Id) para avanzar a través de lotes bloqueados por conflicto
+            const int batchSize = 20;
+            DateTime? cursorCreatedAtUtc = null;
+            Guid? cursorId = null;
             int processedCount = 0;
-            foreach (var receipt in pendingReceipts)
+
+            while (!ct.IsCancellationRequested)
             {
-                // Validación contra asociaciones ambiguas / conflictos de identidad: omitir sin adquirir lease ni llamar al proveedor
-                try
-                {
-                    var identity = await ResolveBillableOperationAsync(
-                        receipt.BookingId,
-                        receipt.CulqiPaymentId,
-                        receipt.Id,
-                        receipt.CashTransactionId,
-                        receipt.BillableOperationKey,
-                        ct);
+                ct.ThrowIfCancellationRequested();
 
-                    var candidates = await FindCandidateReceiptsAsync(receipt.BookingId, identity, ct);
-                    if (candidates.Count > 1)
+                IQueryable<ElectronicReceipt> query = _db.ElectronicReceipts
+                    .Where(r => (r.Status == "Pending" || (r.Status == "Submitted" && !string.IsNullOrWhiteSpace(r.Number))) && r.CreatedAtUtc <= cutoff);
+
+                if (cursorCreatedAtUtc.HasValue && cursorId.HasValue)
+                {
+                    var cCreated = cursorCreatedAtUtc.Value;
+                    var cId = cursorId.Value;
+                    query = query.Where(r => r.CreatedAtUtc > cCreated || (r.CreatedAtUtc == cCreated && r.Id.CompareTo(cId) > 0));
+                }
+
+                var pendingReceipts = await query
+                    .OrderBy(r => r.CreatedAtUtc)
+                    .ThenBy(r => r.Id)
+                    .Take(batchSize)
+                    .ToListAsync(ct);
+
+                if (pendingReceipts.Count == 0)
+                {
+                    break;
+                }
+
+                foreach (var receipt in pendingReceipts)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    // Actualizar el cursor SIEMPRE al documento examinado actual,
+                    // garantizando avance de página aunque sea omitido por conflicto o error
+                    cursorCreatedAtUtc = receipt.CreatedAtUtc;
+                    cursorId = receipt.Id;
+
+                    // Validación contra asociaciones ambiguas / conflictos de identidad: omitir sin adquirir lease ni llamar al proveedor
+                    try
                     {
-                        _logger.LogWarning("Comprobante pendiente {ReceiptId} para reserva {BookingId} omitido: su operación presenta conflicto con {Count} comprobantes asociados. Requiere resolución manual.",
-                            receipt.Id, receipt.BookingId, candidates.Count);
+                        var identity = await ResolveBillableOperationAsync(
+                            receipt.BookingId,
+                            receipt.CulqiPaymentId,
+                            receipt.Id,
+                            receipt.CashTransactionId,
+                            receipt.BillableOperationKey,
+                            ct);
+
+                        var candidates = await FindCandidateReceiptsAsync(receipt.BookingId, identity, ct);
+                        if (candidates.Count > 1)
+                        {
+                            _logger.LogWarning("Comprobante pendiente {ReceiptId} para reserva {BookingId} omitido: su operación presenta conflicto con {Count} comprobantes asociados. Requiere resolución manual.",
+                                receipt.Id, receipt.BookingId, candidates.Count);
+                            continue;
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (AmbiguousReceiptConflictException)
+                    {
+                        _logger.LogWarning("Comprobante pendiente {ReceiptId} omitido por conflicto de identidad.", receipt.Id);
                         continue;
                     }
-                }
-                catch (AmbiguousReceiptConflictException)
-                {
-                    _logger.LogWarning("Comprobante pendiente {ReceiptId} omitido por conflicto de identidad.", receipt.Id);
-                    continue;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Error evaluando candidatos para comprobante pendiente {ReceiptId}. Se omite en este ciclo.", receipt.Id);
-                    continue;
-                }
-
-                // Comprobar compatibilidad de ambiente antes de cualquier acción
-                var docEnv = !string.IsNullOrWhiteSpace(receipt.Environment) ? receipt.Environment : currentMode;
-                var (envRuta, envToken) = ResolveEnvironmentCredentials(docEnv, currentMode);
-                if (!string.Equals(docEnv, "Simulation", StringComparison.OrdinalIgnoreCase) &&
-                    (string.IsNullOrWhiteSpace(envRuta) || string.IsNullOrWhiteSpace(envToken)))
-                {
-                    _logger.LogWarning("Comprobante {ReceiptId} pertenece al ambiente '{DocEnv}', incompatible con la configuración actual '{CurrentMode}'. Se omite en recuperación automática.", receipt.Id, docEnv, currentMode);
-                    continue;
-                }
-
-                if (!string.IsNullOrWhiteSpace(receipt.Number))
-                {
-                    var queried = await ReconcileReceiptWithProviderAsync(receipt.Id, ct);
-                    if (queried.Status == NubefactReconciliationStatus.Confirmed)
+                    catch (Exception ex)
                     {
+                        _logger.LogWarning(ex, "Error evaluando candidatos para comprobante pendiente {ReceiptId}. Se omite en este ciclo.", receipt.Id);
+                        continue;
+                    }
+
+                    // Comprobar compatibilidad de ambiente antes de cualquier acción
+                    var docEnv = !string.IsNullOrWhiteSpace(receipt.Environment) ? receipt.Environment : currentMode;
+                    var (envRuta, envToken) = ResolveEnvironmentCredentials(docEnv, currentMode);
+                    if (!string.Equals(docEnv, "Simulation", StringComparison.OrdinalIgnoreCase) &&
+                        (string.IsNullOrWhiteSpace(envRuta) || string.IsNullOrWhiteSpace(envToken)))
+                    {
+                        _logger.LogWarning("Comprobante {ReceiptId} pertenece al ambiente '{DocEnv}', incompatible con la configuración actual '{CurrentMode}'. Se omite en recuperación automática.", receipt.Id, docEnv, currentMode);
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(receipt.Number))
+                    {
+                        var queried = await ReconcileReceiptWithProviderAsync(receipt.Id, ct);
+                        if (queried.Status == NubefactReconciliationStatus.Confirmed)
+                        {
+                            processedCount++;
+                            continue;
+                        }
+                        if (queried.Status is NubefactReconciliationStatus.Unknown 
+                            or NubefactReconciliationStatus.PendingResponse 
+                            or NubefactReconciliationStatus.ConfirmedRejection 
+                            or NubefactReconciliationStatus.ConfirmedNonExistent)
+                        {
+                            continue;
+                        }
+                    }
+
+                    // Unificado: utilizar TryAcquireEmissionAsync para que worker y direct emission compitan bajo la misma regla atómica
+                    var (claimed, workerClaimToken, refreshed) = await TryAcquireEmissionAsync(receipt.Id, requestedClaimToken: null, allowRejectedRetry: false, ct);
+                    if (!claimed)
+                    {
+                        // Ya fue reclamado por la emisión inicial o por otro hilo/proceso recuperador
+                        continue;
+                    }
+
+                    try
+                    {
+                        await GenerateReceiptAsync(refreshed.BookingId, refreshed.CulqiPaymentId, refreshed.Id, claimToken: workerClaimToken, cashTransactionId: refreshed.CashTransactionId, billableOperationKey: refreshed.BillableOperationKey, ct: ct);
                         processedCount++;
-                        continue;
                     }
-                    if (queried.Status is NubefactReconciliationStatus.Unknown 
-                        or NubefactReconciliationStatus.PendingResponse 
-                        or NubefactReconciliationStatus.ConfirmedRejection 
-                        or NubefactReconciliationStatus.ConfirmedNonExistent)
+                    catch (OperationCanceledException)
                     {
-                        continue;
+                        throw;
                     }
-                }
-
-                // Unificado: utilizar TryAcquireEmissionAsync para que worker y direct emission compitan bajo la misma regla atómica
-                var (claimed, workerClaimToken, refreshed) = await TryAcquireEmissionAsync(receipt.Id, requestedClaimToken: null, allowRejectedRetry: false, ct);
-                if (!claimed)
-                {
-                    // Ya fue reclamado por la emisión inicial o por otro hilo/proceso recuperador
-                    continue;
-                }
-
-                try
-                {
-                    await GenerateReceiptAsync(refreshed.BookingId, refreshed.CulqiPaymentId, refreshed.Id, claimToken: workerClaimToken, cashTransactionId: refreshed.CashTransactionId, billableOperationKey: refreshed.BillableOperationKey, ct: ct);
-                    processedCount++;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "No se pudo recuperar el comprobante pendiente {ReceiptId}", receipt.Id);
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "No se pudo recuperar el comprobante pendiente {ReceiptId}", receipt.Id);
+                    }
                 }
             }
 
