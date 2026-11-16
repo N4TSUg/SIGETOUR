@@ -35,34 +35,49 @@ namespace SIGETOUR.API.Migrations
                             END IF;
                         END IF;
                     END $$;
+
+                    DROP INDEX IF EXISTS ""IX_CulqiPayments_BookingId"";
+                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId"" ON ""CulqiPayments"" (""BookingId"") WHERE ""Status"" IN ('created', 'processing', 'verification', '3ds_required');
                 ");
             }
+            else
+            {
+                migrationBuilder.DropIndex(
+                    name: "IX_CulqiPayments_BookingId",
+                    table: "CulqiPayments");
 
-            migrationBuilder.DropIndex(
-                name: "IX_CulqiPayments_BookingId",
-                table: "CulqiPayments");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CulqiPayments_BookingId",
-                table: "CulqiPayments",
-                column: "BookingId",
-                unique: true,
-                filter: "\"Status\" IN ('created', 'processing', 'verification', '3ds_required')");
+                migrationBuilder.CreateIndex(
+                    name: "IX_CulqiPayments_BookingId",
+                    table: "CulqiPayments",
+                    column: "BookingId",
+                    unique: true,
+                    filter: "\"Status\" IN ('created', 'processing', 'verification', '3ds_required')");
+            }
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_CulqiPayments_BookingId",
-                table: "CulqiPayments");
+            if (migrationBuilder.ActiveProvider != null && migrationBuilder.ActiveProvider.Contains("Npgsql", System.StringComparison.OrdinalIgnoreCase))
+            {
+                migrationBuilder.Sql(@"
+                    DROP INDEX IF EXISTS ""IX_CulqiPayments_BookingId"";
+                    CREATE UNIQUE INDEX IF NOT EXISTS ""IX_CulqiPayments_BookingId"" ON ""CulqiPayments"" (""BookingId"") WHERE ""Status"" IN ('created', 'processing', 'verification');
+                ");
+            }
+            else
+            {
+                migrationBuilder.DropIndex(
+                    name: "IX_CulqiPayments_BookingId",
+                    table: "CulqiPayments");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_CulqiPayments_BookingId",
-                table: "CulqiPayments",
-                column: "BookingId",
-                unique: true,
-                filter: "\"Status\" IN ('created', 'processing', 'verification')");
+                migrationBuilder.CreateIndex(
+                    name: "IX_CulqiPayments_BookingId",
+                    table: "CulqiPayments",
+                    column: "BookingId",
+                    unique: true,
+                    filter: "\"Status\" IN ('created', 'processing', 'verification')");
+            }
         }
     }
 }
