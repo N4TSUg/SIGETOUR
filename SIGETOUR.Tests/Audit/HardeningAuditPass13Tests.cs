@@ -24,6 +24,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Npgsql;
 using SIGETOUR.API.Application.Interfaces;
 using SIGETOUR.API.Application.Invoicing;
 using SIGETOUR.API.Application.Payments;
@@ -184,13 +185,6 @@ namespace SIGETOUR.Tests.Audit
             var options = new DbContextOptionsBuilder<AppDbContext>()
                 .UseInMemoryDatabase(databaseName: dbName)
                 .Options;
-            return new AppDbContext(options);
-        }
-
-        private static AppDbContext CreatePostgresDbContext()
-        {
-            var conn = PostgresTestHelper.GetConfiguredConnectionString()!;
-            var options = PostgresTestHelper.CreatePostgresOptions(conn);
             return new AppDbContext(options);
         }
 
@@ -847,7 +841,7 @@ namespace SIGETOUR.Tests.Audit
         }
 
         // =========================================================================
-        // H.2 PRUEBAS DE INTEGRACIÓN EN POSTGRESQL AISLADO (CON SKIPPABLEFACT)
+        // H.2 PRUEBAS DE INTEGRACIÓN EN POSTGRESQL CON FIXTURE DE AISLAMIENTO EXCLUSIVO
         // =========================================================================
 
         [SkippableFact]
@@ -865,86 +859,86 @@ namespace SIGETOUR.Tests.Audit
 
         private async Task Postgres_ExecuteScenarioA_BlockedBatchFollowedByValids()
         {
-            var db = await PostgresTestHelper.RequirePostgresAsync(_output);
-            if (db == null) return;
+            var fixture = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture == null) return;
 
             var tracker = new TestDataTracker();
             Exception? testEx = null;
             try
             {
-                await using (db)
+                await using var db = fixture.CreateDbContext();
+
+                var baseTime = DateTime.UtcNow.AddMinutes(-60);
+                var shift = SeedCashRegisterShift(db, tracker);
+
+                // 1. Sembrar exactamente 20 comprobantes pendientes en conflicto (Página 1: items 0 a 19)
+                var conflictedList = new List<ElectronicReceipt>();
+                for (int i = 0; i < 20; i++)
                 {
-                    // Limpiar residuos huérfanos de pruebas previas abortadas para evitar interferencia
-                    var residual = await db.ElectronicReceipts
-                        .Where(r => (r.Status == "Pending" || r.Status == "Submitted") && r.Booking != null && r.Booking.ReferenceCode.StartsWith("TC-"))
-                        .ToListAsync();
-                    if (residual.Count > 0)
-                    {
-                        db.ElectronicReceipts.RemoveRange(residual);
-                        await db.SaveChangesAsync();
-                    }
+                    var conflicted = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
+                    conflictedList.Add(conflicted);
+                }
 
-                    var baseTime = DateTime.UtcNow.AddMinutes(-60);
-                    var shift = SeedCashRegisterShift(db, tracker);
+                // 2. Sembrar exactamente 5 comprobantes sanos en Página 2 (items 20 a 24)
+                var healthyList = new List<ElectronicReceipt>();
+                for (int i = 20; i < 25; i++)
+                {
+                    var healthy = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
+                    healthyList.Add(healthy);
+                }
 
-                    // 1. Sembrar exactamente 20 comprobantes pendientes en conflicto (Página 1: items 0 a 19)
-                    var conflictedList = new List<ElectronicReceipt>();
-                    for (int i = 0; i < 20; i++)
-                    {
-                        var conflicted = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
-                        conflictedList.Add(conflicted);
-                    }
+                // 3. Verificación de aislamiento estricta antes de procesar:
+                // Comprobar que en el espacio aislado existen únicamente los IDs sembrados por la prueba
+                var preReceiptIds = await db.ElectronicReceipts.AsNoTracking().Select(r => r.Id).ToListAsync();
+                var expectedAllIds = tracker.ReceiptIds.ToHashSet();
+                var unexpected = preReceiptIds.Except(expectedAllIds).ToList();
+                var missing = expectedAllIds.Except(preReceiptIds).ToList();
+                if (unexpected.Count > 0 || missing.Count > 0)
+                {
+                    Assert.Fail($"[AISLAMIENTO COMPROMETIDO] El espacio aislado '{fixture.SchemaName}' no coincide con los datos sembrados. Inesperados: {unexpected.Count}, Faltantes: {missing.Count}.");
+                }
 
-                    // 2. Sembrar exactamente 5 comprobantes sanos en Página 2 (items 20 a 24)
-                    var healthyList = new List<ElectronicReceipt>();
-                    for (int i = 20; i < 25; i++)
-                    {
-                        var healthy = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
-                        healthyList.Add(healthy);
-                    }
+                var config = CreateConfig();
+                var handler = new InspectableHttpMessageHandler();
+                using var httpClient = new HttpClient(handler);
+                var service = new NubefactInvoiceService(db, config, httpClient, NullLogger<NubefactInvoiceService>.Instance);
 
-                    var config = CreateConfig();
-                    var handler = new InspectableHttpMessageHandler();
-                    using var httpClient = new HttpClient(handler);
-                    var service = new NubefactInvoiceService(db, config, httpClient, NullLogger<NubefactInvoiceService>.Instance);
+                // Act
+                var processed = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
 
-                    // Act
-                    var processed = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
+                // Assert 1: Se procesaron exactamente 5 documentos válidos
+                Assert.Equal(5, processed);
 
-                    // Assert 1: Se procesaron exactamente 5 documentos válidos
-                    Assert.Equal(5, processed);
+                // Assert 2: Cero emisiones para los 20 conflictivos, exactamente 5 llamadas para los válidos
+                Assert.Equal(5, handler.Requests.Count);
 
-                    // Assert 2: Cero emisiones para los 20 conflictivos, exactamente 5 llamadas para los válidos
-                    Assert.Equal(5, handler.Requests.Count);
+                // Assert 3: Correspondencia exacta de cuerpos HTTP y documentos
+                AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
 
-                    // Assert 3: Correspondencia exacta de cuerpos HTTP y documentos
-                    AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
+                // Assert 4: Comprobación con contexto fresco sin seguimiento en el espacio aislado
+                await using var verifyDb = fixture.CreateDbContext();
 
-                    // Assert 4: Comprobación con contexto fresco sin seguimiento en PostgreSQL
-                    await using var verifyDb = CreatePostgresDbContext();
+                foreach (var h in healthyList)
+                {
+                    var freshValid = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == h.Id);
+                    Assert.NotNull(freshValid);
+                    Assert.True(freshValid.Status is "Accepted" or "Demo");
+                    Assert.False(string.IsNullOrWhiteSpace(freshValid.Number));
+                    Assert.NotNull(freshValid.PdfUrl);
 
-                    foreach (var h in healthyList)
-                    {
-                        var freshValid = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == h.Id);
-                        Assert.NotNull(freshValid);
-                        Assert.True(freshValid.Status is "Accepted" or "Demo");
-                        Assert.False(string.IsNullOrWhiteSpace(freshValid.Number));
-                        Assert.NotNull(freshValid.PdfUrl);
+                    // Demostrar contractualmente que el documento ya no puede ser reclamado
+                    var (claimed, _, _) = await service.TryAcquireEmissionAsync(freshValid.Id, requestedClaimToken: null, allowRejectedRetry: false);
+                    Assert.False(claimed);
+                }
 
-                        // Demostrar contractualmente que el documento ya no puede ser reclamado
-                        var (claimed, _, _) = await service.TryAcquireEmissionAsync(freshValid.Id, requestedClaimToken: null, allowRejectedRetry: false);
-                        Assert.False(claimed);
-                    }
-
-                    foreach (var c in conflictedList)
-                    {
-                        var freshConflicted = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == c.Id);
-                        Assert.NotNull(freshConflicted);
-                        Assert.Equal("Pending", freshConflicted.Status);
-                        Assert.True(string.IsNullOrWhiteSpace(freshConflicted.Number));
-                        Assert.Null(freshConflicted.EmissionLeaseToken); // El documento en conflicto NUNCA adquirió lease
-                        Assert.Equal(c.BillableOperationKey, freshConflicted.BillableOperationKey);
-                    }
+                foreach (var c in conflictedList)
+                {
+                    var freshConflicted = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == c.Id);
+                    Assert.NotNull(freshConflicted);
+                    Assert.Equal("Pending", freshConflicted.Status);
+                    Assert.True(string.IsNullOrWhiteSpace(freshConflicted.Number));
+                    Assert.Null(freshConflicted.EmissionLeaseToken); // El documento en conflicto NUNCA adquirió lease
+                    Assert.Equal(c.BillableOperationKey, freshConflicted.BillableOperationKey);
                 }
             }
             catch (Exception ex)
@@ -954,95 +948,101 @@ namespace SIGETOUR.Tests.Audit
             }
             finally
             {
-                await using var cleanupDb = CreatePostgresDbContext();
-                await tracker.CleanupAsync(cleanupDb, _output, testEx);
+                try
+                {
+                    await using var cleanupDb = fixture.CreateDbContext();
+                    await tracker.CleanupAsync(cleanupDb, _output, testEx);
+                }
+                finally
+                {
+                    await fixture.DisposeAsync(testEx);
+                }
             }
         }
 
         [SkippableFact]
         public async Task Postgres_ProcessPendingReceipts_ScenarioB_EqualTimestamps_TieBreakerById_AcrossBoundary()
         {
-            var db = await PostgresTestHelper.RequirePostgresAsync(_output);
-            if (db == null) return;
+            var fixture = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture == null) return;
 
             var tracker = new TestDataTracker();
             Exception? testEx = null;
             try
             {
-                await using (db)
+                await using var db = fixture.CreateDbContext();
+
+                var exactSameTime = DateTime.UtcNow.AddMinutes(-45);
+                var shift = SeedCashRegisterShift(db, tracker);
+
+                // Generar 25 IDs deterministas: 00000000-0000-0000-0000-000000000001 a ...0025
+                var healthyIds = new HashSet<Guid>();
+                var conflictedIds = new HashSet<Guid>();
+
+                // Distribución cruzando el límite de página (20):
+                // Página 1 (pos 1-20): 1-10 conflictivos (10), 11-15 sanos (5), 16-20 conflictivos (5)
+                // Página 2 (pos 21-25): 21-23 sanos (3), 24-25 conflictivos (2)
+                for (int i = 1; i <= 25; i++)
                 {
-                    var residual = await db.ElectronicReceipts
-                        .Where(r => (r.Status == "Pending" || r.Status == "Submitted") && r.Booking != null && r.Booking.ReferenceCode.StartsWith("TC-"))
-                        .ToListAsync();
-                    if (residual.Count > 0)
+                    var guid = Guid.Parse($"00000000-0000-0000-0000-{i:D12}");
+                    bool isHealthy = (i >= 11 && i <= 15) || (i >= 21 && i <= 23);
+
+                    if (isHealthy)
                     {
-                        db.ElectronicReceipts.RemoveRange(residual);
-                        await db.SaveChangesAsync();
+                        SeedHealthyPendingReceipt(db, exactSameTime, explicitId: guid, tracker: tracker);
+                        healthyIds.Add(guid);
                     }
-
-                    var exactSameTime = DateTime.UtcNow.AddMinutes(-45);
-                    var shift = SeedCashRegisterShift(db, tracker);
-
-                    // Generar 25 IDs deterministas: 00000000-0000-0000-0000-000000000001 a ...0025
-                    // En PostgreSQL y en .NET, estos IDs ordenan idénticamente: Id 1 < Id 2 < ... < Id 25
-                    var healthyIds = new HashSet<Guid>();
-                    var conflictedIds = new HashSet<Guid>();
-
-                    // Distribución cruzando el límite de página (20):
-                    // Página 1 (pos 1-20): 1-10 conflictivos (10), 11-15 sanos (5), 16-20 conflictivos (5)
-                    // Página 2 (pos 21-25): 21-23 sanos (3), 24-25 conflictivos (2)
-                    for (int i = 1; i <= 25; i++)
+                    else
                     {
-                        var guid = Guid.Parse($"00000000-0000-0000-0000-{i:D12}");
-                        bool isHealthy = (i >= 11 && i <= 15) || (i >= 21 && i <= 23);
-
-                        if (isHealthy)
-                        {
-                            SeedHealthyPendingReceipt(db, exactSameTime, explicitId: guid, tracker: tracker);
-                            healthyIds.Add(guid);
-                        }
-                        else
-                        {
-                            SeedConflictedPendingReceipt(db, exactSameTime, explicitDocAId: guid, tracker: tracker, shift: shift);
-                            conflictedIds.Add(guid);
-                        }
+                        SeedConflictedPendingReceipt(db, exactSameTime, explicitDocAId: guid, tracker: tracker, shift: shift);
+                        conflictedIds.Add(guid);
                     }
+                }
 
-                    var config = CreateConfig();
-                    var handler = new InspectableHttpMessageHandler();
-                    using var httpClient = new HttpClient(handler);
-                    var service = new NubefactInvoiceService(db, config, httpClient, NullLogger<NubefactInvoiceService>.Instance);
+                // Verificación de aislamiento estricta antes de procesar
+                var preReceiptIds = await db.ElectronicReceipts.AsNoTracking().Select(r => r.Id).ToListAsync();
+                var expectedAllIds = tracker.ReceiptIds.ToHashSet();
+                var unexpected = preReceiptIds.Except(expectedAllIds).ToList();
+                var missing = expectedAllIds.Except(preReceiptIds).ToList();
+                if (unexpected.Count > 0 || missing.Count > 0)
+                {
+                    Assert.Fail($"[AISLAMIENTO COMPROMETIDO] El espacio aislado '{fixture.SchemaName}' no coincide con los datos sembrados. Inesperados: {unexpected.Count}, Faltantes: {missing.Count}.");
+                }
 
-                    // Act
-                    var processed = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
+                var config = CreateConfig();
+                var handler = new InspectableHttpMessageHandler();
+                using var httpClient = new HttpClient(handler);
+                var service = new NubefactInvoiceService(db, config, httpClient, NullLogger<NubefactInvoiceService>.Instance);
 
-                    // Assert: Total sanos esperados = 5 (lote 1) + 3 (lote 2) = 8
-                    Assert.Equal(8, processed);
-                    Assert.Equal(8, handler.Requests.Count);
+                // Act
+                var processed = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
 
-                    AssertHttpRequestsMatchReceipts(handler, healthyIds, conflictedIds);
+                // Assert: Total sanos esperados = 5 (lote 1) + 3 (lote 2) = 8
+                Assert.Equal(8, processed);
+                Assert.Equal(8, handler.Requests.Count);
 
-                    await using var verifyDb = CreatePostgresDbContext();
+                AssertHttpRequestsMatchReceipts(handler, healthyIds, conflictedIds);
 
-                    foreach (var id in healthyIds)
-                    {
-                        var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
-                        Assert.NotNull(fresh);
-                        Assert.True(fresh.Status is "Accepted" or "Demo");
-                        Assert.False(string.IsNullOrWhiteSpace(fresh.Number));
+                await using var verifyDb = fixture.CreateDbContext();
 
-                        var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
-                        Assert.False(claimed);
-                    }
+                foreach (var id in healthyIds)
+                {
+                    var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
+                    Assert.NotNull(fresh);
+                    Assert.True(fresh.Status is "Accepted" or "Demo");
+                    Assert.False(string.IsNullOrWhiteSpace(fresh.Number));
 
-                    foreach (var id in conflictedIds)
-                    {
-                        var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
-                        Assert.NotNull(fresh);
-                        Assert.Equal("Pending", fresh.Status);
-                        Assert.True(string.IsNullOrWhiteSpace(fresh.Number));
-                        Assert.Null(fresh.EmissionLeaseToken);
-                    }
+                    var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
+                    Assert.False(claimed);
+                }
+
+                foreach (var id in conflictedIds)
+                {
+                    var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
+                    Assert.NotNull(fresh);
+                    Assert.Equal("Pending", fresh.Status);
+                    Assert.True(string.IsNullOrWhiteSpace(fresh.Number));
+                    Assert.Null(fresh.EmissionLeaseToken);
                 }
             }
             catch (Exception ex)
@@ -1052,95 +1052,102 @@ namespace SIGETOUR.Tests.Audit
             }
             finally
             {
-                await using var cleanupDb = CreatePostgresDbContext();
-                await tracker.CleanupAsync(cleanupDb, _output, testEx);
+                try
+                {
+                    await using var cleanupDb = fixture.CreateDbContext();
+                    await tracker.CleanupAsync(cleanupDb, _output, testEx);
+                }
+                finally
+                {
+                    await fixture.DisposeAsync(testEx);
+                }
             }
         }
 
         [SkippableFact]
         public async Task Postgres_ProcessPendingReceipts_ScenarioC_DynamicQueueChange_NoSkips()
         {
-            var db = await PostgresTestHelper.RequirePostgresAsync(_output);
-            if (db == null) return;
+            var fixture = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture == null) return;
 
             var tracker = new TestDataTracker();
             Exception? testEx = null;
             try
             {
-                await using (db)
+                await using var db = fixture.CreateDbContext();
+
+                var baseTime = DateTime.UtcNow.AddMinutes(-55);
+                var shift = SeedCashRegisterShift(db, tracker);
+
+                // Página 1 (0 a 19): 15 sanos (0 a 14) + 5 conflictivos (15 a 19)
+                // Página 2 (20 a 29): 5 sanos (20 a 24) + 5 conflictivos (25 a 29)
+                // Total: 20 sanos y 10 conflictivos
+                var healthyIds = new List<Guid>();
+                var conflictedIds = new List<Guid>();
+
+                for (int i = 0; i < 15; i++)
                 {
-                    var residual = await db.ElectronicReceipts
-                        .Where(r => (r.Status == "Pending" || r.Status == "Submitted") && r.Booking != null && r.Booking.ReferenceCode.StartsWith("TC-"))
-                        .ToListAsync();
-                    if (residual.Count > 0)
-                    {
-                        db.ElectronicReceipts.RemoveRange(residual);
-                        await db.SaveChangesAsync();
-                    }
+                    var h = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
+                    healthyIds.Add(h.Id);
+                }
+                for (int i = 15; i < 20; i++)
+                {
+                    var c = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
+                    conflictedIds.Add(c.Id);
+                }
+                for (int i = 20; i < 25; i++)
+                {
+                    var h = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
+                    healthyIds.Add(h.Id);
+                }
+                for (int i = 25; i < 30; i++)
+                {
+                    var c = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
+                    conflictedIds.Add(c.Id);
+                }
 
-                    var baseTime = DateTime.UtcNow.AddMinutes(-55);
-                    var shift = SeedCashRegisterShift(db, tracker);
+                // Verificación de aislamiento estricta antes de procesar
+                var preReceiptIds = await db.ElectronicReceipts.AsNoTracking().Select(r => r.Id).ToListAsync();
+                var expectedAllIds = tracker.ReceiptIds.ToHashSet();
+                var unexpected = preReceiptIds.Except(expectedAllIds).ToList();
+                var missing = expectedAllIds.Except(preReceiptIds).ToList();
+                if (unexpected.Count > 0 || missing.Count > 0)
+                {
+                    Assert.Fail($"[AISLAMIENTO COMPROMETIDO] El espacio aislado '{fixture.SchemaName}' no coincide con los datos sembrados. Inesperados: {unexpected.Count}, Faltantes: {missing.Count}.");
+                }
 
-                    // Página 1 (0 a 19): 15 sanos (0 a 14) + 5 conflictivos (15 a 19)
-                    // Página 2 (20 a 29): 5 sanos (20 a 24) + 5 conflictivos (25 a 29)
-                    // Total: 20 sanos y 10 conflictivos
-                    var healthyIds = new List<Guid>();
-                    var conflictedIds = new List<Guid>();
+                var config = CreateConfig();
+                var handler = new InspectableHttpMessageHandler();
+                using var httpClient = new HttpClient(handler);
+                var service = new NubefactInvoiceService(db, config, httpClient, NullLogger<NubefactInvoiceService>.Instance);
 
-                    for (int i = 0; i < 15; i++)
-                    {
-                        var h = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
-                        healthyIds.Add(h.Id);
-                    }
-                    for (int i = 15; i < 20; i++)
-                    {
-                        var c = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
-                        conflictedIds.Add(c.Id);
-                    }
-                    for (int i = 20; i < 25; i++)
-                    {
-                        var h = SeedHealthyPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker);
-                        healthyIds.Add(h.Id);
-                    }
-                    for (int i = 25; i < 30; i++)
-                    {
-                        var c = SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift);
-                        conflictedIds.Add(c.Id);
-                    }
+                // Act
+                var processed = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
 
-                    var config = CreateConfig();
-                    var handler = new InspectableHttpMessageHandler();
-                    using var httpClient = new HttpClient(handler);
-                    var service = new NubefactInvoiceService(db, config, httpClient, NullLogger<NubefactInvoiceService>.Instance);
+                // Assert: los 20 sanos procesados (los de lote 1 dejaron de ser Pending, sin causar saltos en lote 2)
+                Assert.Equal(20, processed);
+                Assert.Equal(20, handler.Requests.Count);
 
-                    // Act
-                    var processed = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
+                AssertHttpRequestsMatchReceipts(handler, healthyIds, conflictedIds);
 
-                    // Assert: los 20 sanos procesados (los de lote 1 dejaron de ser Pending, sin causar saltos en lote 2)
-                    Assert.Equal(20, processed);
-                    Assert.Equal(20, handler.Requests.Count);
+                await using var verifyDb = fixture.CreateDbContext();
 
-                    AssertHttpRequestsMatchReceipts(handler, healthyIds, conflictedIds);
+                foreach (var id in healthyIds)
+                {
+                    var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
+                    Assert.NotNull(fresh);
+                    Assert.True(fresh.Status is "Accepted" or "Demo");
 
-                    await using var verifyDb = CreatePostgresDbContext();
+                    var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
+                    Assert.False(claimed);
+                }
 
-                    foreach (var id in healthyIds)
-                    {
-                        var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
-                        Assert.NotNull(fresh);
-                        Assert.True(fresh.Status is "Accepted" or "Demo");
-
-                        var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
-                        Assert.False(claimed);
-                    }
-
-                    foreach (var id in conflictedIds)
-                    {
-                        var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
-                        Assert.NotNull(fresh);
-                        Assert.Equal("Pending", fresh.Status);
-                        Assert.Null(fresh.EmissionLeaseToken);
-                    }
+                foreach (var id in conflictedIds)
+                {
+                    var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);
+                    Assert.NotNull(fresh);
+                    Assert.Equal("Pending", fresh.Status);
+                    Assert.Null(fresh.EmissionLeaseToken);
                 }
             }
             catch (Exception ex)
@@ -1150,85 +1157,92 @@ namespace SIGETOUR.Tests.Audit
             }
             finally
             {
-                await using var cleanupDb = CreatePostgresDbContext();
-                await tracker.CleanupAsync(cleanupDb, _output, testEx);
+                try
+                {
+                    await using var cleanupDb = fixture.CreateDbContext();
+                    await tracker.CleanupAsync(cleanupDb, _output, testEx);
+                }
+                finally
+                {
+                    await fixture.DisposeAsync(testEx);
+                }
             }
         }
 
         [SkippableFact]
         public async Task Postgres_ProcessPendingReceipts_ScenarioD_SecondRun_ProducesZeroAdditionalEmissions()
         {
-            var db = await PostgresTestHelper.RequirePostgresAsync(_output);
-            if (db == null) return;
+            var fixture = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture == null) return;
 
             var tracker = new TestDataTracker();
             Exception? testEx = null;
             try
             {
-                await using (db)
+                await using var db = fixture.CreateDbContext();
+
+                var baseTime = DateTime.UtcNow.AddMinutes(-40);
+                var shift = SeedCashRegisterShift(db, tracker);
+
+                // 20 conflictivos y 5 sanos
+                var conflictedList = new List<ElectronicReceipt>();
+                for (int i = 0; i < 20; i++)
                 {
-                    var residual = await db.ElectronicReceipts
-                        .Where(r => (r.Status == "Pending" || r.Status == "Submitted") && r.Booking != null && r.Booking.ReferenceCode.StartsWith("TC-"))
-                        .ToListAsync();
-                    if (residual.Count > 0)
-                    {
-                        db.ElectronicReceipts.RemoveRange(residual);
-                        await db.SaveChangesAsync();
-                    }
+                    conflictedList.Add(SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift));
+                }
+                var healthyList = new List<ElectronicReceipt>();
+                for (int i = 20; i < 25; i++)
+                {
+                    healthyList.Add(SeedHealthyPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker));
+                }
 
-                    var baseTime = DateTime.UtcNow.AddMinutes(-40);
-                    var shift = SeedCashRegisterShift(db, tracker);
+                // Verificación de aislamiento estricta antes de procesar
+                var preReceiptIds = await db.ElectronicReceipts.AsNoTracking().Select(r => r.Id).ToListAsync();
+                var expectedAllIds = tracker.ReceiptIds.ToHashSet();
+                var unexpected = preReceiptIds.Except(expectedAllIds).ToList();
+                var missing = expectedAllIds.Except(preReceiptIds).ToList();
+                if (unexpected.Count > 0 || missing.Count > 0)
+                {
+                    Assert.Fail($"[AISLAMIENTO COMPROMETIDO] El espacio aislado '{fixture.SchemaName}' no coincide con los datos sembrados. Inesperados: {unexpected.Count}, Faltantes: {missing.Count}.");
+                }
 
-                    // 20 conflictivos y 5 sanos
-                    var conflictedList = new List<ElectronicReceipt>();
-                    for (int i = 0; i < 20; i++)
-                    {
-                        conflictedList.Add(SeedConflictedPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker, shift: shift));
-                    }
-                    var healthyList = new List<ElectronicReceipt>();
-                    for (int i = 20; i < 25; i++)
-                    {
-                        healthyList.Add(SeedHealthyPendingReceipt(db, baseTime.AddMinutes(i), tracker: tracker));
-                    }
+                var config = CreateConfig();
+                var handler = new InspectableHttpMessageHandler();
+                using var httpClient = new HttpClient(handler);
+                var service = new NubefactInvoiceService(db, config, httpClient, NullLogger<NubefactInvoiceService>.Instance);
 
-                    var config = CreateConfig();
-                    var handler = new InspectableHttpMessageHandler();
-                    using var httpClient = new HttpClient(handler);
-                    var service = new NubefactInvoiceService(db, config, httpClient, NullLogger<NubefactInvoiceService>.Instance);
+                // Corrida 1
+                var run1 = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
+                Assert.Equal(5, run1);
+                Assert.Equal(5, handler.Requests.Count);
 
-                    // Corrida 1
-                    var run1 = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
-                    Assert.Equal(5, run1);
-                    Assert.Equal(5, handler.Requests.Count);
+                AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
 
-                    AssertHttpRequestsMatchReceipts(handler, healthyList.Select(h => h.Id), conflictedList.Select(c => c.Id));
+                // Corrida 2 inmediata sobre la misma base de datos
+                var run2 = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
+                Assert.Equal(0, run2);
+                Assert.Equal(5, handler.Requests.Count); // Cero llamadas HTTP adicionales
 
-                    // Corrida 2 inmediata sobre la misma base de datos
-                    var run2 = await service.ProcessPendingReceiptsAsync(CancellationToken.None);
-                    Assert.Equal(0, run2);
-                    Assert.Equal(5, handler.Requests.Count); // Cero llamadas HTTP adicionales
+                await using var verifyDb = fixture.CreateDbContext();
 
-                    await using var verifyDb = CreatePostgresDbContext();
+                foreach (var h in healthyList)
+                {
+                    var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == h.Id);
+                    Assert.NotNull(fresh);
+                    Assert.True(fresh.Status is "Accepted" or "Demo");
+                    Assert.False(string.IsNullOrWhiteSpace(fresh.Number));
 
-                    foreach (var h in healthyList)
-                    {
-                        var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == h.Id);
-                        Assert.NotNull(fresh);
-                        Assert.True(fresh.Status is "Accepted" or "Demo");
-                        Assert.False(string.IsNullOrWhiteSpace(fresh.Number));
+                    var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
+                    Assert.False(claimed);
+                }
 
-                        var (claimed, _, _) = await service.TryAcquireEmissionAsync(fresh.Id, requestedClaimToken: null, allowRejectedRetry: false);
-                        Assert.False(claimed);
-                    }
-
-                    foreach (var c in conflictedList)
-                    {
-                        var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == c.Id);
-                        Assert.NotNull(fresh);
-                        Assert.Equal("Pending", fresh.Status);
-                        Assert.True(string.IsNullOrWhiteSpace(fresh.Number));
-                        Assert.Null(fresh.EmissionLeaseToken);
-                    }
+                foreach (var c in conflictedList)
+                {
+                    var fresh = await verifyDb.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == c.Id);
+                    Assert.NotNull(fresh);
+                    Assert.Equal("Pending", fresh.Status);
+                    Assert.True(string.IsNullOrWhiteSpace(fresh.Number));
+                    Assert.Null(fresh.EmissionLeaseToken);
                 }
             }
             catch (Exception ex)
@@ -1238,8 +1252,232 @@ namespace SIGETOUR.Tests.Audit
             }
             finally
             {
-                await using var cleanupDb = CreatePostgresDbContext();
-                await tracker.CleanupAsync(cleanupDb, _output, testEx);
+                try
+                {
+                    await using var cleanupDb = fixture.CreateDbContext();
+                    await tracker.CleanupAsync(cleanupDb, _output, testEx);
+                }
+                finally
+                {
+                    await fixture.DisposeAsync(testEx);
+                }
+            }
+        }
+
+        // =========================================================================
+        // H.3 PRUEBAS ESPECÍFICAS DE AISLAMIENTO EN POSTGRESQL (VERIFICACIÓN A, B, C, D)
+        // =========================================================================
+
+        [SkippableFact]
+        public async Task Postgres_Isolation_ScenarioA_TwoIndependentSpaces_WorkerInOneDoesNotAffectOther()
+        {
+            var fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture1 == null) return;
+            var fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture2 == null)
+            {
+                await fixture1.DisposeAsync();
+                return;
+            }
+
+            try
+            {
+                await using var db1 = fixture1.CreateDbContext();
+                await using var db2 = fixture2.CreateDbContext();
+
+                var baseTime = DateTime.UtcNow.AddMinutes(-30);
+
+                // Sembrar 1 comprobante sano en fixture1 y 1 comprobante sano en fixture2
+                var doc1 = SeedHealthyPendingReceipt(db1, baseTime);
+                var doc2 = SeedHealthyPendingReceipt(db2, baseTime);
+
+                // Ejecutar worker exclusivamente en db1
+                var config = CreateConfig();
+                var handler1 = new InspectableHttpMessageHandler();
+                using var httpClient1 = new HttpClient(handler1);
+                var service1 = new NubefactInvoiceService(db1, config, httpClient1, NullLogger<NubefactInvoiceService>.Instance);
+
+                var processed1 = await service1.ProcessPendingReceiptsAsync(CancellationToken.None);
+
+                Assert.Equal(1, processed1);
+                Assert.Single(handler1.Requests);
+
+                // Verificar que en fixture1 el comprobante se emitió
+                await using var verifyDb1 = fixture1.CreateDbContext();
+                var fresh1 = await verifyDb1.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == doc1.Id);
+                Assert.NotNull(fresh1);
+                Assert.True(fresh1.Status is "Accepted" or "Demo");
+                Assert.False(string.IsNullOrWhiteSpace(fresh1.Number));
+
+                // Verificar que en fixture2 el comprobante permaneció intacto (no fue visto ni tocado por service1)
+                await using var verifyDb2 = fixture2.CreateDbContext();
+                var fresh2 = await verifyDb2.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == doc2.Id);
+                Assert.NotNull(fresh2);
+                Assert.Equal("Pending", fresh2.Status);
+                Assert.True(string.IsNullOrWhiteSpace(fresh2.Number));
+                Assert.Null(fresh2.EmissionLeaseToken);
+            }
+            finally
+            {
+                await fixture1.DisposeAsync();
+                await fixture2.DisposeAsync();
+            }
+        }
+
+        [SkippableFact]
+        public async Task Postgres_Isolation_ScenarioB_CleanupOfOneSpace_DoesNotAffectOther_AndLeavesNoResources()
+        {
+            var fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture1 == null) return;
+            var fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture2 == null)
+            {
+                await fixture1.DisposeAsync();
+                return;
+            }
+
+            try
+            {
+                await using var db1 = fixture1.CreateDbContext();
+                await using var db2 = fixture2.CreateDbContext();
+
+                var doc1 = SeedHealthyPendingReceipt(db1, DateTime.UtcNow.AddMinutes(-20));
+                var doc2 = SeedHealthyPendingReceipt(db2, DateTime.UtcNow.AddMinutes(-20));
+
+                // Liberar fixture1
+                var schema1 = fixture1.SchemaName;
+                await fixture1.DisposeAsync();
+
+                // 1. Comprobar que en PostgreSQL no queda rastro del esquema 1
+                var baseConn = PostgresTestHelper.GetConfiguredConnectionString()!;
+                await using var conn = new NpgsqlConnection(baseConn);
+                await conn.OpenAsync();
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT count(*) FROM pg_namespace WHERE nspname = @name;";
+                cmd.Parameters.AddWithValue("@name", schema1);
+                var schemaCount = (long?)await cmd.ExecuteScalarAsync();
+                Assert.Equal(0, schemaCount);
+
+                // 2. Comprobar que fixture2 sigue plenamente operativo y con sus datos intactos
+                await using var verifyDb2 = fixture2.CreateDbContext();
+                var fresh2 = await verifyDb2.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == doc2.Id);
+                Assert.NotNull(fresh2);
+                Assert.Equal("Pending", fresh2.Status);
+            }
+            finally
+            {
+                await fixture2.DisposeAsync();
+            }
+        }
+
+        [SkippableFact]
+        public async Task Postgres_Isolation_ScenarioC_ControlledTestFailure_PreservesOriginalDiagnostic_AndCleansUpSafely()
+        {
+            var fixture1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture1 == null) return;
+            var fixture2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixture2 == null)
+            {
+                await fixture1.DisposeAsync();
+                return;
+            }
+
+            try
+            {
+                await using var db1 = fixture1.CreateDbContext();
+                await using var db2 = fixture2.CreateDbContext();
+
+                SeedHealthyPendingReceipt(db1, DateTime.UtcNow.AddMinutes(-10));
+                var doc2 = SeedHealthyPendingReceipt(db2, DateTime.UtcNow.AddMinutes(-10));
+
+                // Provocar fallo controlado en el escenario 1
+                Exception? capturedException = null;
+                try
+                {
+                    throw new InvalidOperationException("Fallo simulado de aserción en prueba A");
+                }
+                catch (Exception ex)
+                {
+                    capturedException = ex;
+                }
+
+                // Ejecutar limpieza del escenario 1 pasando el error original
+                await fixture1.DisposeAsync(capturedException);
+
+                // Comprobar que se preservó el diagnóstico
+                Assert.NotNull(capturedException);
+                Assert.Contains("Fallo simulado de aserción en prueba A", capturedException.Message);
+
+                // Comprobar que el espacio 2 no fue alterado por el fallo ni por la limpieza del espacio 1
+                await using var verifyDb2 = fixture2.CreateDbContext();
+                var fresh2 = await verifyDb2.ElectronicReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == doc2.Id);
+                Assert.NotNull(fresh2);
+                Assert.Equal("Pending", fresh2.Status);
+            }
+            finally
+            {
+                await fixture2.DisposeAsync();
+            }
+        }
+
+        [SkippableFact]
+        public async Task Postgres_Isolation_ScenarioD_RepeatedExecution_DoesNotDependOnLeftoversOrPrefixDeletions()
+        {
+            // Ejecución 1
+            var fixtureRun1 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixtureRun1 == null) return;
+            try
+            {
+                await using var db1 = fixtureRun1.CreateDbContext();
+                var shift1 = SeedCashRegisterShift(db1);
+                var baseTime1 = DateTime.UtcNow.AddMinutes(-50);
+                for (int i = 0; i < 20; i++) SeedConflictedPendingReceipt(db1, baseTime1.AddMinutes(i), shift: shift1);
+                for (int i = 20; i < 25; i++) SeedHealthyPendingReceipt(db1, baseTime1.AddMinutes(i));
+
+                // Comprobar que antes de procesar hay exactamente 45 comprobantes en el espacio aislado (20 docA + 20 docB + 5 válidos)
+                var count1 = await db1.ElectronicReceipts.CountAsync();
+                Assert.Equal(45, count1);
+
+                var config = CreateConfig();
+                var handler1 = new InspectableHttpMessageHandler();
+                using var client1 = new HttpClient(handler1);
+                var service1 = new NubefactInvoiceService(db1, config, client1, NullLogger<NubefactInvoiceService>.Instance);
+                var processed1 = await service1.ProcessPendingReceiptsAsync(CancellationToken.None);
+                Assert.Equal(5, processed1);
+            }
+            finally
+            {
+                await fixtureRun1.DisposeAsync();
+            }
+
+            // Ejecución 2 (repetición independiente)
+            var fixtureRun2 = await PostgresIsolatedScenarioFixture.CreateAsync(_output);
+            if (fixtureRun2 == null) return;
+            try
+            {
+                await using var db2 = fixtureRun2.CreateDbContext();
+                // Comprobar que el espacio 2 inicia completamente vacío (0 residuos de ejecución 1)
+                var preCount2 = await db2.ElectronicReceipts.CountAsync();
+                Assert.Equal(0, preCount2);
+
+                var shift2 = SeedCashRegisterShift(db2);
+                var baseTime2 = DateTime.UtcNow.AddMinutes(-50);
+                for (int i = 0; i < 20; i++) SeedConflictedPendingReceipt(db2, baseTime2.AddMinutes(i), shift: shift2);
+                for (int i = 20; i < 25; i++) SeedHealthyPendingReceipt(db2, baseTime2.AddMinutes(i));
+
+                var count2 = await db2.ElectronicReceipts.CountAsync();
+                Assert.Equal(45, count2);
+
+                var config = CreateConfig();
+                var handler2 = new InspectableHttpMessageHandler();
+                using var client2 = new HttpClient(handler2);
+                var service2 = new NubefactInvoiceService(db2, config, client2, NullLogger<NubefactInvoiceService>.Instance);
+                var processed2 = await service2.ProcessPendingReceiptsAsync(CancellationToken.None);
+                Assert.Equal(5, processed2);
+            }
+            finally
+            {
+                await fixtureRun2.DisposeAsync();
             }
         }
     }
