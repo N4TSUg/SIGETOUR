@@ -1134,7 +1134,7 @@ namespace SIGETOUR.Tests.Audit
                 NullLogger<NubefactInvoiceService>.Instance);
 
             // Intento directo de emitir la operación ambigua
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            var ex = await Assert.ThrowsAnyAsync<InvalidOperationException>(() =>
                 service.GenerateReceiptAsync(booking.Id, culqiPaymentId: culqi.Id, exactReceiptId: null, claimToken: null, cashTransactionId: cash.Id));
 
             Assert.Contains("Conflicto de identidad", ex.Message);

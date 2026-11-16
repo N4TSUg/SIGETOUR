@@ -672,10 +672,50 @@ namespace SIGETOUR.API.Application.Invoicing
 
             if (distinctMatches.Count > 1)
             {
-                throw new InvalidOperationException($"Conflicto de identidad: la operación para la reserva {bookingId} tiene múltiples comprobantes asociados ({distinctMatches.Count} comprobantes distintos encontrados). Se requiere conciliación manual.");
+                var ids = distinctMatches.Select(c => c.Id).ToList();
+                throw new AmbiguousReceiptConflictException(
+                    bookingId,
+                    ids,
+                    $"Conflicto de identidad: la operación para la reserva {bookingId} tiene múltiples comprobantes asociados ({distinctMatches.Count} comprobantes distintos encontrados). Se requiere conciliación manual.");
             }
 
             return distinctMatches.FirstOrDefault();
+        }
+
+        private async Task<List<ElectronicReceipt>> FindCandidateReceiptsAsync(
+            Guid bookingId,
+            BillableOperationIdentity identity,
+            CancellationToken ct)
+        {
+            IQueryable<ElectronicReceipt> query = _db.ElectronicReceipts
+                .OrderByDescending(r => r.CreatedAtUtc);
+
+            if (identity.IsHistoricalFallback)
+            {
+                query = query.Where(r => r.BookingId == bookingId &&
+                    !string.IsNullOrEmpty(identity.OperationKey) && r.BillableOperationKey == identity.OperationKey);
+            }
+            else
+            {
+                var opKey = identity.OperationKey;
+                var cashId = identity.CashTransactionId;
+                var culqiId = identity.CulqiPaymentId;
+                var cashKey = cashId != null ? $"CASH:{cashId.Value:N}" : null;
+                var culqiKey = culqiId != null ? $"CULQI:{culqiId.Value:N}" : null;
+
+                query = query.Where(r => r.BookingId == bookingId && (
+                    (!string.IsNullOrEmpty(opKey) && r.BillableOperationKey == opKey) ||
+                    (cashKey != null && r.BillableOperationKey == cashKey) ||
+                    (culqiKey != null && r.BillableOperationKey == culqiKey) ||
+                    (cashId != null && r.CashTransactionId == cashId) ||
+                    (culqiId != null && r.CulqiPaymentId == culqiId)));
+            }
+
+            var matches = await query.ToListAsync(ct);
+            return matches
+                .GroupBy(r => r.Id)
+                .Select(g => g.First())
+                .ToList();
         }
 
         public async Task<BillableOperationIdentity> ResolveBillableOperationAsync(
@@ -717,9 +757,22 @@ namespace SIGETOUR.API.Application.Invoicing
 
                 string key;
                 bool isHistFallback = false;
+                Guid? resolvedCulqiId = receipt.CulqiPaymentId;
+                Guid? resolvedCashId = receipt.CashTransactionId;
+
                 if (!string.IsNullOrWhiteSpace(receipt.BillableOperationKey))
                 {
                     key = receipt.BillableOperationKey;
+                    if (key.StartsWith("CULQI:", StringComparison.OrdinalIgnoreCase) &&
+                        Guid.TryParse(key[6..], out var parsedCulqi))
+                    {
+                        resolvedCulqiId ??= parsedCulqi;
+                    }
+                    else if (key.StartsWith("CASH:", StringComparison.OrdinalIgnoreCase) &&
+                             Guid.TryParse(key[5..], out var parsedCash))
+                    {
+                        resolvedCashId ??= parsedCash;
+                    }
                 }
                 else if (receipt.CulqiPaymentId.HasValue)
                 {
@@ -731,18 +784,52 @@ namespace SIGETOUR.API.Application.Invoicing
                 }
                 else
                 {
-                    key = $"MANUAL:BOOKING:{bookingId:N}";
+                    key = $"MANUAL:RECEIPT:{receipt.Id:N}";
                     isHistFallback = true;
+                }
+
+                // Resolver relaciones cruzadas entre pago Culqi y movimiento de caja para tener la identidad completa
+                if (resolvedCulqiId.HasValue && !resolvedCashId.HasValue)
+                {
+                    var linkedCash = await _db.CashTransactions
+                        .FirstOrDefaultAsync(t => t.CulqiPaymentId == resolvedCulqiId.Value && t.BookingId == bookingId, ct);
+                    if (linkedCash != null)
+                    {
+                        resolvedCashId = linkedCash.Id;
+                    }
+                }
+                else if (resolvedCashId.HasValue && !resolvedCulqiId.HasValue)
+                {
+                    var cashTx = await _db.CashTransactions
+                        .FirstOrDefaultAsync(t => t.Id == resolvedCashId.Value && t.BookingId == bookingId, ct);
+                    if (cashTx?.CulqiPaymentId != null)
+                    {
+                        resolvedCulqiId = cashTx.CulqiPaymentId.Value;
+                    }
                 }
 
                 return new BillableOperationIdentity(
                     OperationKey: key,
-                    CulqiPaymentId: receipt.CulqiPaymentId,
-                    CashTransactionId: receipt.CashTransactionId,
+                    CulqiPaymentId: resolvedCulqiId,
+                    CashTransactionId: resolvedCashId,
                     Amount: receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.PaidAmount,
                     PaymentMethod: booking.PaymentMethod,
                     OperationNumber: booking.OperationNumber,
                     IsHistoricalFallback: isHistFallback);
+            }
+
+            if (!culqiPaymentId.HasValue && !cashTransactionId.HasValue && !string.IsNullOrWhiteSpace(billableOperationKey))
+            {
+                if (billableOperationKey.StartsWith("CULQI:", StringComparison.OrdinalIgnoreCase) &&
+                    Guid.TryParse(billableOperationKey[6..], out var parsedCulqi))
+                {
+                    culqiPaymentId = parsedCulqi;
+                }
+                else if (billableOperationKey.StartsWith("CASH:", StringComparison.OrdinalIgnoreCase) &&
+                         Guid.TryParse(billableOperationKey[5..], out var parsedCash))
+                {
+                    cashTransactionId = parsedCash;
+                }
             }
 
             if (cashTransactionId.HasValue && cashTransactionId.Value != Guid.Empty)
@@ -973,43 +1060,32 @@ namespace SIGETOUR.API.Application.Invoicing
                 {
                     return receipt;
                 }
+
+                // Si el comprobante exacto no es terminal y su operación presenta múltiples candidatos, rechazar emisión con conflicto
+                var candidates = await FindCandidateReceiptsAsync(bookingId, identity, ct);
+                if (candidates.Count > 1)
+                {
+                    var ids = candidates.Select(c => c.Id).ToList();
+                    throw new AmbiguousReceiptConflictException(
+                        bookingId,
+                        ids,
+                        $"Conflicto de identidad: la operación para la reserva {bookingId} tiene múltiples comprobantes asociados ({candidates.Count} comprobantes distintos encontrados: {string.Join(", ", ids)}). Se requiere conciliación manual antes de emitir.");
+                }
+
                 isNew = false;
             }
             else
             {
                 // Validación previa: Si existen múltiples comprobantes distintos asociados a la misma operación, rechazar con conflicto
-                IQueryable<ElectronicReceipt> allCandidateQuery = _db.ElectronicReceipts
-                    .Where(r => r.BookingId == bookingId);
-
-                if (identity.IsHistoricalFallback)
-                {
-                    allCandidateQuery = allCandidateQuery.Where(r => r.CulqiPaymentId == null && r.CashTransactionId == null);
-                }
-                else
-                {
-                    var opKey = identity.OperationKey;
-                    var cashId = identity.CashTransactionId;
-                    var culqiId = identity.CulqiPaymentId;
-                    var cashKey = cashId != null ? $"CASH:{cashId.Value:N}" : null;
-                    var culqiKey = culqiId != null ? $"CULQI:{culqiId.Value:N}" : null;
-
-                    allCandidateQuery = allCandidateQuery.Where(r =>
-                        (!string.IsNullOrEmpty(opKey) && r.BillableOperationKey == opKey) ||
-                        (cashKey != null && r.BillableOperationKey == cashKey) ||
-                        (culqiKey != null && r.BillableOperationKey == culqiKey) ||
-                        (cashId != null && r.CashTransactionId == cashId) ||
-                        (culqiId != null && r.CulqiPaymentId == culqiId));
-                }
-
-                var allCandidates = await allCandidateQuery.ToListAsync(ct);
-                var distinctCandidates = allCandidates
-                    .GroupBy(r => r.Id)
-                    .Select(g => g.First())
-                    .ToList();
+                var distinctCandidates = await FindCandidateReceiptsAsync(bookingId, identity, ct);
 
                 if (distinctCandidates.Count > 1)
                 {
-                    throw new InvalidOperationException($"Conflicto de identidad: la operación para la reserva {bookingId} tiene múltiples comprobantes asociados ({distinctCandidates.Count} comprobantes distintos encontrados). Se requiere conciliación manual antes de emitir.");
+                    var ids = distinctCandidates.Select(c => c.Id).ToList();
+                    throw new AmbiguousReceiptConflictException(
+                        bookingId,
+                        ids,
+                        $"Conflicto de identidad: la operación para la reserva {bookingId} tiene múltiples comprobantes asociados ({distinctCandidates.Count} comprobantes distintos encontrados: {string.Join(", ", ids)}). Se requiere conciliación manual antes de emitir.");
                 }
 
                 // 1. Prevención estricta de duplicados / idempotencia (Reutilizar si ya fue Aceptado, Demo o Simulado)
@@ -1797,6 +1873,25 @@ namespace SIGETOUR.API.Application.Invoicing
                     return receipt;
                 }
 
+                // Si la operación asociada al comprobante presenta múltiples documentos (conflicto de identidad), bloquear reintento
+                var identity = await ResolveBillableOperationAsync(
+                    receipt.BookingId,
+                    receipt.CulqiPaymentId,
+                    receipt.Id,
+                    receipt.CashTransactionId,
+                    receipt.BillableOperationKey,
+                    ct);
+
+                var candidates = await FindCandidateReceiptsAsync(receipt.BookingId, identity, ct);
+                if (candidates.Count > 1)
+                {
+                    var ids = candidates.Select(c => c.Id).ToList();
+                    throw new AmbiguousReceiptConflictException(
+                        receipt.BookingId,
+                        ids,
+                        $"Conflicto de identidad: la operación para el comprobante {receiptId} en reserva {receipt.BookingId} tiene múltiples comprobantes asociados ({candidates.Count} comprobantes distintos encontrados: {string.Join(", ", ids)}). Se requiere conciliación manual antes de emitir.");
+                }
+
                 // Validar compatibilidad de ambiente antes de cualquier acción
                 var currentMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
                 var docEnv = !string.IsNullOrWhiteSpace(receipt.Environment) ? receipt.Environment : currentMode;
@@ -1955,6 +2050,36 @@ namespace SIGETOUR.API.Application.Invoicing
             int processedCount = 0;
             foreach (var receipt in pendingReceipts)
             {
+                // Validación contra asociaciones ambiguas / conflictos de identidad: omitir sin adquirir lease ni llamar al proveedor
+                try
+                {
+                    var identity = await ResolveBillableOperationAsync(
+                        receipt.BookingId,
+                        receipt.CulqiPaymentId,
+                        receipt.Id,
+                        receipt.CashTransactionId,
+                        receipt.BillableOperationKey,
+                        ct);
+
+                    var candidates = await FindCandidateReceiptsAsync(receipt.BookingId, identity, ct);
+                    if (candidates.Count > 1)
+                    {
+                        _logger.LogWarning("Comprobante pendiente {ReceiptId} para reserva {BookingId} omitido: su operación presenta conflicto con {Count} comprobantes asociados. Requiere resolución manual.",
+                            receipt.Id, receipt.BookingId, candidates.Count);
+                        continue;
+                    }
+                }
+                catch (AmbiguousReceiptConflictException)
+                {
+                    _logger.LogWarning("Comprobante pendiente {ReceiptId} omitido por conflicto de identidad.", receipt.Id);
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error evaluando candidatos para comprobante pendiente {ReceiptId}. Se omite en este ciclo.", receipt.Id);
+                    continue;
+                }
+
                 // Comprobar compatibilidad de ambiente antes de cualquier acción
                 var docEnv = !string.IsNullOrWhiteSpace(receipt.Environment) ? receipt.Environment : currentMode;
                 var (envRuta, envToken) = ResolveEnvironmentCredentials(docEnv, currentMode);

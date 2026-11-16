@@ -656,6 +656,65 @@ namespace SIGETOUR.API.Controllers.UI
             return EvaluateCandidates(candidates, "Se encontraron múltiples comprobantes fiscales asociados a este movimiento de caja.");
         }
 
+        private async Task<ReceiptResolutionResult> ResolveReceiptForDocumentAsync(ElectronicReceipt receipt)
+        {
+            Guid? culqiId = receipt.CulqiPaymentId;
+            Guid? cashId = receipt.CashTransactionId;
+
+            if (!string.IsNullOrWhiteSpace(receipt.BillableOperationKey))
+            {
+                if (receipt.BillableOperationKey.StartsWith("CULQI:", StringComparison.OrdinalIgnoreCase) &&
+                    Guid.TryParse(receipt.BillableOperationKey[6..], out var parsedCulqi))
+                {
+                    culqiId ??= parsedCulqi;
+                }
+                else if (receipt.BillableOperationKey.StartsWith("CASH:", StringComparison.OrdinalIgnoreCase) &&
+                         Guid.TryParse(receipt.BillableOperationKey[5..], out var parsedCash))
+                {
+                    cashId ??= parsedCash;
+                }
+            }
+
+            if (culqiId.HasValue && !cashId.HasValue)
+            {
+                var linkedCash = await _context.CashTransactions
+                    .FirstOrDefaultAsync(t => t.CulqiPaymentId == culqiId.Value && t.BookingId == receipt.BookingId);
+                if (linkedCash != null)
+                {
+                    cashId = linkedCash.Id;
+                }
+            }
+            else if (cashId.HasValue && !culqiId.HasValue)
+            {
+                var cashTx = await _context.CashTransactions
+                    .FirstOrDefaultAsync(t => t.Id == cashId.Value && t.BookingId == receipt.BookingId);
+                if (cashTx?.CulqiPaymentId != null)
+                {
+                    culqiId = cashTx.CulqiPaymentId.Value;
+                }
+            }
+
+            if (culqiId.HasValue)
+            {
+                return await ResolveReceiptForCulqiOperationAsync(receipt.BookingId, culqiId.Value, cashId);
+            }
+            else if (cashId.HasValue)
+            {
+                return await ResolveReceiptForManualCashOperationAsync(receipt.BookingId, cashId.Value);
+            }
+            else if (!string.IsNullOrWhiteSpace(receipt.BillableOperationKey))
+            {
+                var candidates = await _context.ElectronicReceipts
+                    .Where(r => r.BookingId == receipt.BookingId && r.BillableOperationKey == receipt.BillableOperationKey)
+                    .ToListAsync();
+                return EvaluateCandidates(candidates, "Se encontraron múltiples comprobantes asociados a esta clave de operación.");
+            }
+            else
+            {
+                return ReceiptResolutionResult.Exact(receipt);
+            }
+        }
+
         [HttpGet]
         public async Task<IActionResult> Ticket(Guid id, string size = "80", Guid? paymentId = null, string? token = null, Guid? cashTransactionId = null, Guid? receiptId = null)
         {
@@ -719,6 +778,17 @@ namespace SIGETOUR.API.Controllers.UI
                 if (receipt.CulqiPaymentId.HasValue)
                 {
                     ViewBag.PaymentId = receipt.CulqiPaymentId.Value;
+                }
+
+                // Si el comprobante visualizado no se encuentra en estado terminal, verificar si su operación está en conflicto
+                if (receipt.Status is not ("Accepted" or "Demo" or "Simulation"))
+                {
+                    var docResolution = await ResolveReceiptForDocumentAsync(receipt);
+                    if (docResolution.IsConflict)
+                    {
+                        ViewBag.DocumentHasConflict = true;
+                        ViewBag.ConflictMessage = docResolution.ConflictMessage;
+                    }
                 }
             }
 
@@ -1081,6 +1151,16 @@ namespace SIGETOUR.API.Controllers.UI
                         return BadRequest("El identificador de transacción de caja no coincide con el comprobante.");
                     }
 
+                    // Protección contra bypass de reintento: Si el comprobante pertenece a una operación en conflicto, bloquear con 409 Conflict
+                    if (existingReceipt.Status is not ("Accepted" or "Demo" or "Simulation"))
+                    {
+                        var docResolution = await ResolveReceiptForDocumentAsync(existingReceipt);
+                        if (docResolution.IsConflict)
+                        {
+                            return StatusCode(StatusCodes.Status409Conflict, "Conflicto: la operación seleccionada presenta múltiples comprobantes asociados (conflicto de identidad) y requiere revisión administrativa antes de cualquier emisión.");
+                        }
+                    }
+
                     var retried = await receiptService.RetryReceiptAsync(receiptId.Value)
                         ?? (existingReceipt.CashTransactionId.HasValue
                             ? await receiptService.GenerateReceiptAsync(
@@ -1197,6 +1277,11 @@ namespace SIGETOUR.API.Controllers.UI
                 }
 
                 return RedirectToAction("Ticket", new { id = result.Id });
+            }
+            catch (AmbiguousReceiptConflictException ex)
+            {
+                _logger?.LogWarning(ex, "Conflicto de identidad detectado en emisión para reserva {BookingId}: {Message}", bookingId, ex.Message);
+                return StatusCode(StatusCodes.Status409Conflict, ex.Message);
             }
             catch (InvalidOperationException ex)
             {

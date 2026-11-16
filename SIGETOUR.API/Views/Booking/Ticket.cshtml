@@ -313,6 +313,69 @@
                     }
                 </div>
             }
+            else if (receipt?.Status == "Rejected")
+            {
+                var rawErr = receipt?.LastError ?? receipt?.ProviderDescription ?? "Rechazado por el proveedor tributario";
+                string cleanErr = rawErr;
+                if (cleanErr.Contains("\"errors\":") || cleanErr.Contains("{\"errors\""))
+                {
+                    try
+                    {
+                        using var errDoc = System.Text.Json.JsonDocument.Parse(cleanErr);
+                        if (errDoc.RootElement.TryGetProperty("errors", out var ep))
+                        {
+                            cleanErr = ep.GetString() ?? cleanErr;
+                        }
+                    }
+                    catch { }
+                }
+                if (cleanErr.Length > 150) cleanErr = cleanErr[..150] + "...";
+
+                <div class="text-center font-bold text-[8.5px] bg-red-100 text-red-900 p-1.5 border border-red-500 rounded mb-1.5 break-words uppercase">
+                    *** COMPROBANTE RECHAZADO ***<br />
+                    <span class="normal-case font-medium block mt-0.5 text-[8px]">@cleanErr</span>
+                    @if ((booking != null || receipt != null) && User?.Identity?.IsAuthenticated == true && User.HasClaim("Permission", SIGETOUR.API.Core.Security.AppPermissions.ReceiptsManage))
+                    {
+                        @if (ViewBag.DocumentHasConflict == true)
+                        {
+                            <div class="mt-1 p-1.5 bg-amber-50 text-amber-900 border border-amber-300 rounded text-[7.5px] normal-case no-print">
+                                <span class="font-bold block uppercase">Reintento bloqueado</span>
+                                La operación asociada a este comprobante presenta conflicto de identidad con otros documentos emitidos. Requiere revisión administrativa antes de cualquier reintento.
+                            </div>
+                        }
+                        else
+                        {
+                            <form asp-controller="Booking" asp-action="RetryReceipt" method="post" class="mt-1 no-print">
+                                @Html.AntiForgeryToken()
+                                @if (receipt != null)
+                                {
+                                    <input type="hidden" name="receiptId" value="@receipt.Id" />
+                                }
+                                <input type="hidden" name="bookingId" value="@(booking?.Id ?? receipt?.BookingId)" />
+                                @if (receipt?.CulqiPaymentId.HasValue == true)
+                                {
+                                    <input type="hidden" name="paymentId" value="@receipt.CulqiPaymentId.Value" />
+                                }
+                                else if (ViewBag.PaymentId != null)
+                                {
+                                    <input type="hidden" name="paymentId" value="@ViewBag.PaymentId" />
+                                }
+                                @if (receipt?.CashTransactionId.HasValue == true)
+                                {
+                                    <input type="hidden" name="cashTransactionId" value="@receipt.CashTransactionId.Value" />
+                                }
+                                else if (ViewBag.SelectedCashTransactionId != null)
+                                {
+                                    <input type="hidden" name="cashTransactionId" value="@ViewBag.SelectedCashTransactionId" />
+                                }
+                                <button type="submit" class="px-2 py-0.5 bg-red-700 hover:bg-red-800 text-white rounded text-[8px] font-bold cursor-pointer transition-colors shadow-xs">
+                                    ↻ Reintentar Emisión NubeFact
+                                </button>
+                            </form>
+                        }
+                    }
+                </div>
+            }
             else if (receipt?.Status == "Simulation" || receipt?.Environment == "Simulation")
             {
                 <div class="text-center font-bold text-[9px] bg-amber-100 p-1 border border-black/30 rounded mb-1.5 uppercase">
@@ -339,59 +402,6 @@
                 <div class="text-center font-bold text-[8.5px] bg-sky-50 text-sky-900 p-1 border border-sky-400 rounded mb-1.5 uppercase">
                     *** COMPROBANTE EN PROCESO ***<br />
                     PENDIENTE DE RECEPCIÓN SUNAT
-                </div>
-            }
-            else if (receipt?.Status == "Rejected")
-            {
-                var rawErr = receipt?.LastError ?? receipt?.ProviderDescription ?? "Rechazado por el proveedor tributario";
-                string cleanErr = rawErr;
-                if (cleanErr.Contains("\"errors\":") || cleanErr.Contains("{\"errors\""))
-                {
-                    try
-                    {
-                        using var errDoc = System.Text.Json.JsonDocument.Parse(cleanErr);
-                        if (errDoc.RootElement.TryGetProperty("errors", out var ep))
-                        {
-                            cleanErr = ep.GetString() ?? cleanErr;
-                        }
-                    }
-                    catch { }
-                }
-                if (cleanErr.Length > 150) cleanErr = cleanErr[..150] + "...";
-
-                <div class="text-center font-bold text-[8.5px] bg-red-100 text-red-900 p-1.5 border border-red-500 rounded mb-1.5 break-words uppercase">
-                    *** COMPROBANTE RECHAZADO ***<br />
-                    <span class="normal-case font-medium block mt-0.5 text-[8px]">@cleanErr</span>
-                    @if ((booking != null || receipt != null) && User?.Identity?.IsAuthenticated == true && User.HasClaim("Permission", SIGETOUR.API.Core.Security.AppPermissions.ReceiptsManage))
-                    {
-                        <form asp-controller="Booking" asp-action="RetryReceipt" method="post" class="mt-1 no-print">
-                            @Html.AntiForgeryToken()
-                            @if (receipt != null)
-                            {
-                                <input type="hidden" name="receiptId" value="@receipt.Id" />
-                            }
-                            <input type="hidden" name="bookingId" value="@(booking?.Id ?? receipt?.BookingId)" />
-                            @if (receipt?.CulqiPaymentId.HasValue == true)
-                            {
-                                <input type="hidden" name="paymentId" value="@receipt.CulqiPaymentId.Value" />
-                            }
-                            else if (ViewBag.PaymentId != null)
-                            {
-                                <input type="hidden" name="paymentId" value="@ViewBag.PaymentId" />
-                            }
-                            @if (receipt?.CashTransactionId.HasValue == true)
-                            {
-                                <input type="hidden" name="cashTransactionId" value="@receipt.CashTransactionId.Value" />
-                            }
-                            else if (ViewBag.SelectedCashTransactionId != null)
-                            {
-                                <input type="hidden" name="cashTransactionId" value="@ViewBag.SelectedCashTransactionId" />
-                            }
-                            <button type="submit" class="px-2 py-0.5 bg-red-700 hover:bg-red-800 text-white rounded text-[8px] font-bold cursor-pointer transition-colors shadow-xs">
-                                ↻ Reintentar Emisión NubeFact
-                            </button>
-                        </form>
-                    }
                 </div>
             }
             else if (receipt == null)
