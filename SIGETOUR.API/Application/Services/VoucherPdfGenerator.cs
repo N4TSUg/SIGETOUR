@@ -22,7 +22,7 @@ namespace SIGETOUR.API.Application.Services
             var tourTitle = tour?.Title ?? "Tour Turístico Cajamarca";
             var tourDuration = tour?.Duration ?? "4 Horas (Medio Día)";
 
-            var companionList = new List<string>();
+            var companionList = new List<(string Name, string Dni)>();
             try
             {
                 if (!string.IsNullOrWhiteSpace(booking.AdditionalPassengersJson) && booking.AdditionalPassengersJson != "[]")
@@ -30,10 +30,26 @@ namespace SIGETOUR.API.Application.Services
                     using var doc = JsonDocument.Parse(booking.AdditionalPassengersJson);
                     foreach (var elem in doc.RootElement.EnumerateArray())
                     {
-                        if (elem.TryGetProperty("Name", out var nameProp))
+                        string name = string.Empty;
+                        string dni = string.Empty;
+
+                        if (elem.TryGetProperty("Name", out var nameProp) || elem.TryGetProperty("name", out nameProp) || 
+                            elem.TryGetProperty("FullName", out nameProp) || elem.TryGetProperty("fullName", out nameProp))
                         {
-                            var nameStr = nameProp.GetString();
-                            if (!string.IsNullOrWhiteSpace(nameStr)) companionList.Add(nameStr);
+                            name = nameProp.GetString()?.Trim() ?? string.Empty;
+                        }
+
+                        if (elem.TryGetProperty("Dni", out var dniProp) || elem.TryGetProperty("dni", out dniProp) ||
+                            elem.TryGetProperty("DNI", out dniProp) ||
+                            elem.TryGetProperty("DocumentNumber", out dniProp) || elem.TryGetProperty("documentNumber", out dniProp) ||
+                            elem.TryGetProperty("DocNumber", out dniProp) || elem.TryGetProperty("docNumber", out dniProp))
+                        {
+                            dni = dniProp.GetString()?.Trim() ?? string.Empty;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(name))
+                        {
+                            companionList.Add((name, dni));
                         }
                     }
                 }
@@ -173,8 +189,10 @@ namespace SIGETOUR.API.Application.Services
                         {
                             sub.Item().PaddingTop(4).Row(r =>
                             {
-                                r.RelativeItem().Text($"{pIdx}. {comp}");
-                                r.ConstantItem(150).AlignRight().Text("DNI: Verificar al embarque").FontSize(9).FontColor("#5e7774");
+                                r.RelativeItem().Text($"{pIdx}. {comp.Name}");
+                                var dniText = !string.IsNullOrWhiteSpace(comp.Dni) ? $"DNI: {comp.Dni}" : "DNI: Verificar al embarque";
+                                var color = !string.IsNullOrWhiteSpace(comp.Dni) ? "#0f3d3e" : "#5e7774";
+                                r.ConstantItem(150).AlignRight().Text(dniText).FontSize(9).FontColor(color);
                             });
                             pIdx++;
                         }

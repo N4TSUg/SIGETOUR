@@ -14,9 +14,9 @@
             using var doc = JsonDocument.Parse(Model.AdditionalPassengersJson);
             foreach (var elem in doc.RootElement.EnumerateArray())
             {
-                var name = elem.TryGetProperty("Name", out var n) ? n.GetString() ?? "" : "";
-                var dni = elem.TryGetProperty("Dni", out var d) ? d.GetString() ?? "" : "";
-                var phone = elem.TryGetProperty("Phone", out var p) ? p.GetString() ?? "" : "";
+                var name = (elem.TryGetProperty("Name", out var n) || elem.TryGetProperty("name", out n) || elem.TryGetProperty("FullName", out n)) ? n.GetString() ?? "" : "";
+                var dni = (elem.TryGetProperty("Dni", out var d) || elem.TryGetProperty("dni", out d) || elem.TryGetProperty("DNI", out d) || elem.TryGetProperty("DocumentNumber", out d) || elem.TryGetProperty("documentNumber", out d)) ? d.GetString() ?? "" : "";
+                var phone = (elem.TryGetProperty("Phone", out var p) || elem.TryGetProperty("phone", out p) || elem.TryGetProperty("PhoneNumber", out p)) ? p.GetString() ?? "" : "";
                 if (!string.IsNullOrWhiteSpace(name))
                 {
                     extraPassengers.Add((name, dni, phone));
