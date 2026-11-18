@@ -36,10 +36,26 @@ namespace SIGETOUR.API.Infrastructure.Data
                 else
                 {
                     // B. Conservar asignación histórica en actualización / reinicio:
-                    // Si el rol ya existía, NUNCA agregar defaults silenciosamente.
+                    // Si el rol ya existía, conservar sus permisos excepto si un rol administrativo crítico no tiene ninguno
                     var existingClaims = await roleManager.GetClaimsAsync(role);
                     bool hasConfigured = existingClaims.Any(c => c.Type == "PermissionConfigured");
-                    if (!hasConfigured)
+                    bool hasAnyPermission = existingClaims.Any(c => c.Type == "Permission");
+
+                    // Si es un rol administrativo crítico (SuperAdmin o Admin) y no tiene ningún permiso en base de datos,
+                    // sembrar sus permisos por defecto para garantizar la operatividad administrativa del sistema.
+                    if (!hasAnyPermission && (roleName == "SuperAdmin" || roleName == "Admin"))
+                    {
+                        var defaults = SIGETOUR.API.Core.Security.AppPermissions.GetDefaultPermissionsForRole(roleName);
+                        foreach (var perm in defaults)
+                        {
+                            await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("Permission", perm));
+                        }
+                        if (!hasConfigured)
+                        {
+                            await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("PermissionConfigured", "true"));
+                        }
+                    }
+                    else if (!hasConfigured)
                     {
                         // Estampar el marcador de inicialización sin alterar los permisos existentes (sean muchos, pocos o ninguno)
                         await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("PermissionConfigured", "true"));

@@ -11,12 +11,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using SIGETOUR.API.Controllers;
 using SIGETOUR.API.Controllers.UI;
 using SIGETOUR.API.Core.Entities;
 using SIGETOUR.API.Core.Security;
+using SIGETOUR.API.Infrastructure.Data;
 using SIGETOUR.API.Infrastructure.Security;
 using SIGETOUR.API.Models;
 using SIGETOUR.API.ViewModels;
@@ -239,6 +241,92 @@ namespace SIGETOUR.Tests.Security
             Assert.Contains(principal.Claims, c => c.Type == "Permission" && c.Value == AppPermissions.BookingsManage);
             Assert.DoesNotContain(principal.Claims, c => c.Type == "Permission" && c.Value == AppPermissions.CashManage);
             Assert.DoesNotContain(principal.Claims, c => c.Type == "Permission" && c.Value == AppPermissions.UsersManage);
+        }
+
+        [Fact]
+        public async Task AppUserClaimsPrincipalFactory_WhenAdminRoleHasZeroClaimsInDb_LoadsDefaultPermissions()
+        {
+            // Arrange
+            var userStore = new Mock<IUserStore<ApplicationUser>>();
+            var userManager = new Mock<UserManager<ApplicationUser>>(userStore.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+            var roleStore = new Mock<IRoleStore<IdentityRole>>();
+            var roleManager = new Mock<RoleManager<IdentityRole>>(roleStore.Object, null!, null!, null!, null!);
+
+            var optionsAccessor = Options.Create(new IdentityOptions());
+
+            var adminUser = new ApplicationUser
+            {
+                Id = "admin-1",
+                UserName = "admin",
+                Email = "admin@sigetour.com",
+                IsActive = true
+            };
+
+            var adminRole = new IdentityRole("Admin");
+
+            userManager.Setup(m => m.GetUserIdAsync(adminUser)).ReturnsAsync(adminUser.Id);
+            userManager.Setup(m => m.GetUserNameAsync(adminUser)).ReturnsAsync(adminUser.UserName);
+            userManager.Setup(m => m.GetRolesAsync(adminUser)).ReturnsAsync(new List<string> { "Admin" });
+            userManager.Setup(m => m.GetClaimsAsync(adminUser)).ReturnsAsync(new List<Claim>());
+
+            roleManager.Setup(m => m.FindByNameAsync("Admin")).ReturnsAsync(adminRole);
+            // La BD tiene 0 claims de permisos para el rol Admin
+            roleManager.Setup(m => m.GetClaimsAsync(adminRole)).ReturnsAsync(new List<Claim>());
+
+            var factory = new AppUserClaimsPrincipalFactory(userManager.Object, roleManager.Object, optionsAccessor);
+
+            // Act
+            var principal = await factory.CreateAsync(adminUser);
+
+            // Assert
+            Assert.NotNull(principal);
+            Assert.Contains(principal.Claims, c => c.Type == ClaimTypes.Role && c.Value == "Admin");
+            // Debe recibir los permisos por defecto para evitar 403 en Dashboard
+            Assert.Contains(principal.Claims, c => c.Type == "Permission" && c.Value == AppPermissions.BookingsView);
+            Assert.Contains(principal.Claims, c => c.Type == "Permission" && c.Value == AppPermissions.ToursView);
+            Assert.Contains(principal.Claims, c => c.Type == "Permission" && c.Value == AppPermissions.CashView);
+        }
+
+        [Fact]
+        public async Task IdentitySeeder_WhenAdminHasZeroClaimsInDb_SeedsDefaultPermissions()
+        {
+            var services = new ServiceCollection();
+            var context = TestDbContextFactory.Create();
+            services.AddSingleton(context);
+
+            var roleStore = new Mock<IRoleStore<IdentityRole>>();
+            var roleManager = new Mock<RoleManager<IdentityRole>>(roleStore.Object, null!, null!, null!, null!);
+            var userStore = new Mock<IUserStore<ApplicationUser>>();
+            var userManager = new Mock<UserManager<ApplicationUser>>(userStore.Object, null!, null!, null!, null!, null!, null!, null!, null!);
+
+            var adminRole = new IdentityRole("Admin");
+            var superAdminRole = new IdentityRole("SuperAdmin");
+            var operadorRole = new IdentityRole("Operador");
+
+            roleManager.Setup(r => r.FindByNameAsync("Admin")).ReturnsAsync(adminRole);
+            roleManager.Setup(r => r.FindByNameAsync("SuperAdmin")).ReturnsAsync(superAdminRole);
+            roleManager.Setup(r => r.FindByNameAsync("Operador")).ReturnsAsync(operadorRole);
+
+            // Admin existe pero tiene 0 permisos en BD
+            roleManager.Setup(r => r.GetClaimsAsync(adminRole)).ReturnsAsync(new List<Claim>());
+            roleManager.Setup(r => r.GetClaimsAsync(superAdminRole)).ReturnsAsync(new List<Claim> { new Claim("Permission", AppPermissions.UsersManage) });
+            roleManager.Setup(r => r.GetClaimsAsync(operadorRole)).ReturnsAsync(new List<Claim> { new Claim("PermissionConfigured", "true") });
+
+            var addedClaims = new List<Claim>();
+            roleManager.Setup(r => r.AddClaimAsync(adminRole, It.IsAny<Claim>()))
+                .Callback<IdentityRole, Claim>((r, c) => addedClaims.Add(c))
+                .ReturnsAsync(IdentityResult.Success);
+
+            services.AddSingleton(roleManager.Object);
+            services.AddSingleton(userManager.Object);
+            var sp = services.BuildServiceProvider();
+
+            // Act
+            await IdentitySeeder.SeedUsersAndRolesAsync(sp);
+
+            // Assert: Admin debe recibir sus permisos por defecto para no quedar bloqueado
+            Assert.Contains(addedClaims, c => c.Type == "Permission" && c.Value == AppPermissions.BookingsView);
+            Assert.Contains(addedClaims, c => c.Type == "Permission" && c.Value == AppPermissions.ToursView);
         }
 
         [Fact]

@@ -40,12 +40,28 @@ namespace SIGETOUR.API.Infrastructure.Security
                     var roleClaims = await RoleManager.GetClaimsAsync(identityRole);
                     var permClaims = roleClaims.Where(c => c.Type == "Permission").ToList();
 
-                    // Lectura pura de permisos efectivos: CERO escrituras en base de datos durante la autenticación
-                    foreach (var claim in permClaims)
+                    // Si es un rol administrativo crítico (SuperAdmin o Admin) y la base de datos no tiene claims de permisos configurados,
+                    // aplicar en memoria los permisos por defecto para evitar que el personal quede bloqueado con 403.
+                    if (permClaims.Count == 0 && (role == "SuperAdmin" || role == "Admin"))
                     {
-                        if (!identity.HasClaim("Permission", claim.Value))
+                        var defaults = AppPermissions.GetDefaultPermissionsForRole(role);
+                        foreach (var def in defaults)
                         {
-                            identity.AddClaim(new Claim("Permission", claim.Value));
+                            if (!identity.HasClaim("Permission", def))
+                            {
+                                identity.AddClaim(new Claim("Permission", def));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Lectura pura de permisos efectivos: CERO escrituras en base de datos durante la autenticación
+                        foreach (var claim in permClaims)
+                        {
+                            if (!identity.HasClaim("Permission", claim.Value))
+                            {
+                                identity.AddClaim(new Claim("Permission", claim.Value));
+                            }
                         }
                     }
 
