@@ -172,5 +172,117 @@ namespace SIGETOUR.Tests.Controllers
             Assert.Equal("Home", redirectResult.ControllerName);
             mockSignInManager.Verify(s => s.SignOutAsync(), Times.Once);
         }
+
+        [Fact]
+        public void AccessDenied_ReturnsViewWithReturnUrl()
+        {
+            // Arrange
+            var mockUserManager = TestHelpers.CreateMockUserManager();
+            var mockSignInManager = TestHelpers.CreateMockSignInManager(mockUserManager);
+            var controller = new AccountController(mockSignInManager.Object, mockUserManager.Object);
+            var httpContext = new DefaultHttpContext();
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+            // Act
+            var result = controller.AccessDenied("/Admin/Dashboard");
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            Assert.Equal("/Admin/Dashboard", controller.ViewData["ReturnUrl"]);
+            Assert.Equal("no-cache, no-store, must-revalidate", httpContext.Response.Headers["Cache-Control"].ToString());
+            Assert.Equal("no-cache", httpContext.Response.Headers["Pragma"].ToString());
+            Assert.Equal("0", httpContext.Response.Headers["Expires"].ToString());
+        }
+
+        [Fact]
+        public void Login_Get_ReturnUrlPointsToLogin_PreventsRedirectLoopAndGoesToDashboard()
+        {
+            // Arrange
+            var mockUserManager = TestHelpers.CreateMockUserManager();
+            var mockSignInManager = TestHelpers.CreateMockSignInManager(mockUserManager);
+            mockSignInManager.Setup(s => s.IsSignedIn(It.IsAny<ClaimsPrincipal>())).Returns(true);
+
+            var controller = new AccountController(mockSignInManager.Object, mockUserManager.Object);
+            var urlHelperMock = new Mock<IUrlHelper>();
+            urlHelperMock.Setup(u => u.IsLocalUrl("/Account/Login")).Returns(true);
+            controller.Url = urlHelperMock.Object;
+            controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+            // Act
+            var result = controller.Login("/Account/Login");
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Dashboard", redirectResult.ActionName);
+            Assert.Equal("Admin", redirectResult.ControllerName);
+        }
+
+        [Fact]
+        public void Login_Get_ReturnUrlPointsToAccessDenied_PreventsRedirectLoopAndGoesToDashboard()
+        {
+            // Arrange
+            var mockUserManager = TestHelpers.CreateMockUserManager();
+            var mockSignInManager = TestHelpers.CreateMockSignInManager(mockUserManager);
+            mockSignInManager.Setup(s => s.IsSignedIn(It.IsAny<ClaimsPrincipal>())).Returns(true);
+
+            var controller = new AccountController(mockSignInManager.Object, mockUserManager.Object);
+            var urlHelperMock = new Mock<IUrlHelper>();
+            urlHelperMock.Setup(u => u.IsLocalUrl("/Account/AccessDenied")).Returns(true);
+            controller.Url = urlHelperMock.Object;
+            controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+            // Act
+            var result = controller.Login("/Account/AccessDenied");
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Dashboard", redirectResult.ActionName);
+            Assert.Equal("Admin", redirectResult.ControllerName);
+        }
+
+        [Fact]
+        public async Task Logout_WithValidReturnUrl_RedirectsToReturnUrl()
+        {
+            // Arrange
+            var mockUserManager = TestHelpers.CreateMockUserManager();
+            var mockSignInManager = TestHelpers.CreateMockSignInManager(mockUserManager);
+            mockSignInManager.Setup(s => s.SignOutAsync()).Returns(Task.CompletedTask);
+
+            var controller = new AccountController(mockSignInManager.Object, mockUserManager.Object);
+            var urlHelperMock = new Mock<IUrlHelper>();
+            urlHelperMock.Setup(u => u.IsLocalUrl("/Account/Login")).Returns(true);
+            controller.Url = urlHelperMock.Object;
+
+            // Act
+            var result = await controller.Logout("/Account/Login");
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectResult>(result);
+            Assert.Equal("/Account/Login", redirectResult.Url);
+            mockSignInManager.Verify(s => s.SignOutAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task Logout_WithRecursiveLogoutReturnUrl_RedirectsToHome()
+        {
+            // Arrange
+            var mockUserManager = TestHelpers.CreateMockUserManager();
+            var mockSignInManager = TestHelpers.CreateMockSignInManager(mockUserManager);
+            mockSignInManager.Setup(s => s.SignOutAsync()).Returns(Task.CompletedTask);
+
+            var controller = new AccountController(mockSignInManager.Object, mockUserManager.Object);
+            var urlHelperMock = new Mock<IUrlHelper>();
+            urlHelperMock.Setup(u => u.IsLocalUrl("/Account/Logout")).Returns(true);
+            controller.Url = urlHelperMock.Object;
+
+            // Act
+            var result = await controller.Logout("/Account/Logout");
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Index", redirectResult.ActionName);
+            Assert.Equal("Home", redirectResult.ControllerName);
+            mockSignInManager.Verify(s => s.SignOutAsync(), Times.Once);
+        }
     }
 }

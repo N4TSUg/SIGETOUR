@@ -1,0 +1,179 @@
+@{
+    Layout = null;
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    var userName = User.Identity?.Name;
+}
+<!DOCTYPE html>
+<html class="h-full" lang="es">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Acceso Denegado | Turismo Chilón</title>
+<!-- Google Fonts & Material Symbols -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-bright": "#e4fffb",
+            "surface-dim": "#ade5df",
+            "on-error": "#ffffff",
+            "on-primary": "#ffffff",
+            "primary-container": "#008472",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-container": "#416b6c",
+            "on-surface": "#00201e",
+            "background": "#e4fffb",
+            "outline": "#6d7a76",
+            "primary": "#00685a",
+            "surface-container-low": "#c6fef8",
+            "surface-container": "#c1f9f3",
+            "outline-variant": "#bdc9c5",
+            "error": "#ba1a1a",
+            "error-container": "#ffdad6",
+            "warning": "#b45309"
+          },
+          "fontFamily": {
+            sans: ["Plus Jakarta Sans", "sans-serif"]
+          }
+        }
+      }
+    }
+</script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-auth-shadow {
+      box-shadow: 0 20px 32px -8px rgba(11, 59, 60, 0.16), 0 4px 12px -2px rgba(0, 135, 117, 0.08);
+    }
+    .backdrop-patron {
+      background-image: radial-gradient(rgba(0, 104, 90, 0.07) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+</style>
+<link rel="icon" type="image/png" href="~/favicon.ico" />
+</head>
+<body class="bg-background text-on-surface font-sans min-h-full flex flex-col justify-between backdrop-patron antialiased relative selection:bg-primary selection:text-on-primary">
+<!-- Top Security Status Bar -->
+<header class="w-full bg-surface-container-lowest/80 backdrop-blur-md px-4 py-3 flex justify-between items-center z-10 border-b border-outline-variant/30">
+    <div class="flex items-center gap-3">
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-surface-container text-primary font-bold">
+            <span class="material-symbols-outlined text-[18px]">verified_user</span>
+        </span>
+        <div class="flex flex-col">
+            <span class="text-xs text-primary font-bold tracking-wide">TURISMO CHILÓN</span>
+            <span class="text-[11px] text-gray-500">Transporte &amp; Turismo | Cajamarca, Perú</span>
+        </div>
+    </div>
+    <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+            <span class="material-symbols-outlined text-[14px] text-amber-600" style="font-variation-settings: 'FILL' 1;">security</span>
+            <span>Control de Acceso</span>
+        </div>
+    </div>
+</header>
+
+<!-- Main Canvas -->
+<main class="flex-grow flex flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8 z-10">
+    <div class="w-full max-w-[500px]">
+        <div class="bg-surface-container-lowest rounded-xl border border-outline-variant/60 custom-auth-shadow overflow-hidden relative">
+            <!-- Amber/Red Accent Top Bar -->
+            <div class="h-1.5 w-full bg-gradient-to-r from-amber-500 via-rose-500 to-red-600"></div>
+
+            <div class="p-6 sm:p-8">
+                <!-- Header Icon & Status -->
+                <div class="flex flex-col items-center text-center mb-6">
+                    <div class="w-20 h-20 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-4 text-amber-600 shadow-sm">
+                        <span class="material-symbols-outlined text-[44px]" style="font-variation-settings: 'FILL' 1;">lock_person</span>
+                    </div>
+
+                    <span class="px-3 py-0.5 rounded-full bg-amber-100 text-amber-800 text-xs font-bold tracking-wider mb-2">
+                        ERROR 403 • ACCESO DENEGADO
+                    </span>
+
+                    <h1 class="text-xl sm:text-2xl font-bold text-gray-900">
+                        Permisos Insuficientes
+                    </h1>
+
+                    <p class="text-sm text-gray-600 mt-2 max-w-sm">
+                        Tu cuenta no dispone de los privilegios administrativos requeridos para acceder a este recurso.
+                    </p>
+                </div>
+
+                <!-- Info Box -->
+                <div class="mb-6 p-4 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-700 space-y-2">
+                    @if (!string.IsNullOrEmpty(userName))
+                    {
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-gray-500 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">account_circle</span> Sesión activa:
+                            </span>
+                            <span class="font-bold text-gray-900 bg-white px-2 py-0.5 rounded border border-gray-200">@userName</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(returnUrl))
+                    {
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-gray-500 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">link</span> Ruta solicitada:
+                            </span>
+                            <span class="font-mono text-gray-800 bg-white px-2 py-0.5 rounded border border-gray-200 max-w-[200px] truncate" title="@returnUrl">@returnUrl</span>
+                        </div>
+                    }
+                    <div class="pt-1 border-t border-gray-200 text-[11px] text-gray-500">
+                        Si requieres acceso al panel administrativo, inicia sesión con un usuario con rol <strong class="text-gray-700">SuperAdmin</strong> o <strong class="text-gray-700">Admin</strong>.
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="space-y-3">
+                    <a href="/Account/Logout?returnUrl=%2FAccount%2FLogin" 
+                       class="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-primary hover:bg-teal-700 text-white text-sm font-bold shadow-md hover:shadow-lg transition-all">
+                        <span class="material-symbols-outlined text-[18px]">switch_account</span>
+                        Cerrar sesión e ingresar con otra cuenta
+                    </a>
+
+                    <a href="/" 
+                       class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-gray-300 hover:bg-gray-100 text-gray-700 text-sm font-semibold transition-all">
+                        <span class="material-symbols-outlined text-[18px]">home</span>
+                        Volver al Portal Principal
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Disclaimer -->
+        <div class="mt-6 text-center space-y-1">
+            <p class="text-xs text-gray-500">
+                Turismo Chilón S.A.C. • RUC 20601248901 • Cajamarca - Perú
+            </p>
+            <p class="text-[11px] text-gray-400">
+                Sistema Integrado de Gestión SIGETOUR
+            </p>
+        </div>
+    </div>
+</main>
+
+<!-- Bottom Micro Bar -->
+<footer class="w-full py-2.5 px-4 bg-surface-container-lowest/70 backdrop-blur-sm border-t border-outline-variant/30 flex justify-between items-center text-gray-500 text-xs z-10">
+    <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+        <span>Acceso supervisado</span>
+    </div>
+    <div>
+        <span>SIGETOUR • Servidor Central Cajamarca</span>
+    </div>
+</footer>
+</body>
+</html>
