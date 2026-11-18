@@ -74,351 +74,447 @@ namespace SIGETOUR.API.Controllers.UI
                 return Forbid();
             }
 
-            var toursCount = canViewTours ? await _context.TourPackages.CountAsync() : 0;
-            var usersCount = canViewUsers ? await _userManager.Users.CountAsync() : 0;
-            var vehicles = canViewTours ? await _context.Vehicles.ToListAsync() : new List<Vehicle>();
-            var vehiclesCount = vehicles.Count;
-            var activeVehicles = vehicles.Count(v => v.IsActive);
-            var bookingsCount = canViewBookings ? await _context.Bookings.CountAsync() : 0;
+            int toursCount = 0;
+            int usersCount = 0;
+            int vehiclesCount = 0;
+            int activeVehicles = 0;
+            int bookingsCount = 0;
+            var activeToursList = new List<TourPackage>();
+            var recentBookings = new List<Booking>();
 
-            // Fecha local de Cajamarca / Perú (UTC-5)
-            var peruNow = PeruTime.Now;
-            var todayPeru = peruNow.Date;
-            var todayPeruStr = todayPeru.ToString("yyyy-MM-dd");
-
-            // Todas las reservas activas (no canceladas) con detalles de vehículo y conductor
-            var allActiveBookings = canViewBookings
-                ? await _context.Bookings
-                    .Include(b => b.Items)
-                    .ThenInclude(i => i.TourPackage)
-                    .Include(b => b.AssignedVehicle)
-                    .Include(b => b.AssignedDriver)
-                    .Where(b => b.Status != BookingStatus.Cancelled)
-                    .ToListAsync()
-                : new List<Booking>();
-
-            // Reservas del día de viaje (evaluando fecha local de Perú)
-            var todayBookings = allActiveBookings.Where(b =>
-                b.TravelDate.Date == todayPeru ||
-                b.TravelDate.ToString("yyyy-MM-dd") == todayPeruStr ||
-                PeruTime.ToPeruTime(b.TravelDate).Date == todayPeru
-            ).ToList();
-
-            var todayPax = todayBookings.Sum(b => b.TotalPassengers);
-            var upcomingBookings = allActiveBookings.Where(b => b.TravelDate.Date > todayPeru).OrderBy(b => b.TravelDate).ToList();
-            var upcomingPax = upcomingBookings.Sum(b => b.TotalPassengers);
-
-            var totalDailyCapacity = vehicles.Where(v => v.IsActive).Sum(v => v.SeatCapacity);
-            if (totalDailyCapacity <= 0) totalDailyCapacity = Math.Max(20, vehiclesCount * 18);
-            var occupancyRate = (canViewBookings && totalDailyCapacity > 0) ? (int)Math.Min(100, Math.Round((double)todayPax / totalDailyCapacity * 100)) : 0;
-
-            // Recaudación del día (Caja / Reservas)
-            decimal todayIncome = 0m;
-            if (canViewCash)
+            try
             {
-                var todayTransactions = await _context.CashTransactions
-                    .Where(t => t.TransactionType == "Ingreso" && t.CreatedAt >= todayPeru && t.CreatedAt < todayPeru.AddDays(1))
-                    .ToListAsync();
-                todayIncome = todayTransactions.Sum(t => t.Amount);
-                if (todayIncome == 0 && todayBookings.Any())
+                if (canViewTours)
                 {
-                    todayIncome = todayBookings.Sum(b => b.PaidAmount);
+                    try { toursCount = await _context.TourPackages.CountAsync(); } catch { }
                 }
-            }
-            var todayPending = canViewBookings ? todayBookings.Sum(b => Math.Max(0, b.TotalAmount - b.PaidAmount)) : 0m;
 
-            // Alertas Regulatorias y de Flota (SOAT y CITV a 30 días)
-            var fleetAlerts = new List<FleetAlertItem>();
-            if (canViewTours)
-            {
-                var nowUtc = DateTime.UtcNow;
-                foreach (var v in vehicles)
+                if (canViewUsers)
                 {
-                    if (v.SoatExpiryDate.HasValue && v.SoatExpiryDate.Value <= nowUtc.AddDays(30))
+                    try { usersCount = await _context.Users.CountAsync(); } catch { }
+                }
+
+                var vehicles = canViewTours 
+                    ? await _context.Vehicles.ToListAsync() 
+                    : new List<Vehicle>();
+                vehiclesCount = vehicles.Count;
+                activeVehicles = vehicles.Count(v => v.IsActive);
+
+                if (canViewBookings)
+                {
+                    try { bookingsCount = await _context.Bookings.CountAsync(); } catch { }
+                }
+
+                // Fecha local de Cajamarca / Perú (UTC-5)
+                var peruNow = PeruTime.Now;
+                var todayPeru = peruNow.Date;
+                var todayPeruStr = todayPeru.ToString("yyyy-MM-dd");
+
+                // Todas las reservas activas (no canceladas) con detalles de vehículo y conductor
+                var allActiveBookings = new List<Booking>();
+                if (canViewBookings)
+                {
+                    try
                     {
-                        var days = (int)Math.Ceiling((v.SoatExpiryDate.Value.Date - nowUtc.Date).TotalDays);
-                        fleetAlerts.Add(new FleetAlertItem
-                        {
-                            LicensePlate = v.LicensePlate,
-                            Model = v.Model,
-                            AlertType = "SOAT Turístico",
-                            ExpiryDate = v.SoatExpiryDate.Value,
-                            DaysRemaining = days,
-                            IsExpired = days < 0
-                        });
+                        allActiveBookings = await _context.Bookings
+                            .Include(b => b.Items)
+                            .ThenInclude(i => i.TourPackage)
+                            .Include(b => b.AssignedVehicle)
+                            .Include(b => b.AssignedDriver)
+                            .Where(b => b.Status != BookingStatus.Cancelled)
+                            .ToListAsync();
                     }
-                    if (v.CitvExpiryDate.HasValue && v.CitvExpiryDate.Value <= nowUtc.AddDays(30))
+                    catch (Exception ex)
                     {
-                        var days = (int)Math.Ceiling((v.CitvExpiryDate.Value.Date - nowUtc.Date).TotalDays);
-                        fleetAlerts.Add(new FleetAlertItem
-                        {
-                            LicensePlate = v.LicensePlate,
-                            Model = v.Model,
-                            AlertType = "CITV (Rev. Técnica)",
-                            ExpiryDate = v.CitvExpiryDate.Value,
-                            DaysRemaining = days,
-                            IsExpired = days < 0
-                        });
+                        _logger?.LogWarning(ex, "Error al cargar reservas activas en Dashboard: {Message}", ex.Message);
                     }
                 }
-            }
 
-            // Demanda por circuito (agrupación de reservas)
-            var circuitDemands = new List<DashboardCircuitDemandItem>();
-            if (canViewBookings)
-            {
-                var allItems = await _context.BookingItems
-                    .Include(i => i.TourPackage)
-                    .ThenInclude(t => t.Category)
-                    .ToListAsync();
+                // Reservas del día de viaje (evaluando fecha local de Perú)
+                var todayBookings = allActiveBookings.Where(b =>
+                    b.TravelDate.Date == todayPeru ||
+                    b.TravelDate.ToString("yyyy-MM-dd") == todayPeruStr ||
+                    PeruTime.ToPeruTime(b.TravelDate).Date == todayPeru
+                ).ToList();
 
-                var groupedDemand = allItems
-                    .GroupBy(i => i.TourPackage?.Title ?? "Circuito Cajamarca")
-                    .Select(g => new
-                    {
-                        Title = g.Key,
-                        Category = g.FirstOrDefault()?.TourPackage?.Category?.Name ?? "Turismo Cultural",
-                        Pax = g.Sum(x => x.Passengers)
-                    })
-                    .OrderByDescending(x => x.Pax)
-                    .Take(5)
-                    .ToList();
+                var todayPax = todayBookings.Sum(b => b.TotalPassengers);
+                var upcomingBookings = allActiveBookings.Where(b => b.TravelDate.Date > todayPeru).OrderBy(b => b.TravelDate).ToList();
+                var upcomingPax = upcomingBookings.Sum(b => b.TotalPassengers);
 
-                var colorClasses = new[] { "bg-primary", "bg-secondary", "bg-emerald-600", "bg-amber-600", "bg-sky-600" };
-                var totalDemandedPax = Math.Max(1, groupedDemand.Sum(x => x.Pax));
-                circuitDemands = groupedDemand.Select((x, idx) => new DashboardCircuitDemandItem
+                var totalDailyCapacity = vehicles.Where(v => v.IsActive).Sum(v => v.SeatCapacity);
+                if (totalDailyCapacity <= 0) totalDailyCapacity = Math.Max(20, vehiclesCount * 18);
+                var occupancyRate = (canViewBookings && totalDailyCapacity > 0) ? (int)Math.Min(100, Math.Round((double)todayPax / totalDailyCapacity * 100)) : 0;
+
+                // Recaudación del día (Caja / Reservas) - Manejo estricto de tipos UTC para PostgreSQL timestamptz
+                decimal todayIncome = 0m;
+                if (canViewCash)
                 {
-                    TourTitle = x.Title,
-                    CategoryName = x.Category,
-                    PassengerCount = x.Pax,
-                    Percentage = (int)Math.Max(5, Math.Round((double)x.Pax / totalDemandedPax * 100)),
-                    ColorClass = colorClasses[idx % colorClasses.Length]
-                }).ToList();
-            }
-
-            var activeToursList = canViewTours
-                ? await _context.TourPackages
-                    .Include(t => t.Images)
-                    .Include(t => t.Category)
-                    .Include(t => t.Shifts)
-                    .Where(t => t.IsActive)
-                    .OrderBy(t => t.Title)
-                    .ToListAsync()
-                : new List<TourPackage>();
-
-            if (!circuitDemands.Any() && activeToursList.Any())
-            {
-                var colorClasses = new[] { "bg-primary", "bg-secondary", "bg-emerald-600", "bg-amber-600", "bg-sky-600" };
-                circuitDemands = activeToursList.Take(4).Select((t, idx) => new DashboardCircuitDemandItem
-                {
-                    TourTitle = t.Title,
-                    CategoryName = t.Category?.Name ?? "Circuito Tradicional",
-                    PassengerCount = 0,
-                    Percentage = 0,
-                    ColorClass = colorClasses[idx % colorClasses.Length]
-                }).ToList();
-            }
-
-            // Tablero de Salidas y Despacho en Vivo con Datos Reales
-            // REGLA OPERATIVA: Solo deben figurar las salidas si el usuario posee permiso de reservas y tours
-            var departures = new List<DashboardDepartureItem>();
-            if (canViewBookings && canViewTours)
-            {
-                var relevantBookings = allActiveBookings.Where(b => b.TravelDate.Date >= todayPeru).ToList();
-                if (!relevantBookings.Any()) relevantBookings = allActiveBookings;
-
-                var tourIdsWithBookings = relevantBookings
-                    .SelectMany(b => b.Items)
-                    .Where(i => i.Passengers > 0)
-                    .Select(i => i.TourPackageId)
-                    .Distinct()
-                    .ToList();
-
-                var toursWithBookings = activeToursList
-                    .Where(t => tourIdsWithBookings.Contains(t.Id))
-                    .ToList();
-
-                foreach (var tour in toursWithBookings)
-                {
-                    var tourBookings = relevantBookings
-                        .Where(b => b.Items.Any(i => i.TourPackageId == tour.Id))
-                        .ToList();
-
-                // Agrupar por FECHA DE VIAJE y TURNO para que cada salida operativa sea única por día y horario
-                var departureGroups = tourBookings
-                    .GroupBy(b => new {
-                        Date = b.TravelDate.Date,
-                        Shift = string.IsNullOrWhiteSpace(b.ShiftName) ? "General" : b.ShiftName.Trim()
-                    });
-
-                foreach (var group in departureGroups)
-                {
-                    var depDate = group.Key.Date;
-                    var shiftKey = group.Key.Shift;
-                    var shiftBookings = group.ToList();
-                    var bookedPax = shiftBookings.Sum(b => b.Items.Where(i => i.TourPackageId == tour.Id).Sum(i => i.Passengers));
-
-                    if (bookedPax <= 0) continue;
-
-                    var assignedBooking = shiftBookings.FirstOrDefault(b => b.AssignedVehicleId != null || b.AssignedDriverId != null);
-                    var veh = assignedBooking?.AssignedVehicle;
-                    var assignedDriver = assignedBooking?.AssignedDriver;
-
-                    string formattedTime = ResolveDepartureTime(tour, shiftKey);
-
-                    var capacity = veh != null && veh.SeatCapacity > 0 
-                        ? veh.SeatCapacity 
-                        : (tour.MaxCapacity > 0 ? tour.MaxCapacity : 15);
-
-                    DateTime depDateTime = depDate;
-                    if (DateTime.TryParse(formattedTime, out var parsedTime))
+                    try
                     {
-                        depDateTime = depDate.Date.Add(parsedTime.TimeOfDay);
-                    }
-                    else
-                    {
-                        if (formattedTime.Contains("PM", StringComparison.OrdinalIgnoreCase))
-                            depDateTime = depDate.Date.AddHours(14).AddMinutes(30);
-                        else
-                            depDateTime = depDate.Date.AddHours(9).AddMinutes(30);
-                    }
-
-                    double durationHours = ResolveTourDurationHours(tour, shiftKey);
-                    DateTime endDateTime = depDateTime.AddHours(durationHours);
-
-                    bool hasUnitOrDriver = (veh != null || assignedDriver != null);
-                    string status;
-                    string statusColor;
-
-                    if (depDate > todayPeru)
-                    {
-                        // Salida programada para un día futuro
-                        status = hasUnitOrDriver ? "En Espera (Unidad Asignada)" : "En Espera (Programada)";
-                        statusColor = hasUnitOrDriver ? "sky" : "slate";
-                    }
-                    else if (depDate < todayPeru || (depDate == todayPeru && peruNow >= endDateTime))
-                    {
-                        // Salida concluida (fecha anterior o tour que ya cumplió su duración de recorrido hoy)
-                        status = "Finalizado (Retorno Concluido)";
-                        statusColor = "zinc";
-                    }
-                    else // Salida correspondiente al día de hoy aún no culminada
-                    {
-                        if (peruNow < depDateTime)
+                        var (startUtc, endUtc) = PeruTime.GetTravelDateRangeUtc(todayPeru);
+                        var todayTransactions = await _context.CashTransactions
+                            .Where(t => t.TransactionType == "Ingreso" && t.CreatedAt >= startUtc && t.CreatedAt < endUtc)
+                            .ToListAsync();
+                        todayIncome = todayTransactions.Sum(t => t.Amount);
+                        if (todayIncome == 0 && todayBookings.Any())
                         {
-                            var minutesToDeparture = (depDateTime - peruNow).TotalMinutes;
-                            if (minutesToDeparture <= 45 && minutesToDeparture >= 0)
-                            {
-                                status = hasUnitOrDriver ? "Abordando Pasajeros" : "Abordando (Por Asignar)";
-                                statusColor = "amber";
-                            }
-                            else
-                            {
-                                status = hasUnitOrDriver ? "En Espera (Unidad Asignada)" : "En Espera (Programada)";
-                                statusColor = hasUnitOrDriver ? "sky" : "slate";
-                            }
-                        }
-                        else // peruNow >= depDateTime && peruNow < endDateTime
-                        {
-                            status = hasUnitOrDriver ? "En Ruta (Despachado)" : "En Ruta (Despacho Pendiente)";
-                            statusColor = "emerald";
+                            todayIncome = todayBookings.Sum(b => b.PaidAmount);
                         }
                     }
-
-                    string formattedDateStr;
-                    var ci = new System.Globalization.CultureInfo("es-PE");
-                    if (depDate == todayPeru)
+                    catch (Exception ex)
                     {
-                        formattedDateStr = $"Hoy, {depDate.ToString("dd MMM", ci)}";
+                        _logger?.LogWarning(ex, "Error al calcular recaudación del día en Dashboard: {Message}", ex.Message);
+                        if (todayBookings.Any())
+                        {
+                            todayIncome = todayBookings.Sum(b => b.PaidAmount);
+                        }
                     }
-                    else if (depDate == todayPeru.AddDays(1))
-                    {
-                        formattedDateStr = $"Mañana, {depDate.ToString("dd MMM", ci)}";
-                    }
-                    else
-                    {
-                        formattedDateStr = depDate.ToString("dd MMM yyyy", ci);
-                    }
-
-                    departures.Add(new DashboardDepartureItem
-                    {
-                        DepartureDate = depDate,
-                        FormattedDate = formattedDateStr,
-                        Time = formattedTime,
-                        TourTitle = tour.Title,
-                        Subtitle = tour.Duration + (tour.Category != null ? " • " + tour.Category.Name : ""),
-                        VehicleModel = veh != null ? veh.Model : string.Empty,
-                        LicensePlate = veh != null ? veh.LicensePlate : string.Empty,
-                        DriverName = assignedDriver != null ? assignedDriver.FullName : string.Empty,
-                        GuideName = string.Empty, // La empresa no cuenta con guías contratados
-                        BookedSeats = bookedPax,
-                        TotalCapacity = capacity,
-                        Status = status,
-                        StatusColor = statusColor,
-                        TourId = tour.Id
-                    });
                 }
+                var todayPending = canViewBookings ? todayBookings.Sum(b => Math.Max(0, b.TotalAmount - b.PaidAmount)) : 0m;
+
+                // Alertas Regulatorias y de Flota (SOAT y CITV a 30 días)
+                var fleetAlerts = new List<FleetAlertItem>();
+                if (canViewTours)
+                {
+                    var nowUtc = DateTime.UtcNow;
+                    foreach (var v in vehicles)
+                    {
+                        if (v.SoatExpiryDate.HasValue && v.SoatExpiryDate.Value <= nowUtc.AddDays(30))
+                        {
+                            var days = (int)Math.Ceiling((v.SoatExpiryDate.Value.Date - nowUtc.Date).TotalDays);
+                            fleetAlerts.Add(new FleetAlertItem
+                            {
+                                LicensePlate = v.LicensePlate,
+                                Model = v.Model,
+                                AlertType = "SOAT Turístico",
+                                ExpiryDate = v.SoatExpiryDate.Value,
+                                DaysRemaining = days,
+                                IsExpired = days < 0
+                            });
+                        }
+                        if (v.CitvExpiryDate.HasValue && v.CitvExpiryDate.Value <= nowUtc.AddDays(30))
+                        {
+                            var days = (int)Math.Ceiling((v.CitvExpiryDate.Value.Date - nowUtc.Date).TotalDays);
+                            fleetAlerts.Add(new FleetAlertItem
+                            {
+                                LicensePlate = v.LicensePlate,
+                                Model = v.Model,
+                                AlertType = "CITV (Rev. Técnica)",
+                                ExpiryDate = v.CitvExpiryDate.Value,
+                                DaysRemaining = days,
+                                IsExpired = days < 0
+                            });
+                        }
+                    }
                 }
+
+                // Demanda por circuito (agrupación de reservas)
+                var circuitDemands = new List<DashboardCircuitDemandItem>();
+                if (canViewBookings)
+                {
+                    try
+                    {
+                        var allItems = await _context.BookingItems
+                            .Include(i => i.TourPackage)
+                            .ThenInclude(t => t.Category)
+                            .ToListAsync();
+
+                        var groupedDemand = allItems
+                            .GroupBy(i => i.TourPackage?.Title ?? "Circuito Cajamarca")
+                            .Select(g => new
+                            {
+                                Title = g.Key,
+                                Category = g.FirstOrDefault()?.TourPackage?.Category?.Name ?? "Turismo Cultural",
+                                Pax = g.Sum(x => x.Passengers)
+                            })
+                            .OrderByDescending(x => x.Pax)
+                            .Take(5)
+                            .ToList();
+
+                        var colorClasses = new[] { "bg-primary", "bg-secondary", "bg-emerald-600", "bg-amber-600", "bg-sky-600" };
+                        var totalDemandedPax = Math.Max(1, groupedDemand.Sum(x => x.Pax));
+                        circuitDemands = groupedDemand.Select((x, idx) => new DashboardCircuitDemandItem
+                        {
+                            TourTitle = x.Title,
+                            CategoryName = x.Category,
+                            PassengerCount = x.Pax,
+                            Percentage = (int)Math.Max(5, Math.Round((double)x.Pax / totalDemandedPax * 100)),
+                            ColorClass = colorClasses[idx % colorClasses.Length]
+                        }).ToList();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error al calcular demanda por circuito en Dashboard: {Message}", ex.Message);
+                    }
+                }
+
+                if (canViewTours)
+                {
+                    try
+                    {
+                        activeToursList = await _context.TourPackages
+                            .Include(t => t.Images)
+                            .Include(t => t.Category)
+                            .Include(t => t.Shifts)
+                            .Where(t => t.IsActive)
+                            .OrderBy(t => t.Title)
+                            .ToListAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error al cargar tours activos en Dashboard: {Message}", ex.Message);
+                    }
+                }
+
+                if (!circuitDemands.Any() && activeToursList.Any())
+                {
+                    var colorClasses = new[] { "bg-primary", "bg-secondary", "bg-emerald-600", "bg-amber-600", "bg-sky-600" };
+                    circuitDemands = activeToursList.Take(4).Select((t, idx) => new DashboardCircuitDemandItem
+                    {
+                        TourTitle = t.Title,
+                        CategoryName = t.Category?.Name ?? "Circuito Tradicional",
+                        PassengerCount = 0,
+                        Percentage = 0,
+                        ColorClass = colorClasses[idx % colorClasses.Length]
+                    }).ToList();
+                }
+
+                // Tablero de Salidas y Despacho en Vivo con Datos Reales
+                var departures = new List<DashboardDepartureItem>();
+                if (canViewBookings && canViewTours)
+                {
+                    try
+                    {
+                        var relevantBookings = allActiveBookings.Where(b => b.TravelDate.Date >= todayPeru).ToList();
+                        if (!relevantBookings.Any()) relevantBookings = allActiveBookings;
+
+                        var tourIdsWithBookings = relevantBookings
+                            .SelectMany(b => b.Items)
+                            .Where(i => i.Passengers > 0)
+                            .Select(i => i.TourPackageId)
+                            .Distinct()
+                            .ToList();
+
+                        var toursWithBookings = activeToursList
+                            .Where(t => tourIdsWithBookings.Contains(t.Id))
+                            .ToList();
+
+                        foreach (var tour in toursWithBookings)
+                        {
+                            var tourBookings = relevantBookings
+                                .Where(b => b.Items.Any(i => i.TourPackageId == tour.Id))
+                                .ToList();
+
+                            // Agrupar por FECHA DE VIAJE y TURNO para que cada salida operativa sea única por día y horario
+                            var departureGroups = tourBookings
+                                .GroupBy(b => new {
+                                    Date = b.TravelDate.Date,
+                                    Shift = string.IsNullOrWhiteSpace(b.ShiftName) ? "General" : b.ShiftName.Trim()
+                                });
+
+                            foreach (var group in departureGroups)
+                            {
+                                var depDate = group.Key.Date;
+                                var shiftKey = group.Key.Shift;
+                                var shiftBookings = group.ToList();
+                                var bookedPax = shiftBookings.Sum(b => b.Items.Where(i => i.TourPackageId == tour.Id).Sum(i => i.Passengers));
+
+                                if (bookedPax <= 0) continue;
+
+                                var assignedBooking = shiftBookings.FirstOrDefault(b => b.AssignedVehicleId != null || b.AssignedDriverId != null);
+                                var veh = assignedBooking?.AssignedVehicle;
+                                var assignedDriver = assignedBooking?.AssignedDriver;
+
+                                string formattedTime = ResolveDepartureTime(tour, shiftKey);
+
+                                var capacity = veh != null && veh.SeatCapacity > 0 
+                                    ? veh.SeatCapacity 
+                                    : (tour.MaxCapacity > 0 ? tour.MaxCapacity : 15);
+
+                                DateTime depDateTime = depDate;
+                                if (DateTime.TryParse(formattedTime, out var parsedTime))
+                                {
+                                    depDateTime = depDate.Date.Add(parsedTime.TimeOfDay);
+                                }
+                                else
+                                {
+                                    if (formattedTime.Contains("PM", StringComparison.OrdinalIgnoreCase))
+                                        depDateTime = depDate.Date.AddHours(14).AddMinutes(30);
+                                    else
+                                        depDateTime = depDate.Date.AddHours(9).AddMinutes(30);
+                                }
+
+                                double durationHours = ResolveTourDurationHours(tour, shiftKey);
+                                DateTime endDateTime = depDateTime.AddHours(durationHours);
+
+                                bool hasUnitOrDriver = (veh != null || assignedDriver != null);
+                                string status;
+                                string statusColor;
+
+                                if (depDate > todayPeru)
+                                {
+                                    status = hasUnitOrDriver ? "En Espera (Unidad Asignada)" : "En Espera (Programada)";
+                                    statusColor = hasUnitOrDriver ? "sky" : "slate";
+                                }
+                                else if (depDate < todayPeru || (depDate == todayPeru && peruNow >= endDateTime))
+                                {
+                                    status = "Finalizado (Retorno Concluido)";
+                                    statusColor = "zinc";
+                                }
+                                else
+                                {
+                                    if (peruNow < depDateTime)
+                                    {
+                                        var minutesToDeparture = (depDateTime - peruNow).TotalMinutes;
+                                        if (minutesToDeparture <= 45 && minutesToDeparture >= 0)
+                                        {
+                                            status = hasUnitOrDriver ? "Abordando Pasajeros" : "Abordando (Por Asignar)";
+                                            statusColor = "amber";
+                                        }
+                                        else
+                                        {
+                                            status = hasUnitOrDriver ? "En Espera (Unidad Asignada)" : "En Espera (Programada)";
+                                            statusColor = hasUnitOrDriver ? "sky" : "slate";
+                                        }
+                                    }
+                                    else
+                                    {
+                                        status = hasUnitOrDriver ? "En Ruta (Despachado)" : "En Ruta (Despacho Pendiente)";
+                                        statusColor = "emerald";
+                                    }
+                                }
+
+                                string formattedDateStr;
+                                var ci = new System.Globalization.CultureInfo("es-PE");
+                                if (depDate == todayPeru)
+                                {
+                                    formattedDateStr = $"Hoy, {depDate.ToString("dd MMM", ci)}";
+                                }
+                                else if (depDate == todayPeru.AddDays(1))
+                                {
+                                    formattedDateStr = $"Mañana, {depDate.ToString("dd MMM", ci)}";
+                                }
+                                else
+                                {
+                                    formattedDateStr = depDate.ToString("dd MMM yyyy", ci);
+                                }
+
+                                departures.Add(new DashboardDepartureItem
+                                {
+                                    DepartureDate = depDate,
+                                    FormattedDate = formattedDateStr,
+                                    Time = formattedTime,
+                                    TourTitle = tour.Title,
+                                    Subtitle = tour.Duration + (tour.Category != null ? " • " + tour.Category.Name : ""),
+                                    VehicleModel = veh != null ? veh.Model : string.Empty,
+                                    LicensePlate = veh != null ? veh.LicensePlate : string.Empty,
+                                    DriverName = assignedDriver != null ? assignedDriver.FullName : string.Empty,
+                                    GuideName = string.Empty,
+                                    BookedSeats = bookedPax,
+                                    TotalCapacity = capacity,
+                                    Status = status,
+                                    StatusColor = statusColor,
+                                    TourId = tour.Id
+                                });
+                            }
+                        }
+
+                        departures = departures
+                            .OrderBy(d => d.DepartureDate)
+                            .ThenBy(d => ParseTimeForSorting(d.Time))
+                            .ToList();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error al procesar salidas de despacho en Dashboard: {Message}", ex.Message);
+                    }
+                }
+
+                if (canViewBookings)
+                {
+                    try
+                    {
+                        recentBookings = await _context.Bookings
+                            .Include(b => b.Items)
+                            .ThenInclude(i => i.TourPackage)
+                            .OrderByDescending(b => b.BookingDate)
+                            .Take(5)
+                            .ToListAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error al cargar reservas recientes en Dashboard: {Message}", ex.Message);
+                    }
+                }
+
+                var todayDeparturesCount = departures.Count(d => d.DepartureDate.Date == todayPeru);
+                var upcomingDeparturesCount = departures.Count(d => d.DepartureDate.Date > todayPeru);
+                var nextDeparture = departures.FirstOrDefault(d => d.DepartureDate.Date > todayPeru);
+                var nextDepartureDateText = nextDeparture != null ? nextDeparture.FormattedDate : null;
+
+                var visitorStats = _visitorCounterService.GetStats();
+
+                var vm = new DashboardViewModel
+                {
+                    TotalTours = toursCount,
+                    TotalUsers = usersCount,
+                    TotalVehicles = vehiclesCount,
+                    ActiveVehicles = activeVehicles,
+                    TotalBookings = bookingsCount,
+                    TodayPassengers = todayPax,
+                    TotalDailyCapacity = totalDailyCapacity,
+                    OccupancyPercentage = occupancyRate,
+                    TodayDeparturesCount = todayDeparturesCount,
+                    UpcomingPassengersCount = upcomingPax,
+                    UpcomingDeparturesCount = upcomingDeparturesCount,
+                    NextDepartureDateText = nextDepartureDateText,
+                    TotalSiteVisits = visitorStats.TotalVisits,
+                    TodaySiteVisits = visitorStats.TodayVisits,
+                    TodayIncome = todayIncome,
+                    TodayPending = todayPending,
+                    Departures = departures,
+                    CircuitDemands = circuitDemands,
+                    FleetAlerts = fleetAlerts,
+                    RecentBookings = recentBookings,
+                    ActiveTours = activeToursList
+                };
+
+                ViewBag.ToursCount = toursCount;
+                ViewBag.UsersCount = usersCount;
+                ViewBag.VehiclesCount = vehiclesCount;
+                ViewBag.BookingsCount = bookingsCount;
+                ViewBag.ActiveTours = activeToursList;
+                ViewBag.RecentBookings = recentBookings;
+
+                return View(vm);
             }
-
-            // Ordenar las salidas de manera cronológica por fecha y hora
-            if (canViewBookings && canViewTours)
+            catch (Exception ex)
             {
-                departures = departures
-                    .OrderBy(d => d.DepartureDate)
-                    .ThenBy(d => ParseTimeForSorting(d.Time))
-                    .ToList();
+                _logger?.LogError(ex, "Fallo crítico recuperado en Dashboard: {Message}", ex.Message);
+
+                var fallbackVm = new DashboardViewModel
+                {
+                    TotalTours = toursCount,
+                    TotalUsers = usersCount,
+                    TotalVehicles = vehiclesCount,
+                    ActiveVehicles = activeVehicles,
+                    TotalBookings = bookingsCount,
+                    Departures = new List<DashboardDepartureItem>(),
+                    CircuitDemands = new List<DashboardCircuitDemandItem>(),
+                    FleetAlerts = new List<FleetAlertItem>(),
+                    RecentBookings = recentBookings,
+                    ActiveTours = activeToursList
+                };
+
+                ViewBag.ToursCount = toursCount;
+                ViewBag.UsersCount = usersCount;
+                ViewBag.VehiclesCount = vehiclesCount;
+                ViewBag.BookingsCount = bookingsCount;
+                ViewBag.ActiveTours = activeToursList;
+                ViewBag.RecentBookings = recentBookings;
+
+                return View(fallbackVm);
             }
-
-            var recentBookings = canViewBookings
-                ? await _context.Bookings
-                    .Include(b => b.Items)
-                    .ThenInclude(i => i.TourPackage)
-                    .OrderByDescending(b => b.BookingDate)
-                    .Take(5)
-                    .ToListAsync()
-                : new List<Booking>();
-
-            var todayDeparturesCount = departures.Count(d => d.DepartureDate.Date == todayPeru);
-            var upcomingDeparturesCount = departures.Count(d => d.DepartureDate.Date > todayPeru);
-            var nextDeparture = departures.FirstOrDefault(d => d.DepartureDate.Date > todayPeru);
-            var nextDepartureDateText = nextDeparture != null ? nextDeparture.FormattedDate : null;
-
-            var visitorStats = _visitorCounterService.GetStats();
-
-            var vm = new DashboardViewModel
-            {
-                TotalTours = toursCount,
-                TotalUsers = usersCount,
-                TotalVehicles = vehiclesCount,
-                ActiveVehicles = activeVehicles,
-                TotalBookings = bookingsCount,
-                TodayPassengers = todayPax,
-                TotalDailyCapacity = totalDailyCapacity,
-                OccupancyPercentage = occupancyRate,
-                TodayDeparturesCount = todayDeparturesCount,
-                UpcomingPassengersCount = upcomingPax,
-                UpcomingDeparturesCount = upcomingDeparturesCount,
-                NextDepartureDateText = nextDepartureDateText,
-                TotalSiteVisits = visitorStats.TotalVisits,
-                TodaySiteVisits = visitorStats.TodayVisits,
-                TodayIncome = todayIncome,
-                TodayPending = todayPending,
-                Departures = departures,
-                CircuitDemands = circuitDemands,
-                FleetAlerts = fleetAlerts,
-                RecentBookings = recentBookings,
-                ActiveTours = activeToursList
-            };
-
-            ViewBag.ToursCount = toursCount;
-            ViewBag.UsersCount = usersCount;
-            ViewBag.VehiclesCount = vehiclesCount;
-            ViewBag.BookingsCount = bookingsCount;
-            ViewBag.ActiveTours = activeToursList;
-            ViewBag.RecentBookings = recentBookings;
-
-            return View(vm);
         }
 
         [HttpGet]
