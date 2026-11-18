@@ -693,5 +693,127 @@ namespace SIGETOUR.Tests.Controllers
                 Assert.Empty(dep.GuideName); // La empresa no tiene guías contratados
             }
         }
+
+        [Fact]
+        public async Task DeleteBooking_WithAssociatedReceiptsPaymentsAndTransactions_DeletesCleanlyAndRedirects()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            var tour = new TourPackage { Id = Guid.NewGuid(), Title = "Tour Test Deletion", MaxCapacity = 15, IsActive = true };
+            context.TourPackages.Add(tour);
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "RES-DEL1",
+                CustomerName = "Carlos Deleteme",
+                TotalPassengers = 2,
+                TotalAmount = 80m,
+                PaidAmount = 80m,
+                Status = BookingStatus.Confirmed,
+                TravelDate = DateTime.UtcNow.AddDays(1)
+            };
+            booking.Items.Add(new BookingItem { TourPackageId = tour.Id, Passengers = 2, SubTotal = 80m });
+            context.Bookings.Add(booking);
+
+            var receipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Number = "00000099",
+                TotalAmount = 80m,
+                Status = "Accepted"
+            };
+            context.ElectronicReceipts.Add(receipt);
+
+            var culqiPayment = new CulqiPayment
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                AmountCents = 8000,
+                Channel = "qr",
+                Status = "paid"
+            };
+            context.CulqiPayments.Add(culqiPayment);
+
+            var incident = new PaymentIncident
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                IncidentType = "ManualReconciliation",
+                Severity = "Info"
+            };
+            context.PaymentIncidents.Add(incident);
+
+            var shift = new CashRegisterShift
+            {
+                Id = Guid.NewGuid(),
+                ShiftNumber = "TURNO-01",
+                OpenedByUserName = "admin",
+                OpenedAt = DateTime.UtcNow,
+                IsOpen = true
+            };
+            context.CashRegisterShifts.Add(shift);
+
+            var cashTx = new CashTransaction
+            {
+                Id = Guid.NewGuid(),
+                ShiftId = shift.Id,
+                BookingId = booking.Id,
+                Amount = 80m,
+                TransactionType = "Ingreso"
+            };
+            context.CashTransactions.Add(cashTx);
+            await context.SaveChangesAsync();
+
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.DeleteBooking(booking.Id);
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal(nameof(controller.Bookings), redirectResult.ActionName);
+            Assert.True(controller.TempData.ContainsKey("SuccessMessage"));
+
+            // Verify database state:
+            var deletedBooking = await context.Bookings.FindAsync(booking.Id);
+            Assert.Null(deletedBooking);
+
+            var deletedItems = await context.BookingItems.Where(i => i.BookingId == booking.Id).ToListAsync();
+            Assert.Empty(deletedItems);
+
+            var deletedReceipts = await context.ElectronicReceipts.Where(r => r.BookingId == booking.Id).ToListAsync();
+            Assert.Empty(deletedReceipts);
+
+            var deletedPayments = await context.CulqiPayments.Where(c => c.BookingId == booking.Id).ToListAsync();
+            Assert.Empty(deletedPayments);
+
+            var deletedIncidents = await context.PaymentIncidents.Where(pi => pi.BookingId == booking.Id).ToListAsync();
+            Assert.Empty(deletedIncidents);
+
+            // CashTransaction is preserved for accounting, but unlinked
+            var reloadedCashTx = await context.CashTransactions.FindAsync(cashTx.Id);
+            Assert.NotNull(reloadedCashTx);
+            Assert.Null(reloadedCashTx.BookingId);
+        }
+
+        [Fact]
+        public async Task DeleteBooking_NonExistentBooking_SetsErrorMessageAndRedirects()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.DeleteBooking(Guid.NewGuid());
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal(nameof(controller.Bookings), redirectResult.ActionName);
+            Assert.True(controller.TempData.ContainsKey("ErrorMessage"));
+        }
     }
 }

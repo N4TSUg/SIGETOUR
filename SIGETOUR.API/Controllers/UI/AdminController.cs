@@ -3855,25 +3855,65 @@ namespace SIGETOUR.API.Controllers.UI
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteBooking(Guid id)
         {
-            var booking = await _context.Bookings
-                .Include(b => b.Items)
-                .FirstOrDefaultAsync(b => b.Id == id);
-
-            if (booking == null)
+            try
             {
-                TempData["ErrorMessage"] = "La reserva seleccionada no existe o ya fue eliminada.";
-                return RedirectToAction(nameof(Bookings));
+                var booking = await _context.Bookings
+                    .Include(b => b.Items)
+                    .FirstOrDefaultAsync(b => b.Id == id);
+
+                if (booking == null)
+                {
+                    TempData["ErrorMessage"] = "La reserva seleccionada no existe o ya fue eliminada.";
+                    return RedirectToAction(nameof(Bookings));
+                }
+
+                // 1. Eliminar Comprobantes Electrónicos asociados
+                var receipts = await _context.ElectronicReceipts.Where(r => r.BookingId == id).ToListAsync();
+                if (receipts.Any())
+                {
+                    _context.ElectronicReceipts.RemoveRange(receipts);
+                }
+
+                // 2. Eliminar Pagos Culqi asociados
+                var culqiPayments = await _context.CulqiPayments.Where(c => c.BookingId == id).ToListAsync();
+                if (culqiPayments.Any())
+                {
+                    _context.CulqiPayments.RemoveRange(culqiPayments);
+                }
+
+                // 3. Eliminar Incidentes de Pago asociados
+                var incidents = await _context.PaymentIncidents.Where(pi => pi.BookingId == id).ToListAsync();
+                if (incidents.Any())
+                {
+                    _context.PaymentIncidents.RemoveRange(incidents);
+                }
+
+                // 4. Desvincular transacciones de caja chica
+                var cashTxs = await _context.CashTransactions.Where(ct => ct.BookingId == id).ToListAsync();
+                foreach (var ct in cashTxs)
+                {
+                    ct.BookingId = null;
+                }
+
+                // 5. Eliminar Items de la reserva
+                if (booking.Items != null && booking.Items.Any())
+                {
+                    _context.BookingItems.RemoveRange(booking.Items);
+                }
+
+                // 6. Eliminar la reserva principal
+                _context.Bookings.Remove(booking);
+                await _context.SaveChangesAsync();
+
+                _logger?.LogInformation("Reserva {BookingId} ({RefCode}) eliminada permanentemente.", id, booking.ReferenceCode);
+                TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} a nombre de {booking.CustomerName} ha sido eliminada permanentemente.";
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error al eliminar la reserva {BookingId}: {Message}", id, ex.Message);
+                TempData["ErrorMessage"] = $"No se pudo eliminar la reserva: {ex.Message}";
             }
 
-            if (booking.Items != null && booking.Items.Any())
-            {
-                _context.BookingItems.RemoveRange(booking.Items);
-            }
-
-            _context.Bookings.Remove(booking);
-            await _context.SaveChangesAsync();
-
-            TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} a nombre de {booking.CustomerName} ha sido eliminada permanentemente.";
             return RedirectToAction(nameof(Bookings));
         }
 
