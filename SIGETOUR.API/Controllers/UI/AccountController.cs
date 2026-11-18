@@ -46,8 +46,9 @@ namespace SIGETOUR.API.Controllers.UI
         {
             if (ModelState.IsValid)
             {
-                var user = await _userManager.FindByEmailAsync(model.EmailOrUsername) ??
-                           await _userManager.FindByNameAsync(model.EmailOrUsername);
+                var cleanInput = model.EmailOrUsername?.Trim() ?? string.Empty;
+                var user = await _userManager.FindByEmailAsync(cleanInput) ??
+                           await _userManager.FindByNameAsync(cleanInput);
 
                 if (user != null)
                 {
@@ -69,6 +70,13 @@ namespace SIGETOUR.API.Controllers.UI
                             return Redirect(returnUrl);
                         }
                         return RedirectToAction("Dashboard", "Admin");
+                    }
+
+                    if (result.IsLockedOut)
+                    {
+                        ModelState.AddModelError(string.Empty, "La cuenta se encuentra bloqueada temporalmente por intentos fallidos. Espere unos minutos e intente nuevamente.");
+                        ViewData["ReturnUrl"] = returnUrl;
+                        return View(model);
                     }
                 }
 

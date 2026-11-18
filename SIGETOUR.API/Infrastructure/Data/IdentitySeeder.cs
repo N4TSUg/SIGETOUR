@@ -78,6 +78,32 @@ namespace SIGETOUR.API.Infrastructure.Data
                 await userManager.CreateAsync(superadmin, "SuperAdmin123!");
                 await userManager.AddToRoleAsync(superadmin, "SuperAdmin");
             }
+            else
+            {
+                // Asegurar cuenta activa, desbloqueada y contraseña oficial sincronizada
+                superadmin.IsActive = true;
+                superadmin.EmailConfirmed = true;
+                try
+                {
+                    if (await userManager.IsLockedOutAsync(superadmin))
+                    {
+                        await userManager.SetLockoutEndDateAsync(superadmin, null);
+                    }
+                    await userManager.ResetAccessFailedCountAsync(superadmin);
+
+                    if (!await userManager.CheckPasswordAsync(superadmin, "SuperAdmin123!"))
+                    {
+                        var resetToken = await userManager.GeneratePasswordResetTokenAsync(superadmin);
+                        await userManager.ResetPasswordAsync(superadmin, resetToken, "SuperAdmin123!");
+                    }
+
+                    if (!await userManager.IsInRoleAsync(superadmin, "SuperAdmin"))
+                    {
+                        await userManager.AddToRoleAsync(superadmin, "SuperAdmin");
+                    }
+                }
+                catch { }
+            }
 
             var admin = await userManager.FindByNameAsync("admin");
             if (admin == null)
@@ -93,6 +119,32 @@ namespace SIGETOUR.API.Infrastructure.Data
                 };
                 await userManager.CreateAsync(admin, "Admin123!");
                 await userManager.AddToRoleAsync(admin, "Admin");
+            }
+            else
+            {
+                // Asegurar cuenta activa, desbloqueada y contraseña oficial sincronizada
+                admin.IsActive = true;
+                admin.EmailConfirmed = true;
+                try
+                {
+                    if (await userManager.IsLockedOutAsync(admin))
+                    {
+                        await userManager.SetLockoutEndDateAsync(admin, null);
+                    }
+                    await userManager.ResetAccessFailedCountAsync(admin);
+
+                    if (!await userManager.CheckPasswordAsync(admin, "Admin123!"))
+                    {
+                        var resetToken = await userManager.GeneratePasswordResetTokenAsync(admin);
+                        await userManager.ResetPasswordAsync(admin, resetToken, "Admin123!");
+                    }
+
+                    if (!await userManager.IsInRoleAsync(admin, "Admin"))
+                    {
+                        await userManager.AddToRoleAsync(admin, "Admin");
+                    }
+                }
+                catch { }
             }
         }
     }
