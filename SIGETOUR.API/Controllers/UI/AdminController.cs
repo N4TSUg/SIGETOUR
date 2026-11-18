@@ -285,8 +285,7 @@ namespace SIGETOUR.API.Controllers.UI
                 {
                     try
                     {
-                        var relevantBookings = allActiveBookings.Where(b => b.TravelDate.Date >= todayPeru).ToList();
-                        if (!relevantBookings.Any()) relevantBookings = allActiveBookings;
+                        var relevantBookings = allActiveBookings;
 
                         var tourIdsWithBookings = relevantBookings
                             .SelectMany(b => b.Items)
@@ -404,10 +403,13 @@ namespace SIGETOUR.API.Controllers.UI
                                     DepartureDate = depDate,
                                     FormattedDate = formattedDateStr,
                                     Time = formattedTime,
+                                    ShiftName = shiftKey,
                                     TourTitle = tour.Title,
                                     Subtitle = tour.Duration + (tour.Category != null ? " • " + tour.Category.Name : ""),
+                                    VehicleId = veh?.Id,
                                     VehicleModel = veh != null ? veh.Model : string.Empty,
                                     LicensePlate = veh != null ? veh.LicensePlate : string.Empty,
+                                    DriverId = assignedDriver?.Id,
                                     DriverName = assignedDriver != null ? assignedDriver.FullName : string.Empty,
                                     GuideName = string.Empty,
                                     BookedSeats = bookedPax,
@@ -473,6 +475,10 @@ namespace SIGETOUR.API.Controllers.UI
                     TodayIncome = todayIncome,
                     TodayPending = todayPending,
                     Departures = departures,
+                    AvailableVehicles = vehicles.Where(v => v.IsActive).OrderBy(v => v.Model).ToList(),
+                    AvailableDrivers = canViewTours 
+                        ? (await _context.Drivers.Where(d => d.IsActive).OrderBy(d => d.FullName).ToListAsync()) 
+                        : new List<Driver>(),
                     CircuitDemands = circuitDemands,
                     FleetAlerts = fleetAlerts,
                     RecentBookings = recentBookings,
@@ -815,6 +821,111 @@ namespace SIGETOUR.API.Controllers.UI
             catch (Exception ex)
             {
                 return BadRequest($"Error al generar el manifiesto: {ex.Message}");
+            }
+        }
+
+        [HttpPost]
+        [Authorize(Policy = AppPermissions.ManifestManage)]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegularizeManifest([FromForm] RegularizeManifestRequest req)
+        {
+            if (req == null || req.TourPackageId == Guid.Empty || req.VehicleId == Guid.Empty)
+            {
+                return BadRequest(new { success = false, message = "Debe seleccionar un tour y un vehículo válidos para regularizar el manifiesto." });
+            }
+
+            try
+            {
+                var tour = await _context.TourPackages.FindAsync(req.TourPackageId);
+                var vehicle = await _context.Vehicles.FindAsync(req.VehicleId);
+                if (vehicle == null)
+                {
+                    return BadRequest(new { success = false, message = "El vehículo seleccionado no existe en el sistema." });
+                }
+
+                Driver? driver = null;
+                if (req.DriverId.HasValue && req.DriverId.Value != Guid.Empty)
+                {
+                    driver = await _context.Drivers.FindAsync(req.DriverId.Value);
+                }
+                else if (!string.IsNullOrWhiteSpace(req.DriverName))
+                {
+                    var dName = req.DriverName.Trim();
+                    driver = await _context.Drivers.FirstOrDefaultAsync(d => d.FullName.ToLower() == dName.ToLower());
+                }
+
+                // Enlazar vehículo y conductor a las reservas correspondientes para esta salida
+                var matchingBookings = await _context.Bookings
+                    .Include(b => b.Items)
+                    .Where(b => b.Status != BookingStatus.Cancelled &&
+                                b.Items.Any(i => i.TourPackageId == req.TourPackageId))
+                    .ToListAsync();
+
+                matchingBookings = matchingBookings.Where(b =>
+                    b.TravelDate.Date == req.Date.Date ||
+                    b.TravelDate.ToUniversalTime().Date == req.Date.Date ||
+                    b.TravelDate.ToString("yyyy-MM-dd") == req.Date.ToString("yyyy-MM-dd")
+                ).ToList();
+
+                if (!string.IsNullOrWhiteSpace(req.ShiftName) &&
+                    !req.ShiftName.Equals("Todos", StringComparison.OrdinalIgnoreCase) &&
+                    !req.ShiftName.StartsWith("Todos", StringComparison.OrdinalIgnoreCase))
+                {
+                    var cleanShift = req.ShiftName.ToLower().Replace("turno", "").Trim();
+                    var keyword = cleanShift.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? cleanShift;
+                    matchingBookings = matchingBookings.Where(b =>
+                        string.IsNullOrWhiteSpace(b.ShiftName) ||
+                        b.ShiftName.ToLower().Contains(keyword) ||
+                        keyword.Contains(b.ShiftName.ToLower())
+                    ).ToList();
+                }
+
+                if (!matchingBookings.Any())
+                {
+                    return NotFound(new { success = false, message = "No se encontraron reservas activas para la salida y turno seleccionados." });
+                }
+
+                foreach (var b in matchingBookings)
+                {
+                    b.AssignedVehicleId = req.VehicleId;
+                    if (driver != null)
+                    {
+                        b.AssignedDriverId = driver.Id;
+                    }
+                    if (b.Status == BookingStatus.Pending)
+                    {
+                        b.Status = BookingStatus.Confirmed;
+                    }
+                }
+
+                // Solo actualizar el estado vehicular a 'Operativo en Ruta' si la salida es de hoy o futura
+                var todayPeru = PeruTime.Today;
+                if (req.Date.Date >= todayPeru)
+                {
+                    vehicle.Status = "Operativo en Ruta (En Servicio)";
+                    vehicle.IsActive = true;
+                    _context.Vehicles.Update(vehicle);
+                }
+
+                await _context.SaveChangesAsync();
+
+                _logger?.LogInformation("Manifiesto regularizado: Tour {TourId}, Fecha {Date}, {Count} reservas asignadas a Vehículo {Plate} y Chofer {Driver}",
+                    req.TourPackageId, req.Date.ToString("yyyy-MM-dd"), matchingBookings.Count, vehicle.LicensePlate, driver?.FullName ?? "N/A");
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"Manifiesto regularizado exitosamente. Se asignó la unidad {vehicle.LicensePlate} ({vehicle.Model}) a {matchingBookings.Count} reserva(s).",
+                    vehicleModel = vehicle.Model,
+                    licensePlate = vehicle.LicensePlate,
+                    driverName = driver != null ? driver.FullName : "Sin conductor asignado",
+                    bookingsUpdated = matchingBookings.Count
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error al regularizar manifiesto: {Message}", ex.Message);
+                return StatusCode(500, new { success = false, message = $"Error interno al regularizar el manifiesto: {ex.Message}" });
             }
         }
 

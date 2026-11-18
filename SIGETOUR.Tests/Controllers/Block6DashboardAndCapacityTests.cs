@@ -605,6 +605,132 @@ namespace SIGETOUR.Tests.Controllers
             Assert.NotNull(depAyer);
             Assert.Equal("Finalizado (Retorno Concluido)", depAyer.Status);
             Assert.Equal("zinc", depAyer.StatusColor);
+            Assert.True(depAyer.IsHistorical);
+            Assert.False(depAyer.IsManifestRegularized);
+            Assert.Equal(1, model.HistoricalDeparturesCount);
+            Assert.Equal(0, model.ActiveDeparturesCount);
+        }
+
+        [Fact]
+        public async Task RegularizeManifest_AssignsVehicleAndDriver_ToHistoricalAndActiveDepartures()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            var todayPeru = PeruTime.Today;
+            var (yesterdayUtc, _) = PeruTime.GetTravelDateRangeUtc(todayPeru.AddDays(-1));
+
+            var tour = new TourPackage { Id = Guid.NewGuid(), Title = "Tour Cumbemayo Manual", Duration = "4 Horas", MaxCapacity = 20, IsActive = true };
+            var vehicle = new Vehicle { Id = Guid.NewGuid(), Model = "Toyota HiAce Test", LicensePlate = "M4B-999", SeatCapacity = 14, IsActive = true };
+            var driver = new Driver { Id = Guid.NewGuid(), FullName = "Segundo Quispe", LicenseNumber = "Q98765432", IsActive = true };
+
+            context.TourPackages.Add(tour);
+            context.Vehicles.Add(vehicle);
+            context.Drivers.Add(driver);
+
+            var b1 = new Booking { Id = Guid.NewGuid(), ReferenceCode = "RES-REG1", TravelDate = yesterdayUtc, ShiftName = "Turno 09:30 AM", TotalPassengers = 3, Status = BookingStatus.Confirmed };
+            b1.Items.Add(new BookingItem { TourPackageId = tour.Id, Passengers = 3, SubTotal = 150 });
+            var b2 = new Booking { Id = Guid.NewGuid(), ReferenceCode = "RES-REG2", TravelDate = yesterdayUtc, ShiftName = "Turno 09:30 AM", TotalPassengers = 2, Status = BookingStatus.Confirmed };
+            b2.Items.Add(new BookingItem { TourPackageId = tour.Id, Passengers = 2, SubTotal = 100 });
+
+            context.Bookings.AddRange(b1, b2);
+            await context.SaveChangesAsync();
+
+            var controller = TestHelpers.CreateAdminController(context);
+
+            var regRequest = new RegularizeManifestRequest
+            {
+                TourPackageId = tour.Id,
+                Date = yesterdayUtc,
+                ShiftName = "Turno 09:30 AM",
+                VehicleId = vehicle.Id,
+                DriverId = driver.Id,
+                Notes = "Manifiesto manual de ruta #012"
+            };
+
+            // Act
+            var result = await controller.RegularizeManifest(regRequest);
+
+            // Assert
+            var jsonResult = Assert.IsType<JsonResult>(result);
+            dynamic data = jsonResult.Value!;
+            Assert.True((bool)data.GetType().GetProperty("success").GetValue(data, null));
+            Assert.Equal(2, (int)data.GetType().GetProperty("bookingsUpdated").GetValue(data, null));
+            Assert.Equal("M4B-999", (string)data.GetType().GetProperty("licensePlate").GetValue(data, null));
+
+            // Verify in DB that bookings were updated
+            var reloadedB1 = await context.Bookings.FindAsync(b1.Id);
+            var reloadedB2 = await context.Bookings.FindAsync(b2.Id);
+            Assert.Equal(vehicle.Id, reloadedB1!.AssignedVehicleId);
+            Assert.Equal(driver.Id, reloadedB1.AssignedDriverId);
+            Assert.Equal(vehicle.Id, reloadedB2!.AssignedVehicleId);
+            Assert.Equal(driver.Id, reloadedB2.AssignedDriverId);
+
+            // Verify Dashboard reflects the regularized departure
+            var dashResult = await controller.Dashboard();
+            var viewResult = Assert.IsType<ViewResult>(dashResult);
+            var dashModel = Assert.IsType<DashboardViewModel>(viewResult.Model);
+
+            var regularizedDep = dashModel.Departures.FirstOrDefault(d => d.TourId == tour.Id);
+            Assert.NotNull(regularizedDep);
+            Assert.True(regularizedDep.IsHistorical);
+            Assert.True(regularizedDep.IsManifestRegularized);
+            Assert.Equal("M4B-999", regularizedDep.LicensePlate);
+            Assert.Equal("Segundo Quispe", regularizedDep.DriverName);
+        }
+
+        [Fact]
+        public async Task RegularizeManifest_ValidatesInput_ReturnsBadRequestOnMissingData()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act & Assert 1: Missing TourPackageId
+            var res1 = await controller.RegularizeManifest(new RegularizeManifestRequest { TourPackageId = Guid.Empty, VehicleId = Guid.NewGuid() });
+            Assert.IsType<BadRequestObjectResult>(res1);
+
+            // Act & Assert 2: Missing VehicleId
+            var res2 = await controller.RegularizeManifest(new RegularizeManifestRequest { TourPackageId = Guid.NewGuid(), VehicleId = Guid.Empty });
+            Assert.IsType<BadRequestObjectResult>(res2);
+        }
+
+        [Fact]
+        public async Task Dashboard_SeparatesActiveAndHistoricalCounts_Accurately()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            var todayPeru = PeruTime.Today;
+            var (todayUtc, _) = PeruTime.GetTravelDateRangeUtc(todayPeru);
+            var (yesterdayUtc, _) = PeruTime.GetTravelDateRangeUtc(todayPeru.AddDays(-1));
+
+            var tourActivo = new TourPackage { Id = Guid.NewGuid(), Title = "Tour Hoy Activo", Duration = "8 Horas", MaxCapacity = 20, IsActive = true };
+            var tourPasado = new TourPackage { Id = Guid.NewGuid(), Title = "Tour Ayer Pasado", Duration = "4 Horas", MaxCapacity = 20, IsActive = true };
+            context.TourPackages.AddRange(tourActivo, tourPasado);
+
+            // Booking activo (hoy con salida en la tarde para que sea futuro/activo respecto a ahora o fecha de viaje)
+            var bActivo = new Booking { Id = Guid.NewGuid(), ReferenceCode = "RES-ACT", TravelDate = todayUtc.AddDays(1), ShiftName = "Mañana", TotalPassengers = 2, Status = BookingStatus.Confirmed };
+            bActivo.Items.Add(new BookingItem { TourPackageId = tourActivo.Id, Passengers = 2, SubTotal = 100 });
+
+            // Booking histórico (ayer)
+            var bPasado = new Booking { Id = Guid.NewGuid(), ReferenceCode = "RES-PAS", TravelDate = yesterdayUtc, ShiftName = "Mañana", TotalPassengers = 2, Status = BookingStatus.Confirmed };
+            bPasado.Items.Add(new BookingItem { TourPackageId = tourPasado.Id, Passengers = 2, SubTotal = 100 });
+
+            context.Bookings.AddRange(bActivo, bPasado);
+            await context.SaveChangesAsync();
+
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.Dashboard();
+
+            // Assert
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<DashboardViewModel>(viewResult.Model);
+
+            Assert.Equal(1, model.ActiveDeparturesCount);
+            Assert.Equal(1, model.HistoricalDeparturesCount);
+            Assert.Contains(model.Departures, d => d.TourId == tourActivo.Id && !d.IsHistorical);
+            Assert.Contains(model.Departures, d => d.TourId == tourPasado.Id && d.IsHistorical);
         }
     }
 }

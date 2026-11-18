@@ -193,22 +193,38 @@
         </div>
     </div>
 
-    <!-- 2. Tablero de Salidas y Despacho en Vivo de Hoy -->
+    <!-- 2. Tablero de Salidas y Despacho en Vivo / Historial -->
     <div id="tablero-despacho" class="bg-surface-container-lowest rounded-2xl border border-outline-variant/60 shadow-sm overflow-hidden flex flex-col">
-        <div class="p-5 border-b border-outline-variant/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-bright">
+        <div class="p-5 border-b border-outline-variant/40 flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-surface-bright">
             <div class="flex flex-wrap items-center gap-3">
                 <span class="w-3 h-3 rounded-full bg-primary animate-ping"></span>
                 <div>
-                    <h2 class="text-title-md font-bold text-on-surface">Tablero de Salidas y Despacho en Vivo</h2>
-                    <p class="text-body-sm text-outline">Programación de circuitos del día con asignación de flota y personal de campo.</p>
+                    <h2 class="text-title-md font-bold text-on-surface">Tablero de Salidas y Despacho</h2>
+                    <p class="text-body-sm text-outline">Programación de circuitos en vivo, asignación de flota y regularización de manifiestos.</p>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="text-label-sm bg-surface-container px-3 py-1 rounded-lg text-primary font-bold border border-primary/20">
-                    Turno Mañana / Tarde
-                </span>
-                <a asp-controller="Admin" asp-action="Bookings" class="text-label-sm px-3 py-1 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container font-semibold transition-colors">
-                    Ver Reservas
+            <div class="flex flex-wrap items-center gap-2.5">
+                <!-- Pestañas Operativas: En Vivo vs Historial -->
+                <div class="inline-flex p-1 bg-surface-container rounded-xl border border-outline-variant/50 text-label-sm">
+                    <button type="button" id="tabBtnActive" onclick="switchDepartureTab('active')" class="px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 bg-primary text-on-primary shadow-xs cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">departure_board</span>
+                        <span>En Vivo y Próximas</span>
+                        <span id="badgeActiveCount" class="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-extrabold">
+                            @Model.ActiveDeparturesCount
+                        </span>
+                    </button>
+                    <button type="button" id="tabBtnHistory" onclick="switchDepartureTab('history')" class="px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">history</span>
+                        <span>Historial Concluido</span>
+                        <span id="badgeHistoryCount" class="px-1.5 py-0.2 rounded-full text-[10px] bg-outline-variant/40 text-on-surface font-extrabold">
+                            @Model.HistoricalDeparturesCount
+                        </span>
+                    </button>
+                </div>
+
+                <a asp-controller="Admin" asp-action="Bookings" class="text-label-sm px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container font-semibold transition-colors flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">table_view</span>
+                    <span>Ver Reservas</span>
                 </a>
             </div>
         </div>
@@ -223,21 +239,40 @@
                         <th class="py-3 px-4">Unidad &amp; Placa</th>
                         <th class="py-3 px-4">Personal Asignado</th>
                         <th class="py-3 px-4">Ocupación Pax</th>
-                        <th class="py-3 px-4">Estado de Salida</th>
+                        <th class="py-3 px-4">Estado / Manifiesto</th>
                         <th class="py-3 px-4 text-right">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-outline-variant/20 text-body-sm">
-                    @if (Model.Departures.Any())
+                    @{
+                        var activeDeps = Model.Departures.Where(d => !d.IsHistorical).OrderBy(d => d.DepartureDate).ThenBy(d => d.Time).ToList();
+                        var historyDeps = Model.Departures.Where(d => d.IsHistorical).OrderByDescending(d => d.DepartureDate).ThenByDescending(d => d.Time).ToList();
+                        var allRenderDeps = activeDeps.Concat(historyDeps).ToList();
+                    }
+
+                    @if (allRenderDeps.Any())
                     {
-                        foreach (var dep in Model.Departures)
+                        foreach (var dep in allRenderDeps)
                         {
                             var pct = dep.TotalCapacity > 0 ? (int)Math.Min(100, Math.Round((double)dep.BookedSeats / dep.TotalCapacity * 100)) : 0;
                             var isFull = dep.BookedSeats >= dep.TotalCapacity;
-                            <tr class="hover:bg-surface-container-low/40 transition-colors">
+                            var rowId = $"row-{dep.TourId}-{dep.DepartureDate:yyyyMMdd}-{(dep.ShiftName ?? "").Replace(" ", "")}";
+
+                            <tr class="departure-row hover:bg-surface-container-low/40 transition-colors @(dep.IsHistorical ? "hidden" : "")"
+                                data-tab-type="@(dep.IsHistorical ? "history" : "active")"
+                                data-dep-id="@rowId"
+                                data-tour-id="@dep.TourId"
+                                data-tour-title="@dep.TourTitle"
+                                data-date="@dep.DepartureDate.ToString("yyyy-MM-dd")"
+                                data-date-formatted="@dep.FormattedDate"
+                                data-shift="@dep.ShiftName"
+                                data-pax="@dep.BookedSeats"
+                                data-vehicle-id="@(dep.VehicleId?.ToString() ?? "")"
+                                data-driver-id="@(dep.DriverId?.ToString() ?? "")">
+                                
                                 <td class="py-3.5 px-4 whitespace-nowrap">
                                     <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                        <div class="w-8 h-8 rounded-lg @(dep.IsHistorical ? "bg-surface-container text-outline" : "bg-primary/10 text-primary") flex items-center justify-center shrink-0">
                                             <span class="material-symbols-outlined text-[18px]">calendar_month</span>
                                         </div>
                                         <div>
@@ -246,8 +281,12 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="py-3.5 px-4 font-bold text-primary font-mono text-title-sm whitespace-nowrap">
+                                <td class="py-3.5 px-4 font-bold @(dep.IsHistorical ? "text-on-surface-variant font-mono" : "text-primary font-mono") text-title-sm whitespace-nowrap">
                                     @dep.Time
+                                    @if (!string.IsNullOrWhiteSpace(dep.ShiftName) && !dep.ShiftName.Equals("General", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <div class="text-[10px] text-outline font-normal">@dep.ShiftName</div>
+                                    }
                                 </td>
                                 <td class="py-3.5 px-4">
                                     <div class="font-bold text-on-surface">@dep.TourTitle</div>
@@ -258,29 +297,31 @@
                                     {
                                         <div class="flex items-center gap-1.5 font-semibold text-on-surface">
                                             <span class="material-symbols-outlined text-[18px] text-primary">directions_bus</span>
-                                            @dep.VehicleModel
+                                            <span class="vehicle-model-label">@dep.VehicleModel</span>
                                         </div>
-                                        <div class="text-label-sm font-mono text-outline">Placa: @dep.LicensePlate</div>
+                                        <div class="text-label-sm font-mono text-outline license-plate-label">Placa: @dep.LicensePlate</div>
                                     }
                                     else
                                     {
-                                        <div class="flex items-center gap-1.5 text-outline text-label-sm">
-                                            <span class="material-symbols-outlined text-[18px] text-outline">pending</span>
-                                            <span class="italic font-medium">Sin unidad asignada</span>
+                                        <div class="flex items-center gap-1.5 @(dep.IsHistorical ? "text-amber-800" : "text-outline") text-label-sm">
+                                            <span class="material-symbols-outlined text-[18px] @(dep.IsHistorical ? "text-amber-600" : "text-outline")">pending</span>
+                                            <span class="italic font-medium vehicle-model-label">Sin unidad asignada</span>
                                         </div>
-                                        <div class="text-[11px] text-outline/80">Por asignar en manifiesto</div>
+                                        <div class="text-[11px] @(dep.IsHistorical ? "text-amber-700 font-semibold" : "text-outline/80") license-plate-label">
+                                            @(dep.IsHistorical ? "Manifiesto manual por regularizar" : "Por asignar en manifiesto")
+                                        </div>
                                     }
                                 </td>
                                 <td class="py-3.5 px-4">
                                     @if (!string.IsNullOrWhiteSpace(dep.DriverName))
                                     {
-                                        <div class="font-medium text-on-surface">@dep.DriverName</div>
+                                        <div class="font-medium text-on-surface driver-name-label">@dep.DriverName</div>
                                     }
                                     else
                                     {
                                         <div class="flex items-center gap-1.5 text-outline text-label-sm">
                                             <span class="material-symbols-outlined text-[18px] text-outline">person_off</span>
-                                            <span class="italic font-medium">Sin conductor asignado</span>
+                                            <span class="italic font-medium driver-name-label">Sin conductor asignado</span>
                                         </div>
                                     }
                                     @if (!string.IsNullOrWhiteSpace(dep.GuideName))
@@ -309,63 +350,129 @@
                                     </div>
                                 </td>
                                 <td class="py-3.5 px-4">
-                                    @if (dep.StatusColor == "emerald")
-                                    {
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-                                            @dep.Status
-                                        </span>
-                                    }
-                                    else if (dep.StatusColor == "amber")
-                                    {
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                            @dep.Status
-                                        </span>
-                                    }
-                                    else if (dep.StatusColor == "sky")
-                                    {
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
-                                            @dep.Status
-                                        </span>
-                                    }
-                                    else if (dep.StatusColor == "zinc")
-                                    {
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-300">
-                                            <span class="material-symbols-outlined text-[13px] text-zinc-600">check_circle</span>
-                                            @dep.Status
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                            @dep.Status
-                                        </span>
-                                    }
+                                    <div class="flex flex-col gap-1 items-start">
+                                        @if (dep.StatusColor == "emerald")
+                                        {
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                                                @dep.Status
+                                            </span>
+                                        }
+                                        else if (dep.StatusColor == "amber")
+                                        {
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                @dep.Status
+                                            </span>
+                                        }
+                                        else if (dep.StatusColor == "sky")
+                                        {
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                                @dep.Status
+                                            </span>
+                                        }
+                                        else if (dep.StatusColor == "zinc")
+                                        {
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-zinc-100 text-zinc-700 border border-zinc-300">
+                                                <span class="material-symbols-outlined text-[13px] text-zinc-600">check_circle</span>
+                                                @dep.Status
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-300">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                                @dep.Status
+                                            </span>
+                                        }
+
+                                        <!-- Badge de Estado del Manifiesto -->
+                                        @if (dep.IsHistorical)
+                                        {
+                                            @if (dep.IsManifestRegularized)
+                                            {
+                                                <span class="manifest-status-badge inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                                    <span class="material-symbols-outlined text-[12px]">verified</span> Manifiesto OK
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="manifest-status-badge inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                                                    <span class="material-symbols-outlined text-[12px]">edit_note</span> Pendiente Regularizar
+                                                </span>
+                                            }
+                                        }
+                                    </div>
                                 </td>
                                 <td class="py-3.5 px-4 text-right">
-                                    <div class="flex items-center justify-end gap-1">
-                                        <a asp-controller="Admin" asp-action="Bookings" asp-route-tourId="@dep.TourId" class="p-1.5 rounded-lg hover:bg-surface-container text-primary" title="Ver Manifiesto y Pasajeros">
-                                            <span class="material-symbols-outlined text-[18px]">assignment</span>
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <!-- Botón Regularizar / Asignar Manifiesto -->
+                                        <button type="button"
+                                                onclick="openRegularizeModal('@dep.TourId', '@Html.Raw(dep.TourTitle.Replace("'", "\\'"))', '@dep.DepartureDate.ToString("yyyy-MM-dd")', '@dep.FormattedDate', '@Html.Raw((dep.ShiftName ?? "").Replace("'", "\\'"))', '@dep.BookedSeats', '@(dep.VehicleId?.ToString() ?? "")', '@(dep.DriverId?.ToString() ?? "")', '@(dep.IsHistorical ? "True" : "False")')"
+                                                class="px-2 py-1 rounded-lg @(dep.IsHistorical && !dep.IsManifestRegularized ? "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold" : "hover:bg-primary/10 text-primary border border-primary/20 hover:border-primary") text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                                                title="@(dep.IsHistorical ? "Regularizar Manifiesto Manual / Normalizar Asignación" : "Asignar Flota y Conductor de Despacho")">
+                                            <span class="material-symbols-outlined text-[16px]">@(dep.IsHistorical ? "assignment_turned_in" : "assignment_add")</span>
+                                            <span>@(dep.IsHistorical ? (dep.IsManifestRegularized ? "Modificar" : "Regularizar") : "Asignar")</span>
+                                        </button>
+
+                                        <!-- Botón Descargar Manifiesto Excel MTC -->
+                                        <a href="@Url.Action("ExportManifestExcel", "Admin", new { tourPackageId = dep.TourId, date = dep.DepartureDate.ToString("yyyy-MM-dd"), shiftName = dep.ShiftName, vehicleId = dep.VehicleId, driverId = dep.DriverId })"
+                                           target="_blank"
+                                           class="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-700 border border-emerald-200 transition-all"
+                                           title="Descargar Manifiesto Oficial de Pasajeros (Excel MTC)">
+                                            <span class="material-symbols-outlined text-[18px]">table_view</span>
                                         </a>
-                                        <a href="@ContactService.GetWhatsAppUrl()" target="_blank" class="p-1.5 rounded-lg hover:bg-surface-container text-secondary" title="Contacto con la Unidad / Chofer">
-                                            <span class="material-symbols-outlined text-[18px]">chat</span>
+
+                                        <!-- Botón Ver Pasajeros / Reservas -->
+                                        <a asp-controller="Admin" asp-action="Bookings" asp-route-tourId="@dep.TourId"
+                                           class="p-1.5 rounded-lg hover:bg-surface-container text-outline hover:text-on-surface transition-colors"
+                                           title="Ver Reservas y Pasajeros">
+                                            <span class="material-symbols-outlined text-[18px]">group</span>
                                         </a>
                                     </div>
                                 </td>
                             </tr>
                         }
                     }
-                    else
-                    {
-                        <tr>
-                            <td colspan="8" class="py-8 text-center text-outline">
-                                No hay salidas registradas. <a asp-controller="Admin" asp-action="Tours" class="text-primary font-bold hover:underline">Revisar catálogo de tours</a>.
-                            </td>
-                        </tr>
-                    }
+
+                    <!-- Estado Vacío: Pestaña En Vivo y Próximas -->
+                    <tr id="activeEmptyState" class="@(activeDeps.Any() ? "hidden" : "")">
+                        <td colspan="8" class="py-12 px-4 text-center">
+                            <div class="max-w-md mx-auto flex flex-col items-center">
+                                <div class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3">
+                                    <span class="material-symbols-outlined text-2xl">event_available</span>
+                                </div>
+                                <h3 class="text-title-sm font-bold text-on-surface">No hay salidas programadas para hoy ni próximas fechas</h3>
+                                <p class="text-body-sm text-outline mt-1 mb-4 leading-relaxed">
+                                    Las salidas de días anteriores se encuentran archivadas en la pestaña <strong>Historial Concluido</strong> para su consulta y regularización de manifiestos.
+                                </p>
+                                <div class="flex flex-wrap items-center justify-center gap-3">
+                                    @if (historyDeps.Any())
+                                    {
+                                        <button type="button" onclick="switchDepartureTab('history')" class="px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-label-sm border border-outline-variant flex items-center gap-1.5 transition-colors cursor-pointer">
+                                            <span class="material-symbols-outlined text-[18px]">history</span>
+                                            <span>Ver Historial Concluido (@historyDeps.Count)</span>
+                                        </button>
+                                    }
+                                    <a asp-controller="Admin" asp-action="CreateBooking" class="px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-on-primary font-bold text-label-sm shadow-sm flex items-center gap-1.5 transition-colors">
+                                        <span class="material-symbols-outlined text-[18px]">add</span>
+                                        <span>Registrar Nueva Reserva</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Estado Vacío: Pestaña Historial Concluido -->
+                    <tr id="historyEmptyState" class="hidden">
+                        <td colspan="8" class="py-12 px-4 text-center text-outline">
+                            <div class="flex flex-col items-center justify-center">
+                                <span class="material-symbols-outlined text-3xl mb-1 text-outline">history</span>
+                                <span>No hay salidas históricas concluidas registradas en el sistema.</span>
+                            </div>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -519,3 +626,304 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de Regularización y Normalización de Manifiesto (Operación y Archivo Histórico) -->
+<div id="regularizeManifestModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/60 backdrop-blur-sm transition-all duration-200 hidden">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-outline-variant relative max-h-[92vh] overflow-y-auto">
+        <div class="flex items-start justify-between border-b border-outline-variant/60 pb-4 mb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-2xl">assignment_turned_in</span>
+                </div>
+                <div>
+                    <h3 id="regModalTitle" class="text-title-md font-bold text-on-surface">Regularizar Manifiesto de Salida</h3>
+                    <p class="text-label-sm text-outline">Asignación de unidad y conductor para normalización de manifiesto MTC/SUTRAN</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeRegularizeModal()" class="p-1 rounded-lg hover:bg-surface-container text-outline hover:text-on-surface transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">close</span>
+            </button>
+        </div>
+
+        <!-- Resumen de la Salida -->
+        <div class="mb-5 p-3.5 rounded-xl bg-surface-container-low/70 border border-outline-variant/40 space-y-2">
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-outline">Circuito Turístico:</span>
+                <span id="regSummaryTour" class="font-bold text-on-surface"></span>
+            </div>
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-outline">Fecha de Recorrido:</span>
+                <span id="regSummaryDate" class="font-bold text-primary"></span>
+            </div>
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-outline">Turno Operativo:</span>
+                <span id="regSummaryShift" class="font-medium text-on-surface"></span>
+            </div>
+            <div class="flex items-center justify-between text-body-sm">
+                <span class="text-outline">Pasajeros Confirmados:</span>
+                <span id="regSummaryPax" class="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-label-sm"></span>
+            </div>
+        </div>
+
+        <form id="regularizeManifestForm" onsubmit="submitRegularizeManifest(event)" class="space-y-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="regTourId" name="TourPackageId" />
+            <input type="hidden" id="regDate" name="Date" />
+            <input type="hidden" id="regShiftName" name="ShiftName" />
+
+            <!-- Selector de Vehículo -->
+            <div>
+                <label for="regVehicleId" class="block text-label-sm font-bold text-on-surface-variant mb-1">
+                    Unidad de Transporte (Flota) <span class="text-tertiary">*</span>
+                </label>
+                <select id="regVehicleId" name="VehicleId" required class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+                    <option value="">-- Seleccionar Unidad / Vehículo --</option>
+                    @foreach (var v in Model.AvailableVehicles)
+                    {
+                        <option value="@v.Id" data-plate="@v.LicensePlate" data-model="@v.Model" data-capacity="@v.SeatCapacity">
+                            @v.Model • Placa: @v.LicensePlate (@v.SeatCapacity plazas)
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <!-- Selector de Conductor -->
+            <div>
+                <label for="regDriverId" class="block text-label-sm font-bold text-on-surface-variant mb-1">
+                    Conductor Asignado
+                </label>
+                <select id="regDriverId" name="DriverId" class="w-full py-2.5 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+                    <option value="">-- Sin conductor asignado / Seleccionar Conductor --</option>
+                    @foreach (var d in Model.AvailableDrivers)
+                    {
+                        <option value="@d.Id" data-name="@d.FullName" data-license="@d.LicenseNumber">
+                            @d.FullName @(!string.IsNullOrEmpty(d.LicenseNumber) ? $"(Lic. {d.LicenseNumber})" : "")
+                        </option>
+                    }
+                </select>
+                <p class="text-[11px] text-outline mt-1">Conductor con brevete profesional vigente para servicio turístico MTC.</p>
+            </div>
+
+            <!-- N° Folio de Manifiesto Físico / Observación -->
+            <div>
+                <label for="regNotes" class="block text-label-sm font-bold text-on-surface-variant mb-1">
+                    N° de Folio / Manifiesto Físico en Cabina (Opcional)
+                </label>
+                <input type="text" id="regNotes" name="Notes" placeholder="Ej: Manifiesto manual físico de cabina #0452" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none" />
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="pt-4 border-t border-outline-variant/60 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+                <button type="button" onclick="closeRegularizeModal()" class="w-full sm:w-auto px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container font-semibold text-body-sm transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" id="btnSaveRegularize" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-on-primary font-bold text-body-sm shadow-sm flex items-center justify-center gap-2 transition-colors cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                    <span>Guardar y Normalizar</span>
+                </button>
+                <button type="button" onclick="submitRegularizeAndDownload()" id="btnSaveAndDownload" class="w-full sm:w-auto px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-body-sm shadow-sm flex items-center justify-center gap-2 transition-colors cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">file_download</span>
+                    <span>Guardar y Descargar Excel</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentRegRowKey = null;
+
+    function switchDepartureTab(tab) {
+        const activeBtn = document.getElementById('tabBtnActive');
+        const historyBtn = document.getElementById('tabBtnHistory');
+        const rows = document.querySelectorAll('.departure-row');
+        const activeEmpty = document.getElementById('activeEmptyState');
+        const historyEmpty = document.getElementById('historyEmptyState');
+
+        let visibleCount = 0;
+        rows.forEach(r => {
+            if (r.getAttribute('data-tab-type') === tab) {
+                r.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                r.classList.add('hidden');
+            }
+        });
+
+        if (tab === 'active') {
+            activeBtn.className = "px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 bg-primary text-on-primary shadow-xs cursor-pointer";
+            historyBtn.className = "px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright cursor-pointer";
+            if (visibleCount === 0 && activeEmpty) activeEmpty.classList.remove('hidden');
+            else if (activeEmpty) activeEmpty.classList.add('hidden');
+            if (historyEmpty) historyEmpty.classList.add('hidden');
+        } else {
+            historyBtn.className = "px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 bg-primary text-on-primary shadow-xs cursor-pointer";
+            activeBtn.className = "px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-bright cursor-pointer";
+            if (visibleCount === 0 && historyEmpty) historyEmpty.classList.remove('hidden');
+            else if (historyEmpty) historyEmpty.classList.add('hidden');
+            if (activeEmpty) activeEmpty.classList.add('hidden');
+        }
+    }
+
+    function openRegularizeModal(tourId, tourTitle, dateStr, dateFormatted, shiftName, pax, vehicleId, driverId, isHistorical) {
+        document.getElementById('regTourId').value = tourId;
+        document.getElementById('regDate').value = dateStr;
+        document.getElementById('regShiftName').value = shiftName;
+
+        document.getElementById('regSummaryTour').textContent = tourTitle;
+        document.getElementById('regSummaryDate').textContent = dateFormatted;
+        document.getElementById('regSummaryShift').textContent = shiftName || 'General / Salida Única';
+        document.getElementById('regSummaryPax').textContent = pax + ' pasajero(s)';
+
+        if (isHistorical === 'True' || isHistorical === true) {
+            document.getElementById('regModalTitle').textContent = 'Regularizar Manifiesto Manual (Historial)';
+        } else {
+            document.getElementById('regModalTitle').textContent = 'Asignar Flota y Conductor de Despacho';
+        }
+
+        if (vehicleId) document.getElementById('regVehicleId').value = vehicleId;
+        else document.getElementById('regVehicleId').value = '';
+
+        if (driverId) document.getElementById('regDriverId').value = driverId;
+        else document.getElementById('regDriverId').value = '';
+
+        document.getElementById('regNotes').value = '';
+        currentRegRowKey = `row-${tourId}-${dateStr.replace(/-/g, '')}-${(shiftName || '').replace(/\s+/g, '')}`;
+
+        document.getElementById('regularizeManifestModal').classList.remove('hidden');
+    }
+
+    function closeRegularizeModal() {
+        document.getElementById('regularizeManifestModal').classList.add('hidden');
+    }
+
+    async function submitRegularizeManifest(e) {
+        if (e) e.preventDefault();
+        const form = document.getElementById('regularizeManifestForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        const saveBtn = document.getElementById('btnSaveRegularize');
+
+        try {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span> Guardando...';
+
+            const res = await fetch('/Admin/RegularizeManifest', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                updateRowInTable(data);
+                closeRegularizeModal();
+                showDashboardToast(data.message, 'success');
+            } else {
+                alert(data.message || 'Error al regularizar el manifiesto.');
+            }
+        } catch (err) {
+            alert('Error de conexión al regularizar el manifiesto.');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">check_circle</span> <span>Guardar y Normalizar</span>';
+        }
+    }
+
+    async function submitRegularizeAndDownload() {
+        const form = document.getElementById('regularizeManifestForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        const formData = new FormData(form);
+        const downloadBtn = document.getElementById('btnSaveAndDownload');
+
+        try {
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span> Procesando...';
+
+            const res = await fetch('/Admin/RegularizeManifest', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                updateRowInTable(data);
+                closeRegularizeModal();
+                showDashboardToast(data.message, 'success');
+
+                const tourId = document.getElementById('regTourId').value;
+                const date = document.getElementById('regDate').value;
+                const shift = document.getElementById('regShiftName').value;
+                const vId = document.getElementById('regVehicleId').value;
+                const dId = document.getElementById('regDriverId').value;
+                window.location.href = `/Admin/ExportManifestExcel?tourPackageId=${encodeURIComponent(tourId)}&date=${encodeURIComponent(date)}&shiftName=${encodeURIComponent(shift)}&vehicleId=${encodeURIComponent(vId)}&driverId=${encodeURIComponent(dId)}`;
+            } else {
+                alert(data.message || 'Error al regularizar el manifiesto.');
+            }
+        } catch (err) {
+            alert('Error de conexión al procesar el manifiesto.');
+        } finally {
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">file_download</span> <span>Guardar y Descargar Excel</span>';
+        }
+    }
+
+    function updateRowInTable(data) {
+        if (!currentRegRowKey) return;
+        const row = document.querySelector(`[data-dep-id="${currentRegRowKey}"]`);
+        if (row) {
+            const vLabel = row.querySelector('.vehicle-model-label');
+            if (vLabel) {
+                vLabel.textContent = data.vehicleModel;
+                vLabel.classList.remove('italic');
+            }
+            const plateLabel = row.querySelector('.license-plate-label');
+            if (plateLabel) {
+                plateLabel.textContent = 'Placa: ' + data.licensePlate;
+                plateLabel.classList.remove('text-amber-700', 'font-semibold');
+                plateLabel.classList.add('text-outline', 'font-mono');
+            }
+            const dLabel = row.querySelector('.driver-name-label');
+            if (dLabel) {
+                dLabel.textContent = data.driverName;
+                dLabel.classList.remove('italic');
+            }
+            const mBadge = row.querySelector('.manifest-status-badge');
+            if (mBadge) {
+                mBadge.className = 'manifest-status-badge inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
+                mBadge.innerHTML = '<span class="material-symbols-outlined text-[12px]">verified</span> Manifiesto OK';
+            }
+        }
+    }
+
+    function showDashboardToast(msg, type) {
+        const toast = document.createElement('div');
+        toast.className = `fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 text-body-sm font-semibold transition-all duration-300 transform translate-y-4 opacity-0 ${
+            type === 'success' ? 'bg-emerald-900 text-white border-emerald-700' : 'bg-surface-container-high text-on-surface border-outline-variant'
+        }`;
+        toast.innerHTML = `<span class="material-symbols-outlined text-[20px]">${type === 'success' ? 'check_circle' : 'info'}</span> <span>${msg}</span>`;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.remove('translate-y-4', 'opacity-0');
+        }, 50);
+        setTimeout(() => {
+            toast.classList.add('opacity-0');
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const hash = (window.location.hash || '').toLowerCase();
+        if (hash === '#historial' || hash === '#history') {
+            switchDepartureTab('history');
+        } else {
+            switchDepartureTab('active');
+        }
+    });
+</script>

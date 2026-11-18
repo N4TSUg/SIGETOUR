@@ -3,6 +3,19 @@ using System.Collections.Generic;
 
 namespace SIGETOUR.API.Models
 {
+    public class RegularizeManifestRequest
+    {
+        public DateTime Date { get; set; } = DateTime.Today;
+        public Guid TourPackageId { get; set; }
+        public string? ShiftName { get; set; }
+        public Guid VehicleId { get; set; }
+        public Guid? DriverId { get; set; }
+        public string? DriverName { get; set; } = string.Empty;
+        public string? DriverLicense { get; set; } = string.Empty;
+        public string? GuideName { get; set; } = string.Empty;
+        public string? Notes { get; set; } = string.Empty;
+    }
+
     public class ManifestExportRequest
     {
         public DateTime Date { get; set; } = DateTime.Today;
