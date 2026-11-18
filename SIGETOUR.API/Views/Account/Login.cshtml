@@ -220,7 +220,7 @@
                 <span class="material-symbols-outlined text-[20px]">lock</span>
             </div>
             <label for="loginPassword" class="sr-only">Contraseña</label>
-                        <input asp-for="Password" id="loginPassword" class="w-full pl-10 pr-10 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="" required />
+                        <input asp-for="Password" type="password" id="loginPassword" class="w-full pl-10 pr-10 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="" required />
             <button aria-label="Mostrar u ocultar Contraseña" class="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface focus:outline-none transition-colors" id="togglePasswordBtn" onclick="togglePasswordVisibility()" type="button">
                 <span class="material-symbols-outlined text-[20px]" id="passwordIcon" aria-hidden="true">visibility</span>
             </button>
@@ -298,15 +298,17 @@
     });
 
     function togglePasswordVisibility() {
-      const passwordInput = document.getElementById('Password');
+      const passwordInput = document.getElementById('loginPassword') || document.getElementById('Password');
       const passwordIcon = document.getElementById('passwordIcon');
       
+      if (!passwordInput) return;
+
       if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
-        passwordIcon.textContent = 'visibility_off';
+        if (passwordIcon) passwordIcon.textContent = 'visibility_off';
       } else {
         passwordInput.type = 'password';
-        passwordIcon.textContent = 'visibility';
+        if (passwordIcon) passwordIcon.textContent = 'visibility';
       }
     }
 
