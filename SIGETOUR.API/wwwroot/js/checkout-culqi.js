@@ -200,7 +200,19 @@ function handleQrStateInit(data, onQrState) {
 async function trigger3DSAuthentication(tokenId, onStatus) {
   onStatus?.("Validando identidad con el banco (3D Secure)...", "info");
   if (typeof Culqi3DS !== "undefined" && typeof Culqi3DS.initAuthentication === "function") {
-    Culqi3DS.options = { showModal: true, showLoading: true };
+    if (currentBookingContext) {
+      Culqi3DS.settings = {
+        charge: {
+          totalAmount: currentBookingContext.amountCents || 10000,
+          returnUrl: window.location.href,
+          currency: "PEN"
+        },
+        card: {
+          email: currentBookingContext.email || "review@culqi.com"
+        }
+      };
+    }
+    Culqi3DS.options = { showModal: true, showLoading: true, showDirect: true };
     await Culqi3DS.initAuthentication(tokenId);
   } else {
     onStatus?.("Autenticación 3DS requerida. Actualiza tu navegador.", "warning");
@@ -297,10 +309,26 @@ async function prepararCobroCulqi(bookingId, checkoutToken, mode, channel, onSta
   return data;
 }
 
-function inicializarCulqi3DS(publicKey) {
+function inicializarCulqi3DS(publicKey, amountCents = 10000, email = null) {
   // Pre-generar fingerprint de dispositivo y configurar Culqi3DS
   if (typeof Culqi3DS !== "undefined") {
+    try {
+      if (typeof Culqi3DS.reset === "function") {
+        Culqi3DS.reset();
+      }
+    } catch (e) {}
+
     Culqi3DS.publicKey = publicKey;
+    Culqi3DS.settings = {
+      charge: {
+        totalAmount: amountCents,
+        returnUrl: window.location.href,
+        currency: "PEN"
+      },
+      card: {
+        email: email || "review@culqi.com"
+      }
+    };
     Culqi3DS.options = { showModal: true, showLoading: true, showDirect: true };
   }
 }
@@ -324,16 +352,17 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
     throw new Error(msg);
   }
 
-  inicializarCulqi3DS(data.publicKey);
-  await getDeviceFingerprint();
-
   currentBookingContext = {
     attemptId: data.attemptId,
     bookingId,
     checkoutToken,
     onStatus,
-    email: email || undefined
+    email: email || undefined,
+    amountCents: data.amountCents
   };
+
+  inicializarCulqi3DS(data.publicKey, data.amountCents, email);
+  await getDeviceFingerprint();
 
   const methods = channel === "wallet_qr"
     ? { tarjeta: false, yape: true, billetera: true, bancaMovil: false, agente: false, cuotealo: false }
