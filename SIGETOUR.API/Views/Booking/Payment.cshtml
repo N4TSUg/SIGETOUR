@@ -296,12 +296,6 @@
               <span class="material-symbols-outlined text-xl mb-1">credit_card</span>
               <span>Tarjeta Déb/Créd</span>
             </button>
-            <!-- COMENTADO TEMPORALMENTE: PAGO POR TRANSFERENCIA (BANCOS / CCI)
-            <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 text-secondary hover:text-on-surface" id="tab-btn-transfer" onclick="switchPaymentTab('transfer')" type="button">
-              <span class="material-symbols-outlined text-xl mb-1">account_balance</span>
-              <span>Bancos / CCI</span>
-            </button>
-            -->
             <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 text-secondary hover:text-on-surface" id="tab-btn-cash" onclick="switchPaymentTab('cash')" type="button">
               <span class="material-symbols-outlined text-xl mb-1">storefront</span>
               <span>Pago Counter</span>
@@ -593,52 +587,6 @@
               </div>
             </div>
           </div>
-
-          <!-- COMENTADO TEMPORALMENTE: PAGO POR TRANSFERENCIA (BANCOS / CCI)
-          <div class="hidden space-y-4" id="tab-transfer">
-            <div class="p-3 bg-[#f0fdf9] border border-primary/20 rounded-lg text-body-sm font-body-sm text-secondary">
-              Transfiere directamente desde tu banca por internet y envíanos el voucher al WhatsApp oficial <strong class="text-on-surface font-semibold">+51 901 195 392</strong>.
-            </div>
-            <div class="space-y-3">
-              <div class="p-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest">
-                <div class="flex items-center justify-between">
-                  <div class="font-bold text-label-md text-inverse-surface flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Banco de Crédito del Perú (BCP)
-                  </div>
-                  <span class="text-label-sm font-label-sm text-secondary">Cta. Corriente Soles</span>
-                </div>
-                <div class="mt-2 text-body-sm font-body-sm text-secondary font-mono">
-                  <div>N° Cuenta: <strong class="text-on-surface">191-2489102-0-45</strong></div>
-                  <div>CCI: <strong class="text-on-surface">002-191-002489102045-52</strong></div>
-                </div>
-              </div>
-              <div class="p-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest">
-                <div class="flex items-center justify-between">
-                  <div class="font-bold text-label-md text-inverse-surface flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-blue-400"></span> BBVA Continental
-                  </div>
-                  <span class="text-label-sm font-label-sm text-secondary">Cta. Ahorros Soles</span>
-                </div>
-                <div class="mt-2 text-body-sm font-body-sm text-secondary font-mono">
-                  <div>N° Cuenta: <strong class="text-on-surface">0011-0285-0200847291</strong></div>
-                  <div>CCI: <strong class="text-on-surface">011-285-000200847291-78</strong></div>
-                </div>
-              </div>
-              <div class="p-3 rounded-lg border border-outline-variant/40 bg-surface-container-lowest">
-                <div class="flex items-center justify-between">
-                  <div class="font-bold text-label-md text-inverse-surface flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-red-600"></span> Banco de la Nación
-                  </div>
-                  <span class="text-label-sm font-label-sm text-secondary">Cta. Corriente</span>
-                </div>
-                <div class="mt-2 text-body-sm font-body-sm text-secondary font-mono">
-                  <div>N° Cuenta: <strong class="text-on-surface">04-019-294821</strong></div>
-                  <div>CCI: <strong class="text-on-surface">018-019-004019294821-33</strong></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          -->
 
           <!-- TAB 4: CASH AT COUNTER (hidden) -->
           <div class="hidden space-y-4" id="tab-cash">
