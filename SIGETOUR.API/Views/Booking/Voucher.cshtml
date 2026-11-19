@@ -2,8 +2,14 @@
 @using System.Text.Json
 @{
     ViewData["Title"] = "Voucher Oficial de Reserva – " + Model.ReferenceCode;
-    var tour = Model.Items.FirstOrDefault()?.TourPackage;
-    var tourPrice = tour?.BasePrice ?? (Model.TotalAmount / Math.Max(1, Model.TotalPassengers));
+    var firstItem = Model.Items.FirstOrDefault();
+    var tour = firstItem?.TourPackage;
+    var tariffTotal = Model.Items.Any()
+        ? Model.Items.Sum(i => i.SubTotal)
+        : (Model.TotalAmount - Model.PickupCost);
+    var effectiveUnitPrice = tariffTotal / Math.Max(1, Model.TotalPassengers);
+    var tourBasePrice = tour?.BasePrice ?? effectiveUnitPrice;
+    var hasPromo = tourBasePrice > effectiveUnitPrice;
     
     // Parse extra passengers safely
     var extraPassengers = new List<(string Name, string Dni, string Phone)>();
@@ -431,7 +437,14 @@
           <div class="space-y-1.5 text-xs">
             <div class="flex justify-between items-center text-gray-600">
               <span>Tarifa (@Model.TotalPassengers Pax):</span>
-              <span class="font-semibold text-gray-900">S/ @((tourPrice * Model.TotalPassengers).ToString("N2"))</span>
+              <div class="text-right">
+                <span class="font-semibold text-gray-900">S/ @tariffTotal.ToString("N2")</span>
+                @if (hasPromo)
+                {
+                  <span class="text-[10px] text-gray-400 line-through ml-1" title="Precio regular de catálogo">S/ @((tourBasePrice * Model.TotalPassengers).ToString("N2"))</span>
+                  <span class="text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded font-bold ml-1">¡S/ @effectiveUnitPrice.ToString("N2")/pax!</span>
+                }
+              </div>
             </div>
             @if (Model.PickupCost > 0)
             {
