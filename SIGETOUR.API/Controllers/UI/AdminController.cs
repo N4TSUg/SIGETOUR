@@ -3835,7 +3835,12 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         [Authorize(Policy = AppPermissions.BookingsManage)]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ReactivateBooking(Guid id)
+        public async Task<IActionResult> ReactivateBooking(
+            Guid id,
+            string? reactivateMode = null,
+            decimal? paymentAmount = null,
+            string? paymentMethod = null,
+            bool reissueSunatReceipt = false)
         {
             var booking = await _context.Bookings
                 .Include(b => b.Items)
@@ -3850,6 +3855,23 @@ namespace SIGETOUR.API.Controllers.UI
             }
 
             var item = booking.Items.FirstOrDefault();
+            var isPendingMode = string.Equals(reactivateMode, "pending", StringComparison.OrdinalIgnoreCase);
+            var isPaymentMode = string.Equals(reactivateMode, "confirm_with_payment", StringComparison.OrdinalIgnoreCase);
+            var resolvedMethod = !string.IsNullOrWhiteSpace(paymentMethod)
+                ? paymentMethod.Trim()
+                : (!string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Efectivo");
+
+            decimal amountToCollect = 0m;
+            if (isPaymentMode)
+            {
+                var remaining = Math.Max(0m, booking.TotalAmount - booking.PaidAmount);
+                amountToCollect = paymentAmount.HasValue && paymentAmount.Value > 0
+                    ? Math.Min(paymentAmount.Value, remaining > 0 ? remaining : booking.TotalAmount)
+                    : remaining;
+            }
+
+            CashTransaction? createdCashTx = null;
+
             if (_context.Database.IsRelational())
             {
                 await using var dbTx = await _context.Database.BeginTransactionAsync();
@@ -3868,7 +3890,29 @@ namespace SIGETOUR.API.Controllers.UI
                         }
                     }
 
-                    booking.Status = BookingStatus.Confirmed;
+                    if (amountToCollect > 0)
+                    {
+                        var shift = await GetOrCreateActiveOrAdminShiftAsync();
+                        createdCashTx = new CashTransaction
+                        {
+                            Id = Guid.NewGuid(),
+                            ShiftId = shift.Id,
+                            TransactionType = "Ingreso",
+                            Category = "Cobro de Reserva",
+                            Amount = amountToCollect,
+                            PaymentMethod = resolvedMethod,
+                            ReferenceCode = booking.ReferenceCode,
+                            BookingId = booking.Id,
+                            Description = $"Cobro por reactivación de reserva {booking.ReferenceCode} - {booking.CustomerName}",
+                            RegisteredBy = User?.Identity?.Name ?? "Admin Central",
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _context.CashTransactions.Add(createdCashTx);
+                        booking.PaidAmount += amountToCollect;
+                        booking.PaymentMethod = resolvedMethod;
+                    }
+
+                    booking.Status = isPendingMode ? BookingStatus.Pending : BookingStatus.Confirmed;
                     _context.Bookings.Update(booking);
                     await _context.SaveChangesAsync();
                     await dbTx.CommitAsync();
@@ -3894,12 +3938,83 @@ namespace SIGETOUR.API.Controllers.UI
                     }
                 }
 
-                booking.Status = BookingStatus.Confirmed;
+                if (amountToCollect > 0)
+                {
+                    var shift = await GetOrCreateActiveOrAdminShiftAsync();
+                    createdCashTx = new CashTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        ShiftId = shift.Id,
+                        TransactionType = "Ingreso",
+                        Category = "Cobro de Reserva",
+                        Amount = amountToCollect,
+                        PaymentMethod = resolvedMethod,
+                        ReferenceCode = booking.ReferenceCode,
+                        BookingId = booking.Id,
+                        Description = $"Cobro por reactivación de reserva {booking.ReferenceCode} - {booking.CustomerName}",
+                        RegisteredBy = User?.Identity?.Name ?? "Admin Central",
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.CashTransactions.Add(createdCashTx);
+                    booking.PaidAmount += amountToCollect;
+                    booking.PaymentMethod = resolvedMethod;
+                }
+
+                booking.Status = isPendingMode ? BookingStatus.Pending : BookingStatus.Confirmed;
                 _context.Bookings.Update(booking);
                 await _context.SaveChangesAsync();
             }
 
-            TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} ha sido reactivada con éxito.";
+            var msgParts = new List<string>
+            {
+                $"La reserva {booking.ReferenceCode} ha sido reactivada con éxito ({(booking.Status == BookingStatus.Pending ? "Pendiente de Pago" : "Confirmada")})."
+            };
+
+            if (amountToCollect > 0)
+            {
+                msgParts.Add($"Se registró el Ingreso en Caja General por S/ {amountToCollect:N2} ({resolvedMethod}).");
+            }
+
+            if (reissueSunatReceipt && booking.Status == BookingStatus.Confirmed && booking.PaidAmount > 0)
+            {
+                var hasActiveReceipt = await _context.ElectronicReceipts
+                    .AnyAsync(r => r.BookingId == booking.Id && r.Status != "Cancelled" && r.Status != "Rejected");
+
+                if (!hasActiveReceipt)
+                {
+                    try
+                    {
+                        var receiptService = HttpContext?.RequestServices?.GetService(typeof(IElectronicReceiptService)) as IElectronicReceiptService;
+                        if (receiptService != null)
+                        {
+                            var opKey = createdCashTx != null
+                                ? $"cash:{createdCashTx.Id}"
+                                : $"reactivate:{Guid.NewGuid():N}";
+                            var newReceipt = await receiptService.GenerateReceiptAsync(
+                                booking.Id,
+                                culqiPaymentId: null,
+                                exactReceiptId: null,
+                                claimToken: null,
+                                cashTransactionId: createdCashTx?.Id,
+                                billableOperationKey: opKey);
+
+                            if (newReceipt != null && !string.IsNullOrWhiteSpace(newReceipt.Number))
+                            {
+                                booking.InvoiceNumber = newReceipt.FullNumber;
+                                _context.Bookings.Update(booking);
+                                await _context.SaveChangesAsync();
+                                msgParts.Add($"Se emitió un nuevo comprobante electrónico SUNAT ({newReceipt.FullNumber}).");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Aviso al emitir nuevo comprobante en reactivación de reserva {BookingId}", booking.Id);
+                    }
+                }
+            }
+
+            TempData["SuccessMessage"] = string.Join(" ", msgParts);
             return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
         }
 

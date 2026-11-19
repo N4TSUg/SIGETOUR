@@ -987,5 +987,44 @@ namespace SIGETOUR.Tests.Controllers
             Assert.NotNull(updatedReceipt);
             Assert.Equal("Cancelled", updatedReceipt.Status);
         }
+
+        [Fact]
+        public async Task ReactivateBooking_WithPayment_RestoresPaymentRegistersIngresoAndConfirms()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+
+            var booking = context.Bookings.Include(b => b.Items).First();
+            booking.TotalAmount = 120m;
+            booking.PaidAmount = 0m; // Fue devuelto al anular
+            booking.Status = BookingStatus.Cancelled;
+            await context.SaveChangesAsync();
+
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.ReactivateBooking(
+                booking.Id,
+                reactivateMode: "confirm_with_payment",
+                paymentAmount: 120m,
+                paymentMethod: "Efectivo",
+                reissueSunatReceipt: true);
+
+            // Assert
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal(nameof(controller.EditBooking), redirect.ActionName);
+
+            var updatedBooking = await context.Bookings.FindAsync(booking.Id);
+            Assert.NotNull(updatedBooking);
+            Assert.Equal(BookingStatus.Confirmed, updatedBooking.Status);
+            Assert.Equal(120m, updatedBooking.PaidAmount);
+
+            var ingresoTx = await context.CashTransactions
+                .FirstOrDefaultAsync(t => t.BookingId == booking.Id && t.TransactionType == "Ingreso");
+            Assert.NotNull(ingresoTx);
+            Assert.Equal(120m, ingresoTx.Amount);
+            Assert.Equal("Cobro de Reserva", ingresoTx.Category);
+        }
     }
 }
