@@ -461,17 +461,22 @@ public sealed class CulqiPaymentsController : ControllerBase
         int claimed;
         if (_db.Database.IsRelational())
         {
-            claimed = await _db.Set<CulqiPayment>().Where(p => p.Id == payment.Id && (p.Status == "created" || p.Status == "3ds_required" || (p.Channel == "charge" && p.Status == "verification")))
-                .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, "processing"), ct);
+            claimed = await _db.Set<CulqiPayment>()
+                .Where(p => p.Id == payment.Id && (p.Status == "created" || p.Status == "3ds_required" || p.Status == "verification"))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.Status, "processing")
+                    .SetProperty(p => p.Channel, "charge"), ct);
         }
         else
         {
             payment.Status = "processing";
+            payment.Channel = "charge";
             await _db.SaveChangesAsync(ct);
             claimed = 1;
         }
         if (claimed != 1) return Conflict(new { message = "El intento ya está en procesamiento" });
         payment.Status = "processing";
+        payment.Channel = "charge";
 
         try
         {
@@ -479,10 +484,10 @@ public sealed class CulqiPaymentsController : ControllerBase
             {
                 ["amount"] = payment.AmountCents,
                 ["currency_code"] = "PEN",
-                ["email"] = !string.IsNullOrWhiteSpace(request.Email) ? request.Email : payment.Booking.CustomerEmail,
+                ["email"] = !string.IsNullOrWhiteSpace(request.Email) ? request.Email : (!string.IsNullOrWhiteSpace(payment.Booking?.CustomerEmail) ? payment.Booking.CustomerEmail : "cliente@turismochilon.com"),
                 ["source_id"] = request.SourceId,
                 ["capture"] = true,
-                ["description"] = $"Reserva {payment.Booking.ReferenceCode}",
+                ["description"] = $"Reserva {payment.Booking?.ReferenceCode ?? payment.BookingId.ToString()}",
                 ["metadata"] = new { booking_id = payment.BookingId.ToString(), attempt_id = payment.Id.ToString() }
             };
 
@@ -494,12 +499,12 @@ public sealed class CulqiPaymentsController : ControllerBase
 
             if (!string.IsNullOrWhiteSpace(request.DeviceFingerPrintId))
             {
-                var names = (payment.Booking.CustomerName ?? "Cliente").Split(' ', 2);
+                var names = (payment.Booking?.CustomerName ?? "Cliente").Split(' ', 2);
                 chargePayload["antifraud_details"] = new
                 {
                     first_name = names[0],
                     last_name = names.Length > 1 ? names[1] : "Pasajero",
-                    phone_number = payment.Booking.CustomerPhone ?? "999999999",
+                    phone_number = payment.Booking?.CustomerPhone ?? "999999999",
                     device_finger_print_id = request.DeviceFingerPrintId
                 };
             }
