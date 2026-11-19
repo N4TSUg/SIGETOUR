@@ -278,12 +278,12 @@
                 </p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Monto a Devolver (S/) *</label>
-                        <input type="number" step="0.50" min="0.50" max="@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" name="refundAmount" value="@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" required class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm font-bold text-on-surface" />
+                        <label for="partialRefundAmountInput" class="block text-label-sm font-bold text-on-surface-variant mb-1">Monto a Devolver (S/) *</label>
+                        <input type="number" id="partialRefundAmountInput" step="0.50" min="0.50" max="@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" name="refundAmount" value="@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" required class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm font-bold text-on-surface" />
                     </div>
                     <div>
-                        <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Medio de Devolución</label>
-                        <select name="paymentMethod" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface">
+                        <label for="partialRefundPaymentMethod" class="block text-label-sm font-bold text-on-surface-variant mb-1">Medio de Devolución</label>
+                        <select id="partialRefundPaymentMethod" name="paymentMethod" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface">
                             <option value="Efectivo">Efectivo</option>
                             <option value="Yape / Plin">Yape / Plin</option>
                             <option value="Transferencia BCP / BBVA">Transferencia Bancaria</option>
@@ -291,8 +291,8 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Motivo / Justificación de la Devolución *</label>
-                    <input type="text" name="reason" minlength="5" required placeholder="Ej: Devolución de 1 pasaje por inasistencia justificada de acompañante" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface" />
+                    <label for="partialRefundReasonInput" class="block text-label-sm font-bold text-on-surface-variant mb-1">Motivo / Justificación de la Devolución *</label>
+                    <input type="text" id="partialRefundReasonInput" name="reason" minlength="5" required placeholder="Ej: Devolución de 1 pasaje por inasistencia justificada de acompañante" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface" />
                 </div>
             </div>
             <div class="p-6 pt-4 bg-surface-container-high/20 border-t border-outline-variant/40 flex justify-end gap-3">
