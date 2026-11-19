@@ -85,5 +85,34 @@ namespace SIGETOUR.Tests.Services
             Assert.NotNull(pdfBytes);
             Assert.True(pdfBytes.Length > 1000);
         }
+
+        [Fact]
+        public void GenerateVoucherPdf_ParsesNumericDniAndSynonyms_Successfully()
+        {
+            // Arrange
+            var tour = new TourPackage { Id = Guid.NewGuid(), Title = "Cumbemayo" };
+            var rawJson = "[{\"nombre\":\"José Arana\",\"documento\":71271712,\"telefono\":928876259},{\"FullName\":\"María Narro\",\"DocumentNumber\":\"26600414\"}]";
+
+            var booking = new Booking
+            {
+                Id = Guid.NewGuid(),
+                ReferenceCode = "RES-1756",
+                CustomerName = "Cesar Arana",
+                CustomerDni = "71271712",
+                TotalPassengers = 3,
+                TotalAmount = 120m,
+                PaidAmount = 120m,
+                Status = BookingStatus.Confirmed,
+                AdditionalPassengersJson = rawJson
+            };
+
+            // Act
+            var pdfBytes = VoucherPdfGenerator.GenerateVoucherPdf(booking, tour, "BBB1-20");
+
+            // Assert
+            Assert.NotNull(pdfBytes);
+            Assert.NotEmpty(pdfBytes);
+            Assert.True(pdfBytes.Length > 1000);
+        }
     }
 }

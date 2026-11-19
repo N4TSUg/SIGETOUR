@@ -463,11 +463,11 @@
             <div class="space-y-0.5">
                 <div>
                     <span class="text-gray-600">CLIENTE:</span><br />
-                    <strong class="uppercase font-bold">@(receipt?.CustomerName ?? booking?.CustomerName ?? "CLIENTE GENERAL")</strong>
+                    <strong class="uppercase font-bold">@(!string.IsNullOrWhiteSpace(receipt?.CustomerName) ? receipt.CustomerName : (!string.IsNullOrWhiteSpace(booking?.CustomerName) ? booking.CustomerName : "CLIENTE GENERAL"))</strong>
                 </div>
                 <div class="flex justify-between">
                     <span>@(receipt?.CustomerDocType == "6" ? "RUC:" : "DNI/DOC:"):</span>
-                    <strong class="font-mono">@(receipt?.CustomerDocNumber ?? booking?.CustomerDni ?? "00000000")</strong>
+                    <strong class="font-mono">@(!string.IsNullOrWhiteSpace(receipt?.CustomerDocNumber) ? receipt.CustomerDocNumber : (!string.IsNullOrWhiteSpace(booking?.CustomerDni) ? booking.CustomerDni : "00000000"))</strong>
                 </div>
                 <div class="flex justify-between">
                     <span>Reserva / Boleto:</span>

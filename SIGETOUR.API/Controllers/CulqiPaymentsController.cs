@@ -1201,6 +1201,32 @@ public sealed class CulqiPaymentsController : ControllerBase
         if (pendingReceipt == null)
         {
             var isFacturaChoice = string.Equals(booking.InvoiceType, "factura", StringComparison.OrdinalIgnoreCase);
+            var dniTrimmed = (booking.CustomerDni ?? "").Trim();
+            string docType;
+            if (isFacturaChoice)
+            {
+                docType = "6"; // RUC
+            }
+            else if (dniTrimmed.Length == 8 && dniTrimmed.All(char.IsDigit))
+            {
+                docType = "1"; // DNI
+            }
+            else if (dniTrimmed.Length == 11 && dniTrimmed.All(char.IsDigit))
+            {
+                docType = "6"; // RUC
+            }
+            else if (dniTrimmed.Length is >= 9 and <= 12)
+            {
+                docType = "4"; // CE / Pasaporte
+            }
+            else
+            {
+                docType = "0"; // Doc Trib No Domic / Sin Documento
+            }
+
+            var subtotal = Math.Round(paidIncrement / 1.18m, 2);
+            var igv = paidIncrement - subtotal;
+
             pendingReceipt = new ElectronicReceipt
             {
                 Id = Guid.NewGuid(),
@@ -1210,6 +1236,12 @@ public sealed class CulqiPaymentsController : ControllerBase
                 Series = isFacturaChoice ? (_config["Nubefact:FacturaSeries"] ?? "F001") : (_config["Nubefact:BoletaSeries"] ?? "B001"),
                 Status = "Pending",
                 Environment = _config["Nubefact:Mode"]?.Trim() ?? "Demo",
+                CustomerDocType = docType,
+                CustomerDocNumber = !string.IsNullOrWhiteSpace(dniTrimmed) ? dniTrimmed : "00000000",
+                CustomerName = !string.IsNullOrWhiteSpace(booking.CustomerName) ? booking.CustomerName.Trim() : "Cliente General",
+                CustomerEmail = booking.CustomerEmail ?? string.Empty,
+                SubtotalAmount = subtotal,
+                IgvAmount = igv,
                 TotalAmount = paidIncrement,
                 CreatedAtUtc = DateTime.UtcNow
             };

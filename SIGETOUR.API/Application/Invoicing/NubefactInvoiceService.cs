@@ -1222,6 +1222,10 @@ namespace SIGETOUR.API.Application.Invoicing
             {
                 receipt.Environment = effectiveEnvironment;
             }
+            if (!isNew)
+            {
+                await _db.SaveChangesAsync(ct);
+            }
 
             // 5. Separación estricta de Modos: Mock, Demo y Production
             var currentConfigMode = _config["Nubefact:Mode"]?.Trim() ?? "Demo";
@@ -1453,6 +1457,30 @@ namespace SIGETOUR.API.Application.Invoicing
                 }
                 receipt = refreshedReceipt;
                 acquiredToken = acqToken;
+
+                // Asegurar persistencia y coherencia de campos del cliente tras recarga desde base de datos
+                if (string.IsNullOrWhiteSpace(receipt.CustomerDocNumber) || receipt.CustomerDocNumber == "00000000")
+                {
+                    receipt.CustomerDocNumber = !string.IsNullOrWhiteSpace(dni) ? dni : "00000000";
+                }
+                if (string.IsNullOrWhiteSpace(receipt.CustomerName) || receipt.CustomerName == "Cliente General")
+                {
+                    receipt.CustomerName = !string.IsNullOrWhiteSpace(booking.CustomerName) ? booking.CustomerName : "Cliente General";
+                }
+                if (string.IsNullOrWhiteSpace(receipt.CustomerDocType) || receipt.CustomerDocType == "0")
+                {
+                    receipt.CustomerDocType = docType;
+                }
+                if (string.IsNullOrWhiteSpace(receipt.CustomerEmail))
+                {
+                    receipt.CustomerEmail = booking.CustomerEmail ?? string.Empty;
+                }
+                if (receipt.TotalAmount <= 0)
+                {
+                    receipt.TotalAmount = total;
+                    receipt.SubtotalAmount = subtotal;
+                    receipt.IgvAmount = igv;
+                }
             }
 
             // 7. Construcción de conceptos y desglose por cada paquete o pasajero en la reserva
@@ -1630,6 +1658,13 @@ namespace SIGETOUR.API.Application.Invoicing
             receipt.SnapshotJson = JsonSerializer.Serialize(snapshot);
             await _db.SaveChangesAsync(ct);
 
+            var effectiveDocNumber = !string.IsNullOrWhiteSpace(receipt.CustomerDocNumber) && receipt.CustomerDocNumber != "00000000"
+                ? receipt.CustomerDocNumber.Trim()
+                : (!string.IsNullOrWhiteSpace(booking.CustomerDni) ? booking.CustomerDni.Trim() : "00000000");
+            var effectiveCustomerName = !string.IsNullOrWhiteSpace(receipt.CustomerName) && receipt.CustomerName != "Cliente General"
+                ? receipt.CustomerName.Trim()
+                : (!string.IsNullOrWhiteSpace(booking.CustomerName) ? booking.CustomerName.Trim() : "Cliente General");
+
             var payload = new Dictionary<string, object?>
             {
                 ["operacion"] = "generar_comprobante",
@@ -1637,11 +1672,11 @@ namespace SIGETOUR.API.Application.Invoicing
                 ["serie"] = receipt.Series,
                 ["numero"] = null, // Auto-correlativo controlado exclusivamente por NubeFact
                 ["sunat_transaction"] = 1, // 1 = Venta Interna
-                ["cliente_tipo_de_documento"] = int.TryParse(receipt.CustomerDocType, out var dt) ? dt : 1,
-                ["cliente_numero_de_documento"] = receipt.CustomerDocNumber,
-                ["cliente_denominacion"] = receipt.CustomerName,
+                ["cliente_tipo_de_documento"] = int.TryParse(receipt.CustomerDocType, out var dt) && dt > 0 ? dt : (isFactura ? 6 : (effectiveDocNumber.Length == 8 ? 1 : 1)),
+                ["cliente_numero_de_documento"] = effectiveDocNumber,
+                ["cliente_denominacion"] = effectiveCustomerName,
                 ["cliente_direccion"] = "Cajamarca, Perú",
-                ["cliente_email"] = receipt.CustomerEmail,
+                ["cliente_email"] = !string.IsNullOrWhiteSpace(receipt.CustomerEmail) ? receipt.CustomerEmail : (booking.CustomerEmail ?? string.Empty),
                 ["fecha_de_emision"] = fechaEmision,
                 ["moneda"] = 1, // Soles
                 ["porcentaje_de_igv"] = isExonerado ? 0 : 18.00,
@@ -1992,6 +2027,30 @@ namespace SIGETOUR.API.Application.Invoicing
                 // Si está en Pending, Rejected o Failed (y no en revisión/in-flight), proceder a emitir
                 if (receipt.Status is "Pending" or "Rejected" or "Failed")
                 {
+                    if (receipt.Booking != null)
+                    {
+                        bool modified = false;
+                        if (string.IsNullOrWhiteSpace(receipt.CustomerDocNumber) || receipt.CustomerDocNumber == "00000000")
+                        {
+                            receipt.CustomerDocNumber = !string.IsNullOrWhiteSpace(receipt.Booking.CustomerDni) ? receipt.Booking.CustomerDni.Trim() : "00000000";
+                            modified = true;
+                        }
+                        if (string.IsNullOrWhiteSpace(receipt.CustomerName) || receipt.CustomerName == "Cliente General")
+                        {
+                            receipt.CustomerName = !string.IsNullOrWhiteSpace(receipt.Booking.CustomerName) ? receipt.Booking.CustomerName.Trim() : "Cliente General";
+                            modified = true;
+                        }
+                        if (string.IsNullOrWhiteSpace(receipt.CustomerEmail) && !string.IsNullOrWhiteSpace(receipt.Booking.CustomerEmail))
+                        {
+                            receipt.CustomerEmail = receipt.Booking.CustomerEmail;
+                            modified = true;
+                        }
+                        if (modified)
+                        {
+                            await _db.SaveChangesAsync(ct);
+                        }
+                    }
+
                     return await GenerateReceiptAsync(
                         receipt.BookingId,
                         receipt.CulqiPaymentId,

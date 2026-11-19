@@ -3859,6 +3859,13 @@ namespace SIGETOUR.API.Controllers.UI
             return RedirectToAction(nameof(Bookings));
         }
 
+        [HttpGet]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
+        public IActionResult DeleteBooking()
+        {
+            return RedirectToAction(nameof(Bookings));
+        }
+
         [HttpPost]
         [Authorize(Policy = AppPermissions.BookingsManage)]
         [ValidateAntiForgeryToken]
@@ -3876,18 +3883,26 @@ namespace SIGETOUR.API.Controllers.UI
                     return RedirectToAction(nameof(Bookings));
                 }
 
-                // 1. Eliminar Comprobantes Electrónicos asociados
+                // 1. Desvincular transacciones de caja chica (BookingId y CulqiPaymentId) para preservar integridad referencial
+                var culqiIds = await _context.CulqiPayments.Where(c => c.BookingId == id).Select(c => c.Id).ToListAsync();
+                var cashTxs = await _context.CashTransactions
+                    .Where(ct => ct.BookingId == id || (ct.CulqiPaymentId != null && culqiIds.Contains(ct.CulqiPaymentId.Value)))
+                    .ToListAsync();
+                foreach (var ct in cashTxs)
+                {
+                    ct.BookingId = null;
+                    ct.CulqiPaymentId = null;
+                }
+                if (cashTxs.Any())
+                {
+                    await _context.SaveChangesAsync();
+                }
+
+                // 2. Eliminar Comprobantes Electrónicos asociados
                 var receipts = await _context.ElectronicReceipts.Where(r => r.BookingId == id).ToListAsync();
                 if (receipts.Any())
                 {
                     _context.ElectronicReceipts.RemoveRange(receipts);
-                }
-
-                // 2. Eliminar Pagos Culqi asociados
-                var culqiPayments = await _context.CulqiPayments.Where(c => c.BookingId == id).ToListAsync();
-                if (culqiPayments.Any())
-                {
-                    _context.CulqiPayments.RemoveRange(culqiPayments);
                 }
 
                 // 3. Eliminar Incidentes de Pago asociados
@@ -3897,11 +3912,11 @@ namespace SIGETOUR.API.Controllers.UI
                     _context.PaymentIncidents.RemoveRange(incidents);
                 }
 
-                // 4. Desvincular transacciones de caja chica
-                var cashTxs = await _context.CashTransactions.Where(ct => ct.BookingId == id).ToListAsync();
-                foreach (var ct in cashTxs)
+                // 4. Eliminar Pagos Culqi asociados
+                var culqiPayments = await _context.CulqiPayments.Where(c => c.BookingId == id).ToListAsync();
+                if (culqiPayments.Any())
                 {
-                    ct.BookingId = null;
+                    _context.CulqiPayments.RemoveRange(culqiPayments);
                 }
 
                 // 5. Eliminar Items de la reserva

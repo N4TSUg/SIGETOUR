@@ -14,9 +14,21 @@
             using var doc = JsonDocument.Parse(Model.AdditionalPassengersJson);
             foreach (var elem in doc.RootElement.EnumerateArray())
             {
-                var name = (elem.TryGetProperty("Name", out var n) || elem.TryGetProperty("name", out n) || elem.TryGetProperty("FullName", out n)) ? n.GetString() ?? "" : "";
-                var dni = (elem.TryGetProperty("Dni", out var d) || elem.TryGetProperty("dni", out d) || elem.TryGetProperty("DNI", out d) || elem.TryGetProperty("DocumentNumber", out d) || elem.TryGetProperty("documentNumber", out d)) ? d.GetString() ?? "" : "";
-                var phone = (elem.TryGetProperty("Phone", out var p) || elem.TryGetProperty("phone", out p) || elem.TryGetProperty("PhoneNumber", out p)) ? p.GetString() ?? "" : "";
+                var name = "";
+                if (elem.TryGetProperty("Name", out var n) || elem.TryGetProperty("name", out n) || elem.TryGetProperty("FullName", out n) || elem.TryGetProperty("fullName", out n) || elem.TryGetProperty("nombre", out n) || elem.TryGetProperty("Nombre", out n))
+                {
+                    name = n.ValueKind == JsonValueKind.String ? (n.GetString()?.Trim() ?? "") : (n.ValueKind != JsonValueKind.Null && n.ValueKind != JsonValueKind.Undefined ? n.ToString().Trim() : "");
+                }
+                var dni = "";
+                if (elem.TryGetProperty("Dni", out var d) || elem.TryGetProperty("dni", out d) || elem.TryGetProperty("DNI", out d) || elem.TryGetProperty("DocumentNumber", out d) || elem.TryGetProperty("documentNumber", out d) || elem.TryGetProperty("DocNumber", out d) || elem.TryGetProperty("docNumber", out d) || elem.TryGetProperty("documento", out d) || elem.TryGetProperty("Documento", out d))
+                {
+                    dni = d.ValueKind == JsonValueKind.String ? (d.GetString()?.Trim() ?? "") : (d.ValueKind == JsonValueKind.Number ? d.ToString().Trim() : "");
+                }
+                var phone = "";
+                if (elem.TryGetProperty("Phone", out var p) || elem.TryGetProperty("phone", out p) || elem.TryGetProperty("PhoneNumber", out p) || elem.TryGetProperty("phoneNumber", out p) || elem.TryGetProperty("celular", out p) || elem.TryGetProperty("telefono", out p))
+                {
+                    phone = p.ValueKind == JsonValueKind.String ? (p.GetString()?.Trim() ?? "") : (p.ValueKind == JsonValueKind.Number ? p.ToString().Trim() : "");
+                }
                 if (!string.IsNullOrWhiteSpace(name))
                 {
                     extraPassengers.Add((name, dni, phone));

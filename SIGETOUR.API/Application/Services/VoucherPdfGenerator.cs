@@ -34,17 +34,19 @@ namespace SIGETOUR.API.Application.Services
                         string dni = string.Empty;
 
                         if (elem.TryGetProperty("Name", out var nameProp) || elem.TryGetProperty("name", out nameProp) || 
-                            elem.TryGetProperty("FullName", out nameProp) || elem.TryGetProperty("fullName", out nameProp))
+                            elem.TryGetProperty("FullName", out nameProp) || elem.TryGetProperty("fullName", out nameProp) ||
+                            elem.TryGetProperty("nombre", out nameProp) || elem.TryGetProperty("Nombre", out nameProp))
                         {
-                            name = nameProp.GetString()?.Trim() ?? string.Empty;
+                            name = nameProp.ValueKind == JsonValueKind.String ? (nameProp.GetString()?.Trim() ?? string.Empty) : (nameProp.ValueKind != JsonValueKind.Null && nameProp.ValueKind != JsonValueKind.Undefined ? nameProp.ToString().Trim() : string.Empty);
                         }
 
                         if (elem.TryGetProperty("Dni", out var dniProp) || elem.TryGetProperty("dni", out dniProp) ||
                             elem.TryGetProperty("DNI", out dniProp) ||
                             elem.TryGetProperty("DocumentNumber", out dniProp) || elem.TryGetProperty("documentNumber", out dniProp) ||
-                            elem.TryGetProperty("DocNumber", out dniProp) || elem.TryGetProperty("docNumber", out dniProp))
+                            elem.TryGetProperty("DocNumber", out dniProp) || elem.TryGetProperty("docNumber", out dniProp) ||
+                            elem.TryGetProperty("documento", out dniProp) || elem.TryGetProperty("Documento", out dniProp))
                         {
-                            dni = dniProp.GetString()?.Trim() ?? string.Empty;
+                            dni = dniProp.ValueKind == JsonValueKind.String ? (dniProp.GetString()?.Trim() ?? string.Empty) : (dniProp.ValueKind == JsonValueKind.Number ? dniProp.ToString().Trim() : string.Empty);
                         }
 
                         if (!string.IsNullOrWhiteSpace(name))
