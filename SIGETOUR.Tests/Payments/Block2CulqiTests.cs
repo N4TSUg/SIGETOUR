@@ -674,5 +674,142 @@ namespace SIGETOUR.Tests.Payments
             Assert.NotNull(cashTx);
             Assert.Equal(50m, cashTx.Amount);
         }
+
+        [Fact]
+        public async Task Prepare_SwitchingFromWalletQrToCharge_WhenQrUnpaid_InvalidatesQrAndAllowsChargeAttempt()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = CreateSampleBooking(context, 120m);
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(15));
+            var unpaidOrderId = "ord_test_unpaid_" + Guid.NewGuid().ToString("N")[..6];
+
+            // Intento previo en wallet_qr en espera
+            var qrAttempt = new CulqiPayment
+            {
+                BookingId = booking.Id,
+                AmountCents = 12000,
+                Channel = "wallet_qr",
+                Status = "verification",
+                ProviderId = unpaidOrderId,
+                ExpirationDateUtc = DateTime.UtcNow.AddMinutes(20),
+                Booking = booking
+            };
+            context.CulqiPayments.Add(qrAttempt);
+            await context.SaveChangesAsync();
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                var path = req.RequestUri!.PathAndQuery;
+                if (path.Contains($"orders/{unpaidOrderId}"))
+                {
+                    // Orden aún en pending (el cliente no pagó el QR)
+                    var json = $"{{\"object\":\"order\",\"id\":\"{unpaidOrderId}\",\"amount\":12000,\"currency_code\":\"PEN\",\"state\":\"pending\"}}";
+                    return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+                }
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            });
+
+            var controller = CreateController(context, mockClient);
+
+            // El usuario cambia de método a tarjeta ("charge")
+            var result = await controller.Prepare(new PreparePayment(booking.Id, token, "full", "charge"), CancellationToken.None) as OkObjectResult;
+            Assert.NotNull(result);
+
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(result.Value));
+            var newAttemptId = doc.RootElement.GetProperty("attemptId").GetString();
+            Assert.NotEqual(qrAttempt.Id.ToString(), newAttemptId);
+
+            // El intento QR previo fue invalidado sin error 409
+            var updatedQr = await context.CulqiPayments.FindAsync(qrAttempt.Id);
+            Assert.NotNull(updatedQr);
+            Assert.Equal("failed", updatedQr.Status);
+
+            // Se generó un nuevo intento para cargo de tarjeta
+            var newAttempt = await context.CulqiPayments.FindAsync(Guid.Parse(newAttemptId!));
+            Assert.NotNull(newAttempt);
+            Assert.Equal("charge", newAttempt.Channel);
+            Assert.Equal("created", newAttempt.Status);
+        }
+
+        [Fact]
+        public async Task Charge_YapeTokenOnVerificationStatus_TransitionsToChargeAndConfirmsPayment()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = CreateSampleBooking(context, 120m);
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(15));
+            var chargeId = "chr_test_yape_verif_" + Guid.NewGuid().ToString("N")[..6];
+            var orderId = "ord_test_yape_order_" + Guid.NewGuid().ToString("N")[..6];
+
+            // Intento en wallet_qr en estado verification (esperando QR o token)
+            var payment = new CulqiPayment
+            {
+                BookingId = booking.Id,
+                AmountCents = 12000,
+                Channel = "wallet_qr",
+                Status = "verification",
+                ProviderId = orderId,
+                Booking = booking
+            };
+            context.CulqiPayments.Add(payment);
+            await context.SaveChangesAsync();
+
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                var json = $"{{\"object\":\"charge\",\"id\":\"{chargeId}\",\"amount\":12000,\"currency_code\":\"PEN\",\"capture\":true,\"outcome\":{{\"type\":\"venta_exitosa\"}}}}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            });
+
+            var controller = CreateController(context, mockClient);
+            // El usuario envía un token Yape generado en el modal
+            var result = await controller.Charge(new ChargePayment(payment.Id, token, "tkn_test_yape_token_modal"), CancellationToken.None) as OkObjectResult;
+            Assert.NotNull(result);
+
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(result.Value));
+            Assert.Equal("paid", doc.RootElement.GetProperty("status").GetString());
+
+            var updatedPayment = await context.CulqiPayments.FindAsync(payment.Id);
+            Assert.NotNull(updatedPayment);
+            Assert.Equal("charge", updatedPayment.Channel);
+            Assert.Equal(chargeId, updatedPayment.ProviderId);
+            Assert.Equal("paid", updatedPayment.Status);
+        }
+
+        [Fact]
+        public async Task Charge_CustomEmail_SendsEmailToCulqiPayload()
+        {
+            using var context = TestDbContextFactory.Create();
+            var booking = CreateSampleBooking(context, 100m);
+            var token = _checkoutAccess.Create(booking.Id, TimeSpan.FromMinutes(15));
+            var chargeId = "chr_test_3ds_" + Guid.NewGuid().ToString("N")[..6];
+
+            var payment = new CulqiPayment
+            {
+                BookingId = booking.Id,
+                AmountCents = 10000,
+                Channel = "charge",
+                Status = "created",
+                Booking = booking
+            };
+            context.CulqiPayments.Add(payment);
+            await context.SaveChangesAsync();
+
+            string capturedPayload = "";
+            var mockClient = CreateMockCulqiClient(req =>
+            {
+                if (req.Content != null)
+                {
+                    capturedPayload = req.Content.ReadAsStringAsync().Result;
+                }
+                var json = $"{{\"object\":\"charge\",\"id\":\"{chargeId}\",\"amount\":10000,\"currency_code\":\"PEN\",\"capture\":true,\"outcome\":{{\"type\":\"venta_exitosa\"}}}}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            });
+
+            var controller = CreateController(context, mockClient);
+            // Cliente envía correo de prueba oficial 3DS review@culqi.com
+            var result = await controller.Charge(new ChargePayment(payment.Id, token, "tkn_test_card_3ds", Email: "review@culqi.com"), CancellationToken.None) as OkObjectResult;
+            Assert.NotNull(result);
+
+            Assert.Contains("review@culqi.com", capturedPayload);
+        }
     }
 }

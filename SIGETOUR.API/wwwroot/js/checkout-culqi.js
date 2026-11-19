@@ -53,7 +53,7 @@ function iniciarCuentaRegresivaQr(segundosRestantes, onTick, onExpired) {
 }
 
 function isValid3DSOrigin(origin) {
-  return origin === "https://3ds.culqi.com" || origin === "https://checkout.culqi.com";
+  return origin === window.location.origin || origin === "https://3ds.culqi.com" || origin === "https://checkout.culqi.com";
 }
 
 function getVoucherRedirectUrl(bookingId) {
@@ -74,7 +74,7 @@ function handle3DSChargeResult(isOk, result, bookingId, onStatus) {
 }
 
 async function execute3DSCharge(parameters3DS) {
-  const { attemptId, checkoutToken, bookingId, onStatus, sourceId } = currentBookingContext;
+  const { attemptId, checkoutToken, bookingId, onStatus, sourceId, email } = currentBookingContext;
   if (onStatus) onStatus("Autenticación 3D Secure aprobada por el banco. Finalizando cobro...", "info");
 
   try {
@@ -86,7 +86,8 @@ async function execute3DSCharge(parameters3DS) {
         checkoutToken,
         sourceId,
         parameters3DS,
-        deviceFingerPrintId: currentDeviceFingerprint
+        deviceFingerPrintId: currentDeviceFingerprint,
+        email: email || undefined
       })
     });
 
@@ -240,7 +241,8 @@ async function processCulqiToken(checkout, attemptId, checkoutToken, bookingId, 
       attemptId,
       checkoutToken,
       sourceId: checkout.token.id,
-      deviceFingerPrintId: deviceId
+      deviceFingerPrintId: deviceId,
+      email: currentBookingContext?.email || undefined
     })
   });
 
@@ -329,7 +331,8 @@ async function abrirPagoSigetour({ bookingId, checkoutToken, email, mode = "full
     attemptId: data.attemptId,
     bookingId,
     checkoutToken,
-    onStatus
+    onStatus,
+    email: email || undefined
   };
 
   const methods = channel === "wallet_qr"

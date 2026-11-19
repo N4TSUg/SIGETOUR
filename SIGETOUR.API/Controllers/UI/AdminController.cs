@@ -63,10 +63,13 @@ namespace SIGETOUR.API.Controllers.UI
 
         public async Task<IActionResult> Dashboard()
         {
-            bool canViewBookings = User.HasClaim("Permission", AppPermissions.BookingsView);
-            bool canViewTours = User.HasClaim("Permission", AppPermissions.ToursView);
-            bool canViewCash = User.HasClaim("Permission", AppPermissions.CashView) || User.HasClaim("Permission", AppPermissions.CashManage);
-            bool canViewUsers = User.HasClaim("Permission", AppPermissions.UsersManage);
+            bool isSuperAdmin = User.IsInRole("SuperAdmin");
+            bool isAdmin = User.IsInRole("Admin");
+
+            bool canViewBookings = isSuperAdmin || isAdmin || User.HasClaim("Permission", AppPermissions.BookingsView);
+            bool canViewTours = isSuperAdmin || isAdmin || User.HasClaim("Permission", AppPermissions.ToursView);
+            bool canViewCash = isSuperAdmin || isAdmin || User.HasClaim("Permission", AppPermissions.CashView) || User.HasClaim("Permission", AppPermissions.CashManage);
+            bool canViewUsers = isSuperAdmin || User.HasClaim("Permission", AppPermissions.UsersManage);
 
             // Si el usuario no tiene ningún permiso sobre módulos administrativos, denegar acceso explícitamente con 403
             if (!canViewBookings && !canViewTours && !canViewCash && !canViewUsers)

@@ -234,6 +234,15 @@ public sealed class CulqiPaymentsController : ControllerBase
                                 message = "Orden QR activa recuperada exitosamente"
                             });
                         }
+
+                        // Si el usuario cambió de canal (ej. de wallet_qr a charge, o viceversa)
+                        // o la orden QR previa expiró o tiene monto distinto,
+                        // como en Culqi no fue pagada, invalidar el intento previo para permitir la nueva operación:
+                        if (existingAttempt.Channel != request.Channel || !isQrActive || existingAttempt.AmountCents != cents)
+                        {
+                            existingAttempt.Status = "failed";
+                            continue;
+                        }
                     }
                     else if (queryResult.HttpStatus == 404)
                     {
@@ -259,36 +268,25 @@ public sealed class CulqiPaymentsController : ControllerBase
             }
 
             // 2. Si no tiene ProviderId (interacción pendiente o en vuelo con Culqi):
-            // Si es un intento en 3ds_required, mantener un solo intento y permitir continuar legítimamente el mismo reto
+            // Si es un intento en 3ds_required, reutilizar si es mismo canal/importe; si cambió canal o importe, invalidar:
             if (existingAttempt.Status == "3ds_required")
             {
-                if (existingAttempt.CreatedAtUtc < DateTime.UtcNow.AddMinutes(-15))
+                if (existingAttempt.CreatedAtUtc < DateTime.UtcNow.AddMinutes(-15) || existingAttempt.Channel != request.Channel || existingAttempt.AmountCents != cents)
                 {
                     existingAttempt.Status = "failed";
                     continue;
                 }
 
-                if (existingAttempt.Channel == request.Channel && existingAttempt.AmountCents == cents)
-                {
-                    await _db.SaveChangesAsync(ct);
-                    return Ok(new
-                    {
-                        attemptId = existingAttempt.Id,
-                        amountCents = cents,
-                        currency = "PEN",
-                        publicKey = _config["Culqi:PublicKey"],
-                        status = "3ds_required",
-                        reused = true,
-                        message = "Existe una validación 3D Secure activa para este abono. Continuando con el mismo reto de autenticación."
-                    });
-                }
-
                 await _db.SaveChangesAsync(ct);
-                return Conflict(new
+                return Ok(new
                 {
-                    message = "Existe una transacción con validación 3D Secure en curso. Complete o cancele la autenticación bancaria antes de iniciar un nuevo cobro.",
                     attemptId = existingAttempt.Id,
-                    status = "3ds_required"
+                    amountCents = cents,
+                    currency = "PEN",
+                    publicKey = _config["Culqi:PublicKey"],
+                    status = "3ds_required",
+                    reused = true,
+                    message = "Existe una validación 3D Secure activa para este abono. Continuando con el mismo reto de autenticación."
                 });
             }
 
@@ -413,7 +411,13 @@ public sealed class CulqiPaymentsController : ControllerBase
         if (!_access.Verify(payment.BookingId, request.CheckoutToken)) return Unauthorized();
 
         // Acepta channel charge y también wallet_qr si el cliente completó la transacción vía token Yape en el modal
-        if ((payment.Channel != "charge" && payment.Channel != "wallet_qr") || (payment.Status != "created" && payment.Status != "3ds_required"))
+        var isYapeTokenOnQrAttempt = payment.Channel == "wallet_qr" && (payment.Status == "created" || payment.Status == "verification")
+            && !string.IsNullOrWhiteSpace(request.SourceId)
+            && (request.SourceId.StartsWith("tkn_test_") || request.SourceId.StartsWith("ype_test_") ||
+                request.SourceId.StartsWith("tkn_live_") || request.SourceId.StartsWith("ype_live_"));
+
+        if ((payment.Channel != "charge" && !isYapeTokenOnQrAttempt) ||
+            (payment.Status != "created" && payment.Status != "3ds_required" && !isYapeTokenOnQrAttempt))
         {
             if (payment.Status is "verification" or "processing")
             {
@@ -437,8 +441,8 @@ public sealed class CulqiPaymentsController : ControllerBase
             payment.Channel = "charge";
         }
 
-        // Si ya cuenta con un ProviderId registrado, no volver a disparar el cargo externo; verificar su estado:
-        if (payment.ProviderId != null)
+        // Si ya cuenta con un ProviderId registrado que NO sea una orden previa (ord_), no volver a disparar el cargo externo; verificar su estado:
+        if (payment.ProviderId != null && !payment.ProviderId.StartsWith("ord_"))
         {
             var applied = await VerifyAndApply(payment.Id, ct);
             if (applied || IsPaidStatus(payment.Status))
@@ -449,14 +453,15 @@ public sealed class CulqiPaymentsController : ControllerBase
         }
 
         if (string.IsNullOrWhiteSpace(request.SourceId) ||
-            !(request.SourceId.StartsWith("tkn_test_") || request.SourceId.StartsWith("ype_test_")))
+            !(request.SourceId.StartsWith("tkn_test_") || request.SourceId.StartsWith("ype_test_") ||
+              request.SourceId.StartsWith("tkn_live_") || request.SourceId.StartsWith("ype_live_")))
             return BadRequest(new { message = "Debe enviar un token de sandbox emitido por Culqi" });
 
         // Cambio de estado atómico en PostgreSQL; impide cargos simultáneos al mismo intento.
         int claimed;
         if (_db.Database.IsRelational())
         {
-            claimed = await _db.Set<CulqiPayment>().Where(p => p.Id == payment.Id && (p.Status == "created" || p.Status == "3ds_required"))
+            claimed = await _db.Set<CulqiPayment>().Where(p => p.Id == payment.Id && (p.Status == "created" || p.Status == "3ds_required" || (p.Channel == "charge" && p.Status == "verification")))
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, "processing"), ct);
         }
         else
@@ -474,7 +479,7 @@ public sealed class CulqiPaymentsController : ControllerBase
             {
                 ["amount"] = payment.AmountCents,
                 ["currency_code"] = "PEN",
-                ["email"] = payment.Booking.CustomerEmail,
+                ["email"] = !string.IsNullOrWhiteSpace(request.Email) ? request.Email : payment.Booking.CustomerEmail,
                 ["source_id"] = request.SourceId,
                 ["capture"] = true,
                 ["description"] = $"Reserva {payment.Booking.ReferenceCode}",
@@ -1254,5 +1259,5 @@ public sealed class CulqiPaymentsController : ControllerBase
 }
 
 public sealed record PreparePayment(Guid BookingId, string CheckoutToken, string Mode, string Channel);
-public sealed record ChargePayment(Guid AttemptId, string CheckoutToken, string SourceId, JsonElement? Parameters3DS = null, string? DeviceFingerPrintId = null);
+public sealed record ChargePayment(Guid AttemptId, string CheckoutToken, string SourceId, JsonElement? Parameters3DS = null, string? DeviceFingerPrintId = null, string? Email = null);
 public sealed record CheckPayment(Guid AttemptId, string CheckoutToken, Guid? BookingId = null);

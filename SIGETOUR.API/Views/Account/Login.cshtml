@@ -133,6 +133,10 @@
       background-image: radial-gradient(rgba(0, 104, 90, 0.07) 1px, transparent 1px);
       background-size: 20px 20px;
     }
+    input[type="password"]::-ms-reveal,
+    input[type="password"]::-ms-clear {
+      display: none !important;
+    }
   </style>
 <link rel="icon" type="image/png" href="~/favicon.ico" />
 </head>
@@ -221,8 +225,8 @@
             </div>
             <label for="loginPassword" class="sr-only">Contraseña</label>
                         <input asp-for="Password" type="password" id="loginPassword" class="w-full pl-10 pr-10 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface placeholder:text-outline/70 font-body-md text-body-md focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all" placeholder="" required />
-            <button aria-label="Mostrar u ocultar Contraseña" class="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface focus:outline-none transition-colors" id="togglePasswordBtn" onclick="togglePasswordVisibility()" type="button">
-                <span class="material-symbols-outlined text-[20px]" id="passwordIcon" aria-hidden="true">visibility</span>
+            <button aria-label="Mostrar u ocultar Contraseña" class="absolute inset-y-0 right-0 pr-3 flex items-center text-outline hover:text-on-surface focus:outline-none transition-colors z-10 cursor-pointer" id="togglePasswordBtn" onclick="togglePasswordVisibility(event)" type="button">
+                <span class="material-symbols-outlined text-[20px] select-none pointer-events-none" id="passwordIcon" aria-hidden="true">visibility</span>
             </button>
             <span asp-validation-for="Password" class="text-error text-[11px] block mt-1"></span>
         </div>
@@ -297,8 +301,12 @@
         }
     });
 
-    function togglePasswordVisibility() {
-      const passwordInput = document.getElementById('loginPassword') || document.getElementById('Password');
+    function togglePasswordVisibility(e) {
+      if (e) {
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+      }
+      const passwordInput = document.getElementById('loginPassword') || document.querySelector('input[type="password"], input[name="Password"], #Password');
       const passwordIcon = document.getElementById('passwordIcon');
       
       if (!passwordInput) return;
@@ -311,6 +319,13 @@
         if (passwordIcon) passwordIcon.textContent = 'visibility';
       }
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const btn = document.getElementById('togglePasswordBtn');
+      if (btn) {
+        btn.addEventListener('click', togglePasswordVisibility);
+      }
+    });
 
 
 

@@ -517,16 +517,24 @@
 
                 <!-- SECCIÓN 2: CASOS DE AUTENTICACIÓN 3DS -->
                 <div class="p-4 bg-[#f8fafc] rounded-xl border border-outline-variant/40 space-y-3">
-                  <div class="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+                  <div class="flex flex-wrap items-center justify-between border-b border-outline-variant/20 pb-2 gap-2">
                     <span class="text-label-md font-bold text-inverse-surface flex items-center gap-1.5">
                       <span class="material-symbols-outlined text-primary text-lg">security</span>
                       Casos de Autenticación 3D Secure (3DS)
                     </span>
-                    <span class="text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">Email: review@culqi.com</span>
+                    <button type="button" onclick="copyToClipboard('review@culqi.com', this)" class="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded font-sans text-[11px] font-bold transition-all border border-primary/20 flex items-center gap-1 cursor-pointer">
+                      <span class="material-symbols-outlined text-xs">content_copy</span> Copiar review@culqi.com
+                    </button>
                   </div>
-                  <p class="text-body-sm text-secondary leading-snug">
-                    Para activar la validación 3DS en Culqi Checkout, ingresa como correo del pagador: <strong class="text-primary font-mono select-all">review@culqi.com</strong>
-                  </p>
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-primary/5 rounded-lg border border-primary/20">
+                    <p class="text-body-sm text-secondary leading-snug">
+                      Para activar el reto bancario 3DS en Culqi Checkout, usa el correo: <strong class="text-primary font-mono select-all">review@culqi.com</strong>
+                    </p>
+                    <label class="inline-flex items-center gap-2 cursor-pointer shrink-0 text-xs font-bold text-primary bg-white px-3 py-1.5 rounded-lg border border-primary/30 shadow-xs hover:bg-[#f0fdf9] transition-all">
+                      <input type="checkbox" id="chk-use-3ds-email" class="rounded text-primary focus:ring-primary h-4 w-4" onchange="toggle3DsEmail(this.checked)" />
+                      <span>Activar modo prueba 3DS</span>
+                    </label>
+                  </div>
                   <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs border border-outline-variant/30 rounded-lg overflow-hidden">
                       <thead class="bg-white text-secondary font-bold border-b border-outline-variant/30">
@@ -547,7 +555,7 @@
                           <td class="py-2 px-3 text-secondary">111</td>
                           <td class="py-2 px-3 font-sans text-emerald-700 font-semibold">Exitosa con Challenge</td>
                           <td class="py-2 px-3 text-right">
-                            <button type="button" onclick="copyToClipboard('4456530000001096', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                            <button type="button" onclick="copy3DSCard('4456530000001096', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
                           </td>
                         </tr>
                         <tr class="hover:bg-slate-50 transition-colors">
@@ -557,7 +565,7 @@
                           <td class="py-2 px-3 text-secondary">111</td>
                           <td class="py-2 px-3 font-sans text-emerald-700 font-semibold">Exitosa sin Challenge</td>
                           <td class="py-2 px-3 text-right">
-                            <button type="button" onclick="copyToClipboard('4456530000001005', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                            <button type="button" onclick="copy3DSCard('4456530000001005', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
                           </td>
                         </tr>
                         <tr class="hover:bg-slate-50 transition-colors">
@@ -567,7 +575,7 @@
                           <td class="py-2 px-3 text-secondary">111</td>
                           <td class="py-2 px-3 font-sans text-emerald-700 font-semibold">Exitosa con Challenge</td>
                           <td class="py-2 px-3 text-right">
-                            <button type="button" onclick="copyToClipboard('5200000000001096', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                            <button type="button" onclick="copy3DSCard('5200000000001096', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
                           </td>
                         </tr>
                         <tr class="hover:bg-slate-50 transition-colors">
@@ -577,7 +585,7 @@
                           <td class="py-2 px-3 text-secondary">111</td>
                           <td class="py-2 px-3 font-sans text-emerald-700 font-semibold">Exitosa sin Challenge</td>
                           <td class="py-2 px-3 text-right">
-                            <button type="button" onclick="copyToClipboard('5200000000001005', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                            <button type="button" onclick="copy3DSCard('5200000000001005', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
                           </td>
                         </tr>
                       </tbody>
@@ -1003,14 +1011,29 @@
         el.textContent = message;
     }
 
+    let force3dsEmail = false;
+
+    function toggle3DsEmail(enabled) {
+        force3dsEmail = enabled;
+        const chk = document.getElementById('chk-use-3ds-email');
+        if (chk) chk.checked = enabled;
+        showStatusFeedback(enabled ? "Modo 3DS activado: se usará review@culqi.com para el reto bancario." : "Correo restablecido al del pasajero titular.", "info");
+    }
+
+    function copy3DSCard(cardNumber, btnElement) {
+        copyToClipboard(cardNumber, btnElement);
+        toggle3DsEmail(true);
+    }
+
     async function ejecutarPagoCulqi(explicitChannel = null) {
         const channel = explicitChannel || (currentTab === 'yape' ? 'wallet_qr' : 'charge');
         const mode = currentModality;
+        const activeEmail = (force3dsEmail && channel === 'charge') ? 'review@culqi.com' : customerEmail;
         try {
             await abrirPagoSigetour({
                 bookingId,
                 checkoutToken,
-                email: customerEmail,
+                email: activeEmail,
                 mode,
                 channel,
                 onStatus: showStatusFeedback,
