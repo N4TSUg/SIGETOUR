@@ -660,7 +660,27 @@
     </div>
 </div>
 
+<!-- FORMULARIO OCULTO PARA EMITIR COMPROBANTE ELECTRÓNICO SUNAT (NUBEFACT) -->
+<form asp-action="EmitBookingReceipt" method="post" id="emitReceiptForm" class="hidden">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="id" value="@Model.Id" />
+    <input type="hidden" name="invoiceType" id="emitReceiptInvoiceTypeInput" value="@Model.InvoiceType" />
+</form>
+
 <script>
+    function submitEmitReceiptFromEdit() {
+        const typeSelect = document.getElementById('InvoiceType');
+        const hiddenType = document.getElementById('emitReceiptInvoiceTypeInput');
+        if (typeSelect && hiddenType) {
+            hiddenType.value = typeSelect.value;
+        }
+        const btn = document.getElementById('btnEmitSunatReceipt');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">refresh</span> <span>Emitiendo en SUNAT / NubeFact...</span>';
+        }
+        document.getElementById('emitReceiptForm')?.submit();
+    }
     function openReactivateModal() {
         document.getElementById('reactivateBookingModal')?.classList.remove('hidden');
     }

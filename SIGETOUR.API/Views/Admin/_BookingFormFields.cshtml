@@ -292,6 +292,41 @@
             <input id="InvoiceNumber" asp-for="InvoiceNumber" placeholder="Ej. B001-000428" class="flex-1 py-2 px-3 bg-surface-container-lowest border border-outline-variant rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-mono font-bold" />
           </div>
         </div>
+
+        @if (Model.Id != Guid.Empty)
+        {
+          @if (string.IsNullOrWhiteSpace(Model.InvoiceNumber))
+          {
+            <div class="pt-3 border-t border-outline-variant/50 space-y-2.5">
+              <div class="flex items-center gap-2 text-xs text-amber-900 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                <span class="material-symbols-outlined text-[17px] text-amber-600 shrink-0">info</span>
+                <span>Comprobante SUNAT pendiente de emisión.</span>
+              </div>
+              <button type="button"
+                      onclick="submitEmitReceiptFromEdit()"
+                      id="btnEmitSunatReceipt"
+                      class="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-[#0e5a52] text-on-primary font-label-md font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer">
+                <span class="material-symbols-outlined text-[19px]">bolt</span>
+                <span>Emitir Comprobante Electrónico SUNAT</span>
+              </button>
+            </div>
+          }
+          else
+          {
+            <div class="pt-3 border-t border-outline-variant/50 space-y-2">
+              <div class="flex items-center justify-between gap-2 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg">
+                <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                  <span class="material-symbols-outlined text-[18px] text-emerald-600">verified</span>
+                  <span>Emitido en SUNAT: @Model.InvoiceNumber</span>
+                </div>
+                <a href="@Url.Action("Ticket", "Booking", new { id = Model.Id })" target="_blank" class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+                  <span>Ver Ticket / PDF</span>
+                  <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                </a>
+              </div>
+            </div>
+          }
+        }
       </div>
     </div>
   </div>

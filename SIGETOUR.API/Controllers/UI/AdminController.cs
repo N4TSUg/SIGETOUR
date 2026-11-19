@@ -3825,11 +3825,107 @@ namespace SIGETOUR.API.Controllers.UI
 
                 receipt.Status = "Cancelled";
                 receipt.ProviderDescription = providerNote;
+                receipt.BillableOperationKey = $"VOIDED:{receipt.Id:N}";
+                receipt.CashTransactionId = null;
+                receipt.CulqiPaymentId = null;
                 _context.ElectronicReceipts.Update(receipt);
                 regularizedNumbers.Add(displayNum);
             }
 
+            if (receipts.Any())
+            {
+                booking.InvoiceNumber = string.Empty;
+            }
+
             return regularizedNumbers;
+        }
+
+        [HttpPost]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EmitBookingReceipt(Guid id, string? invoiceType = null)
+        {
+            var booking = await _context.Bookings
+                .Include(b => b.Items)
+                .FirstOrDefaultAsync(b => b.Id == id);
+
+            if (booking == null) return NotFound();
+
+            if (booking.PaidAmount <= 0)
+            {
+                TempData["ErrorMessage"] = "La reserva debe tener un abono o pago registrado mayor a S/ 0.00 para emitir un comprobante electrónico en SUNAT.";
+                return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+            }
+
+            if (!string.IsNullOrWhiteSpace(invoiceType))
+            {
+                booking.InvoiceType = invoiceType.Trim().ToLowerInvariant();
+                _context.Bookings.Update(booking);
+                await _context.SaveChangesAsync();
+            }
+
+            if (string.Equals(booking.InvoiceType, "nota", StringComparison.OrdinalIgnoreCase))
+            {
+                booking.InvoiceType = "boleta";
+                _context.Bookings.Update(booking);
+                await _context.SaveChangesAsync();
+            }
+
+            try
+            {
+                var receiptService = HttpContext?.RequestServices?.GetService(typeof(IElectronicReceiptService)) as IElectronicReceiptService;
+                if (receiptService == null)
+                {
+                    TempData["ErrorMessage"] = "El servicio de facturación electrónica NubeFact no se encuentra disponible.";
+                    return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
+                }
+
+                var latestCulqiId = await _context.CulqiPayments
+                    .Where(p => p.BookingId == booking.Id && p.Status == "paid")
+                    .OrderByDescending(p => p.CreatedAtUtc)
+                    .Select(p => (Guid?)p.Id)
+                    .FirstOrDefaultAsync();
+
+                Guid? latestCashId = null;
+                if (!latestCulqiId.HasValue)
+                {
+                    latestCashId = await _context.CashTransactions
+                        .Where(t => t.BookingId == booking.Id && t.TransactionType == "Ingreso" && t.CulqiPaymentId == null)
+                        .OrderByDescending(t => t.CreatedAt)
+                        .Select(t => (Guid?)t.Id)
+                        .FirstOrDefaultAsync();
+                }
+
+                var emitted = await receiptService.GenerateReceiptAsync(
+                    booking.Id,
+                    culqiPaymentId: latestCulqiId,
+                    exactReceiptId: null,
+                    claimToken: null,
+                    cashTransactionId: latestCashId,
+                    billableOperationKey: null);
+
+                if (emitted != null && !string.IsNullOrWhiteSpace(emitted.Number) && emitted.Status != "Rejected")
+                {
+                    booking.InvoiceNumber = emitted.FullNumber;
+                    booking.InvoiceType = string.Equals(emitted.ReceiptType, "Factura", StringComparison.OrdinalIgnoreCase) ? "factura" : "boleta";
+                    _context.Bookings.Update(booking);
+                    await _context.SaveChangesAsync();
+
+                    TempData["SuccessMessage"] = $"Comprobante electrónico SUNAT ({emitted.FullNumber}) emitido exitosamente en NubeFact.";
+                }
+                else
+                {
+                    var err = emitted?.LastError ?? emitted?.ProviderDescription ?? "No se pudo completar la emisión.";
+                    TempData["ErrorMessage"] = $"Aviso al emitir comprobante SUNAT: {err}";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Error al emitir comprobante manual desde EditBooking para {BookingId}", booking.Id);
+                TempData["ErrorMessage"] = $"No se pudo emitir el comprobante electrónico: {ex.Message}";
+            }
+
+            return RedirectToAction(nameof(EditBooking), new { id = booking.Id });
         }
 
         [HttpPost]
@@ -3987,18 +4083,25 @@ namespace SIGETOUR.API.Controllers.UI
                         var receiptService = HttpContext?.RequestServices?.GetService(typeof(IElectronicReceiptService)) as IElectronicReceiptService;
                         if (receiptService != null)
                         {
-                            var opKey = createdCashTx != null
-                                ? $"cash:{createdCashTx.Id}"
-                                : $"reactivate:{Guid.NewGuid():N}";
+                            Guid? targetCashId = createdCashTx?.Id;
+                            if (!targetCashId.HasValue)
+                            {
+                                targetCashId = await _context.CashTransactions
+                                    .Where(t => t.BookingId == booking.Id && t.TransactionType == "Ingreso" && t.CulqiPaymentId == null)
+                                    .OrderByDescending(t => t.CreatedAt)
+                                    .Select(t => (Guid?)t.Id)
+                                    .FirstOrDefaultAsync();
+                            }
+
                             var newReceipt = await receiptService.GenerateReceiptAsync(
                                 booking.Id,
                                 culqiPaymentId: null,
                                 exactReceiptId: null,
                                 claimToken: null,
-                                cashTransactionId: createdCashTx?.Id,
-                                billableOperationKey: opKey);
+                                cashTransactionId: targetCashId,
+                                billableOperationKey: null);
 
-                            if (newReceipt != null && !string.IsNullOrWhiteSpace(newReceipt.Number))
+                            if (newReceipt != null && !string.IsNullOrWhiteSpace(newReceipt.Number) && newReceipt.Status != "Rejected")
                             {
                                 booking.InvoiceNumber = newReceipt.FullNumber;
                                 _context.Bookings.Update(booking);

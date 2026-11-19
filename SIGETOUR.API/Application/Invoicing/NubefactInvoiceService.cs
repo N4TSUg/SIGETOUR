@@ -637,6 +637,7 @@ namespace SIGETOUR.API.Application.Invoicing
             CancellationToken ct)
         {
             IQueryable<ElectronicReceipt> query = _db.ElectronicReceipts
+                .Where(r => r.Status != "Cancelled")
                 .OrderByDescending(r => r.CreatedAtUtc);
 
             if (identity.IsHistoricalFallback)
@@ -688,6 +689,7 @@ namespace SIGETOUR.API.Application.Invoicing
             CancellationToken ct)
         {
             IQueryable<ElectronicReceipt> query = _db.ElectronicReceipts
+                .Where(r => r.Status != "Cancelled")
                 .OrderByDescending(r => r.CreatedAtUtc);
 
             if (identity.IsHistoricalFallback)
@@ -972,7 +974,7 @@ namespace SIGETOUR.API.Application.Invoicing
             else if (manualCashList.Count > 1)
             {
                 var unbilledManual = manualCashList
-                    .Where(t => !_db.ElectronicReceipts.Any(r => r.CashTransactionId == t.Id || r.BillableOperationKey == $"CASH:{t.Id:N}"))
+                    .Where(t => !_db.ElectronicReceipts.Any(r => r.Status != "Cancelled" && (r.CashTransactionId == t.Id || r.BillableOperationKey == $"CASH:{t.Id:N}")))
                     .ToList();
 
                 if (unbilledManual.Count == 1)
@@ -992,7 +994,7 @@ namespace SIGETOUR.API.Application.Invoicing
             }
 
             var historicalReceipts = await _db.ElectronicReceipts
-                .Where(r => r.BookingId == bookingId && r.CulqiPaymentId == null && r.CashTransactionId == null)
+                .Where(r => r.BookingId == bookingId && r.Status != "Cancelled" && r.CulqiPaymentId == null && r.CashTransactionId == null)
                 .OrderByDescending(r => r.CreatedAtUtc)
                 .ToListAsync(ct);
 
