@@ -606,6 +606,7 @@ namespace SIGETOUR.API.Application.Services
                 .Include(b => b.Items)
                 .Where(b => b.TravelDate >= minUtc && b.TravelDate <= maxUtc &&
                             b.Status != BookingStatus.Cancelled &&
+                            b.Status != BookingStatus.Draft &&
                             b.Items.Any(i => i.TourPackageId == tourId))
                 .OrderBy(b => b.BookingDate)
                 .ToListAsync();

@@ -287,7 +287,7 @@
             </span>
           </div>
           <!-- Tab Navigation -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 bg-[#edf7f5] rounded-xl mb-6">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 p-1.5 bg-[#edf7f5] rounded-xl mb-6">
             <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 bg-surface-container-lowest text-primary shadow-xs font-bold" id="tab-btn-yape" onclick="switchPaymentTab('yape')" type="button">
               <span class="material-symbols-outlined text-xl mb-1 text-primary">qr_code_scanner</span>
               <span>Yape / Plin</span>
@@ -296,10 +296,12 @@
               <span class="material-symbols-outlined text-xl mb-1">credit_card</span>
               <span>Tarjeta Déb/Créd</span>
             </button>
+            <!-- COMENTADO TEMPORALMENTE: PAGO POR TRANSFERENCIA (BANCOS / CCI)
             <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 text-secondary hover:text-on-surface" id="tab-btn-transfer" onclick="switchPaymentTab('transfer')" type="button">
               <span class="material-symbols-outlined text-xl mb-1">account_balance</span>
               <span>Bancos / CCI</span>
             </button>
+            -->
             <button class="flex flex-col items-center justify-center py-2.5 px-3 rounded-lg text-label-md font-label-lg transition-all duration-150 text-secondary hover:text-on-surface" id="tab-btn-cash" onclick="switchPaymentTab('cash')" type="button">
               <span class="material-symbols-outlined text-xl mb-1">storefront</span>
               <span>Pago Counter</span>
@@ -336,6 +338,43 @@
                   <span class="text-[11px] text-secondary italic">Válido por 25 minutos desde su emisión</span>
                 </div>
               </div>
+            </div>
+
+            <!-- CAJA DE AYUDA: DATOS DE PRUEBA YAPE SANDBOX (CULQI OFICIAL) -->
+            <div class="p-4 bg-gradient-to-br from-[#faf5ff] to-[#f3e8ff] border border-purple-200 rounded-xl space-y-3 shadow-xs">
+              <div class="flex items-center justify-between border-b border-purple-200/60 pb-2">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-purple-700 text-xl">phone_iphone</span>
+                  <span class="text-label-md font-bold text-purple-950">Compras Exitosas con Yape Sandbox (Culqi Oficial)</span>
+                </div>
+                <span class="text-[10px] font-bold text-purple-800 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-full">CulqiDocs</span>
+              </div>
+              <p class="text-body-sm text-purple-900 leading-snug">
+                Te compartimos este número oficial de Culqi para comprobar las transacciones realizadas por el botón de pagos de Yape:
+              </p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="p-3 bg-white rounded-lg border border-purple-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span class="text-[11px] text-secondary block font-semibold">Nro celular de prueba:</span>
+                    <span class="font-mono text-body-md font-extrabold text-purple-900 select-all">900 000 001</span>
+                  </div>
+                  <button type="button" onclick="copyToClipboard('900000001', this)" class="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold rounded flex items-center gap-1 transition-all border border-purple-200">
+                    <span class="material-symbols-outlined text-sm">content_copy</span> Copiar
+                  </button>
+                </div>
+                <div class="p-3 bg-white rounded-lg border border-purple-200 shadow-xs flex items-center justify-between">
+                  <div>
+                    <span class="text-[11px] text-secondary block font-semibold">Código de verificación:</span>
+                    <span class="font-mono text-body-md font-bold text-purple-900">6 dígitos aleatorios</span>
+                  </div>
+                  <button type="button" onclick="copyToClipboard('123456', this)" class="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold rounded flex items-center gap-1 transition-all border border-purple-200" title="Copiar código '123456'">
+                    <span class="material-symbols-outlined text-sm">content_copy</span> Ej: 123456
+                  </button>
+                </div>
+              </div>
+              <p class="text-[11px] text-purple-800 italic">
+                * En la ventana de pago de Yape, ingresa el celular <strong>900 000 001</strong> y cualquier código de 6 dígitos aleatorios para aprobar la compra.
+              </p>
             </div>
 
             <!-- Monitor en vivo de estado de Orden QR -->
@@ -382,6 +421,7 @@
                 <span class="px-2 py-0.5 bg-blue-50 text-blue-800 text-[10px] font-bold rounded border border-blue-200">VISA</span>
                 <span class="px-2 py-0.5 bg-red-50 text-red-800 text-[10px] font-bold rounded border border-red-200">MASTERCARD</span>
                 <span class="px-2 py-0.5 bg-sky-50 text-sky-800 text-[10px] font-bold rounded border border-sky-200">AMEX</span>
+                <span class="px-2 py-0.5 bg-indigo-50 text-indigo-800 text-[10px] font-bold rounded border border-indigo-200">DINERS</span>
               </div>
             </div>
             <div class="p-4 bg-[#f0fdf9] border border-primary/20 rounded-xl space-y-3">
@@ -392,17 +432,169 @@
                   <p class="text-secondary text-body-sm">Cifrado de extremo a extremo mediante el estándar PCI-DSS.</p>
                 </div>
               </div>
-              <div class="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/30 text-body-sm text-secondary">
-                <div class="font-semibold text-inverse-surface mb-1">Tarjetas de Prueba Culqi Sandbox:</div>
-                <div class="font-mono text-xs space-y-1">
-                  <div>Visa: <span class="text-primary font-bold">4213 5400 0000 0000</span> (Cualquier fecha futura, CVV 123)</div>
-                  <div>Mastercard: <span class="text-primary font-bold">5454 5454 5454 5454</span> (Cualquier fecha futura, CVV 123)</div>
+
+              <!-- CATÁLOGO OFICIAL DE TARJETAS DE PRUEBA CULQI SANDBOX -->
+              <div class="space-y-4 pt-1">
+                <!-- SECCIÓN 1: COMPRAS EXITOSAS -->
+                <div class="p-4 bg-surface-container-lowest rounded-xl border border-outline-variant/40 shadow-xs space-y-3">
+                  <div class="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+                    <span class="text-label-md font-bold text-inverse-surface flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-emerald-600 text-lg">check_circle</span>
+                      Tarjetas para Compras Exitosas (Venta Exitosa)
+                    </span>
+                    <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">CulqiDocs</span>
+                  </div>
+                  <p class="text-body-sm text-secondary leading-snug">
+                    Usa estas tarjetas oficiales de Culqi Sandbox para probar compras con venta exitosa:
+                  </p>
+                  
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border border-outline-variant/30 rounded-lg overflow-hidden">
+                      <thead class="bg-[#f8fafc] text-secondary font-bold border-b border-outline-variant/30">
+                        <tr>
+                          <th class="py-2 px-3">Marca</th>
+                          <th class="py-2 px-3">Número de Tarjeta</th>
+                          <th class="py-2 px-3">Mes/Año</th>
+                          <th class="py-2 px-3">CVV</th>
+                          <th class="py-2 px-3">Tipo</th>
+                          <th class="py-2 px-3 text-right">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-outline-variant/20 bg-white font-mono">
+                        <!-- Visa Débito -->
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-blue-700">VISA</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">4111 1111 1111 1111</td>
+                          <td class="py-2 px-3 text-secondary">09/30</td>
+                          <td class="py-2 px-3 text-secondary">123</td>
+                          <td class="py-2 px-3 font-sans text-secondary">Débito</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('4111111111111111', this)" class="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                        <!-- Visa Crédito -->
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-blue-700">VISA</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">4111 1111 1010 1113</td>
+                          <td class="py-2 px-3 text-secondary">09/30</td>
+                          <td class="py-2 px-3 text-secondary">123</td>
+                          <td class="py-2 px-3 font-sans text-secondary">Crédito</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('4111111110101113', this)" class="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                        <!-- Mastercard Crédito -->
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-red-600">Mastercard</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">5111 1111 1111 1118</td>
+                          <td class="py-2 px-3 text-secondary">12/30</td>
+                          <td class="py-2 px-3 text-secondary">039</td>
+                          <td class="py-2 px-3 font-sans text-secondary">Crédito</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('5111111111111118', this)" class="px-2 py-0.5 bg-red-50 hover:bg-red-100 text-red-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                        <!-- AMEX Crédito -->
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-sky-700">AMEX</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">3712 1212 1212 122</td>
+                          <td class="py-2 px-3 text-secondary">12/30</td>
+                          <td class="py-2 px-3 text-secondary">2841</td>
+                          <td class="py-2 px-3 font-sans text-secondary">Crédito</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('371212121212122', this)" class="px-2 py-0.5 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                        <!-- Diners Crédito -->
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-indigo-700">Diners</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">360012 1212 1218</td>
+                          <td class="py-2 px-3 text-secondary">12/30</td>
+                          <td class="py-2 px-3 text-secondary">964</td>
+                          <td class="py-2 px-3 font-sans text-secondary">Crédito</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('36001212121218', this)" class="px-2 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- SECCIÓN 2: CASOS DE AUTENTICACIÓN 3DS -->
+                <div class="p-4 bg-[#f8fafc] rounded-xl border border-outline-variant/40 space-y-3">
+                  <div class="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+                    <span class="text-label-md font-bold text-inverse-surface flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-primary text-lg">security</span>
+                      Casos de Autenticación 3D Secure (3DS)
+                    </span>
+                    <span class="text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">Email: review@culqi.com</span>
+                  </div>
+                  <p class="text-body-sm text-secondary leading-snug">
+                    Para activar la validación 3DS en Culqi Checkout, ingresa como correo del pagador: <strong class="text-primary font-mono select-all">review@culqi.com</strong>
+                  </p>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border border-outline-variant/30 rounded-lg overflow-hidden">
+                      <thead class="bg-white text-secondary font-bold border-b border-outline-variant/30">
+                        <tr>
+                          <th class="py-2 px-3">Marca</th>
+                          <th class="py-2 px-3">Número de Tarjeta</th>
+                          <th class="py-2 px-3">Mes/Año</th>
+                          <th class="py-2 px-3">CVV</th>
+                          <th class="py-2 px-3">Resultado 3DS</th>
+                          <th class="py-2 px-3 text-right">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-outline-variant/20 bg-white font-mono">
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-blue-700">VISA</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">4456 5300 0000 1096</td>
+                          <td class="py-2 px-3 text-secondary">07/30</td>
+                          <td class="py-2 px-3 text-secondary">111</td>
+                          <td class="py-2 px-3 font-sans text-emerald-700 font-semibold">Exitosa con Challenge</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('4456530000001096', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-blue-700">VISA</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">4456 5300 0000 1005</td>
+                          <td class="py-2 px-3 text-secondary">07/30</td>
+                          <td class="py-2 px-3 text-secondary">111</td>
+                          <td class="py-2 px-3 font-sans text-emerald-700 font-semibold">Exitosa sin Challenge</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('4456530000001005', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-red-600">Mastercard</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">5200 0000 0000 1096</td>
+                          <td class="py-2 px-3 text-secondary">12/30</td>
+                          <td class="py-2 px-3 text-secondary">111</td>
+                          <td class="py-2 px-3 font-sans text-emerald-700 font-semibold">Exitosa con Challenge</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('5200000000001096', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                        <tr class="hover:bg-slate-50 transition-colors">
+                          <td class="py-2 px-3 font-sans font-bold text-red-600">Mastercard</td>
+                          <td class="py-2 px-3 font-bold text-inverse-surface">5200 0000 0000 1005</td>
+                          <td class="py-2 px-3 text-secondary">12/30</td>
+                          <td class="py-2 px-3 text-secondary">111</td>
+                          <td class="py-2 px-3 font-sans text-emerald-700 font-semibold">Exitosa sin Challenge</td>
+                          <td class="py-2 px-3 text-right">
+                            <button type="button" onclick="copyToClipboard('5200000000001005', this)" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded font-sans text-[11px] font-semibold transition-all">Copiar</button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- TAB 3: BANK TRANSFER (hidden) -->
+          <!-- COMENTADO TEMPORALMENTE: PAGO POR TRANSFERENCIA (BANCOS / CCI)
           <div class="hidden space-y-4" id="tab-transfer">
             <div class="p-3 bg-[#f0fdf9] border border-primary/20 rounded-lg text-body-sm font-body-sm text-secondary">
               Transfiere directamente desde tu banca por internet y envíanos el voucher al WhatsApp oficial <strong class="text-on-surface font-semibold">+51 901 195 392</strong>.
@@ -446,6 +638,7 @@
               </div>
             </div>
           </div>
+          -->
 
           <!-- TAB 4: CASH AT COUNTER (hidden) -->
           <div class="hidden space-y-4" id="tab-cash">
@@ -891,6 +1084,29 @@
         } catch (err) {
             console.error("Culqi check error:", err);
             showStatusFeedback(err.message, "error");
+        }
+    }
+
+    function copyToClipboard(text, btnElement) {
+        if (!navigator.clipboard) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(textArea);
+        } else {
+            navigator.clipboard.writeText(text).catch(err => console.warn(err));
+        }
+
+        if (btnElement) {
+            const originalHtml = btnElement.innerHTML;
+            btnElement.innerHTML = '<span class="material-symbols-outlined text-sm">done</span> ¡Copiado!';
+            btnElement.classList.add('bg-emerald-100', 'text-emerald-800');
+            setTimeout(() => {
+                btnElement.innerHTML = originalHtml;
+                btnElement.classList.remove('bg-emerald-100', 'text-emerald-800');
+            }, 1800);
         }
     }
 

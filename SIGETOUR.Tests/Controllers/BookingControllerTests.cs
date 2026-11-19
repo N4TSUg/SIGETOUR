@@ -93,7 +93,7 @@ namespace SIGETOUR.Tests.Controllers
             Assert.Equal("Maria Quispe", savedBooking.CustomerName);
             Assert.Equal(2, savedBooking.TotalPassengers);
             Assert.Equal(tour.BasePrice * 2, savedBooking.TotalAmount);
-            Assert.Equal(BookingStatus.Pending, savedBooking.Status);
+            Assert.Equal(BookingStatus.Draft, savedBooking.Status); // Inicia como Draft antes de confirmar registro o pago
             Assert.Single(savedBooking.Items);
         }
 
@@ -396,6 +396,61 @@ namespace SIGETOUR.Tests.Controllers
 
             // Verifica que se invocó con los identificadores exactos de la reserva y del pago para no duplicar
             mockReceiptService.Verify(s => s.GenerateReceiptAsync(booking.Id, culqiPayment.Id, System.Threading.CancellationToken.None), Moq.Times.Once);
+        }
+
+        [Fact]
+        public async Task Checkout_Post_CreatesDraftBooking_DoesNotPolluteAdminBookingsUntilConfirmed()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+            var controller = new BookingController(context);
+            var tour = context.TourPackages.First();
+
+            var model = new CheckoutRequestViewModel
+            {
+                TourId = tour.Id,
+                CustomerName = "Carlos Mendoza",
+                CustomerDni = "71271712",
+                CustomerEmail = "carlos@example.com",
+                CustomerPhone = "928876259",
+                TravelDate = DateTime.UtcNow.AddDays(3),
+                Shift = "Turno Mañana",
+                Passengers = 1,
+                BoardingPoint = "agency"
+            };
+
+            // Act - Crear borrador en Checkout
+            var result = await controller.Checkout(model);
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            var bookingId = (Guid)redirectResult.RouteValues!["id"]!;
+
+            var draftBooking = context.Bookings.Find(bookingId);
+            Assert.NotNull(draftBooking);
+            Assert.Equal(BookingStatus.Draft, draftBooking.Status);
+
+            // Verificar que AdminController.Bookings excluye borradores por defecto
+            var adminController = TestHelpers.CreateAdminController(context);
+            var bookingsResult = await adminController.Bookings(null, null, null, null, 1);
+            var viewResult = Assert.IsType<ViewResult>(bookingsResult);
+            var list = Assert.IsAssignableFrom<IEnumerable<Booking>>(viewResult.Model);
+            Assert.DoesNotContain(list, b => b.Id == bookingId);
+
+            // Act 2 - Confirmar reserva en Counter
+            var token = _checkoutAccess.Create(bookingId, CheckoutAccess.DefaultCheckoutTtl);
+            var confirmResult = await controller.ConfirmPayment(bookingId, "Pago en Counter (Efectivo)", token);
+            Assert.IsType<RedirectToActionResult>(confirmResult);
+
+            var confirmedBooking = context.Bookings.Find(bookingId);
+            Assert.NotNull(confirmedBooking);
+            Assert.Equal(BookingStatus.Pending, confirmedBooking.Status);
+            Assert.Equal("Pago en Counter (Efectivo)", confirmedBooking.PaymentMethod);
+
+            // Verificar que ahora SÍ aparece en AdminController.Bookings
+            var bookingsAfterConfirm = await adminController.Bookings(null, null, null, null, 1);
+            var viewAfterConfirm = Assert.IsType<ViewResult>(bookingsAfterConfirm);
+            var listAfterConfirm = Assert.IsAssignableFrom<IEnumerable<Booking>>(viewAfterConfirm.Model);
+            Assert.Contains(listAfterConfirm, b => b.Id == bookingId);
         }
     }
 }

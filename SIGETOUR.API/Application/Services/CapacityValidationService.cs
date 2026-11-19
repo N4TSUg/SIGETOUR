@@ -88,6 +88,7 @@ namespace SIGETOUR.API.Application.Services
             var query = _context.BookingItems
                 .Where(bi => bi.TourPackageId == tourId &&
                              bi.Booking.Status != BookingStatus.Cancelled &&
+                             bi.Booking.Status != BookingStatus.Draft &&
                              bi.Booking.TravelDate >= startUtc &&
                              bi.Booking.TravelDate < endUtc);
 

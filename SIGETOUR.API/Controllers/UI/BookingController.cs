@@ -195,65 +195,107 @@ namespace SIGETOUR.API.Controllers.UI
                 }
             }
 
-            string refCode;
-            do
+            // Si el usuario ya contaba con un borrador de checkout activo, actualizarlo en lugar de crear filas duplicadas
+            Booking? existingDraft = null;
+            if (Request != null && Request.Cookies.TryGetValue("sigetour_last_booking", out var prevCookieToken) && !string.IsNullOrWhiteSpace(prevCookieToken))
             {
-                refCode = $"RES-{Random.Shared.Next(1000, 9999)}";
-            } while (await _context.Bookings.AnyAsync(b => b.ReferenceCode == refCode));
+                var candidateDrafts = await _context.Bookings
+                    .Include(b => b.Items)
+                    .Where(b => b.Status == BookingStatus.Draft)
+                    .ToListAsync();
+                existingDraft = candidateDrafts.FirstOrDefault(b => _checkoutAccess.Verify(b.Id, prevCookieToken));
+            }
 
-            var booking = new Booking
+            Booking booking;
+            if (existingDraft != null)
             {
-                ReferenceCode = refCode,
-                CustomerName = model.CustomerName,
-                CustomerDni = model.CustomerDni,
-                CustomerEmail = model.CustomerEmail,
-                CustomerPhone = model.CustomerPhone,
-                TravelDate = DateTime.SpecifyKind(model.TravelDate.Date, DateTimeKind.Utc),
-                ShiftName = model.Shift,
-                TotalPassengers = model.Passengers,
-                TotalAmount = (effectiveUnitPrice * model.Passengers) + pickupCost,
-                PickupLocation = pickupLocation,
-                PickupCost = pickupCost,
-                Status = BookingStatus.Pending,
-                AdditionalPassengersJson = JsonSerializer.Serialize(extraPassengers)
-            };
+                booking = existingDraft;
+                booking.CustomerName = model.CustomerName;
+                booking.CustomerDni = model.CustomerDni;
+                booking.CustomerEmail = model.CustomerEmail;
+                booking.CustomerPhone = model.CustomerPhone;
+                booking.TravelDate = DateTime.SpecifyKind(model.TravelDate.Date, DateTimeKind.Utc);
+                booking.ShiftName = model.Shift;
+                booking.TotalPassengers = model.Passengers;
+                booking.TotalAmount = (effectiveUnitPrice * model.Passengers) + pickupCost;
+                booking.PickupLocation = pickupLocation;
+                booking.PickupCost = pickupCost;
+                booking.Status = BookingStatus.Draft;
+                booking.AdditionalPassengersJson = JsonSerializer.Serialize(extraPassengers);
 
-            booking.Items.Add(new BookingItem
-            {
-                TourPackageId = tour.Id,
-                Passengers = model.Passengers,
-                UnitPrice = effectiveUnitPrice, // Precio unitario contratado inmutable en el ítem
-                SubTotal = effectiveUnitPrice * model.Passengers
-            });
-
-            if (_context.Database.IsRelational())
-            {
-                await using var dbTx = await _context.Database.BeginTransactionAsync();
-                try
+                booking.Items.Clear();
+                booking.Items.Add(new BookingItem
                 {
-                    var finalCapacity = await _capacityService.ValidateCapacityAsync(
-                        tour.Id, model.TravelDate, model.Shift, model.Passengers, null);
+                    TourPackageId = tour.Id,
+                    Passengers = model.Passengers,
+                    UnitPrice = effectiveUnitPrice,
+                    SubTotal = effectiveUnitPrice * model.Passengers
+                });
 
-                    if (!finalCapacity.IsAvailable)
-                    {
-                        ModelState.AddModelError("", finalCapacity.ErrorMessage ?? "No hay cupos suficientes para la fecha y turno seleccionados.");
-                        return View(tour);
-                    }
-
-                    _context.Bookings.Add(booking);
-                    await _context.SaveChangesAsync();
-                    await dbTx.CommitAsync();
-                }
-                catch
-                {
-                    await dbTx.RollbackAsync();
-                    throw;
-                }
+                await _context.SaveChangesAsync();
             }
             else
             {
-                _context.Bookings.Add(booking);
-                await _context.SaveChangesAsync();
+                string refCode;
+                do
+                {
+                    refCode = $"RES-{Random.Shared.Next(1000, 9999)}";
+                } while (await _context.Bookings.AnyAsync(b => b.ReferenceCode == refCode));
+
+                booking = new Booking
+                {
+                    ReferenceCode = refCode,
+                    CustomerName = model.CustomerName,
+                    CustomerDni = model.CustomerDni,
+                    CustomerEmail = model.CustomerEmail,
+                    CustomerPhone = model.CustomerPhone,
+                    TravelDate = DateTime.SpecifyKind(model.TravelDate.Date, DateTimeKind.Utc),
+                    ShiftName = model.Shift,
+                    TotalPassengers = model.Passengers,
+                    TotalAmount = (effectiveUnitPrice * model.Passengers) + pickupCost,
+                    PickupLocation = pickupLocation,
+                    PickupCost = pickupCost,
+                    Status = BookingStatus.Draft,
+                    AdditionalPassengersJson = JsonSerializer.Serialize(extraPassengers)
+                };
+
+                booking.Items.Add(new BookingItem
+                {
+                    TourPackageId = tour.Id,
+                    Passengers = model.Passengers,
+                    UnitPrice = effectiveUnitPrice, // Precio unitario contratado inmutable en el ítem
+                    SubTotal = effectiveUnitPrice * model.Passengers
+                });
+
+                if (_context.Database.IsRelational())
+                {
+                    await using var dbTx = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        var finalCapacity = await _capacityService.ValidateCapacityAsync(
+                            tour.Id, model.TravelDate, model.Shift, model.Passengers, null);
+
+                        if (!finalCapacity.IsAvailable)
+                        {
+                            ModelState.AddModelError("", finalCapacity.ErrorMessage ?? "No hay cupos suficientes para la fecha y turno seleccionados.");
+                            return View(tour);
+                        }
+
+                        _context.Bookings.Add(booking);
+                        await _context.SaveChangesAsync();
+                        await dbTx.CommitAsync();
+                    }
+                    catch
+                    {
+                        await dbTx.RollbackAsync();
+                        throw;
+                    }
+                }
+                else
+                {
+                    _context.Bookings.Add(booking);
+                    await _context.SaveChangesAsync();
+                }
             }
 
             // Guardar en sesión y cookie de forma segura para permitir acceso inmediato a su voucher
@@ -332,8 +374,9 @@ namespace SIGETOUR.API.Controllers.UI
             // La reserva queda en estado Pendiente y con PaidAmount = 0 (o el monto real previamente acreditado).
             // La conciliación e ingreso a caja se realizan exclusivamente cuando el cajero/administrador
             // valida el comprobante o recibe el dinero físico en AdminController.
-            if (booking.Status == BookingStatus.Pending && booking.PaidAmount == 0)
+            if ((booking.Status == BookingStatus.Draft || booking.Status == BookingStatus.Pending) && booking.PaidAmount == 0)
             {
+                booking.Status = BookingStatus.Pending; // Formaliza el registro como reserva provisional
                 booking.PaymentMethod = string.IsNullOrWhiteSpace(manualPaymentMethod)
                     ? "Pago en Counter / Agencia"
                     : manualPaymentMethod;

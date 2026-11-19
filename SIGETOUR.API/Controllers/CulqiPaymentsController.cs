@@ -1156,6 +1156,10 @@ public sealed class CulqiPaymentsController : ControllerBase
         {
             booking.Status = BookingStatus.Confirmed;
         }
+        else if (booking.PaidAmount > 0)
+        {
+            booking.Status = BookingStatus.Pending;
+        }
 
         // Registrar ingreso para conciliación contable garantizada (incluso si no hay turno presencial abierto)
         // estrictamente sin duplicados por CulqiPaymentId

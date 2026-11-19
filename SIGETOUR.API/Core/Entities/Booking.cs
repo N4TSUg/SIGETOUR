@@ -51,9 +51,10 @@ namespace SIGETOUR.API.Core.Entities
 
     public enum BookingStatus
     {
-        Pending,
-        Confirmed,
-        Cancelled
+        Pending = 0,
+        Confirmed = 1,
+        Cancelled = 2,
+        Draft = 3
     }
 }
 

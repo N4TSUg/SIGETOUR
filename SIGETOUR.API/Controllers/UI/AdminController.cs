@@ -102,7 +102,7 @@ namespace SIGETOUR.API.Controllers.UI
 
                 if (canViewBookings)
                 {
-                    try { bookingsCount = await _context.Bookings.CountAsync(); } catch { }
+                    try { bookingsCount = await _context.Bookings.CountAsync(b => b.Status != BookingStatus.Draft); } catch { }
                 }
 
                 // Fecha local de Cajamarca / Perú (UTC-5)
@@ -110,7 +110,7 @@ namespace SIGETOUR.API.Controllers.UI
                 var todayPeru = peruNow.Date;
                 var todayPeruStr = todayPeru.ToString("yyyy-MM-dd");
 
-                // Todas las reservas activas (no canceladas) con detalles de vehículo y conductor
+                // Todas las reservas activas (no canceladas y no borradores) con detalles de vehículo y conductor
                 var allActiveBookings = new List<Booking>();
                 if (canViewBookings)
                 {
@@ -121,7 +121,7 @@ namespace SIGETOUR.API.Controllers.UI
                             .ThenInclude(i => i.TourPackage)
                             .Include(b => b.AssignedVehicle)
                             .Include(b => b.AssignedDriver)
-                            .Where(b => b.Status != BookingStatus.Cancelled)
+                            .Where(b => b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Draft)
                             .ToListAsync();
                     }
                     catch (Exception ex)
@@ -439,6 +439,7 @@ namespace SIGETOUR.API.Controllers.UI
                         recentBookings = await _context.Bookings
                             .Include(b => b.Items)
                             .ThenInclude(i => i.TourPackage)
+                            .Where(b => b.Status != BookingStatus.Draft)
                             .OrderByDescending(b => b.BookingDate)
                             .Take(5)
                             .ToListAsync();
@@ -634,6 +635,11 @@ namespace SIGETOUR.API.Controllers.UI
                 {
                     query = query.Where(b => b.Status == stEnum);
                 }
+            }
+            else
+            {
+                // Por defecto, solo mostrar reservas operativas reales (excluir borradores no confirmados de checkout)
+                query = query.Where(b => b.Status != BookingStatus.Draft);
             }
 
             if (date.HasValue)
@@ -4264,7 +4270,7 @@ namespace SIGETOUR.API.Controllers.UI
                         var rawUnassigned = await _context.Bookings
                             .AsNoTracking()
                             .Include(b => b.Items).ThenInclude(i => i.TourPackage)
-                            .Where(b => b.Status != BookingStatus.Cancelled && b.TravelDate >= startDate && b.TravelDate < endDate)
+                            .Where(b => b.Status != BookingStatus.Cancelled && b.Status != BookingStatus.Draft && b.TravelDate >= startDate && b.TravelDate < endDate)
                             .Where(b => b.AssignedVehicleId == null || b.AssignedDriverId == null)
                             .OrderBy(b => b.TravelDate)
                             .Take(3)
@@ -4323,6 +4329,7 @@ namespace SIGETOUR.API.Controllers.UI
                     {
                         var rawBookings = await _context.Bookings
                             .AsNoTracking()
+                            .Where(b => b.Status != BookingStatus.Draft)
                             .OrderByDescending(b => b.BookingDate)
                             .Take(5)
                             .Select(b => new {
