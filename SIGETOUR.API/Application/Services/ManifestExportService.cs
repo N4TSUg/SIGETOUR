@@ -154,7 +154,29 @@ namespace SIGETOUR.API.Application.Services
                 .FirstOrDefaultAsync(t => t.Id == request.TourPackageId)
                 ?? throw new Exception("Tour no encontrado.");
 
-            // Si se seleccionó un DriverId de la base de datos, extraer sus datos oficiales
+            var bookings = await GetMatchingBookingsAsync(request.Date, request.TourPackageId, request.ShiftName);
+
+            // Auto-recuperación de unidad vehicular asignada desde las reservas de la salida
+            if (request.VehicleId == Guid.Empty)
+            {
+                var existingVid = bookings.FirstOrDefault(b => b.AssignedVehicleId.HasValue && b.AssignedVehicleId.Value != Guid.Empty)?.AssignedVehicleId;
+                if (existingVid.HasValue)
+                {
+                    request.VehicleId = existingVid.Value;
+                }
+            }
+
+            // Auto-recuperación de conductor asignado desde las reservas de la salida
+            if (!request.DriverId.HasValue || request.DriverId.Value == Guid.Empty)
+            {
+                var existingDid = bookings.FirstOrDefault(b => b.AssignedDriverId.HasValue && b.AssignedDriverId.Value != Guid.Empty)?.AssignedDriverId;
+                if (existingDid.HasValue)
+                {
+                    request.DriverId = existingDid.Value;
+                }
+            }
+
+            // Si se seleccionó o detectó un DriverId de la base de datos, extraer sus datos oficiales
             if (request.DriverId.HasValue && request.DriverId.Value != Guid.Empty)
             {
                 var driverDb = await _context.Drivers.FindAsync(request.DriverId.Value);
@@ -170,6 +192,10 @@ namespace SIGETOUR.API.Application.Services
             {
                 vehicle = await _context.Vehicles.FirstOrDefaultAsync(v => v.Id == request.VehicleId);
             }
+            if (vehicle == null)
+            {
+                vehicle = bookings.FirstOrDefault(b => b.AssignedVehicle != null)?.AssignedVehicle;
+            }
             if (vehicle == null && tour.DefaultVehicle != null)
             {
                 vehicle = tour.DefaultVehicle;
@@ -181,9 +207,18 @@ namespace SIGETOUR.API.Application.Services
                        ?? new Vehicle { Model = "Van Turística Estándar", LicensePlate = "T7C-000", SeatCapacity = 18 };
             }
 
+            if (string.IsNullOrWhiteSpace(request.DriverName))
+            {
+                var assignedD = bookings.FirstOrDefault(b => b.AssignedDriver != null)?.AssignedDriver;
+                if (assignedD != null)
+                {
+                    request.DriverName = assignedD.FullName;
+                    request.DriverLicense = assignedD.LicenseNumber;
+                }
+            }
+
             int totalSeats = vehicle.SeatCapacity > 0 ? vehicle.SeatCapacity : 18;
 
-            var bookings = await GetMatchingBookingsAsync(request.Date, request.TourPackageId, request.ShiftName);
             var passengerList = ExtractPassengers(bookings);
 
             using var workbook = new XLWorkbook();
@@ -604,6 +639,8 @@ namespace SIGETOUR.API.Application.Services
 
             var candidates = await _context.Bookings
                 .Include(b => b.Items)
+                .Include(b => b.AssignedVehicle)
+                .Include(b => b.AssignedDriver)
                 .Where(b => b.TravelDate >= minUtc && b.TravelDate <= maxUtc &&
                             b.Status != BookingStatus.Cancelled &&
                             b.Status != BookingStatus.Draft &&

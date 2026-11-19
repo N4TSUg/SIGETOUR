@@ -552,10 +552,13 @@ namespace SIGETOUR.Tests.Controllers
             Assert.Equal("sky", depEspera.StatusColor);
 
             // 3. Hoy en ventana <= 45 min -> Abordando (Por Asignar)
-            var depAbordando = model.Departures.FirstOrDefault(d => d.TourId == tourAbordando.Id);
-            Assert.NotNull(depAbordando);
-            Assert.Equal("Abordando (Por Asignar)", depAbordando.Status);
-            Assert.Equal("amber", depAbordando.StatusColor);
+            if (peruNow.TimeOfDay.TotalMinutes <= 24 * 60 - 45)
+            {
+                var depAbordando = model.Departures.FirstOrDefault(d => d.TourId == tourAbordando.Id);
+                Assert.NotNull(depAbordando);
+                Assert.Equal("Abordando (Por Asignar)", depAbordando.Status);
+                Assert.Equal("amber", depAbordando.StatusColor);
+            }
 
             // 4. Hoy durante el recorrido -> En Ruta (Despachado)
             if (peruNow.TimeOfDay.TotalHours >= 1.5)

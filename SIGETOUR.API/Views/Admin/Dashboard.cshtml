@@ -407,22 +407,23 @@
                                 </td>
                                 <td class="py-3.5 px-4 text-right">
                                     <div class="flex items-center justify-end gap-1.5">
-                                        <!-- Botón Regularizar / Asignar Manifiesto -->
-                                        <button type="button"
-                                                onclick="openRegularizeModal('@dep.TourId', '@Html.Raw(dep.TourTitle.Replace("'", "\\'"))', '@dep.DepartureDate.ToString("yyyy-MM-dd")', '@dep.FormattedDate', '@Html.Raw((dep.ShiftName ?? "").Replace("'", "\\'"))', '@dep.BookedSeats', '@(dep.VehicleId?.ToString() ?? "")', '@(dep.DriverId?.ToString() ?? "")', '@(dep.IsHistorical ? "True" : "False")')"
-                                                class="px-2 py-1 rounded-lg @(dep.IsHistorical && !dep.IsManifestRegularized ? "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold" : "hover:bg-primary/10 text-primary border border-primary/20 hover:border-primary") text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
-                                                title="@(dep.IsHistorical ? "Regularizar Manifiesto Manual / Normalizar Asignación" : "Asignar Flota y Conductor de Despacho")">
-                                            <span class="material-symbols-outlined text-[16px]">@(dep.IsHistorical ? "assignment_turned_in" : "assignment_add")</span>
-                                            <span>@(dep.IsHistorical ? (dep.IsManifestRegularized ? "Modificar" : "Regularizar") : "Asignar")</span>
-                                        </button>
-
                                         <!-- Botón Descargar Manifiesto Excel MTC -->
                                         <a href="@Url.Action("ExportManifestExcel", "Admin", new { tourPackageId = dep.TourId, date = dep.DepartureDate.ToString("yyyy-MM-dd"), shiftName = dep.ShiftName, vehicleId = dep.VehicleId, driverId = dep.DriverId })"
                                            target="_blank"
-                                           class="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-700 border border-emerald-200 transition-all"
+                                           class="btn-export-manifest inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg @(dep.VehicleId.HasValue ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold" : "hover:bg-emerald-50 text-emerald-700 border border-emerald-200") text-[11px] transition-all shadow-2xs"
                                            title="Descargar Manifiesto Oficial de Pasajeros (Excel MTC)">
-                                            <span class="material-symbols-outlined text-[18px]">table_view</span>
+                                            <span class="material-symbols-outlined text-[16px] text-emerald-700">table_view</span>
+                                            <span>Manifiesto MTC</span>
                                         </a>
+
+                                        <!-- Botón Regularizar / Asignar / Modificar Despacho -->
+                                        <button type="button"
+                                                onclick="openRegularizeModalFromRow(this)"
+                                                class="btn-assign-departure px-2 py-1 rounded-lg @(dep.IsHistorical && !dep.IsManifestRegularized ? "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold" : (dep.VehicleId.HasValue ? "hover:bg-primary/10 text-primary border border-primary/20 hover:border-primary" : "bg-primary text-on-primary hover:bg-primary/90 font-bold shadow-xs")) text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                                                title="@(dep.IsHistorical ? "Regularizar Manifiesto Manual / Normalizar Asignación" : (dep.VehicleId.HasValue ? "Modificar Unidad y Conductor Asignados" : "Asignar Flota y Conductor de Despacho"))">
+                                            <span class="material-symbols-outlined text-[16px]">@(dep.IsHistorical ? (dep.IsManifestRegularized ? "edit" : "assignment_turned_in") : (dep.VehicleId.HasValue ? "edit" : "assignment_add"))</span>
+                                            <span>@(dep.IsHistorical ? (dep.IsManifestRegularized ? "Modificar" : "Regularizar") : (dep.VehicleId.HasValue ? "Modificar" : "Asignar"))</span>
+                                        </button>
 
                                         <!-- Botón Ver Pasajeros / Reservas -->
                                         <a asp-controller="Admin" asp-action="Bookings" asp-route-tourId="@dep.TourId"
@@ -765,27 +766,40 @@
         }
     }
 
+    function openRegularizeModalFromRow(btn) {
+        const row = btn.closest('.departure-row');
+        if (!row) return;
+        const tourId = row.dataset.tourId;
+        const tourTitle = row.dataset.tourTitle;
+        const dateStr = row.dataset.date;
+        const dateFormatted = row.dataset.dateFormatted;
+        const shiftName = row.dataset.shift || '';
+        const pax = row.dataset.pax;
+        const vehicleId = row.dataset.vehicleId;
+        const driverId = row.dataset.driverId;
+        const isHistorical = row.dataset.tabType === 'history';
+        openRegularizeModal(tourId, tourTitle, dateStr, dateFormatted, shiftName, pax, vehicleId, driverId, isHistorical);
+    }
+
     function openRegularizeModal(tourId, tourTitle, dateStr, dateFormatted, shiftName, pax, vehicleId, driverId, isHistorical) {
         document.getElementById('regTourId').value = tourId;
         document.getElementById('regDate').value = dateStr;
-        document.getElementById('regShiftName').value = shiftName;
+        document.getElementById('regShiftName').value = shiftName || '';
 
         document.getElementById('regSummaryTour').textContent = tourTitle;
         document.getElementById('regSummaryDate').textContent = dateFormatted;
         document.getElementById('regSummaryShift').textContent = shiftName || 'General / Salida Única';
         document.getElementById('regSummaryPax').textContent = pax + ' pasajero(s)';
 
-        if (isHistorical === 'True' || isHistorical === true) {
-            document.getElementById('regModalTitle').textContent = 'Regularizar Manifiesto Manual (Historial)';
+        const isHist = (isHistorical === 'True' || isHistorical === true);
+        if (isHist) {
+            document.getElementById('regModalTitle').textContent = vehicleId ? 'Modificar Manifiesto Regularizado (Historial)' : 'Regularizar Manifiesto Manual (Historial)';
         } else {
-            document.getElementById('regModalTitle').textContent = 'Asignar Flota y Conductor de Despacho';
+            document.getElementById('regModalTitle').textContent = vehicleId ? 'Modificar Asignación de Despacho' : 'Asignar Flota y Conductor de Despacho';
         }
 
-        if (vehicleId) document.getElementById('regVehicleId').value = vehicleId;
-        else document.getElementById('regVehicleId').value = '';
-
-        if (driverId) document.getElementById('regDriverId').value = driverId;
-        else document.getElementById('regDriverId').value = '';
+        document.getElementById('regVehicleId').value = vehicleId || '';
+        document.getElementById('regDriverId').value = driverId || '';
 
         document.getElementById('regNotes').value = '';
         currentRegRowKey = `row-${tourId}-${dateStr.replace(/-/g, '')}-${(shiftName || '').replace(/\s+/g, '')}`;
@@ -860,8 +874,8 @@
                 const tourId = document.getElementById('regTourId').value;
                 const date = document.getElementById('regDate').value;
                 const shift = document.getElementById('regShiftName').value;
-                const vId = document.getElementById('regVehicleId').value;
-                const dId = document.getElementById('regDriverId').value;
+                const vId = data.vehicleId || document.getElementById('regVehicleId').value;
+                const dId = data.driverId || document.getElementById('regDriverId').value;
                 window.location.href = `/Admin/ExportManifestExcel?tourPackageId=${encodeURIComponent(tourId)}&date=${encodeURIComponent(date)}&shiftName=${encodeURIComponent(shift)}&vehicleId=${encodeURIComponent(vId)}&driverId=${encodeURIComponent(dId)}`;
             } else {
                 alert(data.message || 'Error al regularizar el manifiesto.');
@@ -878,6 +892,9 @@
         if (!currentRegRowKey) return;
         const row = document.querySelector(`[data-dep-id="${currentRegRowKey}"]`);
         if (row) {
+            if (data.vehicleId) row.dataset.vehicleId = data.vehicleId;
+            if (data.driverId) row.dataset.driverId = data.driverId;
+
             const vLabel = row.querySelector('.vehicle-model-label');
             if (vLabel) {
                 vLabel.textContent = data.vehicleModel;
@@ -898,6 +915,29 @@
             if (mBadge) {
                 mBadge.className = 'manifest-status-badge inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
                 mBadge.innerHTML = '<span class="material-symbols-outlined text-[12px]">verified</span> Manifiesto OK';
+            }
+
+            // Actualizar enlace de descarga de manifiesto con los nuevos IDs
+            const exportLink = row.querySelector('.btn-export-manifest');
+            if (exportLink) {
+                const tourId = row.dataset.tourId;
+                const date = row.dataset.date;
+                const shift = row.dataset.shift || '';
+                const vId = data.vehicleId || row.dataset.vehicleId || '';
+                const dId = data.driverId || row.dataset.driverId || '';
+                exportLink.href = `/Admin/ExportManifestExcel?tourPackageId=${encodeURIComponent(tourId)}&date=${encodeURIComponent(date)}&shiftName=${encodeURIComponent(shift)}&vehicleId=${encodeURIComponent(vId)}&driverId=${encodeURIComponent(dId)}`;
+                exportLink.className = "btn-export-manifest inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[11px] transition-all shadow-2xs";
+            }
+
+            // Actualizar botón de asignación a 'Modificar'
+            const assignBtn = row.querySelector('.btn-assign-departure');
+            if (assignBtn) {
+                const labelSpan = assignBtn.querySelector('span:not(.material-symbols-outlined)');
+                if (labelSpan) labelSpan.textContent = 'Modificar';
+                const iconSpan = assignBtn.querySelector('.material-symbols-outlined');
+                if (iconSpan) iconSpan.textContent = 'edit';
+                assignBtn.className = "btn-assign-departure px-2 py-1 rounded-lg hover:bg-primary/10 text-primary border border-primary/20 hover:border-primary text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs";
+                assignBtn.title = "Modificar Unidad y Conductor Asignados";
             }
         }
     }

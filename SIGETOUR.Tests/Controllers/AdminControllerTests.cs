@@ -671,6 +671,62 @@ namespace SIGETOUR.Tests.Controllers
         }
 
         [Fact]
+        public async Task ExportManifestExcel_AutoRecovers_AssignedVehicleAndDriver_WhenOmittedInRequest()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+
+            var booking = context.Bookings.Include(b => b.Items).First();
+            var tourId = booking.Items.First().TourPackageId;
+            var vehicle = context.Vehicles.First();
+
+            var driver = new Driver
+            {
+                Id = Guid.NewGuid(),
+                FullName = "Conductor Previamente Asignado",
+                Dni = "40102030",
+                LicenseNumber = "Q-40102030",
+                IsActive = true
+            };
+            context.Drivers.Add(driver);
+
+            // Pre-asignamos vehículo y conductor en la reserva
+            booking.AssignedVehicleId = vehicle.Id;
+            booking.AssignedDriverId = driver.Id;
+            context.SaveChanges();
+
+            ManifestExportRequest? capturedRequest = null;
+            var mockManifest = new Mock<IManifestExportService>();
+            mockManifest.Setup(m => m.GenerateManifestExcelAsync(It.IsAny<ManifestExportRequest>()))
+                .Callback<ManifestExportRequest>(req => capturedRequest = req)
+                .ReturnsAsync(new byte[] { 1, 2, 3 });
+
+            var controller = TestHelpers.CreateAdminController(context, manifestService: mockManifest);
+
+            // Request sin vehicleId ni driverId (como al hacer clic directo en descarga de manifiesto)
+            var queryRequest = new ManifestExportRequest
+            {
+                Date = booking.TravelDate.Date,
+                TourPackageId = tourId,
+                VehicleId = Guid.Empty,
+                DriverId = null,
+                ShiftName = booking.ShiftName
+            };
+
+            // Act
+            var result = await controller.ExportManifestExcel(null, queryRequest);
+
+            // Assert
+            Assert.IsType<FileContentResult>(result);
+            Assert.NotNull(capturedRequest);
+            Assert.Equal(vehicle.Id, capturedRequest.VehicleId);
+            Assert.Equal(driver.Id, capturedRequest.DriverId);
+            Assert.Equal(driver.FullName, capturedRequest.DriverName);
+            Assert.Equal(driver.LicenseNumber, capturedRequest.DriverLicense);
+        }
+
+        [Fact]
         public async Task Dashboard_DeparturesBoard_ShowsRealOccupancyAndEmptyWhenUnassigned()
         {
             // Arrange

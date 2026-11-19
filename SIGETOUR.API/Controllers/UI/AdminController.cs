@@ -769,13 +769,11 @@ namespace SIGETOUR.API.Controllers.UI
 
             try
             {
-                var fileBytes = await _manifestService.GenerateManifestExcelAsync(req);
-                var tour = await _context.TourPackages.FindAsync(req.TourPackageId);
-                var vehicle = await _context.Vehicles.FindAsync(req.VehicleId);
-
                 // Enlazar vehículo y conductor a las reservas correspondientes para esta salida oficial
                 var matchingBookings = await _context.Bookings
                     .Include(b => b.Items)
+                    .Include(b => b.AssignedVehicle)
+                    .Include(b => b.AssignedDriver)
                     .Where(b => b.Status != BookingStatus.Cancelled &&
                                 b.Items.Any(i => i.TourPackageId == req.TourPackageId))
                     .ToListAsync();
@@ -799,6 +797,41 @@ namespace SIGETOUR.API.Controllers.UI
                     ).ToList();
                 }
 
+                // Auto-recuperación de vehículo asignado si no fue especificado en la llamada
+                if (req.VehicleId == Guid.Empty)
+                {
+                    var existingVehicleId = matchingBookings.FirstOrDefault(b => b.AssignedVehicleId.HasValue && b.AssignedVehicleId.Value != Guid.Empty)?.AssignedVehicleId;
+                    if (existingVehicleId.HasValue)
+                    {
+                        req.VehicleId = existingVehicleId.Value;
+                    }
+                }
+
+                // Auto-recuperación de conductor asignado si no fue especificado en la llamada
+                if (!req.DriverId.HasValue || req.DriverId.Value == Guid.Empty)
+                {
+                    var existingDriverId = matchingBookings.FirstOrDefault(b => b.AssignedDriverId.HasValue && b.AssignedDriverId.Value != Guid.Empty)?.AssignedDriverId;
+                    if (existingDriverId.HasValue)
+                    {
+                        req.DriverId = existingDriverId.Value;
+                    }
+                }
+
+                if (req.DriverId.HasValue && req.DriverId.Value != Guid.Empty && string.IsNullOrWhiteSpace(req.DriverName))
+                {
+                    var driverDb = await _context.Drivers.FindAsync(req.DriverId.Value);
+                    if (driverDb != null)
+                    {
+                        req.DriverName = driverDb.FullName;
+                        req.DriverLicense = driverDb.LicenseNumber;
+                    }
+                }
+
+                // Generar manifiesto oficial con los datos precisos de unidad y conductor asignados
+                var fileBytes = await _manifestService.GenerateManifestExcelAsync(req);
+                var tour = await _context.TourPackages.FindAsync(req.TourPackageId);
+                var vehicle = req.VehicleId != Guid.Empty ? await _context.Vehicles.FindAsync(req.VehicleId) : null;
+
                 foreach (var b in matchingBookings)
                 {
                     if (req.VehicleId != Guid.Empty)
@@ -809,10 +842,13 @@ namespace SIGETOUR.API.Controllers.UI
                     {
                         b.AssignedDriverId = req.DriverId;
                     }
-                    b.Status = BookingStatus.Confirmed;
+                    if (b.Status == BookingStatus.Pending)
+                    {
+                        b.Status = BookingStatus.Confirmed;
+                    }
                 }
 
-                if (vehicle != null)
+                if (vehicle != null && req.Date.Date >= PeruTime.Today)
                 {
                     vehicle.Status = "Operativo en Ruta (En Servicio)";
                     vehicle.IsActive = true;
@@ -925,8 +961,10 @@ namespace SIGETOUR.API.Controllers.UI
                 {
                     success = true,
                     message = $"Manifiesto regularizado exitosamente. Se asignó la unidad {vehicle.LicensePlate} ({vehicle.Model}) a {matchingBookings.Count} reserva(s).",
+                    vehicleId = vehicle.Id,
                     vehicleModel = vehicle.Model,
                     licensePlate = vehicle.LicensePlate,
+                    driverId = driver?.Id,
                     driverName = driver != null ? driver.FullName : "Sin conductor asignado",
                     bookingsUpdated = matchingBookings.Count
                 });
