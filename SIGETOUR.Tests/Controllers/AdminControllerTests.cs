@@ -871,5 +871,121 @@ namespace SIGETOUR.Tests.Controllers
             Assert.Equal(nameof(controller.Bookings), redirectResult.ActionName);
             Assert.True(controller.TempData.ContainsKey("ErrorMessage"));
         }
+
+        [Fact]
+        public async Task CancelBooking_WithCashRefundAndSunatVoid_RegistersEgresoAndCancelsReceipt()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+
+            var booking = context.Bookings.First();
+            booking.TotalAmount = 120m;
+            booking.PaidAmount = 120m;
+            booking.Status = BookingStatus.Confirmed;
+
+            var receipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Number = "24",
+                Status = "Accepted",
+                Environment = "Simulation",
+                TotalAmount = 120m
+            };
+            context.ElectronicReceipts.Add(receipt);
+            await context.SaveChangesAsync();
+
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.CancelBooking(
+                booking.Id,
+                refundType: "full",
+                refundAmount: 120m,
+                registerCashRefund: true,
+                refundMethod: "Efectivo",
+                voidSunatReceipt: true,
+                sunatAction: "credit_note",
+                cancelReason: "Cancelación solicitada por el pasajero");
+
+            // Assert
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal(nameof(controller.Bookings), redirect.ActionName);
+
+            var updatedBooking = await context.Bookings.FindAsync(booking.Id);
+            Assert.NotNull(updatedBooking);
+            Assert.Equal(BookingStatus.Cancelled, updatedBooking.Status);
+            Assert.Equal(0m, updatedBooking.PaidAmount);
+
+            var refundTx = await context.CashTransactions
+                .FirstOrDefaultAsync(t => t.BookingId == booking.Id && t.TransactionType == "Egreso");
+            Assert.NotNull(refundTx);
+            Assert.Equal(120m, refundTx.Amount);
+            Assert.Equal("Devolución", refundTx.Category);
+
+            var updatedReceipt = await context.ElectronicReceipts.FindAsync(receipt.Id);
+            Assert.NotNull(updatedReceipt);
+            Assert.Equal("Cancelled", updatedReceipt.Status);
+        }
+
+        [Fact]
+        public async Task CancelDeparture_CancelsAllMatchingBookings_RegistersRefundsAndVoidsReceipts()
+        {
+            // Arrange
+            using var context = TestDbContextFactory.Create();
+            TestDbContextFactory.SeedSampleData(context);
+
+            var booking = context.Bookings.Include(b => b.Items).First();
+            var tourId = booking.Items.First().TourPackageId;
+            booking.PaidAmount = 100m;
+            booking.Status = BookingStatus.Confirmed;
+
+            var receipt = new ElectronicReceipt
+            {
+                Id = Guid.NewGuid(),
+                BookingId = booking.Id,
+                ReceiptType = "Boleta",
+                Series = "BBB1",
+                Number = "25",
+                Status = "Accepted",
+                Environment = "Simulation",
+                TotalAmount = 100m
+            };
+            context.ElectronicReceipts.Add(receipt);
+            await context.SaveChangesAsync();
+
+            var controller = TestHelpers.CreateAdminController(context);
+
+            // Act
+            var result = await controller.CancelDeparture(
+                tourId,
+                booking.TravelDate.Date,
+                booking.ShiftName,
+                registerCashRefund: true,
+                voidSunatReceipts: true,
+                sunatAction: "credit_note",
+                cancelReason: "Bloqueo de carretera / Clima");
+
+            // Assert
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal(nameof(controller.Dashboard), redirect.ActionName);
+
+            var updatedBooking = await context.Bookings.FindAsync(booking.Id);
+            Assert.NotNull(updatedBooking);
+            Assert.Equal(BookingStatus.Cancelled, updatedBooking.Status);
+            Assert.Equal(0m, updatedBooking.PaidAmount);
+
+            var refundTx = await context.CashTransactions
+                .FirstOrDefaultAsync(t => t.BookingId == booking.Id && t.TransactionType == "Egreso");
+            Assert.NotNull(refundTx);
+            Assert.Equal(100m, refundTx.Amount);
+
+            var updatedReceipt = await context.ElectronicReceipts.FindAsync(receipt.Id);
+            Assert.NotNull(updatedReceipt);
+            Assert.Equal("Cancelled", updatedReceipt.Status);
+        }
     }
 }

@@ -313,6 +313,13 @@
                     }
                 </div>
             }
+            else if (receipt?.Status == "Cancelled")
+            {
+                <div class="text-center font-bold text-[8.5px] bg-red-50 text-red-900 p-1.5 border border-red-400 rounded mb-1.5 uppercase">
+                    *** COMPROBANTE ANULADO / DADO DE BAJA ***<br />
+                    <span class="normal-case font-medium block mt-0.5 text-[8px]">@(receipt.ProviderDescription ?? "Operación anulada por devolución o cancelación de reserva")</span>
+                </div>
+            }
             else if (receipt?.Status == "Rejected")
             {
                 var rawErr = receipt?.LastError ?? receipt?.ProviderDescription ?? "Rechazado por el proveedor tributario";

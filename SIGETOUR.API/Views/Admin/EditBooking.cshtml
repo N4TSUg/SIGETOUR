@@ -78,9 +78,16 @@
         </button>
         @if (!isCancelled)
         {
-          <button type="button" onclick="openCancelModal()" class="bg-surface-container border border-red-300 text-red-600 hover:bg-red-50 transition-colors font-label-md px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold cursor-pointer" title="Anular esta reserva">
+          @if (Model.PaidAmount > 0)
+          {
+            <button type="button" onclick="openRefundModal()" class="bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100 transition-colors font-label-md px-3.5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm font-bold cursor-pointer" title="Registrar devolución parcial de dinero en Caja General manteniendo la reserva">
+              <span class="material-symbols-outlined text-[18px] text-amber-700">currency_exchange</span>
+              Devolución Parcial
+            </button>
+          }
+          <button type="button" onclick="openCancelModal()" class="bg-surface-container border border-red-300 text-red-600 hover:bg-red-50 transition-colors font-label-md px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-sm font-bold cursor-pointer" title="Anular esta reserva y regularizar devolución en Caja y SUNAT">
             <span class="material-symbols-outlined text-[18px]">cancel</span>
-            Anular Reserva
+            Anular / Devolver
           </button>
         }
         else
@@ -107,51 +114,195 @@
 </form>
 </div>
 
-<!-- MODAL DE ANULACIÓN DE RESERVA -->
+<!-- MODAL INTEGRADO DE ANULACIÓN Y REGULARIZACIÓN (CAJA Y SUNAT) -->
 <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="cancelBookingModal">
-    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-lg border border-outline-variant shadow-2xl overflow-hidden transform transition-all duration-200">
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-xl border border-outline-variant shadow-2xl overflow-hidden transform transition-all duration-200 max-h-[92vh] overflow-y-auto">
         <div class="h-2 w-full bg-red-600"></div>
-        <div class="p-6 pb-4 flex items-start justify-between gap-4">
+        <div class="p-6 pb-4 flex items-start justify-between gap-4 border-b border-outline-variant/50">
             <div class="flex items-center gap-3">
                 <div class="w-12 h-12 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
-                    <span class="material-symbols-outlined text-[28px]">warning</span>
+                    <span class="material-symbols-outlined text-[28px]">cancel</span>
                 </div>
                 <div>
-                    <h3 class="text-headline-sm font-bold text-on-surface leading-snug">¿Confirmas anular esta reserva?</h3>
-                    <span class="text-label-sm text-red-600 font-bold tracking-wider uppercase">Código @Model.ReferenceCode</span>
+                    <h3 class="text-title-md font-bold text-on-surface leading-snug">Anular Reserva y Regularizar Devolución</h3>
+                    <span class="text-label-sm text-red-600 font-bold tracking-wider uppercase">Localizador @Model.ReferenceCode • @Model.TotalPassengers pax</span>
                 </div>
             </div>
             <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer" onclick="closeCancelModal()" type="button">
                 <span class="material-symbols-outlined">close</span>
             </button>
         </div>
-        <div class="px-6 py-4 space-y-4">
-            <p class="text-body-md text-on-surface leading-relaxed">
-                Estás a punto de anular la reserva a nombre de <strong class="font-bold text-primary">@Model.CustomerName</strong> para el tour <strong class="font-bold" id="modalTourName">@Model.TourName</strong>.
-            </p>
-            <div class="p-4 rounded-xl bg-red-50 border border-red-200 text-body-sm text-red-800 space-y-1">
-                <div class="flex items-center gap-1.5 font-bold">
-                    <span class="material-symbols-outlined text-[18px]">info</span>
-                    <span>Consecuencias operativas:</span>
+
+        <form asp-action="CancelBooking" method="post" id="cancelBookingForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+
+            <div class="px-6 py-4 space-y-4">
+                <!-- Resumen Financiero y Tributario Actual -->
+                <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/60 space-y-1.5 text-body-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-outline">Titular / Circuito:</span>
+                        <span class="font-bold text-on-surface">@Model.CustomerName • @Model.TourName</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-outline">Monto Abonado Actual:</span>
+                        <span class="font-bold text-emerald-700">S/ @Model.PaidAmount.ToString("N2") (@(string.IsNullOrWhiteSpace(Model.PaymentMethod) ? "Efectivo" : Model.PaymentMethod))</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-outline">Comprobante SUNAT Asociado:</span>
+                        <span class="font-bold text-primary">@(string.IsNullOrWhiteSpace(Model.InvoiceNumber) ? "Detección automática (Boleta / Factura)" : $"{Model.InvoiceType} {Model.InvoiceNumber}")</span>
+                    </div>
                 </div>
-                <ul class="list-disc list-inside text-xs space-y-0.5 pl-1">
-                    <li>La reserva pasará al estado <strong>Cancelado</strong>.</li>
-                    <li>Los @Model.TotalPassengers cupos quedarán liberados inmediatamente del despacho.</li>
-                    <li>Podrás reactivar la reserva en cualquier momento si fue un error.</li>
-                </ul>
+
+                @if (Model.PaidAmount > 0)
+                {
+                    <!-- 1. Devolución y Regularización en Caja General -->
+                    <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 font-bold text-amber-950 text-body-sm">
+                                <span class="material-symbols-outlined text-[19px] text-amber-700">point_of_sale</span>
+                                <span>1. Devolución de Dinero y Caja General</span>
+                            </div>
+                            <label class="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 cursor-pointer">
+                                <input type="checkbox" name="registerCashRefund" id="chkRegisterCashRefund" value="true" checked class="rounded border-amber-400 text-primary focus:ring-primary" />
+                                <span>Registrar Egreso en Caja</span>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-amber-300 bg-white cursor-pointer font-semibold text-on-surface">
+                                <input type="radio" name="refundType" value="full" checked onchange="toggleCancelRefundAmount()" class="text-primary focus:ring-primary" />
+                                <span>Total 100% (S/ @Model.PaidAmount.ToString("N2"))</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-amber-300 bg-white cursor-pointer font-semibold text-on-surface">
+                                <input type="radio" name="refundType" value="partial" onchange="toggleCancelRefundAmount()" class="text-primary focus:ring-primary" />
+                                <span>Parcial (Con penalidad)</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-amber-300 bg-white cursor-pointer font-semibold text-on-surface">
+                                <input type="radio" name="refundType" value="none" onchange="toggleCancelRefundAmount()" class="text-primary focus:ring-primary" />
+                                <span>Sin devolución (No-Show)</span>
+                            </label>
+                        </div>
+
+                        <div id="partialRefundInputBox" class="hidden pt-1 space-y-2">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <label for="cancelRefundAmountInput" class="text-xs font-bold text-amber-950">Monto exacto a devolver (S/):</label>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="setCancelPenaltyPreset(0.8)" class="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 text-[11px] font-bold cursor-pointer">80% (-20% penalidad)</button>
+                                    <button type="button" onclick="setCancelPenaltyPreset(0.5)" class="px-2 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 text-[11px] font-bold cursor-pointer">50% (-50% penalidad)</button>
+                                </div>
+                            </div>
+                            <input type="number" step="0.50" min="0" max="@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" name="refundAmount" id="cancelRefundAmountInput" value="@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" class="w-full py-2 px-3 rounded-lg border border-amber-300 bg-white text-body-sm font-bold text-on-surface" />
+                        </div>
+
+                        <div id="refundMethodBox" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            <div>
+                                <label for="cancelRefundMethod" class="block text-[11px] font-bold text-amber-900 mb-1">Medio de salida del dinero:</label>
+                                <select name="refundMethod" id="cancelRefundMethod" class="w-full py-1.5 px-2.5 rounded-lg border border-amber-300 bg-white text-xs font-semibold text-on-surface">
+                                    <option value="Efectivo">Efectivo (Caja General)</option>
+                                    <option value="Yape / Plin">Yape / Plin</option>
+                                    <option value="Transferencia BCP / BBVA">Transferencia Bancaria</option>
+                                    <option value="Extorno Culqi">Extorno Pasarela Culqi</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <p class="text-[11px] text-amber-800 leading-tight">Se descontará automáticamente del arqueo en el turno abierto de Caja General.</p>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <!-- 2. Regularización Tributaria SUNAT (NubeFact) -->
+                <div class="p-4 rounded-xl bg-sky-50/70 border border-sky-200 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2 font-bold text-sky-950 text-body-sm">
+                            <span class="material-symbols-outlined text-[19px] text-sky-700">receipt_long</span>
+                            <span>2. Regularización en SUNAT (NubeFact)</span>
+                        </div>
+                        <label class="inline-flex items-center gap-1.5 text-xs font-bold text-sky-900 cursor-pointer">
+                            <input type="checkbox" name="voidSunatReceipt" value="true" checked class="rounded border-sky-400 text-primary focus:ring-primary" />
+                            <span>Anular en SUNAT</span>
+                        </label>
+                    </div>
+                    <div>
+                        <label for="cancelSunatAction" class="block text-[11px] font-bold text-sky-900 mb-1">Operación Tributaria Electrónica:</label>
+                        <select name="sunatAction" id="cancelSunatAction" class="w-full py-2 px-3 rounded-lg border border-sky-300 bg-white text-xs font-semibold text-on-surface">
+                            <option value="credit_note">Emitir Nota de Crédito Electrónica (Catálogo 09 SUNAT - Anulación / Devolución)</option>
+                            <option value="void">Comunicación de Baja / Anulación Directa del Comprobante en NubeFact</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 3. Motivo de Anulación -->
+                <div>
+                    <label for="cancelReasonInput" class="block text-label-sm font-bold text-on-surface-variant mb-1">Motivo de Anulación / Sustento Tributario y de Caja</label>
+                    <input type="text" name="cancelReason" id="cancelReasonInput" value="Anulación de reserva y devolución a solicitud del pasajero" required class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface focus:border-primary outline-none" />
+                </div>
             </div>
-        </div>
-        <div class="p-6 pt-4 bg-surface-container-high/20 border-t border-outline-variant/40 flex flex-col-reverse sm:flex-row justify-end gap-3">
-            <button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md font-bold hover:bg-surface-container transition-all cursor-pointer" onclick="closeCancelModal()" type="button">Volver</button>
-            <form asp-action="CancelBooking" method="post" id="cancelBookingForm">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="id" value="@Model.Id" />
-                <button type="submit" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700 cursor-pointer">
+
+            <div class="p-6 pt-4 bg-surface-container-high/20 border-t border-outline-variant/40 flex flex-col-reverse sm:flex-row justify-end gap-3">
+                <button class="px-5 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface font-label-md font-bold hover:bg-surface-container transition-all cursor-pointer" onclick="closeCancelModal()" type="button">Volver</button>
+                <button type="submit" class="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 text-white font-label-md font-bold shadow-sm transition-all hover:bg-red-700 cursor-pointer">
                     <span class="material-symbols-outlined text-[18px]">cancel</span>
-                    <span>Sí, Anular Reserva</span>
+                    <span>Confirmar Anulación y Regularizar</span>
                 </button>
-            </form>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL DE DEVOLUCIÓN PARCIAL (MANTENIENDO LA RESERVA ACTIVA) -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-inverse-surface/70 backdrop-blur-sm transition-opacity duration-200 hidden" id="refundBookingModal">
+    <div class="bg-surface-container-lowest rounded-2xl w-full max-w-lg border border-outline-variant shadow-2xl overflow-hidden transform transition-all duration-200">
+        <div class="h-2 w-full bg-amber-500"></div>
+        <div class="p-6 pb-4 flex items-start justify-between gap-4 border-b border-outline-variant/50">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-800 shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">currency_exchange</span>
+                </div>
+                <div>
+                    <h3 class="text-title-md font-bold text-on-surface">Registrar Devolución / Reembolso en Caja</h3>
+                    <span class="text-label-sm text-amber-800 font-bold uppercase">Reserva @Model.ReferenceCode • Pagado: S/ @Model.PaidAmount.ToString("N2")</span>
+                </div>
+            </div>
+            <button class="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer" onclick="closeRefundModal()" type="button">
+                <span class="material-symbols-outlined">close</span>
+            </button>
         </div>
+        <form asp-action="RefundBookingPayment" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+            <div class="px-6 py-4 space-y-4">
+                <p class="text-xs text-on-surface-variant leading-relaxed">
+                    Usa esta opción cuando la reserva continúa activa (por ejemplo, si desiste 1 acompañante o se aplica un descuento) y deseas devolver parte del dinero registrando el <strong>Egreso en Caja General</strong>.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Monto a Devolver (S/) *</label>
+                        <input type="number" step="0.50" min="0.50" max="@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" name="refundAmount" value="@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" required class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm font-bold text-on-surface" />
+                    </div>
+                    <div>
+                        <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Medio de Devolución</label>
+                        <select name="paymentMethod" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Yape / Plin">Yape / Plin</option>
+                            <option value="Transferencia BCP / BBVA">Transferencia Bancaria</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-label-sm font-bold text-on-surface-variant mb-1">Motivo / Justificación de la Devolución *</label>
+                    <input type="text" name="reason" minlength="5" required placeholder="Ej: Devolución de 1 pasaje por inasistencia justificada de acompañante" class="w-full py-2 px-3 rounded-lg border border-outline-variant bg-surface-bright text-body-sm text-on-surface" />
+                </div>
+            </div>
+            <div class="p-6 pt-4 bg-surface-container-high/20 border-t border-outline-variant/40 flex justify-end gap-3">
+                <button type="button" onclick="closeRefundModal()" class="px-4 py-2 rounded-lg border border-outline-variant text-on-surface font-bold text-body-sm cursor-pointer">Cancelar</button>
+                <button type="submit" class="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-body-sm flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                    <span>Registrar Devolución en Caja</span>
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -409,6 +560,36 @@
     }
     function closeCancelModal() {
         document.getElementById('cancelBookingModal')?.classList.add('hidden');
+    }
+    function openRefundModal() {
+        document.getElementById('refundBookingModal')?.classList.remove('hidden');
+    }
+    function closeRefundModal() {
+        document.getElementById('refundBookingModal')?.classList.add('hidden');
+    }
+    function toggleCancelRefundAmount() {
+        const selected = document.querySelector('input[name="refundType"]:checked')?.value;
+        const partialBox = document.getElementById('partialRefundInputBox');
+        const methodBox = document.getElementById('refundMethodBox');
+        const chkCash = document.getElementById('chkRegisterCashRefund');
+        if (partialBox) {
+            partialBox.classList.toggle('hidden', selected !== 'partial');
+        }
+        if (methodBox) {
+            methodBox.classList.toggle('hidden', selected === 'none');
+        }
+        if (chkCash && selected === 'none') {
+            chkCash.checked = false;
+        } else if (chkCash && (selected === 'full' || selected === 'partial')) {
+            chkCash.checked = true;
+        }
+    }
+    function setCancelPenaltyPreset(factor) {
+        const basePaid = parseFloat('@Model.PaidAmount.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)') || 0;
+        const input = document.getElementById('cancelRefundAmountInput');
+        if (input) {
+            input.value = (Math.round(basePaid * factor * 100) / 100).toFixed(2);
+        }
     }
     function openDeleteBookingModal() {
         document.getElementById('deleteBookingModal')?.classList.remove('hidden');

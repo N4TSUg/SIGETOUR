@@ -3148,6 +3148,20 @@ namespace SIGETOUR.API.Controllers.UI
                     : booking.PickupLocation;
             }
 
+            var activeReceipt = await _context.ElectronicReceipts
+                .AsNoTracking()
+                .Where(r => r.BookingId == booking.Id && r.Status != "Cancelled")
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .FirstOrDefaultAsync();
+
+            var resolvedInvoiceType = !string.IsNullOrWhiteSpace(booking.InvoiceType)
+                ? booking.InvoiceType
+                : (activeReceipt?.ReceiptType ?? "Boleta");
+
+            var resolvedInvoiceNumber = !string.IsNullOrWhiteSpace(booking.InvoiceNumber)
+                ? booking.InvoiceNumber
+                : (activeReceipt != null && !string.IsNullOrWhiteSpace(activeReceipt.Number) ? activeReceipt.FullNumber : string.Empty);
+
             var vm = new SIGETOUR.API.Models.EditBookingViewModel
             {
                 Id = booking.Id,
@@ -3165,8 +3179,8 @@ namespace SIGETOUR.API.Controllers.UI
                 PaidAmount = booking.PaidAmount,
                 PaymentMethod = pMethod,
                 OperationNumber = booking.OperationNumber,
-                InvoiceType = booking.InvoiceType,
-                InvoiceNumber = booking.InvoiceNumber,
+                InvoiceType = resolvedInvoiceType,
+                InvoiceNumber = resolvedInvoiceNumber,
                 Status = booking.Status,
                 AdditionalPassengersJson = booking.AdditionalPassengersJson,
                 TourPackageId = tour?.Id ?? Guid.Empty,
@@ -3508,17 +3522,314 @@ namespace SIGETOUR.API.Controllers.UI
         [HttpPost]
         [Authorize(Policy = AppPermissions.BookingsManage)]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CancelBooking(Guid id)
+        public async Task<IActionResult> CancelBooking(
+            Guid id,
+            string? refundType = null,
+            decimal? refundAmount = null,
+            bool registerCashRefund = false,
+            string? refundMethod = null,
+            bool voidSunatReceipt = false,
+            string? sunatAction = null,
+            string? cancelReason = null)
         {
             var booking = await _context.Bookings.FindAsync(id);
             if (booking == null) return NotFound();
+
+            var reasonText = string.IsNullOrWhiteSpace(cancelReason)
+                ? "Anulación de reserva y devolución a solicitud del pasajero"
+                : cancelReason.Trim();
+
+            var messages = new List<string> { $"La reserva {booking.ReferenceCode} ha sido anulada con éxito." };
+
+            if (registerCashRefund && booking.PaidAmount > 0 && !string.Equals(refundType, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                decimal effectiveRefund = string.Equals(refundType, "partial", StringComparison.OrdinalIgnoreCase)
+                    ? Math.Clamp(refundAmount ?? booking.PaidAmount, 0m, booking.PaidAmount)
+                    : booking.PaidAmount;
+
+                if (effectiveRefund > 0)
+                {
+                    var shift = await GetOrCreateActiveOrAdminShiftAsync();
+                    var resolvedMethod = !string.IsNullOrWhiteSpace(refundMethod)
+                        ? refundMethod.Trim()
+                        : (!string.IsNullOrWhiteSpace(booking.PaymentMethod) ? booking.PaymentMethod : "Efectivo");
+
+                    _context.CashTransactions.Add(new CashTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        ShiftId = shift.Id,
+                        TransactionType = "Egreso",
+                        Category = "Devolución",
+                        Amount = effectiveRefund,
+                        PaymentMethod = resolvedMethod,
+                        ReferenceCode = booking.ReferenceCode,
+                        BookingId = booking.Id,
+                        Description = $"Devolución {(string.Equals(refundType, "partial", StringComparison.OrdinalIgnoreCase) ? "parcial" : "total")} por anulación de reserva {booking.ReferenceCode} ({booking.CustomerName}). Motivo: {reasonText}",
+                        RegisteredBy = User?.Identity?.Name ?? "Admin Central",
+                        CreatedAt = DateTime.UtcNow
+                    });
+
+                    booking.PaidAmount = Math.Max(0m, booking.PaidAmount - effectiveRefund);
+                    messages.Add($"Se registró el Egreso por Devolución en Caja General por S/ {effectiveRefund:N2} ({resolvedMethod}).");
+                }
+            }
+
+            if (voidSunatReceipt)
+            {
+                var voidedReceipts = await RegularizeSunatReceiptsOnCancellationAsync(booking, reasonText, sunatAction);
+                if (voidedReceipts.Any())
+                {
+                    messages.Add($"Comprobante(s) SUNAT ({string.Join(", ", voidedReceipts)}) regularizado(s) como Anulado / Nota de Crédito.");
+                }
+            }
 
             booking.Status = BookingStatus.Cancelled;
             _context.Bookings.Update(booking);
             await _context.SaveChangesAsync();
 
-            TempData["SuccessMessage"] = $"La reserva {booking.ReferenceCode} ha sido anulada con éxito.";
+            TempData["SuccessMessage"] = string.Join(" ", messages);
             return RedirectToAction(nameof(Bookings));
+        }
+
+        [HttpPost]
+        [Authorize(Policy = AppPermissions.BookingsManage)]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CancelDeparture(
+            Guid tourPackageId,
+            DateTime date,
+            string? shiftName = null,
+            bool registerCashRefund = true,
+            bool voidSunatReceipts = true,
+            string? sunatAction = "credit_note",
+            string? cancelReason = null)
+        {
+            if (tourPackageId == Guid.Empty)
+            {
+                TempData["ErrorMessage"] = "No se especificó un circuito válido para cancelar la salida.";
+                return RedirectToAction(nameof(Dashboard));
+            }
+
+            var targetDate = date.Date;
+            var normShift = string.IsNullOrWhiteSpace(shiftName) ? "General" : shiftName.Trim();
+            var reasonText = string.IsNullOrWhiteSpace(cancelReason)
+                ? "Cancelación de salida operativa por fuerza mayor / reprogramación"
+                : cancelReason.Trim();
+
+            var candidateBookings = await _context.Bookings
+                .Include(b => b.Items)
+                .Where(b => b.Status != BookingStatus.Cancelled &&
+                            b.Status != BookingStatus.Draft &&
+                            b.Items.Any(i => i.TourPackageId == tourPackageId))
+                .ToListAsync();
+
+            var matchingBookings = candidateBookings.Where(b =>
+            {
+                var bDate = b.TravelDate.Date == targetDate || PeruTime.ToPeruTime(b.TravelDate).Date == targetDate;
+                if (!bDate) return false;
+                var bShift = string.IsNullOrWhiteSpace(b.ShiftName) ? "General" : b.ShiftName.Trim();
+                return string.Equals(bShift, normShift, StringComparison.OrdinalIgnoreCase) ||
+                       normShift.Equals("General", StringComparison.OrdinalIgnoreCase);
+            }).ToList();
+
+            if (!matchingBookings.Any())
+            {
+                TempData["ErrorMessage"] = "No se encontraron reservas activas para la salida seleccionada.";
+                return RedirectToAction(nameof(Dashboard));
+            }
+
+            CashRegisterShift? shift = null;
+            if (registerCashRefund)
+            {
+                shift = await GetOrCreateActiveOrAdminShiftAsync();
+            }
+
+            int cancelledCount = 0;
+            decimal totalRefunded = 0m;
+            int sunatVoidedCount = 0;
+
+            foreach (var b in matchingBookings)
+            {
+                if (registerCashRefund && b.PaidAmount > 0 && shift != null)
+                {
+                    var refundAmt = b.PaidAmount;
+                    var method = !string.IsNullOrWhiteSpace(b.PaymentMethod) ? b.PaymentMethod : "Efectivo";
+
+                    _context.CashTransactions.Add(new CashTransaction
+                    {
+                        Id = Guid.NewGuid(),
+                        ShiftId = shift.Id,
+                        TransactionType = "Egreso",
+                        Category = "Devolución",
+                        Amount = refundAmt,
+                        PaymentMethod = method,
+                        ReferenceCode = b.ReferenceCode,
+                        BookingId = b.Id,
+                        Description = $"Devolución total (100%) por cancelación de salida operativa - Reserva {b.ReferenceCode} ({b.CustomerName}). Motivo: {reasonText}",
+                        RegisteredBy = User?.Identity?.Name ?? "Admin Central",
+                        CreatedAt = DateTime.UtcNow
+                    });
+
+                    totalRefunded += refundAmt;
+                    b.PaidAmount = 0m;
+                }
+
+                if (voidSunatReceipts)
+                {
+                    var voided = await RegularizeSunatReceiptsOnCancellationAsync(b, reasonText, sunatAction);
+                    sunatVoidedCount += voided.Count;
+                }
+
+                b.Status = BookingStatus.Cancelled;
+                _context.Bookings.Update(b);
+                cancelledCount++;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var tour = await _context.TourPackages.FindAsync(tourPackageId);
+            var tourTitle = tour?.Title ?? "Circuito";
+            TempData["SuccessMessage"] = $"Salida cancelada ({tourTitle} - {targetDate:dd/MM/yyyy} {normShift}): {cancelledCount} reserva(s) anulada(s), S/ {totalRefunded:N2} devueltos en Caja General y {sunatVoidedCount} comprobante(s) regularizado(s) en SUNAT.";
+            return RedirectToAction(nameof(Dashboard));
+        }
+
+        private async Task<List<string>> RegularizeSunatReceiptsOnCancellationAsync(Booking booking, string reasonText, string? sunatAction)
+        {
+            var regularizedNumbers = new List<string>();
+            var receipts = await _context.ElectronicReceipts
+                .Where(r => r.BookingId == booking.Id && r.Status != "Cancelled")
+                .ToListAsync();
+
+            var config = HttpContext?.RequestServices?.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration)) as Microsoft.Extensions.Configuration.IConfiguration;
+            var ruta = config?["Nubefact:Ruta"]?.Trim();
+            var token = config?["Nubefact:Token"]?.Trim();
+
+            foreach (var receipt in receipts)
+            {
+                var displayNum = !string.IsNullOrWhiteSpace(receipt.Number) ? receipt.FullNumber : $"{receipt.Series}-PEND";
+                string providerNote = $"Anulado por cancelación de reserva ({reasonText})";
+
+                if (!string.IsNullOrWhiteSpace(receipt.Series) &&
+                    !string.IsNullOrWhiteSpace(receipt.Number) &&
+                    int.TryParse(receipt.Number, out var numInt) &&
+                    numInt > 0 &&
+                    !string.Equals(receipt.Environment, "Simulation", StringComparison.OrdinalIgnoreCase) &&
+                    !string.IsNullOrWhiteSpace(ruta) &&
+                    !string.IsNullOrWhiteSpace(token))
+                {
+                    try
+                    {
+                        var isFactura = string.Equals(receipt.ReceiptType, "Factura", StringComparison.OrdinalIgnoreCase) ||
+                                        receipt.Series.StartsWith("F", StringComparison.OrdinalIgnoreCase);
+
+                        bool notified = false;
+                        if (string.Equals(sunatAction, "credit_note", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var total = receipt.TotalAmount > 0 ? receipt.TotalAmount : booking.TotalAmount;
+                            var subtotal = receipt.SubtotalAmount > 0 ? receipt.SubtotalAmount : Math.Round(total / 1.18m, 2);
+                            var igv = receipt.IgvAmount > 0 ? receipt.IgvAmount : Math.Round(total - subtotal, 2);
+                            var unitVal = Math.Round(total / 1.18m, 4);
+                            var docNumber = !string.IsNullOrWhiteSpace(receipt.CustomerDocNumber) ? receipt.CustomerDocNumber : (booking.CustomerDni ?? "00000000");
+                            var custName = !string.IsNullOrWhiteSpace(receipt.CustomerName) ? receipt.CustomerName : (booking.CustomerName ?? "Cliente General");
+
+                            var ncPayload = new Dictionary<string, object?>
+                            {
+                                ["operacion"] = "generar_comprobante",
+                                ["tipo_de_comprobante"] = 3,
+                                ["serie"] = receipt.Series,
+                                ["numero"] = null,
+                                ["sunat_transaction"] = 1,
+                                ["cliente_tipo_de_documento"] = isFactura ? 6 : 1,
+                                ["cliente_numero_de_documento"] = docNumber,
+                                ["cliente_denominacion"] = custName,
+                                ["cliente_direccion"] = "Cajamarca, Perú",
+                                ["fecha_de_emision"] = PeruTime.Today.ToString("dd-MM-yyyy"),
+                                ["moneda"] = 1,
+                                ["tipo_de_nota_de_credito"] = 1,
+                                ["documento_que_se_modifica_tipo"] = isFactura ? 1 : 2,
+                                ["documento_que_se_modifica_serie"] = receipt.Series,
+                                ["documento_que_se_modifica_numero"] = numInt,
+                                ["porcentaje_de_igv"] = 18.00,
+                                ["total_gravada"] = subtotal.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                                ["total_igv"] = igv.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                                ["total"] = total.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                                ["enviar_automaticamente_a_la_sunat"] = true,
+                                ["enviar_automaticamente_al_cliente"] = false,
+                                ["observaciones"] = reasonText,
+                                ["items"] = new[]
+                                {
+                                    new Dictionary<string, object?>
+                                    {
+                                        ["unidad_de_medida"] = "ZZ",
+                                        ["codigo"] = "NC-ANUL",
+                                        ["descripcion"] = $"Anulación / Devolución de reserva {booking.ReferenceCode} ({receipt.FullNumber})",
+                                        ["cantidad"] = 1,
+                                        ["valor_unitario"] = unitVal.ToString("F4", System.Globalization.CultureInfo.InvariantCulture),
+                                        ["precio_unitario"] = total.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                                        ["subtotal"] = subtotal.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                                        ["tipo_de_igv"] = 1,
+                                        ["igv"] = igv.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                                        ["total"] = total.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                                        ["anticipo_regularizacion"] = false
+                                    }
+                                }
+                            };
+
+                            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                            using var req = new HttpRequestMessage(HttpMethod.Post, ruta);
+                            req.Headers.TryAddWithoutValidation("Authorization", $"Token token=\"{token}\"");
+                            req.Content = new StringContent(
+                                System.Text.Json.JsonSerializer.Serialize(ncPayload),
+                                System.Text.Encoding.UTF8,
+                                "application/json");
+                            var resp = await http.SendAsync(req);
+                            var body = await resp.Content.ReadAsStringAsync();
+                            if (resp.IsSuccessStatusCode && !body.Contains("\"errors\"", StringComparison.OrdinalIgnoreCase))
+                            {
+                                notified = true;
+                                providerNote = $"Nota de Crédito emitida en SUNAT/NubeFact sobre {receipt.FullNumber}. Motivo: {reasonText}";
+                            }
+                        }
+
+                        if (!notified)
+                        {
+                            var voidPayload = new Dictionary<string, object?>
+                            {
+                                ["operacion"] = "generar_anulacion",
+                                ["tipo_de_comprobante"] = isFactura ? 1 : 2,
+                                ["serie"] = receipt.Series,
+                                ["numero"] = numInt,
+                                ["motivo"] = reasonText.ToUpperInvariant(),
+                                ["codigo_unico"] = $"VOID-{receipt.Id:N}"
+                            };
+
+                            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                            using var req = new HttpRequestMessage(HttpMethod.Post, ruta);
+                            req.Headers.TryAddWithoutValidation("Authorization", $"Token token=\"{token}\"");
+                            req.Content = new StringContent(
+                                System.Text.Json.JsonSerializer.Serialize(voidPayload),
+                                System.Text.Encoding.UTF8,
+                                "application/json");
+                            var resp = await http.SendAsync(req);
+                            var body = await resp.Content.ReadAsStringAsync();
+                            if (resp.IsSuccessStatusCode && !body.Contains("\"errors\"", StringComparison.OrdinalIgnoreCase))
+                            {
+                                providerNote = $"Comunicación de Baja enviada a SUNAT/NubeFact para {receipt.FullNumber}. Motivo: {reasonText}";
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Aviso al regularizar baja/nota de crédito en NubeFact para {ReceiptId}", receipt.Id);
+                    }
+                }
+
+                receipt.Status = "Cancelled";
+                receipt.ProviderDescription = providerNote;
+                _context.ElectronicReceipts.Update(receipt);
+                regularizedNumbers.Add(displayNum);
+            }
+
+            return regularizedNumbers;
         }
 
         [HttpPost]
